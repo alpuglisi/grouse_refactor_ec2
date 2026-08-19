@@ -185,10 +185,14 @@ def score_ensemble(members, features, val_ds, args):
         # carry geometry beyond pooling (early_attn, keep_early_
         # resolution), and a guessed constructor either fails to load or
         # silently runs the wrong architecture. CLI args are only the
-        # fallback for bare-state_dict checkpoints; early_attn_pos_enc
-        # defaults False because checkpoints from before that fix
-        # trained without position encodings.
+        # fallback for bare-state_dict checkpoints. Position-mode legacy
+        # chain: new checkpoints store early_attn_pos_mode; ones from
+        # the interim sin-cos fix store early_attn_pos_enc (bool); older
+        # ones store neither and trained position-blind.
         cfg = cfg or {}
+        pos_mode = cfg.get("early_attn_pos_mode")
+        if pos_mode is None:
+            pos_mode = 'abs' if cfg.get("early_attn_pos_enc") else 'none'
         model = GrouseResNet(
             cat_f, cont_f, pretrained=False,
             pool=cfg.get("pool", pool),
@@ -200,7 +204,7 @@ def score_ensemble(members, features, val_ds, args):
                                      args.early_attn_heads),
             early_attn_kv_stride=cfg.get("early_attn_kv_stride",
                                          args.early_attn_kv_stride),
-            early_attn_pos_enc=cfg.get("early_attn_pos_enc", False),
+            early_attn_pos_mode=pos_mode,
         ).to(device).eval()
         model.load_state_dict(state)
         outs, labels = [], []
@@ -309,16 +313,24 @@ def main():
                              "the network and memorized hard examples "
                              "once focal loss switched on; 0.1 paces it "
                              "to the pretrained trunk.")
-    parser.add_argument("--early-attn-pos-enc",
-                        action=argparse.BooleanOptionalAction, default=True,
-                        help="Add fixed 2D sin-cos position encodings to "
-                             "the early-attn block's queries/keys. "
-                             "Without them attention is permutation-"
-                             "equivariant - blind to spatial arrangement "
-                             "- and can only compute a global content "
-                             "fingerprint of the patch (a memorization "
-                             "channel). --no-early-attn-pos-enc "
-                             "reproduces the old behavior.")
+    parser.add_argument("--early-attn-pos", default="rel",
+                        choices=["rel", "abs", "none"],
+                        help="How the early-attn block sees position. "
+                             "'rel' (default): 2D rotary embeddings on "
+                             "Q/K plus a learned relative-offset bias - "
+                             "every attention score is a joint function "
+                             "of two pixels' feature stacks AND their "
+                             "relative (drow, dcol) offset, identical "
+                             "wherever the pair sits in the patch. This "
+                             "directly encodes juxtaposition-driven "
+                             "habitat structure (regenerating cover NEXT "
+                             "TO conifer NEXT TO an opening). 'abs': "
+                             "fixed 2D sin-cos added to Q/K (position-"
+                             "aware but location-specific - relationships "
+                             "must be relearned per location). 'none': "
+                             "position-blind attention (the original "
+                             "block; only a global content fingerprint - "
+                             "a memorization channel).")
     parser.add_argument("--early-attn-kv-stride", type=int, default=1,
                         help="1 = full self-attention (every token "
                              "attends to every other - expensive: "
@@ -515,7 +527,7 @@ def main():
             early_attn_kv_stride=args.early_attn_kv_stride,
             early_attn_dropout=args.early_attn_dropout,
             early_attn_droppath=args.early_attn_droppath,
-            early_attn_pos_enc=args.early_attn_pos_enc,
+            early_attn_pos_mode=args.early_attn_pos,
             early_attn_lr_factor=args.early_attn_lr_factor,
             label_smoothing=overrides.get('label_smoothing',
                                           args.label_smoothing),

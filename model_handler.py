@@ -203,7 +203,7 @@ class GrouseModelHandler:
                  keep_early_resolution=False, early_attn=False,
                  early_attn_heads=4, early_attn_kv_stride=1,
                  early_attn_dropout=0.1, early_attn_droppath=0.1,
-                 early_attn_pos_enc=True, early_attn_lr_factor=0.1,
+                 early_attn_pos_mode='rel', early_attn_lr_factor=0.1,
                  pos_threshold=0.75, neg_threshold=0.25,
                  strict_objective=None,
                  divergence_patience=3, on_divergence='warn',
@@ -304,17 +304,23 @@ class GrouseModelHandler:
             early_attn_kv_stride=early_attn_kv_stride,
             early_attn_dropout=early_attn_dropout,
             early_attn_droppath=early_attn_droppath,
-            early_attn_pos_enc=early_attn_pos_enc).to(self.device)
+            early_attn_pos_mode=early_attn_pos_mode).to(self.device)
         if early_attn:
             n_attn_params = sum(p.numel() for p in
                                 self.model.early_attn.parameters())
+            pos_desc = {'rel': "pos=rel (2D RoPE + learned "
+                               "relative-offset bias: pairwise, "
+                               "translation-invariant geometry)",
+                        'abs': "pos=abs (fixed 2D sin-cos)",
+                        'none': "pos=NONE (position-blind)"}[
+                self.model.early_attn.pos_mode]
             print(f"   Early self-attention block active: 32x32 tokens"
                  f"{' (keep_early_resolution off - see note above)' if not keep_early_resolution else ''}"
                  f", {early_attn_heads} heads, "
                  f"kv_stride={early_attn_kv_stride} "
                  f"({'full attention' if early_attn_kv_stride == 1 else f'{early_attn_kv_stride}x downsampled KV'})"
                  f", +{n_attn_params:,} params | "
-                 f"pos_enc={'on' if early_attn_pos_enc else 'OFF'}, "
+                 f"{pos_desc}, "
                  f"attn_dropout={early_attn_dropout}, "
                  f"drop_path={early_attn_droppath}, "
                  f"lr_factor={early_attn_lr_factor} "
@@ -381,13 +387,16 @@ class GrouseModelHandler:
                            "early_attn_heads":
                                self.model._early_attn_heads,
                            # Loaders must rebuild the block with the same
-                           # position-encoding setting it trained with;
-                           # checkpoints from before the pos_enc fix lack
-                           # this key, and readers default it to False so
-                           # those models keep their trained behavior.
-                           "early_attn_pos_enc":
-                               (self.model.early_attn is not None
-                                and self.model.early_attn.pos_enc)}}
+                           # position mode it trained with. Legacy keys:
+                           # checkpoints written between the pos-enc fix
+                           # and the relative-position upgrade carry
+                           # early_attn_pos_enc (bool -> 'abs'/'none');
+                           # ones from before either fix carry neither
+                           # (-> 'none'). Readers map both.
+                           "early_attn_pos_mode":
+                               (self.model.early_attn.pos_mode
+                                if self.model.early_attn is not None
+                                else 'none')}}
 
     @staticmethod
     def unwrap_checkpoint(obj):

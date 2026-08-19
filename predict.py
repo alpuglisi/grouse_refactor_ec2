@@ -100,10 +100,15 @@ def load_model(model_path, disk_features, device, cli_pool="attn",
         early_attn = cfg.get("early_attn", False)
         early_attn_kv_stride = cfg.get("early_attn_kv_stride", 1)
         early_attn_heads = cfg.get("early_attn_heads", 4)
-        # False for configs written before the pos-enc fix: those
-        # models trained without position encodings and must be
-        # evaluated the same way.
-        early_attn_pos_enc = cfg.get("early_attn_pos_enc", False)
+        # Position-mode legacy chain: new configs store
+        # early_attn_pos_mode; interim ones store early_attn_pos_enc
+        # (bool -> 'abs'); pre-fix ones store neither and trained
+        # position-blind ('none'). The model must be rebuilt with
+        # whatever mode it trained under.
+        early_attn_pos_mode = cfg.get("early_attn_pos_mode")
+        if early_attn_pos_mode is None:
+            early_attn_pos_mode = ('abs' if cfg.get("early_attn_pos_enc")
+                                   else 'none')
         print(f"   Checkpoint config: pool={pool}, "
               f"center_skip={center_skip}")
         if set(features) != set(disk_features):
@@ -114,7 +119,7 @@ def load_model(model_path, disk_features, device, cli_pool="attn",
                                        disk_features)
         keep_early_res, early_attn = False, False
         early_attn_kv_stride, early_attn_heads = 1, 4
-        early_attn_pos_enc = False
+        early_attn_pos_mode = 'none'
         print(f"   Bare (pre-config) checkpoint: assuming pool={pool}, "
               f"center_skip={center_skip} - pass --pool/--center-skip "
               f"matching the training run if this is wrong.")
@@ -124,7 +129,7 @@ def load_model(model_path, disk_features, device, cli_pool="attn",
         keep_early_resolution=keep_early_res, early_attn=early_attn,
         early_attn_heads=early_attn_heads,
         early_attn_kv_stride=early_attn_kv_stride,
-        early_attn_pos_enc=early_attn_pos_enc).to(device)
+        early_attn_pos_mode=early_attn_pos_mode).to(device)
     try:
         model.load_state_dict(state)
     except RuntimeError as e:

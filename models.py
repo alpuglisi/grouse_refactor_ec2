@@ -20,9 +20,88 @@ Everything architectural is preserved from the original:
 """
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torchvision import models
 
 from blocks import CBAM
+
+# Relative-position geometry for EarlyAttentionBlock's 'rel' mode.
+# ROPE_BASE: frequency base for the 2D rotary embedding; 100 (not the
+#   language-model 10000) because grid coordinates only span ~0-64, and
+#   the resulting wavelengths (~6 to ~200 cells) cover that range with
+#   real resolution instead of being nearly constant across it.
+# REL_MAX: the relative-bias table covers offsets in [-REL_MAX, REL_MAX]
+#   per axis - exactly the 32x32 keep-early-resolution grid. Offsets
+#   beyond it (only possible with img_size > 64) clamp to the table
+#   edge, i.e. the bias saturates at long range instead of failing.
+ROPE_BASE = 100.0
+REL_MAX = 31
+
+
+def _apply_rope(x, cos, sin):
+    """Rotate per-head token vectors by their position angles.
+    x: (B, heads, L, head_dim); cos/sin: (L, head_dim/2)."""
+    cos = cos.to(x.dtype)[None, None]
+    sin = sin.to(x.dtype)[None, None]
+    x1, x2 = x[..., 0::2], x[..., 1::2]
+    return torch.stack((x1 * cos - x2 * sin,
+                        x1 * sin + x2 * cos), dim=-1).flatten(-2)
+
+
+class RelativeMultiheadAttention(nn.Module):
+    """Multi-head attention with nn.MultiheadAttention's EXACT parameter
+    layout (packed in_proj_weight/in_proj_bias + out_proj), so
+    checkpoints trained with the stock module load into this one
+    unchanged - verified numerically equivalent when rope/bias are off.
+    On top of the stock math it accepts two relative-position inputs:
+
+      rope_q/rope_k : (cos, sin) tables that rotate each token's Q/K
+        vector by an angle proportional to its (row, col). The QK dot
+        product then depends on the two tokens' CONTENT and their
+        RELATIVE offset jointly - "what is 2 cells north-east of what" -
+        and is invariant to where the pair sits in the patch.
+      bias : (heads, Lq, Lk) additive attention-logit bias looked up
+        from a learned (drow, dcol) table - a content-independent
+        distance/direction prior.
+
+    Attention runs through scaled_dot_product_attention; with a bias
+    the flash kernel is ineligible but the memory-efficient backend
+    still avoids materializing the (B, heads, L, L) matrix."""
+
+    def __init__(self, embed_dim, num_heads, dropout=0.0):
+        super().__init__()
+        if embed_dim % num_heads:
+            raise ValueError(f"embed_dim {embed_dim} not divisible by "
+                             f"num_heads {num_heads}")
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.dropout = float(dropout)
+        self.in_proj_weight = nn.Parameter(torch.empty(3 * embed_dim,
+                                                       embed_dim))
+        self.in_proj_bias = nn.Parameter(torch.zeros(3 * embed_dim))
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+        nn.init.xavier_uniform_(self.in_proj_weight)
+
+    def forward(self, query, key, value, rope_q=None, rope_k=None,
+                bias=None):
+        b, lq, c = query.shape
+        lk = key.shape[1]
+        w_q, w_k, w_v = self.in_proj_weight.chunk(3)
+        b_q, b_k, b_v = self.in_proj_bias.chunk(3)
+        q = F.linear(query, w_q, b_q).view(
+            b, lq, self.num_heads, self.head_dim).transpose(1, 2)
+        k = F.linear(key, w_k, b_k).view(
+            b, lk, self.num_heads, self.head_dim).transpose(1, 2)
+        v = F.linear(value, w_v, b_v).view(
+            b, lk, self.num_heads, self.head_dim).transpose(1, 2)
+        if rope_q is not None:
+            q = _apply_rope(q, *rope_q)
+            k = _apply_rope(k, *rope_k)
+        mask = None if bias is None else bias.unsqueeze(0).to(q.dtype)
+        out = F.scaled_dot_product_attention(
+            q, k, v, attn_mask=mask,
+            dropout_p=self.dropout if self.training else 0.0)
+        return self.out_proj(out.transpose(1, 2).reshape(b, lq, c))
 
 
 def sincos_position_encoding(h, w, channels, stride=1, device=None):
@@ -79,15 +158,32 @@ class EarlyAttentionBlock(nn.Module):
     earlier version, which diverged a few epochs after the focal-loss
     switch):
 
-    POSITION (pos_enc=True): attention is a set operation - without
+    POSITION (pos_mode): attention is a set operation - without
       position information the block is exactly permutation-equivariant
       in its spatial tokens (verified), i.e. blind to arrangement, and
       the only thing it can compute is a global content summary of the
       patch. That summary acts as a per-patch fingerprint - a
       memorization channel, the opposite of the spatial reasoning the
-      block exists for. A fixed 2D sin-cos encoding is added to the
-      NORMED queries and keys only, so position shapes the attention
-      pattern but never leaks into the values/residual stream.
+      block exists for. Modes:
+      'rel' (default): RELATIVE geometry, two mechanisms.
+        (1) 2D rotary embedding (RoPE) on Q and K: every attention
+            score becomes a joint function of the two tokens' CONTENT
+            and their RELATIVE (drow, dcol) offset. This is the direct
+            encoding of the habitat hypothesis the block exists for -
+            suitability driven by how each pixel's feature stack sits
+            relative to every other stack (regenerating aspen/birch
+            NEXT TO conifer cover NEXT TO an opening), a relationship
+            that must score identically wherever the arrangement falls
+            inside the 1.9km patch. Absolute encodings represent it
+            only indirectly and must relearn it per location; RoPE
+            makes it translation-invariant by construction.
+        (2) A learned per-head bias table over (drow, dcol), added to
+            the attention logits: the content-independent prior
+            (adjacency vs distance, N-S vs E-W anisotropy), learnable
+            even before content features mature. Zero-init.
+      'abs': fixed 2D sin-cos added to normed Q/K (the previous fix -
+        position-aware but location-specific).
+      'none': the original position-blind block, for old checkpoints.
     IDENTITY AT INIT: attn.out_proj and the MLP's output Linear are
       zero-initialized, so the block starts as an exact identity
       instead of injecting ~30% relative noise (measured) into the
@@ -100,18 +196,32 @@ class EarlyAttentionBlock(nn.Module):
       hole."""
 
     def __init__(self, channels, num_heads=4, kv_stride=1,
-                 attn_dropout=0.1, drop_path=0.1, pos_enc=True):
+                 attn_dropout=0.1, drop_path=0.1, pos_mode='rel'):
         super().__init__()
         if channels % 4 != 0:
             raise ValueError(f"channels must be divisible by 4 for the "
                              f"2D sin-cos position encoding, got {channels}")
+        if pos_mode not in ('rel', 'abs', 'none'):
+            raise ValueError(f"pos_mode must be 'rel'/'abs'/'none', "
+                             f"got {pos_mode!r}")
         self.kv_stride = int(kv_stride)
-        self.pos_enc = bool(pos_enc)
+        self.pos_mode = pos_mode
         self.drop_path_p = float(drop_path)
         self.norm1 = nn.LayerNorm(channels)
-        self.attn = nn.MultiheadAttention(channels, num_heads,
-                                          dropout=attn_dropout,
-                                          batch_first=True)
+        self.attn = RelativeMultiheadAttention(channels, num_heads,
+                                               dropout=attn_dropout)
+        if pos_mode == 'rel':
+            if self.attn.head_dim % 4:
+                raise ValueError(f"head_dim {self.attn.head_dim} must be "
+                                 f"divisible by 4 for 2D RoPE (half the "
+                                 f"rotation pairs per spatial axis)")
+            # (heads, drow, dcol) attention-logit bias, indexed by
+            # relative offset + REL_MAX. Zero-init: neutral until
+            # training discovers a spatial prior. Created ONLY in 'rel'
+            # mode so 'abs'/'none' state dicts stay byte-identical to
+            # checkpoints from before this mode existed.
+            self.rel_bias = nn.Parameter(
+                torch.zeros(num_heads, 2 * REL_MAX + 1, 2 * REL_MAX + 1))
         if self.kv_stride > 1:
             self.kv_proj = nn.Conv2d(channels, channels,
                                      kernel_size=self.kv_stride,
@@ -126,15 +236,64 @@ class EarlyAttentionBlock(nn.Module):
         nn.init.zeros_(self.attn.out_proj.bias)
         nn.init.zeros_(self.mlp[2].weight)
         nn.init.zeros_(self.mlp[2].bias)
-        # Position encodings are deterministic functions of the grid
-        # geometry - cached per (shape, device), never saved or learned.
+        # Position tables are deterministic functions of the grid
+        # geometry - cached per (shape, device), never saved. (The
+        # rel_bias PARAMETER is learned; only its integer index grid is
+        # cached here.)
         self._pe_cache = {}
 
     def _pe(self, h, w, stride, device):
-        key = (h, w, stride, device)
+        key = ('abs', h, w, stride, device)
         if key not in self._pe_cache:
             self._pe_cache[key] = sincos_position_encoding(
                 h, w, self.norm1.normalized_shape[0], stride, device)
+        return self._pe_cache[key]
+
+    def _rope(self, h, w, stride, device):
+        """(cos, sin) rotation tables, (h*w, head_dim/2). Half the
+        rotation pairs turn with the row coordinate, half with the
+        column, so the QK product sees both axes of the offset.
+        Coordinates are in full-resolution cell units ((i+0.5)*stride
+        centers), so a strided KV grid shares the query grid's frame."""
+        key = ('rope', h, w, stride, device)
+        if key not in self._pe_cache:
+            n = self.attn.head_dim // 4        # frequencies per axis
+            freqs = ROPE_BASE ** (-torch.arange(
+                n, dtype=torch.float32, device=device) / n)
+            rows = (torch.arange(h, dtype=torch.float32, device=device)
+                    + 0.5) * stride
+            cols = (torch.arange(w, dtype=torch.float32, device=device)
+                    + 0.5) * stride
+            ar = rows[:, None] * freqs         # (h, n)
+            ac = cols[:, None] * freqs         # (w, n)
+            ang = torch.cat([ar[:, None, :].expand(h, w, n),
+                             ac[None, :, :].expand(h, w, n)],
+                            dim=2).reshape(h * w, 2 * n)
+            self._pe_cache[key] = (ang.cos(), ang.sin())
+        return self._pe_cache[key]
+
+    def _bias_index(self, h, w, kh, kw, stride, device):
+        """(Lq, Lk) int64 lookup into the flattened rel_bias table:
+        entry [q, k] = (drow + REL_MAX) * span + (dcol + REL_MAX), with
+        offsets measured in full-resolution cell units (rounded when a
+        strided KV grid makes them fractional) and clamped to the
+        table's range."""
+        key = ('bias', h, w, kh, kw, stride, device)
+        if key not in self._pe_cache:
+            span = 2 * REL_MAX + 1
+            qr = torch.arange(h, dtype=torch.float32, device=device) + 0.5
+            qc = torch.arange(w, dtype=torch.float32, device=device) + 0.5
+            kr = (torch.arange(kh, dtype=torch.float32, device=device)
+                  + 0.5) * stride
+            kc = (torch.arange(kw, dtype=torch.float32, device=device)
+                  + 0.5) * stride
+            dr = torch.round(qr[:, None] - kr[None, :]).long().clamp(
+                -REL_MAX, REL_MAX) + REL_MAX          # (h, kh)
+            dc = torch.round(qc[:, None] - kc[None, :]).long().clamp(
+                -REL_MAX, REL_MAX) + REL_MAX          # (w, kw)
+            idx = (dr[:, None, :, None] * span
+                   + dc[None, :, None, :])            # (h, w, kh, kw)
+            self._pe_cache[key] = idx.reshape(h * w, kh * kw)
         return self._pe_cache[key]
 
     def _drop_path(self, t):
@@ -151,27 +310,33 @@ class EarlyAttentionBlock(nn.Module):
         q_normed = self.norm1(q_tokens)
         if self.kv_stride > 1:
             kv_map = self.kv_proj(x)                       # downsample
-            kv_tokens = kv_map.flatten(2).transpose(1, 2)
-            kv_normed = self.norm1(kv_tokens)
+            kh, kw = kv_map.shape[2], kv_map.shape[3]
+            kv_normed = self.norm1(kv_map.flatten(2).transpose(1, 2))
         else:
-            kv_map = None
+            kh, kw = h, w
             kv_normed = q_normed
-        if self.pos_enc:
+        q_in, k_in = q_normed, kv_normed
+        rope_q = rope_k = bias = None
+        if self.pos_mode == 'rel':
+            # Position enters through the attention MATH (Q/K rotation
+            # + logit bias), never the token contents, so the residual
+            # stream stays pure content and the geometry is relative by
+            # construction.
+            rope_q = self._rope(h, w, 1, x.device)
+            rope_k = (rope_q if self.kv_stride == 1
+                      else self._rope(kh, kw, self.kv_stride, x.device))
+            bias = self.rel_bias.flatten(1)[
+                :, self._bias_index(h, w, kh, kw, self.kv_stride,
+                                    x.device)]
+        elif self.pos_mode == 'abs':
             # Queries and keys carry position; values stay content-only
             # so no position vector enters the residual stream.
             q_in = q_normed + self._pe(h, w, 1, x.device).to(q_normed.dtype)
-            if kv_map is not None:
-                k_in = kv_normed + self._pe(
-                    kv_map.shape[2], kv_map.shape[3],
-                    self.kv_stride, x.device).to(kv_normed.dtype)
-            else:
-                k_in = q_in
-        else:
-            q_in, k_in = q_normed, kv_normed
-        # need_weights=False keeps torch on the fused SDPA path, which
-        # never materializes the (B, heads, HW, HW) attention matrix -
-        # the allocation that made this block's memory quadratic.
-        attn_out, _ = self.attn(q_in, k_in, kv_normed, need_weights=False)
+            k_in = (q_in if self.kv_stride == 1 else
+                    kv_normed + self._pe(kh, kw, self.kv_stride,
+                                         x.device).to(kv_normed.dtype))
+        attn_out = self.attn(q_in, k_in, kv_normed,
+                             rope_q=rope_q, rope_k=rope_k, bias=bias)
         x_tokens = q_tokens + self._drop_path(attn_out)
         x_tokens = x_tokens + self._drop_path(self.mlp(self.norm2(x_tokens)))
         return x_tokens.transpose(1, 2).reshape(b, c, h, w)
@@ -222,7 +387,7 @@ class GrouseResNet(nn.Module):
                  keep_early_resolution=False, early_attn=False,
                  early_attn_heads=4, early_attn_kv_stride=1,
                  early_attn_dropout=0.1, early_attn_droppath=0.1,
-                 early_attn_pos_enc=True):
+                 early_attn_pos_mode='rel'):
         """cat_features / cont_features: ordered feature-name lists (from
         split_features). Geometry is derived from them + the spec.
 
@@ -285,7 +450,7 @@ class GrouseResNet(nn.Module):
                                kv_stride=early_attn_kv_stride,
                                attn_dropout=early_attn_dropout,
                                drop_path=early_attn_droppath,
-                               pos_enc=early_attn_pos_enc)
+                               pos_mode=early_attn_pos_mode)
             if early_attn else None)
         self._early_attn_kv_stride = int(early_attn_kv_stride)
         self._early_attn_heads = int(early_attn_heads)

@@ -1,0 +1,9 @@
+# 1. Ignore everything by default
+*
+
+# 2. Allow tracking of python files in the root directory only
+!/*.py
+
+# 3. Explicitly allow essential configuration files in the root
+!/.gitignore
+!/README.md

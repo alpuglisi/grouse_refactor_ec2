@@ -25,6 +25,29 @@ from torchvision import models
 from blocks import CBAM
 
 
+def sincos_position_encoding(h, w, channels, stride=1, device=None):
+    """(1, h*w, channels) fixed 2D sin-cos position encoding.
+
+    Coordinates are expressed in FULL-RESOLUTION pixel units: token
+    (i, j) of a grid produced at `stride` sits at pixel center
+    ((i + 0.5) * stride, (j + 0.5) * stride). A full-res query grid and
+    a kv_stride-downsampled key grid therefore share one coordinate
+    frame, so query-key position offsets stay geometrically meaningful
+    across the two resolutions."""
+    d4 = channels // 4
+    omega = 1.0 / (10000.0 ** (
+        torch.arange(d4, dtype=torch.float32, device=device) / d4))
+    ys = ((torch.arange(h, dtype=torch.float32, device=device) + 0.5)
+          * stride)[:, None] * omega
+    xs = ((torch.arange(w, dtype=torch.float32, device=device) + 0.5)
+          * stride)[:, None] * omega
+    pe_y = torch.cat([ys.sin(), ys.cos()], dim=1)          # (h, C/2)
+    pe_x = torch.cat([xs.sin(), xs.cos()], dim=1)          # (w, C/2)
+    pe = torch.cat([pe_y[:, None, :].expand(h, w, 2 * d4),
+                    pe_x[None, :, :].expand(h, w, 2 * d4)], dim=2)
+    return pe.reshape(1, h * w, channels)
+
+
 class EarlyAttentionBlock(nn.Module):
     """Standard pre-norm transformer block (multi-head self-attention +
     MLP, both with residuals) operating on a spatial feature map as a
@@ -49,13 +72,45 @@ class EarlyAttentionBlock(nn.Module):
       (queries stay full-resolution) - every fine pixel still attends
       OUT to the whole map, just against a coarser summary of it,
       trading some fidelity for roughly kv_stride^2 less attention
-      compute."""
+      compute.
 
-    def __init__(self, channels, num_heads=4, kv_stride=1):
+    Three properties this block must hold to be trainable inside a
+    pretrained backbone on ~12.7k noisy points (each was violated by an
+    earlier version, which diverged a few epochs after the focal-loss
+    switch):
+
+    POSITION (pos_enc=True): attention is a set operation - without
+      position information the block is exactly permutation-equivariant
+      in its spatial tokens (verified), i.e. blind to arrangement, and
+      the only thing it can compute is a global content summary of the
+      patch. That summary acts as a per-patch fingerprint - a
+      memorization channel, the opposite of the spatial reasoning the
+      block exists for. A fixed 2D sin-cos encoding is added to the
+      NORMED queries and keys only, so position shapes the attention
+      pattern but never leaks into the values/residual stream.
+    IDENTITY AT INIT: attn.out_proj and the MLP's output Linear are
+      zero-initialized, so the block starts as an exact identity
+      instead of injecting ~30% relative noise (measured) into the
+      pretrained stream that layer2 was trained to expect. The block
+      then fades in only as fast as its gradients justify.
+    REGULARIZATION (attn_dropout, drop_path): the trainer's Dropout2d /
+      embed-dropout knobs never touch this block, so it was the one
+      unregularized module in the network. Attention-weight dropout
+      plus per-sample drop-path on both residual branches close that
+      hole."""
+
+    def __init__(self, channels, num_heads=4, kv_stride=1,
+                 attn_dropout=0.1, drop_path=0.1, pos_enc=True):
         super().__init__()
+        if channels % 4 != 0:
+            raise ValueError(f"channels must be divisible by 4 for the "
+                             f"2D sin-cos position encoding, got {channels}")
         self.kv_stride = int(kv_stride)
+        self.pos_enc = bool(pos_enc)
+        self.drop_path_p = float(drop_path)
         self.norm1 = nn.LayerNorm(channels)
         self.attn = nn.MultiheadAttention(channels, num_heads,
+                                          dropout=attn_dropout,
                                           batch_first=True)
         if self.kv_stride > 1:
             self.kv_proj = nn.Conv2d(channels, channels,
@@ -65,6 +120,30 @@ class EarlyAttentionBlock(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(channels, channels * 4), nn.GELU(),
             nn.Linear(channels * 4, channels))
+        # Identity at init (see docstring): both residual branches
+        # contribute exactly zero until training moves these weights.
+        nn.init.zeros_(self.attn.out_proj.weight)
+        nn.init.zeros_(self.attn.out_proj.bias)
+        nn.init.zeros_(self.mlp[2].weight)
+        nn.init.zeros_(self.mlp[2].bias)
+        # Position encodings are deterministic functions of the grid
+        # geometry - cached per (shape, device), never saved or learned.
+        self._pe_cache = {}
+
+    def _pe(self, h, w, stride, device):
+        key = (h, w, stride, device)
+        if key not in self._pe_cache:
+            self._pe_cache[key] = sincos_position_encoding(
+                h, w, self.norm1.normalized_shape[0], stride, device)
+        return self._pe_cache[key]
+
+    def _drop_path(self, t):
+        """Per-sample stochastic depth on a residual branch."""
+        if self.drop_path_p <= 0.0 or not self.training:
+            return t
+        keep = 1.0 - self.drop_path_p
+        mask = t.new_empty(t.shape[0], 1, 1).bernoulli_(keep)
+        return t * (mask / keep)
 
     def forward(self, x):
         b, c, h, w = x.shape
@@ -75,10 +154,26 @@ class EarlyAttentionBlock(nn.Module):
             kv_tokens = kv_map.flatten(2).transpose(1, 2)
             kv_normed = self.norm1(kv_tokens)
         else:
+            kv_map = None
             kv_normed = q_normed
-        attn_out, _ = self.attn(q_normed, kv_normed, kv_normed)
-        x_tokens = q_tokens + attn_out
-        x_tokens = x_tokens + self.mlp(self.norm2(x_tokens))
+        if self.pos_enc:
+            # Queries and keys carry position; values stay content-only
+            # so no position vector enters the residual stream.
+            q_in = q_normed + self._pe(h, w, 1, x.device).to(q_normed.dtype)
+            if kv_map is not None:
+                k_in = kv_normed + self._pe(
+                    kv_map.shape[2], kv_map.shape[3],
+                    self.kv_stride, x.device).to(kv_normed.dtype)
+            else:
+                k_in = q_in
+        else:
+            q_in, k_in = q_normed, kv_normed
+        # need_weights=False keeps torch on the fused SDPA path, which
+        # never materializes the (B, heads, HW, HW) attention matrix -
+        # the allocation that made this block's memory quadratic.
+        attn_out, _ = self.attn(q_in, k_in, kv_normed, need_weights=False)
+        x_tokens = q_tokens + self._drop_path(attn_out)
+        x_tokens = x_tokens + self._drop_path(self.mlp(self.norm2(x_tokens)))
         return x_tokens.transpose(1, 2).reshape(b, c, h, w)
 
 # ==========================================
@@ -125,7 +220,9 @@ class GrouseResNet(nn.Module):
                  pretrained=True, pool='mean', dropout=0.0,
                  embed_dropout=0.0, center_skip=False,
                  keep_early_resolution=False, early_attn=False,
-                 early_attn_heads=4, early_attn_kv_stride=1):
+                 early_attn_heads=4, early_attn_kv_stride=1,
+                 early_attn_dropout=0.1, early_attn_droppath=0.1,
+                 early_attn_pos_enc=True):
         """cat_features / cont_features: ordered feature-name lists (from
         split_features). Geometry is derived from them + the spec.
 
@@ -185,9 +282,13 @@ class GrouseResNet(nn.Module):
         self.cbam1 = CBAM(64)
         self.early_attn = (
             EarlyAttentionBlock(64, num_heads=early_attn_heads,
-                               kv_stride=early_attn_kv_stride)
+                               kv_stride=early_attn_kv_stride,
+                               attn_dropout=early_attn_dropout,
+                               drop_path=early_attn_droppath,
+                               pos_enc=early_attn_pos_enc)
             if early_attn else None)
         self._early_attn_kv_stride = int(early_attn_kv_stride)
+        self._early_attn_heads = int(early_attn_heads)
         if early_attn and not self.keep_early_resolution:
             print("   [note] early_attn=True without "
                  "keep_early_resolution=True: attention runs on the "

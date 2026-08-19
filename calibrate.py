@@ -81,6 +81,11 @@ def load_model(path, device, cli_pool, cli_center_skip, disk_features):
         keep_early_res = cfg.get("keep_early_resolution", False)
         early_attn = cfg.get("early_attn", False)
         early_attn_kv_stride = cfg.get("early_attn_kv_stride", 1)
+        early_attn_heads = cfg.get("early_attn_heads", 4)
+        # False for configs written before the pos-enc fix: those
+        # models trained without position encodings and must be
+        # evaluated the same way.
+        early_attn_pos_enc = cfg.get("early_attn_pos_enc", False)
         print(f"Checkpoint config: pool={pool}, center_skip={center_skip}, "
               f"features={features}")
         if set(features) != set(disk_features):
@@ -89,6 +94,9 @@ def load_model(path, device, cli_pool, cli_center_skip, disk_features):
                   f"that's the geometry the weights encode.")
     else:
         pool, center_skip, features = cli_pool, cli_center_skip, disk_features
+        keep_early_res, early_attn = False, False
+        early_attn_kv_stride, early_attn_heads = 1, 4
+        early_attn_pos_enc = False
         print(f"Bare (pre-config) checkpoint: assuming pool={pool}, "
               f"center_skip={center_skip} from CLI flags - if loading "
               f"fails or results look wrong, pass the flags the model "
@@ -97,7 +105,9 @@ def load_model(path, device, cli_pool, cli_center_skip, disk_features):
     model = GrouseResNet(
         cat_f, cont_f, pretrained=False, pool=pool, center_skip=center_skip,
         keep_early_resolution=keep_early_res, early_attn=early_attn,
-        early_attn_kv_stride=early_attn_kv_stride).to(device)
+        early_attn_heads=early_attn_heads,
+        early_attn_kv_stride=early_attn_kv_stride,
+        early_attn_pos_enc=early_attn_pos_enc).to(device)
     try:
         model.load_state_dict(state)
     except RuntimeError as e:

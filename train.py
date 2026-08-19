@@ -179,10 +179,29 @@ def score_ensemble(members, features, val_ds, args):
     loader = DataLoader(val_ds, batch_size=256, num_workers=args.workers)
     per_member, ys = [], None
     for path, pool in members:
-        model = GrouseResNet(cat_f, cont_f, pretrained=False, pool=pool,
-                             center_skip=args.center_skip).to(device).eval()
-        state, _cfg = GrouseModelHandler.unwrap_checkpoint(
+        state, cfg = GrouseModelHandler.unwrap_checkpoint(
             torch.load(path, map_location=device, weights_only=True))
+        # Rebuild each member from its own stored config - members can
+        # carry geometry beyond pooling (early_attn, keep_early_
+        # resolution), and a guessed constructor either fails to load or
+        # silently runs the wrong architecture. CLI args are only the
+        # fallback for bare-state_dict checkpoints; early_attn_pos_enc
+        # defaults False because checkpoints from before that fix
+        # trained without position encodings.
+        cfg = cfg or {}
+        model = GrouseResNet(
+            cat_f, cont_f, pretrained=False,
+            pool=cfg.get("pool", pool),
+            center_skip=cfg.get("center_skip", args.center_skip),
+            keep_early_resolution=cfg.get("keep_early_resolution",
+                                          args.keep_early_resolution),
+            early_attn=cfg.get("early_attn", args.early_attn),
+            early_attn_heads=cfg.get("early_attn_heads",
+                                     args.early_attn_heads),
+            early_attn_kv_stride=cfg.get("early_attn_kv_stride",
+                                         args.early_attn_kv_stride),
+            early_attn_pos_enc=cfg.get("early_attn_pos_enc", False),
+        ).to(device).eval()
         model.load_state_dict(state)
         outs, labels = [], []
         with torch.no_grad():
@@ -275,6 +294,31 @@ def main():
                              "Pair with --keep-early-resolution for full "
                              "pixel-level attention.")
     parser.add_argument("--early-attn-heads", type=int, default=4)
+    parser.add_argument("--early-attn-dropout", type=float, default=0.1,
+                        help="Dropout on the early-attn block's attention "
+                             "weights. The block sits outside the reach "
+                             "of --dropout/--embed-dropout, so this is "
+                             "its only activation-level regularizer.")
+    parser.add_argument("--early-attn-droppath", type=float, default=0.1,
+                        help="Per-sample stochastic depth on the early-"
+                             "attn block's two residual branches.")
+    parser.add_argument("--early-attn-lr-factor", type=float, default=0.1,
+                        help="LR multiplier for the early-attn block's "
+                             "parameters (relative to --lr). At 1.0 the "
+                             "block was the fastest-learning module in "
+                             "the network and memorized hard examples "
+                             "once focal loss switched on; 0.1 paces it "
+                             "to the pretrained trunk.")
+    parser.add_argument("--early-attn-pos-enc",
+                        action=argparse.BooleanOptionalAction, default=True,
+                        help="Add fixed 2D sin-cos position encodings to "
+                             "the early-attn block's queries/keys. "
+                             "Without them attention is permutation-"
+                             "equivariant - blind to spatial arrangement "
+                             "- and can only compute a global content "
+                             "fingerprint of the patch (a memorization "
+                             "channel). --no-early-attn-pos-enc "
+                             "reproduces the old behavior.")
     parser.add_argument("--early-attn-kv-stride", type=int, default=1,
                         help="1 = full self-attention (every token "
                              "attends to every other - expensive: "
@@ -446,6 +490,10 @@ def main():
             early_attn=args.early_attn,
             early_attn_heads=args.early_attn_heads,
             early_attn_kv_stride=args.early_attn_kv_stride,
+            early_attn_dropout=args.early_attn_dropout,
+            early_attn_droppath=args.early_attn_droppath,
+            early_attn_pos_enc=args.early_attn_pos_enc,
+            early_attn_lr_factor=args.early_attn_lr_factor,
             label_smoothing=overrides.get('label_smoothing',
                                           args.label_smoothing),
             ema_decay=args.ema, lr=lr,

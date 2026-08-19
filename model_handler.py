@@ -202,6 +202,8 @@ class GrouseModelHandler:
                  center_skip=False, label_smoothing=0.0, ema_decay=0.0,
                  keep_early_resolution=False, early_attn=False,
                  early_attn_heads=4, early_attn_kv_stride=1,
+                 early_attn_dropout=0.1, early_attn_droppath=0.1,
+                 early_attn_pos_enc=True, early_attn_lr_factor=0.1,
                  pos_threshold=0.75, neg_threshold=0.25,
                  strict_objective=None,
                  divergence_patience=3, on_divergence='warn',
@@ -236,6 +238,7 @@ class GrouseModelHandler:
                        sched_t0=sched_t0, sched_tmult=sched_tmult,
                        label_smoothing=label_smoothing,
                        backbone_lr_factor=backbone_lr_factor,
+                       early_attn_lr_factor=early_attn_lr_factor,
                        sched=sched)
         self.ema_decay = float(ema_decay)
         self.ema = None
@@ -286,7 +289,10 @@ class GrouseModelHandler:
             embed_dropout=embed_dropout, center_skip=center_skip,
             keep_early_resolution=keep_early_resolution,
             early_attn=early_attn, early_attn_heads=early_attn_heads,
-            early_attn_kv_stride=early_attn_kv_stride).to(self.device)
+            early_attn_kv_stride=early_attn_kv_stride,
+            early_attn_dropout=early_attn_dropout,
+            early_attn_droppath=early_attn_droppath,
+            early_attn_pos_enc=early_attn_pos_enc).to(self.device)
         if early_attn:
             n_attn_params = sum(p.numel() for p in
                                 self.model.early_attn.parameters())
@@ -295,7 +301,12 @@ class GrouseModelHandler:
                  f", {early_attn_heads} heads, "
                  f"kv_stride={early_attn_kv_stride} "
                  f"({'full attention' if early_attn_kv_stride == 1 else f'{early_attn_kv_stride}x downsampled KV'})"
-                 f", +{n_attn_params:,} params.")
+                 f", +{n_attn_params:,} params | "
+                 f"pos_enc={'on' if early_attn_pos_enc else 'OFF'}, "
+                 f"attn_dropout={early_attn_dropout}, "
+                 f"drop_path={early_attn_droppath}, "
+                 f"lr_factor={early_attn_lr_factor} "
+                 f"(zero-init: identity at start).")
         print(f"GrouseModelHandler: device={self.device.type}, "
               f"categorical={self.cat_features}, "
               f"continuous={self.cont_features}, "
@@ -354,7 +365,17 @@ class GrouseModelHandler:
                                bool(self.model.keep_early_resolution),
                            "early_attn": self.model.early_attn is not None,
                            "early_attn_kv_stride":
-                               self.model._early_attn_kv_stride}}
+                               self.model._early_attn_kv_stride,
+                           "early_attn_heads":
+                               self.model._early_attn_heads,
+                           # Loaders must rebuild the block with the same
+                           # position-encoding setting it trained with;
+                           # checkpoints from before the pos_enc fix lack
+                           # this key, and readers default it to False so
+                           # those models keep their trained behavior.
+                           "early_attn_pos_enc":
+                               (self.model.early_attn is not None
+                                and self.model.early_attn.pos_enc)}}
 
     @staticmethod
     def unwrap_checkpoint(obj):
@@ -510,25 +531,45 @@ class GrouseModelHandler:
         BACKBONE_LR_FACTOR = self.hp['backbone_lr_factor']
         pretrained_prefixes = ("bn1.", "layer1.", "layer2.",
                                "layer3.", "layer4.")
-        backbone_params, fresh_params = [], []
+        # The early-attn block gets its own (slow) LR group rather than
+        # riding the fresh group: a randomly-initialized global-attention
+        # module fed by focal loss at the full fresh LR was the fastest-
+        # moving part of the network, and it used that speed to memorize
+        # hard (usually mislabeled) examples - the measured divergence.
+        # Zero-init makes it start as identity; the reduced LR makes it
+        # fade in no faster than the pretrained trunk it must cooperate
+        # with.
+        backbone_params, attn_params, fresh_params = [], [], []
         for name, p in self.model.named_parameters():
             if name.startswith(pretrained_prefixes):
                 backbone_params.append(p)
+            elif name.startswith("early_attn."):
+                attn_params.append(p)
             else:
                 fresh_params.append(p)
+        groups = [{"params": backbone_params,
+                   "lr": self.hp['lr'] * BACKBONE_LR_FACTOR}]
+        if attn_params:
+            groups.append({"params": attn_params,
+                           "lr": self.hp['lr']
+                                 * self.hp['early_attn_lr_factor']})
+        groups.append({"params": fresh_params, "lr": self.hp['lr']})
         optimizer = torch.optim.AdamW(
-            [{"params": backbone_params,
-              "lr": self.hp['lr'] * BACKBONE_LR_FACTOR},
-             {"params": fresh_params, "lr": self.hp['lr']}],
+            groups,
             weight_decay=self.hp['weight_decay'],
             # Fused AdamW folds the whole parameter update into one
             # multi-tensor CUDA kernel instead of ~200 small launches -
             # the same arithmetic, minus the per-tensor launch overhead
             # that dominates at these tensor sizes.
             fused=(self.device.type == 'cuda'))
+        attn_desc = (f" | early_attn "
+                     f"{self.hp['lr'] * self.hp['early_attn_lr_factor']:.1e} "
+                     f"({sum(p.numel() for p in attn_params):,} params)"
+                     if attn_params else "")
         print(f"   Differential LR: backbone "
              f"{self.hp['lr'] * BACKBONE_LR_FACTOR:.1e} "
-             f"({sum(p.numel() for p in backbone_params):,} params) | "
+             f"({sum(p.numel() for p in backbone_params):,} params)"
+             f"{attn_desc} | "
              f"fresh layers {self.hp['lr']:.1e} "
              f"({sum(p.numel() for p in fresh_params):,} params)")
         scaler = (torch.amp.GradScaler('cuda')

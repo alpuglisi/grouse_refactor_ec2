@@ -362,11 +362,34 @@ def main():
     parser.add_argument("--warmup-epochs", type=int, default=3,
                         help="Epochs of alpha-weighted BCE (gamma=0) "
                              "before switching to FocalLoss.")
-    parser.add_argument("--select-by", default="auc",
-                        choices=["loss", "auc", "strict"],
+    parser.add_argument("--select-by", default="rank",
+                        choices=["loss", "auc", "rank", "strict"],
                         help="Metric the best checkpoint is chosen on. "
-                             "'strict' = the confidence-demanding accuracy "
-                             "defined by --pos-threshold/--neg-threshold.")
+                             "'rank' (default) = mean of per-point TTA AUC "
+                             "and TTA AP - the two ranking metrics that "
+                             "matter for deployment, which disagree "
+                             "exactly when late-training memorization "
+                             "inflates one at the other's expense "
+                             "(measured: selecting on AUC alone kept "
+                             "saving through epochs 12-30 for +0.002 AUC "
+                             "- a third of that AUC's ~0.006 standard "
+                             "error on this val set - while AP fell and "
+                             "val loss rose 38%%). 'auc' = TTA AUC alone "
+                             "(the old default). 'strict' = the "
+                             "confidence-demanding accuracy defined by "
+                             "--pos-threshold/--neg-threshold.")
+    parser.add_argument("--select-min-delta", type=float, default=1e-3,
+                        help="A new checkpoint must beat the LAST SAVED "
+                             "one's selection score by at least this "
+                             "margin. Filters noise-level 'improvements' "
+                             "(max-based selection otherwise creeps "
+                             "upward on measurement noise and replaces a "
+                             "genuinely better earlier model); cumulative "
+                             "real gains still save because comparison is "
+                             "against the saved reference, not the "
+                             "running max. 0 disables. Applies to every "
+                             "--select-by mode ('loss' compares on "
+                             "-val_loss, same magnitude).")
     parser.add_argument("--pos-threshold", type=float, default=0.75,
                         help="STRICT accuracy: a positive val point only "
                              "counts as correct when the model's "
@@ -503,6 +526,7 @@ def main():
             sched=args.sched,
             warmup_epochs=args.warmup_epochs,
             select_by=args.select_by,
+            select_min_delta=args.select_min_delta,
             pos_threshold=args.pos_threshold,
             neg_threshold=args.neg_threshold,
             strict_objective=args.strict_objective,

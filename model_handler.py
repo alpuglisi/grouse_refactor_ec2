@@ -209,7 +209,7 @@ class GrouseModelHandler:
                  divergence_patience=3, on_divergence='warn',
                  divergence_dampen_factor=0.5,
                  backbone_lr_factor=0.1, sched='warm_restarts',
-                 select_by='loss', flip_tta=False):
+                 select_by='loss', select_min_delta=0.0, flip_tta=False):
         # DEFAULTS RECALIBRATED for ~1:1 balanced data (post symmetric
         # rotation). The originals came from the old negative-heavy
         # project and demonstrably produced constant-predictor collapse
@@ -247,7 +247,19 @@ class GrouseModelHandler:
         # when fit() was never called (e.g. loading a checkpoint).
         self._mem_fmt = torch.preserve_format
         self._clip_params = None
+        if select_by not in ('loss', 'auc', 'rank', 'strict'):
+            raise ValueError(f"select_by must be 'loss'/'auc'/'rank'/"
+                             f"'strict', got {select_by!r}")
         self.select_by = select_by
+        # Minimum margin a new checkpoint must beat the LAST SAVED one
+        # by before it replaces it. Max-based selection otherwise chases
+        # measurement noise: on a ~3.2k-point val set the SE of an AUC
+        # near 0.88 is ~0.006, and a measured run spent epochs 12-30
+        # replacing the checkpoint nine times for a cumulative +0.0019
+        # of AUC while val loss rose 38% and AP fell. Comparing against
+        # the saved reference (not the running max) keeps the semantics
+        # cumulative: many small genuine gains still add up to a save.
+        self.select_min_delta = float(select_min_delta)
         # STRICT (confidence-demanding) accuracy band. A positive point
         # only counts as correct when p >= pos_threshold; a negative only
         # when p <= neg_threshold; anything hedging in between is wrong
@@ -383,6 +395,27 @@ class GrouseModelHandler:
         if isinstance(obj, dict) and "state_dict" in obj:
             return obj["state_dict"], obj.get("config")
         return obj, None
+
+    @staticmethod
+    def selection_score(select_by, metrics):
+        """Sign-normalized checkpoint-selection score (HIGHER = better,
+        for every mode - 'loss' is negated so one comparison works for
+        all). 'rank' is the mean of per-point TTA AUC and TTA AP: AUC
+        measures the global ordering of positives over negatives, AP
+        weights the top of the ranking where deployment decisions are
+        made, and the two disagree exactly when late-training
+        memorization inflates one at the other's expense (measured:
+        AUC +0.002 while AP -0.004 and val loss +38% over epochs
+        11-30). Their mean refuses that trade. Calibration is left to
+        calibrate.py, so val_loss is deliberately not part of 'rank'."""
+        if select_by == 'auc':
+            return metrics.get('tta_auc', metrics['auc'])
+        if select_by == 'rank':
+            return 0.5 * (metrics.get('tta_auc', metrics['auc'])
+                          + metrics.get('tta_ap', metrics['ap']))
+        if select_by == 'strict':
+            return metrics.get('strict_accuracy', float('-inf'))
+        return -metrics['val_loss']
 
     # ---- training --------------------------------------------------------
     def _eval_batch_size(self, batch_size, requested=None):
@@ -607,6 +640,12 @@ class GrouseModelHandler:
         best_loss = float('inf')
         best_auc = float('-inf')
         best_strict = float('-inf')
+        best_rank = float('-inf')
+        # Selection score of the last SAVED checkpoint (None = nothing
+        # saved yet, so the first epoch always saves). New checkpoints
+        # must beat this by select_min_delta - see __init__.
+        sel_ref = None
+        best_epoch = 0
         guard = DivergenceGuard(self._divergence_patience,
                                 self.on_divergence,
                                 self._divergence_dampen_factor)
@@ -723,29 +762,30 @@ class GrouseModelHandler:
                        if not k.startswith('_')}
             metrics['epoch'] = epoch + 1
             metrics['lr'] = optimizer.param_groups[-1]['lr']
+            metrics['rank_score'] = self.selection_score('rank', metrics)
             status = (f"   Epoch {epoch + 1}/{epochs} | "
                       f"Focal Loss: {metrics['val_loss']:.4f} | "
                       f"Val Accuracy: {metrics['accuracy']:.2f}% | "
                       f"AUC: {metrics['auc']:.4f} | "
                       f"TTA AUC: {metrics.get('tta_auc', float('nan')):.4f} | "
                       f"AP: {metrics['ap']:.4f} | "
+                      f"rank: {metrics['rank_score']:.4f} | "
                       f"tuned acc: {metrics['tuned_tta_accuracy']:.2f}% | "
                       f"strict: {metrics.get('strict_accuracy', float('nan')):.2f}% "
                       f"(hedged {metrics.get('hedged_pct', float('nan')):.1f}%) | "
                       f"train acc: {metrics['train_accuracy']:.1f}% | "
                       f"logit std: {metrics['logit_std']:.3f}")
-            if self.select_by == 'auc':
-                improved = metrics['tta_auc'] > best_auc
-            elif self.select_by == 'strict':
-                improved = metrics.get('strict_accuracy',
-                                       float('-inf')) > best_strict
-            else:
-                improved = metrics['val_loss'] < best_loss
+            sel = self.selection_score(self.select_by, metrics)
+            improved = (sel_ref is None
+                        or sel > sel_ref + self.select_min_delta)
             best_loss = min(best_loss, metrics['val_loss'])
             best_auc = max(best_auc, metrics['tta_auc'])
             best_strict = max(best_strict,
                               metrics.get('strict_accuracy', float('-inf')))
+            best_rank = max(best_rank, metrics['rank_score'])
             if improved:
+                sel_ref = sel
+                best_epoch = epoch + 1
                 torch.save(self._wrap_checkpoint(
                     ema_state if ema_state is not None
                     else self.model.state_dict()), self.save_path)
@@ -782,8 +822,11 @@ class GrouseModelHandler:
         print(f"\nTraining finished{' (stopped on divergence)' if stop_early else ''}."
              f" Best Focal Loss: {best_loss:.4f} | "
              f"Best TTA AUC: {best_auc:.4f} | "
+             f"Best rank: {best_rank:.4f} | "
              f"Best strict acc: {best_strict:.2f}% "
-             f"(selection metric: {self.select_by})"
+             f"(selection metric: {self.select_by}"
+             f"{f', min delta {self.select_min_delta:g}' if self.select_min_delta else ''}"
+             f" -> saved checkpoint is epoch {best_epoch})"
              f"{f' | divergence triggers: {guard.n_triggers}' if guard.n_triggers else ''}")
         return self.save_path
 

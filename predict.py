@@ -23,12 +23,29 @@ refactored from the previous project's version for the current pipeline:
 
 KMZ generation (present in the original, kept and fixed): the output
 GeoTIFF is reprojected to lat/lon, colorized, and packaged as a Google
-Earth GroundOverlay. Two explicit styles:
+Earth GroundOverlay. Three explicit styles:
   --style absolute  (default) color = the model's actual probability;
                     comparable across regions and model versions
+  --style quantile  color = the cell's rank within THIS map (0..1);
+                    --alpha-below then hides everything below that
+                    quantile ("0.8 = show the top 20% of the box").
+                    The right product when the deployed use is ranking
+                    candidate habitat inside an area of interest.
   --style stretched 2-98 percentile stretch + gamma, like the original
                     (which claimed "no normalization" while doing this);
                     maximizes local contrast, NOT comparable across maps
+
+PROBABILITY SEMANTICS / why a whole-forest box can light up: the model
+is trained and calibrated on a ~50/50 presence/pseudo-absence design
+(see calibrate.py "HONEST LIMITS"), so p=0.5 means "even odds AGAINST A
+SAMPLED PSEUDO-ABSENCE", not "50% of such cells hold grouse". Over a
+real landscape whose suitable fraction is far below 50%, those
+probabilities read inflated - and temperature scaling cannot shift
+them, because sigmoid(logit/T) is symmetric about p=0.5: no T moves a
+score across 0.5. Fixes: --prior <f> re-anchors the calibrated logits
+to an expected deployment prevalence f (the standard
+logit(f)-logit(0.5) prior correction), or --style quantile sidesteps
+absolute probabilities entirely.
 
 Usage:
     python predict.py --region ME
@@ -225,7 +242,7 @@ def read_strip(srcs, cat_f, cont_f, r0, rows, c0, cols):
 
 def predict_region(model, device, srcs, ref, cat_f, cont_f,
                    window_bounds, stride, batch_size, use_compile,
-                   flip_tta=True, temperature=1.0):
+                   flip_tta=True, temperature=1.0, logit_shift=0.0):
     r_start, r_end, c_start, c_end = window_bounds
     height, width = r_end - r_start, c_end - c_start
     out_h = (height - IMG_SIZE) // stride + 1
@@ -299,8 +316,12 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                                 rc.flip(-1), rn.flip(-1)).float())
                     tta_logits.append(lg.flatten())
                 pooled_logit = torch.stack(tta_logits).mean(dim=0)
+                # Temperature first (calibrates the val-design scale),
+                # then the prior shift (converts calibrated logits from
+                # the 50/50 training prior to the deployment prior).
                 probs = torch.sigmoid(
-                    pooled_logit / temperature).float().cpu().numpy()
+                    pooled_logit / temperature
+                    + logit_shift).float().cpu().numpy()
 
                 for p, (y, x) in zip(probs, keep):
                     gy = (y0 + y) // stride
@@ -360,6 +381,17 @@ def generate_kmz(input_tif, output_kmz, style="absolute",
             shown = np.clip((dest - p_low) / (p_high - p_low), 0, 1) ** 3.0
         else:
             shown = np.clip(dest, 0, 1)
+    elif style == "quantile" and valid.any():
+        # Color = the cell's rank among THIS map's valid cells (0..1).
+        # Absolute probabilities from a 50/50 presence/pseudo-absence
+        # model saturate over a uniformly-forested box; rank is the
+        # quantity the deployed use ("where do I scout first in this
+        # area") actually needs, and it guarantees exactly (1 -
+        # alpha_below) of the valid area lights up.
+        vals = dest[valid]
+        sv = np.sort(vals)
+        shown = np.zeros_like(dest)
+        shown[valid] = np.searchsorted(sv, vals, side='right') / len(sv)
     else:
         shown = np.clip(dest, 0, 1)          # absolute: color==probability
 
@@ -367,7 +399,11 @@ def generate_kmz(input_tif, output_kmz, style="absolute",
             ).astype(np.uint8)
     alpha = np.full(dest.shape, overlay_alpha, dtype=np.uint8)
     alpha[~valid] = 0                        # nodata fully transparent
-    alpha[np.nan_to_num(dest) < alpha_below] = 0
+    # absolute/stretched hide below an absolute probability; quantile
+    # hides below a RANK ("0.8 = only the top 20% of this box visible").
+    thr_vals = (shown if style == "quantile"
+                else np.nan_to_num(dest))
+    alpha[thr_vals < alpha_below] = 0
     rgba[:, :, 3] = alpha
 
     with tempfile.TemporaryDirectory() as td:
@@ -407,12 +443,36 @@ def main():
                              "pixels (30m each). 4 -> 120m output "
                              "resolution.")
     parser.add_argument("--batch-size", type=int, default=256)
-    parser.add_argument("--style", choices=["absolute", "stretched"],
-                        default="absolute")
+    parser.add_argument("--style",
+                        choices=["absolute", "quantile", "stretched"],
+                        default="absolute",
+                        help="'absolute': color = calibrated probability. "
+                             "'quantile': color = the cell's rank within "
+                             "this map - the right product when the use "
+                             "is ranking candidate habitat inside a box, "
+                             "and immune to the 50/50-design probability "
+                             "inflation. 'stretched': 2-98 percentile "
+                             "stretch + gamma (local contrast only).")
     parser.add_argument("--cmap", default="jet")
     parser.add_argument("--alpha-below", type=float, default=0.15,
-                        help="Probabilities below this render fully "
-                             "transparent in the KMZ.")
+                        help="Cells below this render fully transparent "
+                             "in the KMZ. For --style absolute/stretched "
+                             "it is an absolute probability; for --style "
+                             "quantile it is a rank (0.8 = show only the "
+                             "top 20%% of the mapped area).")
+    parser.add_argument("--prior", type=float, default=None,
+                        help="Expected fraction of the mapped area that "
+                             "is genuinely suitable (0-1). The model's "
+                             "probabilities are calibrated to its 50/50 "
+                             "presence/pseudo-absence design, so over a "
+                             "real landscape they read inflated - and "
+                             "temperature scaling cannot fix that (it "
+                             "never moves a score across 0.5). This "
+                             "applies the standard prior correction "
+                             "(logits shifted by logit(prior)-logit(0.5)) "
+                             "AFTER temperature: e.g. --prior 0.1 makes "
+                             "a displayed 0.8 require a raw calibrated "
+                             "score of ~0.97. Default: no correction.")
     parser.add_argument("--compile", action="store_true",
                         help="torch.compile the model (worthwhile on "
                              "GPU for large areas).")
@@ -478,6 +538,17 @@ def main():
         print("Calibration: none (raw probabilities). Run calibrate.py "
               "to fit one.")
 
+    logit_shift = 0.0
+    if args.prior is not None:
+        if not (0.0 < args.prior < 1.0):
+            raise SystemExit(f"--prior must be in (0, 1), got {args.prior}")
+        logit_shift = math.log(args.prior / (1.0 - args.prior))
+        print(f"Prior correction: deployment prevalence {args.prior:g} "
+              f"(training design 0.5) -> calibrated logits shifted by "
+              f"{logit_shift:+.3f}. A displayed 0.5 now requires a raw "
+              f"calibrated score of "
+              f"{1.0 / (1.0 + args.prior / (1.0 - args.prior)):.3f}.")
+
     srcs, ref = open_aligned_sources(rd, cat_f, cont_f)
     try:
         bounds = args.bounds or list(BOXES[args.region])
@@ -485,10 +556,31 @@ def main():
         heatmap, transform = predict_region(
             model, device, srcs, ref, cat_f, cont_f, window_bounds,
             args.stride, args.batch_size, args.compile,
-            flip_tta=args.flip_tta, temperature=temperature)
+            flip_tta=args.flip_tta, temperature=temperature,
+            logit_shift=logit_shift)
     finally:
         for s in srcs.values():
             s.close()
+
+    vals = heatmap[np.isfinite(heatmap)]
+    if len(vals):
+        pct5, pct8 = 100 * (vals >= 0.5).mean(), 100 * (vals >= 0.8).mean()
+        print(f"Score distribution: min {vals.min():.3f} | median "
+              f"{np.median(vals):.3f} | p90 {np.percentile(vals, 90):.3f} "
+              f"| max {vals.max():.3f} | {pct5:.1f}% >= 0.5 | "
+              f"{pct8:.1f}% >= 0.8")
+        if args.prior is None and args.style != "quantile" and pct5 > 50.0:
+            print(
+                "   [note] Over half the scored area exceeds p=0.5. The "
+                "model's probabilities are calibrated to its 50/50 "
+                "presence/pseudo-absence design (calibrate.py 'HONEST "
+                "LIMITS'), so over a real landscape they read inflated - "
+                "and temperature scaling cannot shift them (it never "
+                "moves a score across 0.5). Remedies: --prior <expected "
+                "suitable fraction, e.g. 0.1> to re-anchor the "
+                "probabilities, or --style quantile to color/threshold "
+                "by within-map rank (--alpha-below 0.8 then shows only "
+                "the top 20% of the box).")
 
     tag = args.region + ("_custom" if args.bounds else "")
     tif_path = os.path.join(OUT_DIR, f"{tag}_suitability.tif")

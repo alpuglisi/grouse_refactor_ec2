@@ -371,6 +371,12 @@ def main():
     print(f"\nSaved: {json_path}\n       {csv_path}\n       {png_path}")
     print("predict.py picks up the temperature automatically from "
           "calibration.json.")
+    print("NOTE: temperature calibrates probabilities to the ~50/50 "
+          "presence/pseudo-absence validation design; it is symmetric "
+          "about p=0.5 and can never move a score across it. If a "
+          "predicted map lights up wall-to-wall, that is prior "
+          "mismatch, not a bad temperature - use predict.py --prior "
+          "<expected suitable fraction> or --style quantile.")
 
 
 if __name__ == "__main__":

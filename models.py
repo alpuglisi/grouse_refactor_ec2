@@ -471,7 +471,84 @@ FEATURE_SPEC = {
     # 250 is remapped to -9999 at download so it clamps to padding).
     "tcc":    {"kind": "continuous", "scale": 100.0},
     "nlcd":   {"kind": "categorical", "vocab": 256, "dim": 16},
+    # USGS 3DEP LiDAR (download_lidar.py). 3DEP's national EE product is
+    # BARE-EARTH ELEVATION ONLY - no canopy-height band exists in the
+    # collection, so these are honestly terrain features, not a canopy
+    # substitute. Both are native to their OWN grid at native_scale_m
+    # (default 10 m; the download script's default target resolution),
+    # finer than every other feature's native 30 m - see
+    # resolve_patch_geometry(), which grows the whole patch grid to
+    # match the finest feature actually requested.
+    #   lidar_elev  : bare-earth elevation (m), aggregated 1m -> target
+    #                 resolution by MEAN (not resampling) - absolute
+    #                 elevation, included for coarse terrain context.
+    #   lidar_rough : local relief - the STD DEV of the native 1m
+    #                 elevation within each output cell. This is the
+    #                 actual payoff of 1m source data: microtopography
+    #                 (hummocks, drainage, edge structure) that a 30m
+    #                 DEM (or even a 10m one built by resampling rather
+    #                 than aggregating) cannot resolve at all.
+    "lidar_elev":  {"kind": "continuous", "scale": 500.0,
+                    "native_scale_m": 10},
+    "lidar_rough": {"kind": "continuous", "scale": 5.0,
+                    "native_scale_m": 10},
 }
+
+
+def native_scale_m(feature, spec=None):
+    """A feature's own raster resolution in meters - 30 (the LANDFIRE/
+    TCC/NLCD grid) unless FEATURE_SPEC declares native_scale_m
+    explicitly (LiDAR features, currently the only finer-than-30m
+    case)."""
+    spec = spec or FEATURE_SPEC
+    return int(spec[feature].get("native_scale_m", 30))
+
+
+def resolve_patch_geometry(feature_names, spec=None, base_img_size=64,
+                           base_pixel_m=30):
+    """The single source of truth for patch grid geometry, used by both
+    the dataset/trainer and predict.py so they can never disagree about
+    what resolution a given feature set trains/predicts at.
+
+    Every feature has its own native pixel size (30 m for the original
+    LANDFIRE-derived stack, 10 m for LiDAR); the patch resolves to the
+    FINEST native size actually requested, holding the GROUND FOOTPRINT
+    fixed at base_img_size * base_pixel_m (the tuned recipe's ~1.92 km).
+    Coarser features are then block-upsampled (nearest-neighbor
+    replication - exact for an integer ratio, which is why this
+    requires base_pixel_m to divide evenly by every native scale in
+    play) so every fine-grid cell carries a complete feature vector,
+    per the "each LiDAR subpixel gets the full feature set" design.
+
+    Returns (pixel_m, img_size, ratios): pixel_m is the resolved grid's
+    pixel size; img_size is base_img_size * base_pixel_m // pixel_m;
+    ratios maps each feature -> its own (integer) upsample factor
+    (1 for features already native at pixel_m)."""
+    spec = spec or FEATURE_SPEC
+    scales = {f: native_scale_m(f, spec) for f in feature_names}
+    pixel_m = min(scales.values()) if scales else base_pixel_m
+    if base_pixel_m % pixel_m != 0:
+        raise ValueError(
+            f"base resolution {base_pixel_m}m does not divide evenly "
+            f"by the finest requested feature resolution {pixel_m}m "
+            f"(scales: {scales}) - block-upsampling requires an "
+            f"integer ratio. Pick a --fine-pixel-m that divides "
+            f"{base_pixel_m} evenly.")
+    img_size = base_img_size * base_pixel_m // pixel_m
+    ratios = {}
+    for f, s in scales.items():
+        if s % pixel_m != 0:
+            raise ValueError(
+                f"feature '{f}' native resolution {s}m does not "
+                f"divide evenly by the resolved grid {pixel_m}m.")
+        if (base_img_size * base_pixel_m) % s != 0:
+            raise ValueError(
+                f"feature '{f}' native resolution {s}m does not divide "
+                f"the ground footprint {base_img_size * base_pixel_m}m "
+                f"evenly - its per-patch pixel count would be "
+                f"fractional.")
+        ratios[f] = s // pixel_m
+    return pixel_m, img_size, ratios
 
 
 def config_to_model_kwargs(cfg, defaults=None):

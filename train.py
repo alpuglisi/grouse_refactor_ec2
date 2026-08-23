@@ -60,7 +60,7 @@ if not os.path.exists(os.path.join(_here, "grouse_data.py")):
 
 from torch.utils.data import ConcatDataset
 
-from grouse_data import GrouseData
+from grouse_data import GrouseData, STATIC_FEATURES
 from models import FEATURE_SPEC, split_features
 from dataset import GrousePatchDataset
 from model_handler import GrouseModelHandler
@@ -173,7 +173,8 @@ def filter_by_year_gap(df, rd, features, tolerance, what, region):
     if (tolerance < 0 or 'year' not in df.columns
             or df['year'].isna().all()):
         return df
-    yrs = {f: rd.raster_years(f) for f in features}
+    gated = [f for f in features if f not in STATIC_FEATURES]
+    yrs = {f: rd.raster_years(f) for f in gated}
     yrs = {f: ys for f, ys in yrs.items() if ys}
 
     def ok(year):

@@ -81,7 +81,23 @@ RASTER_FEATURES = ["evt", "evh", "evc", "sclass", "fdist", "ch", "cc",
                    # Earth Engine products (download_tcc_nlcd.py):
                    # tcc = USFS Tree Canopy Cover percent (continuous),
                    # nlcd = Annual NLCD land-cover class (categorical).
-                   "tcc", "nlcd"]
+                   "tcc", "nlcd",
+                   # USGS 3DEP LiDAR terrain (download_lidar.py):
+                   # lidar_elev/lidar_rough - see STATIC_FEATURES below.
+                   "lidar_elev", "lidar_rough"]
+
+# Features exempted from the +/-YEAR_MATCH_TOLERANCE training-exclusion
+# policy (train.py filter_by_year_gap). LiDAR acquisitions are one-off
+# per project, not annually repeated like vegetation products, and
+# TERRAIN itself doesn't meaningfully change year to year the way
+# vegetation structure does - a hillside's microtopography in 2011 is
+# still its microtopography in 2023. Enforcing the vegetation-currency
+# tolerance on a static layer would exclude most training records for
+# no ecological reason. raster_path() still resolves to whichever
+# vintage is on disk (typically the region's only one) and a real gap
+# still prints its once-per-feature notice; only the hard EXCLUSION is
+# skipped.
+STATIC_FEATURES = {"lidar_elev", "lidar_rough"}
 
 # Year-matching policy: a sighting's year resolves to the exact raster
 # year when present, else the CLOSEST year (ties -> earlier year, i.e.

@@ -205,6 +205,7 @@ class GrouseModelHandler:
                  early_attn_heads=4, early_attn_kv_stride=1,
                  early_attn_dropout=0.1, early_attn_droppath=0.1,
                  early_attn_pos_mode='rel', early_attn_lr_factor=0.1,
+                 dual_branch='off', dual_branch_channels=64,
                  pos_threshold=0.75, neg_threshold=0.25,
                  strict_objective=None,
                  divergence_patience=3, on_divergence='warn',
@@ -311,7 +312,19 @@ class GrouseModelHandler:
             early_attn_kv_stride=early_attn_kv_stride,
             early_attn_dropout=early_attn_dropout,
             early_attn_droppath=early_attn_droppath,
-            early_attn_pos_mode=early_attn_pos_mode).to(self.device)
+            early_attn_pos_mode=early_attn_pos_mode,
+            dual_branch=dual_branch,
+            dual_branch_channels=dual_branch_channels).to(self.device)
+        if dual_branch != 'off':
+            n_b = (sum(p.numel() for p in
+                       self.model.spatial_branch.parameters())
+                   + sum(p.numel() for p in
+                         self.model.spatial_head.parameters()))
+            print(f"   Dual-branch head active: Branch B = "
+                  f"{dual_branch} ({dual_branch_channels} ch, full-"
+                  f"resolution multi-scale via dilation), pooled with "
+                  f"'{pool}', +{n_b:,} params, zero-init head "
+                  f"(identity at start).")
         if early_attn:
             n_attn_params = sum(p.numel() for p in
                                 self.model.early_attn.parameters())
@@ -403,7 +416,10 @@ class GrouseModelHandler:
                            "early_attn_pos_mode":
                                (self.model.early_attn.pos_mode
                                 if self.model.early_attn is not None
-                                else 'none')}}
+                                else 'none'),
+                           "dual_branch": self.model.dual_branch,
+                           "dual_branch_channels":
+                               self.model._dual_branch_channels}}
 
     @staticmethod
     def unwrap_checkpoint(obj):

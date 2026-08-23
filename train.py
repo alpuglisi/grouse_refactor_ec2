@@ -307,6 +307,9 @@ def score_ensemble(members, features, val_ds, args):
             early_attn_kv_stride=cfg.get("early_attn_kv_stride",
                                          args.early_attn_kv_stride),
             early_attn_pos_mode=pos_mode,
+            dual_branch=cfg.get("dual_branch", args.dual_branch),
+            dual_branch_channels=cfg.get("dual_branch_channels",
+                                         args.dual_branch_channels),
         ).to(device).eval()
         model.load_state_dict(state)
         outs, labels = [], []
@@ -460,6 +463,25 @@ def main():
                              "this factor via a strided conv first "
                              "(queries stay full-res) - roughly "
                              "kv_stride^2 cheaper, small fidelity cost.")
+    parser.add_argument("--dual-branch", default="off",
+                        choices=["off", "unet", "dilated"],
+                        help="Add a second, resolution-preserving "
+                             "multi-scale branch ('Branch B') alongside "
+                             "the ResNet trunk, fused into the final "
+                             "logit through a zero-init head. The trunk "
+                             "downsamples away exactly WHERE an edge or "
+                             "conifer/deciduous transition sits; Branch "
+                             "B keeps the native 64x64 grid and grows "
+                             "its receptive field by dilation instead. "
+                             "'unet' = shallow U-Net-lite with a "
+                             "dilated bottleneck (recommended); "
+                             "'dilated' = pure ASPP-style stack, no "
+                             "downsampling at all. Ablate against "
+                             "'off' - if the trunk (esp. with "
+                             "--keep-early-resolution/--early-attn) "
+                             "already captures it, B adds cost without "
+                             "signal.")
+    parser.add_argument("--dual-branch-channels", type=int, default=64)
     parser.add_argument("--center-skip",
                         action=argparse.BooleanOptionalAction, default=True,
                         help="Feed the center pixel's feature vector "
@@ -708,6 +730,8 @@ def main():
             early_attn_droppath=args.early_attn_droppath,
             early_attn_pos_mode=args.early_attn_pos,
             early_attn_lr_factor=args.early_attn_lr_factor,
+            dual_branch=args.dual_branch,
+            dual_branch_channels=args.dual_branch_channels,
             label_smoothing=overrides.get('label_smoothing',
                                           args.label_smoothing),
             ema_decay=args.ema, lr=lr,

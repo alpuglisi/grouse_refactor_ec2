@@ -126,6 +126,8 @@ def load_model(model_path, disk_features, device, cli_pool="attn",
         if early_attn_pos_mode is None:
             early_attn_pos_mode = ('abs' if cfg.get("early_attn_pos_enc")
                                    else 'none')
+        dual_branch = cfg.get("dual_branch", "off")
+        dual_branch_channels = cfg.get("dual_branch_channels", 64)
         print(f"   Checkpoint config: pool={pool}, "
               f"center_skip={center_skip}")
         if set(features) != set(disk_features):
@@ -137,6 +139,7 @@ def load_model(model_path, disk_features, device, cli_pool="attn",
         keep_early_res, early_attn = False, False
         early_attn_kv_stride, early_attn_heads = 1, 4
         early_attn_pos_mode = 'none'
+        dual_branch, dual_branch_channels = 'off', 64
         print(f"   Bare (pre-config) checkpoint: assuming pool={pool}, "
               f"center_skip={center_skip} - pass --pool/--center-skip "
               f"matching the training run if this is wrong.")
@@ -146,7 +149,9 @@ def load_model(model_path, disk_features, device, cli_pool="attn",
         keep_early_resolution=keep_early_res, early_attn=early_attn,
         early_attn_heads=early_attn_heads,
         early_attn_kv_stride=early_attn_kv_stride,
-        early_attn_pos_mode=early_attn_pos_mode).to(device)
+        early_attn_pos_mode=early_attn_pos_mode,
+        dual_branch=dual_branch,
+        dual_branch_channels=dual_branch_channels).to(device)
     try:
         model.load_state_dict(state)
     except RuntimeError as e:

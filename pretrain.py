@@ -65,7 +65,8 @@ from train import discover_features, sample_background_points, WORKERS
 # Head keys never saved: they belong to the supervised task, and saving
 # their random init would drag them into the fine-tune's reduced-LR
 # "loaded backbone" group for no benefit.
-HEAD_PREFIXES = ("conv_out.", "center_head.", "drop.")
+HEAD_PREFIXES = ("conv_out.", "center_head.", "drop.",
+                 "spatial_branch.", "spatial_head.")
 
 
 class SimSiam(nn.Module):

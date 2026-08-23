@@ -341,6 +341,107 @@ class EarlyAttentionBlock(nn.Module):
         x_tokens = x_tokens + self._drop_path(self.mlp(self.norm2(x_tokens)))
         return x_tokens.transpose(1, 2).reshape(b, c, h, w)
 
+def _conv_bn_relu(cin, cout, dilation=1, stride=1):
+    return nn.Sequential(
+        nn.Conv2d(cin, cout, 3, stride=stride, padding=dilation,
+                  dilation=dilation, bias=False),
+        nn.BatchNorm2d(cout), nn.ReLU(inplace=True))
+
+
+class DualSpatialBranch(nn.Module):
+    """"Branch B" of the dual-branch head: a resolution-preserving,
+    multi-scale feature extractor over the full-resolution embedded
+    input, running in parallel with the ResNet trunk ("Branch A").
+
+    The trunk's stem halves the input immediately and pooling collapses
+    it further, so by the time its features are scored, exactly WHERE a
+    hard edge or conifer/deciduous transition sat has been smeared into
+    coarse cells. This branch never pays that cost: it stays at (or
+    returns to) the input's native 64x64 grid while growing its
+    receptive field through DILATION instead of downsampling - wide
+    context AND precise edge position, rather than trading one for the
+    other. The classifier then sees "general habitat character"
+    (Branch A) and "precise local arrangement" (Branch B) as separate
+    signals.
+
+    mode='unet' (default): shallow U-Net-lite - two-conv encoder at
+      full res, one stride-2 descent, a DILATED bottleneck (d=2,4) in
+      place of deeper pooling, bilinear return, skip-concat, fuse. The
+      hybrid keeps some cheap context-building downsampling but only
+      one level of it - the sweet spot for a 64px patch with no
+      resolution to spare.
+    mode='dilated': no downsampling at all - a projection then a
+      residual stack of 3x3 convs at dilation 1,2,4,8 (ASPP-style;
+      receptive field ~31px at native resolution).
+
+    The map is collapsed to a feature VECTOR with the same pooling
+    mechanism family the trunk uses (attn: learned softmax scores;
+    gauss/center/mean: the same fixed spatial weightings), applied to
+    feature channels instead of a logit map."""
+
+    def __init__(self, in_channels, channels=64, mode='unet',
+                 pool='attn'):
+        super().__init__()
+        if mode not in ('unet', 'dilated'):
+            raise ValueError(f"mode must be 'unet'/'dilated', got {mode!r}")
+        self.mode = mode
+        self.pool = pool
+        c = int(channels)
+        if mode == 'dilated':
+            self.proj = _conv_bn_relu(in_channels, c)
+            self.stack = nn.ModuleList(
+                [_conv_bn_relu(c, c, dilation=d) for d in (1, 2, 4, 8)])
+        else:
+            self.enc = nn.Sequential(_conv_bn_relu(in_channels, c),
+                                     _conv_bn_relu(c, c))
+            self.down = _conv_bn_relu(c, 2 * c, stride=2)
+            self.bott = nn.Sequential(_conv_bn_relu(2 * c, 2 * c, dilation=2),
+                                      _conv_bn_relu(2 * c, 2 * c, dilation=4))
+            self.fuse = _conv_bn_relu(3 * c, c)
+        self.score = nn.Conv2d(c, 1, 1)      # attn-pool score map
+        self._gauss_cache = {}
+
+    def feature_map(self, x):
+        if self.mode == 'dilated':
+            h = self.proj(x)
+            for blk in self.stack:
+                h = h + blk(h)               # residual dilated stack
+            return h
+        e = self.enc(x)
+        b = self.bott(self.down(e))
+        u = F.interpolate(b, size=e.shape[2:], mode='bilinear',
+                          align_corners=False)
+        return self.fuse(torch.cat([u, e], dim=1))
+
+    def _weights(self, fmap):
+        b, c, h, w = fmap.shape
+        if self.pool == 'attn':
+            return torch.softmax(
+                self.score(fmap).reshape(b, 1, h * w), dim=2)
+        if self.pool == 'center':
+            m = torch.zeros(1, 1, h, w, device=fmap.device)
+            m[:, :, (h - 1) // 2:h // 2 + 1, (w - 1) // 2:w // 2 + 1] = 1
+            return (m / m.sum()).reshape(1, 1, h * w).to(fmap.dtype)
+        if self.pool == 'gauss':
+            key = (h, w, fmap.device)
+            if key not in self._gauss_cache:
+                yy = torch.arange(h, dtype=torch.float32,
+                                  device=fmap.device) - (h - 1) / 2.0
+                xx = torch.arange(w, dtype=torch.float32,
+                                  device=fmap.device) - (w - 1) / 2.0
+                g = torch.exp(-(yy[:, None] ** 2 + xx[None, :] ** 2)
+                              / (2 * (max(h, w) / 4.0) ** 2))
+                self._gauss_cache[key] = (g / g.sum()).reshape(1, 1, h * w)
+            return self._gauss_cache[key].to(fmap.dtype)
+        return fmap.new_full((1, 1, h * w), 1.0 / (h * w))   # mean
+
+    def forward(self, x):
+        fmap = self.feature_map(x)
+        b, c, h, w = fmap.shape
+        return (fmap.reshape(b, c, h * w)
+                * self._weights(fmap)).sum(dim=2)            # (B, c)
+
+
 # ==========================================
 # FEATURE SPEC - single source of truth for model input geometry.
 # kind: 'categorical' -> nn.Embedding(vocab, dim, padding_idx=0), values
@@ -397,7 +498,8 @@ class GrouseResNet(nn.Module):
                  keep_early_resolution=False, early_attn=False,
                  early_attn_heads=4, early_attn_kv_stride=1,
                  early_attn_dropout=0.1, early_attn_droppath=0.1,
-                 early_attn_pos_mode='rel'):
+                 early_attn_pos_mode='rel',
+                 dual_branch='off', dual_branch_channels=64):
         """cat_features / cont_features: ordered feature-name lists (from
         split_features). Geometry is derived from them + the spec.
 
@@ -500,6 +602,30 @@ class GrouseResNet(nn.Module):
             self.center_head = nn.Sequential(
                 nn.Linear(total_in_channels, 128), nn.ReLU(),
                 nn.Dropout(dropout), nn.Linear(128, 1))
+        # Dual-branch "Branch B" (see DualSpatialBranch): a resolution-
+        # preserving multi-scale extractor over the full-res embedded
+        # input, pooled to a feature vector and scored by its own head.
+        # The head's output layer is ZERO-INITIALIZED, so the fused
+        # logit equals the plain Branch-A logit at init and Branch B
+        # fades in only as its gradients justify - additive fusion,
+        # which is the concatenate-then-linear head of the design
+        # decomposed per branch (and the same wide-&-deep pattern
+        # center_skip already proves out).
+        if dual_branch not in ('off', 'unet', 'dilated'):
+            raise ValueError(f"dual_branch must be 'off'/'unet'/"
+                             f"'dilated', got {dual_branch!r}")
+        self.dual_branch = dual_branch
+        self._dual_branch_channels = int(dual_branch_channels)
+        if dual_branch != 'off':
+            self.spatial_branch = DualSpatialBranch(
+                total_in_channels, channels=dual_branch_channels,
+                mode=dual_branch, pool=pool)
+            c = int(dual_branch_channels)
+            self.spatial_head = nn.Sequential(
+                nn.Linear(c, c), nn.ReLU(),
+                nn.Dropout(dropout), nn.Linear(c, 1))
+            nn.init.zeros_(self.spatial_head[-1].weight)
+            nn.init.zeros_(self.spatial_head[-1].bias)
 
     def embed(self, cat_x, cont_x):
         """Stack every feature into the (B, C, H, W) input tensor: one
@@ -564,11 +690,14 @@ class GrouseResNet(nn.Module):
 
     def logits(self, cat_x, cont_x):
         """The single scalar logit per sample that training optimizes:
-        pooled trunk output, plus the center-pixel skip when enabled."""
+        pooled trunk output (Branch A), plus the center-pixel skip and
+        the dual-branch spatial head (Branch B) when enabled."""
         x = self.embed(cat_x, cont_x)
         out = self.pool_logits(self.trunk(x))
         if self.center_skip:
             out = out + self.center_head(self._center_vector(cat_x, cont_x, x))
+        if self.dual_branch != 'off':
+            out = out + self.spatial_head(self.spatial_branch(x))
         return out
 
     def _center_vector(self, cat_x, cont_x, x):

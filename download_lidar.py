@@ -74,9 +74,38 @@ assert TARGET_PIXEL_M == native_scale_m("lidar_rough"), (
     "download_lidar.py produces both at a single target resolution.")
 
 
+def state_land_geometry(ee, region, bbox_geom):
+    """The region's ACTUAL land area (US Census TIGER state polygon,
+    clipped to the AOI bbox) instead of the raw lon/lat bounding
+    rectangle. BOXES' bounding boxes are rectangles, not state outlines
+    - ME's in particular includes a large slice of Atlantic Ocean and
+    Canada (Quebec/New Brunswick), which 3DEP (CONUS-only) will NEVER
+    cover regardless of how complete its actual Maine coverage is.
+    Measuring coverage against the raw bbox (as an earlier version of
+    this script did) deflates the reported percentage with guaranteed-
+    empty non-US area - the same root cause diagnosed for NLCD/wetland
+    composition earlier in this project. Falls back to the raw bbox
+    (with a warning) if the TIGER asset or state code lookup fails, so
+    a transient EE hiccup degrades to the old behavior rather than
+    crashing the download."""
+    try:
+        states = ee.FeatureCollection("TIGER/2018/States")
+        state = states.filter(ee.Filter.eq("STUSPS", region))
+        if state.size().getInfo() == 0:
+            raise ValueError(f"no TIGER state polygon for '{region}'")
+        return state.geometry().intersection(bbox_geom, ee.ErrorMargin(30))
+    except Exception as e:
+        print(f"   [warn] could not load the TIGER state boundary for "
+              f"land-clipped coverage ({e}) - falling back to the raw "
+              f"bounding box, which includes ocean/out-of-state area "
+              f"and will understate real land coverage.")
+        return bbox_geom
+
+
 def aoi_coverage(ee, geom):
-    """(years present, fraction of the AOI actually covered by any
-    3DEP 1m tile) - printed honestly since coverage is often partial."""
+    """(years present, fraction of the LAND geometry actually covered
+    by any 3DEP 1m tile) - printed honestly since coverage is often
+    partial even within actual land area."""
     col = ee.ImageCollection(COLLECTION_ID).filterBounds(geom)
     n = col.size().getInfo()
     if n == 0:
@@ -93,26 +122,30 @@ def aoi_coverage(ee, geom):
     return years, frac
 
 
-def build_band_image(ee, geom, reducer_name):
+def build_band_image(ee, geom, land_geom, reducer_name):
     """3DEP 1m mosaic -> reduceResolution(reducer) -> reprojected to
-    the target grid. reduceResolution aggregates the real sub-cell
-    distribution (mean or stdDev of the native 1m pixels inside each
-    output cell) - this is NOT the same as resampling, which would
-    just pick/interpolate a single value and discard the variance
-    reduceResolution preserves."""
+    the target grid -> clipped to the region's actual LAND polygon
+    (land_geom, not the bbox rectangle geom). reduceResolution
+    aggregates the real sub-cell distribution (mean or stdDev of the
+    native 1m pixels inside each output cell) - this is NOT the same
+    as resampling, which would just pick/interpolate a single value
+    and discard the variance reduceResolution preserves. The clip is
+    defense in depth (3DEP already has no source pixels over ocean/
+    Canada, so those areas mask out regardless) making that explicit
+    rather than relying on absence of source data."""
     reducer = {"mean": ee.Reducer.mean(),
               "stdDev": ee.Reducer.stdDev()}[reducer_name]
     mosaic = ee.ImageCollection(COLLECTION_ID).filterBounds(geom).mosaic()
     proj = ee.Projection("EPSG:5070").atScale(TARGET_PIXEL_M)
     return (mosaic.reduceResolution(reducer=reducer, maxPixels=1024)
-            .reproject(proj))
+            .reproject(proj).clip(land_geom))
 
 
-def build_lidar_raster(ee, feature, reducer_name, bounds_lonlat, out_path,
-                       tile_m, workers, valid_range):
+def build_lidar_raster(ee, feature, reducer_name, bounds_lonlat, land_geom,
+                       out_path, tile_m, workers, valid_range):
     x0, y0, x1, y1 = region_grid(bounds_lonlat)
     geom = ee.Geometry.Rectangle([x0, y0, x1, y1], "EPSG:5070", False)
-    image = build_band_image(ee, geom, reducer_name)
+    image = build_band_image(ee, geom, land_geom, reducer_name)
     tile_list = list(tiles(x0, y0, x1, y1, tile_m))
     lo, hi = valid_range
     with tempfile.TemporaryDirectory() as td:
@@ -195,11 +228,21 @@ def main():
 
     for region in args.regions:
         x0, y0, x1, y1 = region_grid(BOXES[region])
-        geom = ee.Geometry.Rectangle([x0, y0, x1, y1], "EPSG:5070", False)
-        years, frac = aoi_coverage(ee, geom)
+        bbox_geom = ee.Geometry.Rectangle([x0, y0, x1, y1], "EPSG:5070", False)
+        # BOXES rectangles overshoot real state borders (ME's in
+        # particular includes a lot of Atlantic Ocean and Canada) -
+        # measure and report coverage against actual LAND, not the
+        # raw bbox, or a state showing e.g. 41% looks alarming when
+        # most of that "missing" 59% was never going to have data
+        # (ocean, Canada) regardless of how complete 3DEP's real
+        # Maine coverage is.
+        land_geom = state_land_geometry(ee, region, bbox_geom)
+        years, frac = aoi_coverage(ee, land_geom)
         year = args.year or (max(set(years), key=years.count)
                              if years else None)
-        print(f"\n[{region}] 3DEP coverage: {100 * frac:.1f}% of AOI "
+        print(f"\n[{region}] 3DEP coverage: {100 * frac:.1f}% of "
+              f"{region}'s LAND area (excludes ocean/out-of-state "
+              f"portions of the bounding box) "
               f"({'no 3DEP tiles intersect this region - skipping' if not years else f'years present: {years}'})")
         if not years:
             continue
@@ -207,10 +250,11 @@ def main():
               f"year present; parts of the region may date from "
               f"other years in {years}, or be uncovered -> nodata).")
         if frac < 0.5:
-            print(f"   [warn] less than half the AOI has 3DEP coverage - "
-                  f"most points in the remainder will read this "
-                  f"feature as nodata, and (being STATIC_FEATURES) they "
-                  f"will still train, just without this signal.")
+            print(f"   [warn] less than half of {region}'s LAND area has "
+                  f"3DEP coverage - most points in the remainder will "
+                  f"read this feature as nodata, and (being "
+                  f"STATIC_FEATURES) they will still train, just "
+                  f"without this signal.")
 
         for feature, reducer_name, vrange in (
                 ("lidar_elev", "mean", (-100.0, 6000.0)),
@@ -220,6 +264,7 @@ def main():
                 print(f"   {out_path} exists - skipping (--force to redo).")
                 continue
             build_lidar_raster(ee, feature, reducer_name, BOXES[region],
+                               land_geom,
                                out_path, args.tile_m, args.workers, vrange)
 
     print("\nDone. lidar_elev/lidar_rough are discovered automatically "

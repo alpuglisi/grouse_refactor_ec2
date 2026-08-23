@@ -61,7 +61,7 @@ _here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _here)
 
 from prepare_training_data import BOXES
-from grouse_data import GrouseData, DataConfig
+from grouse_data import GrouseData, DataConfig, YEAR_MATCH_TOLERANCE
 
 NODATA = -9999
 PIXEL_M = 30
@@ -134,13 +134,9 @@ def collection_years(ee, cid):
         pass
     if not years:
         for idx in col.aggregate_array("system:index").getInfo():
-            years |= {int(y) for y in re.findall(r"(19|20)\d{2}",
-                                                 str(idx)) or []
+            years |= {int(y) for y in re.findall(r"(?:19|20)\d{2}",
+                                                 str(idx))
                       if 1980 < int(y) < 2100}
-        if not years:
-            for idx in col.aggregate_array("system:index").getInfo():
-                m = re.findall(r"\d{4}", str(idx))
-                years |= {int(y) for y in m if 1980 < int(y) < 2100}
     return sorted(years)
 
 
@@ -174,16 +170,18 @@ def sighting_years(rd):
 def choose_product_years(product_years, needed_years):
     """The set of product years to download: for each sighting year the
     closest published year (ties -> earlier, matching
-    grouse_data.raster_path), warning past +/-1; plus the latest
-    published year for prediction-time use."""
+    grouse_data.raster_path), warning past the pipeline's shared
+    YEAR_MATCH_TOLERANCE; plus the latest published year for
+    prediction-time use."""
     chosen = set()
     for sy in sorted(needed_years):
         c = min(product_years, key=lambda y: (abs(y - sy), y))
-        if abs(c - sy) > 1:
+        if abs(c - sy) > YEAR_MATCH_TOLERANCE:
             print(f"   [warn] sighting year {sy}: nearest published "
                   f"year is {c} ({abs(c - sy)} years off) - outside "
-                  f"the +/-1 policy; the training loader will warn "
-                  f"when it uses it.")
+                  f"the +/-{YEAR_MATCH_TOLERANCE} policy; train.py "
+                  f"will EXCLUDE these records unless "
+                  f"--max-train-year-gap loosens it.")
         chosen.add(c)
     chosen.add(max(product_years))
     return sorted(chosen)
@@ -211,7 +209,7 @@ def tiles(x0, y0, x1, y1, tile_m):
             yield tx, ty, min(tx + tile_m, x1), min(ty + tile_m, y1)
 
 
-def fetch_tile(ee, image, band, rect, dest, retries=4):
+def fetch_tile(ee, image, rect, dest, retries=4):
     """One getDownloadURL request -> GeoTIFF on disk, with backoff.
     crs_transform pins the global 30 m grid so tiles merge exactly."""
     params = {
@@ -239,20 +237,24 @@ def fetch_tile(ee, image, band, rect, dest, retries=4):
             delay *= 2
 
 
-def _fetch_all(tile_list, fetch_fn, workers, desc):
-    """Fetch every tile through fetch_fn(index, rect) concurrently.
-    Each getDownloadURL call is an EE server round-trip plus an HTTP
+def _fetch_all(n_tiles, fetch_fn, workers, desc):
+    """Fetch every tile through fetch_fn(index) concurrently. Each
+    getDownloadURL call is an EE server round-trip plus an HTTP
     transfer, and the tiles are independent - serializing them was the
-    entire wall-clock cost. The first failure cancels the rest and
-    propagates."""
+    entire wall-clock cost. On the first failure, queued tiles are
+    CANCELLED before the error propagates (plain executor shutdown
+    would let every queued tile run its full retry cycle first)."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        futures = {ex.submit(fetch_fn, i, rect): i
-                   for i, rect in enumerate(tile_list)}
+        futures = {ex.submit(fetch_fn, i): i for i in range(n_tiles)}
         bar = tqdm(total=len(futures), desc=desc, leave=False)
         try:
             for fut in as_completed(futures):
-                fut.result()
+                try:
+                    fut.result()
+                except Exception:
+                    ex.shutdown(wait=False, cancel_futures=True)
+                    raise
                 bar.update(1)
         finally:
             bar.close()
@@ -267,9 +269,8 @@ def build_raster(ee, feature, spec, cid, year, bounds_lonlat, out_path,
     with tempfile.TemporaryDirectory() as td:
         paths = [os.path.join(td, f"t{i}.tif")
                  for i in range(len(tile_list))]
-        _fetch_all(tile_list,
-                   lambda i, rect=None: fetch_tile(
-                       ee, image, band, tile_list[i], paths[i]),
+        _fetch_all(len(tile_list),
+                   lambda i: fetch_tile(ee, image, tile_list[i], paths[i]),
                    workers, f"   {os.path.basename(out_path)}")
         srcs = [rasterio.open(p) for p in paths]
         try:

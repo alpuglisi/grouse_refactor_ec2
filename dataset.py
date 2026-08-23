@@ -280,64 +280,29 @@ class GrousePatchDataset(Dataset):
 
         stack = self._raw_stack(i, lon, lat, year)
 
-        n, pad = self.img_size, self.pad
-        flip = False
         if self.augment:
-            # torch's RNG (not numpy's) because DataLoader reseeds it per
-            # worker AND per epoch; numpy's global seed is duplicated
-            # across workers, which would make every worker draw the same
-            # "random" augmentation sequence.
-            rot = int(torch.randint(0, 4, (1,)).item())
-            flip = bool(torch.randint(0, 2, (1,)).item())
-            if pad:
-                dy = int(torch.randint(-pad, pad + 1, (1,)).item())
-                dx = int(torch.randint(-pad, pad + 1, (1,)).item())
-            else:
-                dy = dx = 0
-            stack = stack[:, pad + dy:pad + dy + n, pad + dx:pad + dx + n]
-        elif pad:
-            stack = stack[:, pad:pad + n, pad:pad + n]
-
-        n_cat = len(self.cat_features)
-        cat_np, cont_np = stack[:n_cat], stack[n_cat:]
-        cat_x = (torch.from_numpy(np.ascontiguousarray(cat_np)).long()
-                 if n_cat else torch.zeros((0, n, n), dtype=torch.long))
-        if len(self.cont_features):
-            scales = np.array([[[float(self.spec[f].get("scale", 1.0))]]
-                               for f in self.cont_features], dtype=np.float32)
-            cont_x = torch.from_numpy(
-                np.ascontiguousarray(cont_np / scales)).float()
+            # D4 symmetry: rotation covers 4 of the 8 orientations, the
+            # reflection the rest. Habitat suitability is invariant to
+            # both, so this is free label-preserving data.
+            cat_x, cont_x = self._augmented_view(stack)
         else:
-            cont_x = torch.zeros((0, n, n), dtype=torch.float32)
-
-        # D4 symmetry: rotation alone covers 4 of the 8 orientations;
-        # adding the reflection covers the rest. Habitat suitability is
-        # invariant to both, so this is free label-preserving data.
-        if rot:
-            cat_x = torch.rot90(cat_x, k=rot, dims=(1, 2))
-            cont_x = torch.rot90(cont_x, k=rot, dims=(1, 2))
-        if flip:
-            cat_x = torch.flip(cat_x, dims=(2,))
-            cont_x = torch.flip(cont_x, dims=(2,))
+            n, pad = self.img_size, self.pad
+            if pad:
+                stack = stack[:, pad:pad + n, pad:pad + n]
+            cat_x, cont_x = self._to_tensors(stack)
+            if rot:    # deterministic idx%4 rotation (val / --no-augment)
+                cat_x = torch.rot90(cat_x, k=rot, dims=(1, 2))
+                cont_x = torch.rot90(cont_x, k=rot, dims=(1, 2))
 
         yl = torch.tensor(float(row['label']), dtype=torch.float32)
         w = torch.tensor(float(row['weight']), dtype=torch.float32)
         return cat_x, cont_x, yl, w
 
-    def _augmented_view(self, stack):
-        """One randomly augmented view (jitter crop + random D4
-        orientation) of a raw padded stack -> (cat_x, cont_x). Mirrors
-        __getitem__'s augment=True path exactly; SSLPairDataset calls
-        it twice per access to draw two independent views of one tile."""
-        n, pad = self.img_size, self.pad
-        rot = int(torch.randint(0, 4, (1,)).item())
-        flip = bool(torch.randint(0, 2, (1,)).item())
-        if pad:
-            dy = int(torch.randint(-pad, pad + 1, (1,)).item())
-            dx = int(torch.randint(-pad, pad + 1, (1,)).item())
-        else:
-            dy = dx = 0
-        s = stack[:, pad + dy:pad + dy + n, pad + dx:pad + dx + n]
+    def _to_tensors(self, s):
+        """Cropped (n_feat, n, n) float stack -> (cat_x int64,
+        cont_x scaled float32). The single tensorize path shared by
+        every view (deterministic, augmented, SSL)."""
+        n = self.img_size
         n_cat = len(self.cat_features)
         cat_np, cont_np = s[:n_cat], s[n_cat:]
         cat_x = (torch.from_numpy(np.ascontiguousarray(cat_np)).long()
@@ -349,6 +314,27 @@ class GrousePatchDataset(Dataset):
                 np.ascontiguousarray(cont_np / scales)).float()
         else:
             cont_x = torch.zeros((0, n, n), dtype=torch.float32)
+        return cat_x, cont_x
+
+    def _augmented_view(self, stack):
+        """One randomly augmented view (jitter crop + random D4
+        orientation) of a raw padded stack -> (cat_x, cont_x). THE
+        augment path: __getitem__ (augment=True) and SSLPairDataset
+        both delegate here, so supervised training and SSL pretraining
+        can never drift apart. torch's RNG (not numpy's) because
+        DataLoader reseeds it per worker AND per epoch; numpy's global
+        seed is duplicated across workers. Draw order (rot, flip, dy,
+        dx) is part of the reproducibility contract."""
+        n, pad = self.img_size, self.pad
+        rot = int(torch.randint(0, 4, (1,)).item())
+        flip = bool(torch.randint(0, 2, (1,)).item())
+        if pad:
+            dy = int(torch.randint(-pad, pad + 1, (1,)).item())
+            dx = int(torch.randint(-pad, pad + 1, (1,)).item())
+        else:
+            dy = dx = 0
+        cat_x, cont_x = self._to_tensors(
+            stack[:, pad + dy:pad + dy + n, pad + dx:pad + dx + n])
         if rot:
             cat_x = torch.rot90(cat_x, k=rot, dims=(1, 2))
             cont_x = torch.rot90(cont_x, k=rot, dims=(1, 2))

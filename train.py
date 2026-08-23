@@ -201,7 +201,7 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
     cat_f, cont_f = split_features(features)
     train_parts, val_parts, train_labels = [], [], []
     aug = dict(cache_dir=cache_dir, jitter=jitter, augment=augment)
-    for region in regions:
+    for region_i, region in enumerate(regions):
         rd = data[region]
         # Year-gap exclusion applies to TRAINING only. Validation keeps
         # every point so metrics stay comparable across runs and across
@@ -224,8 +224,11 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
         if background_per_pos > 0:
             n_bg = int(round(background_per_pos * len(pos_df)))
             if n_bg > 0:
+                # seed + region index: each region draws its own RNG
+                # stream (same convention as pretrain.py) instead of
+                # every region replaying identical row/col sequences.
                 bg_df = sample_background_points(rd, features, n_bg,
-                                                 seed=seed)
+                                                 seed=seed + region_i)
                 bg_tr = GrousePatchDataset(bg_df, rd, cat_f, cont_f,
                                            img_size=img_size,
                                            expand_rotations=True,
@@ -280,37 +283,25 @@ def score_ensemble(members, features, val_ds, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     loader = DataLoader(val_ds, batch_size=256, num_workers=args.workers)
     per_member, ys = [], None
+    from models import config_to_model_kwargs
     for path, pool in members:
         state, cfg = GrouseModelHandler.unwrap_checkpoint(
             torch.load(path, map_location=device, weights_only=True))
         # Rebuild each member from its own stored config - members can
-        # carry geometry beyond pooling (early_attn, keep_early_
-        # resolution), and a guessed constructor either fails to load or
-        # silently runs the wrong architecture. CLI args are only the
-        # fallback for bare-state_dict checkpoints. Position-mode legacy
-        # chain: new checkpoints store early_attn_pos_mode; ones from
-        # the interim sin-cos fix store early_attn_pos_enc (bool); older
-        # ones store neither and trained position-blind.
-        cfg = cfg or {}
-        pos_mode = cfg.get("early_attn_pos_mode")
-        if pos_mode is None:
-            pos_mode = 'abs' if cfg.get("early_attn_pos_enc") else 'none'
-        model = GrouseResNet(
-            cat_f, cont_f, pretrained=False,
-            pool=cfg.get("pool", pool),
-            center_skip=cfg.get("center_skip", args.center_skip),
-            keep_early_resolution=cfg.get("keep_early_resolution",
-                                          args.keep_early_resolution),
-            early_attn=cfg.get("early_attn", args.early_attn),
-            early_attn_heads=cfg.get("early_attn_heads",
-                                     args.early_attn_heads),
-            early_attn_kv_stride=cfg.get("early_attn_kv_stride",
-                                         args.early_attn_kv_stride),
-            early_attn_pos_mode=pos_mode,
-            dual_branch=cfg.get("dual_branch", args.dual_branch),
-            dual_branch_channels=cfg.get("dual_branch_channels",
-                                         args.dual_branch_channels),
-        ).to(device).eval()
+        # carry geometry beyond pooling, and a guessed constructor
+        # either fails to load or silently runs the wrong architecture.
+        # config_to_model_kwargs owns the legacy key chains; CLI args
+        # are only the fallback for bare-state_dict checkpoints.
+        kw = config_to_model_kwargs(cfg, defaults=dict(
+            pool=pool, center_skip=args.center_skip,
+            keep_early_resolution=args.keep_early_resolution,
+            early_attn=args.early_attn,
+            early_attn_heads=args.early_attn_heads,
+            early_attn_kv_stride=args.early_attn_kv_stride,
+            dual_branch=args.dual_branch,
+            dual_branch_channels=args.dual_branch_channels))
+        model = GrouseResNet(cat_f, cont_f, pretrained=False,
+                             **kw).to(device).eval()
         model.load_state_dict(state)
         outs, labels = [], []
         with torch.no_grad():

@@ -184,9 +184,10 @@ class RegionData:
         nearest=True (default): the EXACT year when a raster for it
         exists, otherwise the closest available year (ties -> earlier
         year, i.e. the conditions that existed at sighting time). A
-        resolution farther than max_year_gap (default
-        YEAR_MATCH_TOLERANCE = +/-1 year) still resolves so training
-        never hard-crashes on sparse vintages, but prints a one-time
+        resolution farther than max_year_gap (default: the shared
+        YEAR_MATCH_TOLERANCE constant, currently +/-2 years) still
+        resolves so unfiltered paths (validation, analysis) never
+        hard-crash on sparse vintages, but prints a one-time
         warning naming the gap - the +/-1-year matching policy is
         enforced whenever the data allows and loud when it can't be.
 

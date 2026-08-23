@@ -419,19 +419,16 @@ class DualSpatialBranch(nn.Module):
             return torch.softmax(
                 self.score(fmap).reshape(b, 1, h * w), dim=2)
         if self.pool == 'center':
+            # normalized-mask form of pool_logits' 2x2 center-window
+            # mean - same cells, same uniform weights
             m = torch.zeros(1, 1, h, w, device=fmap.device)
             m[:, :, (h - 1) // 2:h // 2 + 1, (w - 1) // 2:w // 2 + 1] = 1
             return (m / m.sum()).reshape(1, 1, h * w).to(fmap.dtype)
         if self.pool == 'gauss':
             key = (h, w, fmap.device)
             if key not in self._gauss_cache:
-                yy = torch.arange(h, dtype=torch.float32,
-                                  device=fmap.device) - (h - 1) / 2.0
-                xx = torch.arange(w, dtype=torch.float32,
-                                  device=fmap.device) - (w - 1) / 2.0
-                g = torch.exp(-(yy[:, None] ** 2 + xx[None, :] ** 2)
-                              / (2 * (max(h, w) / 4.0) ** 2))
-                self._gauss_cache[key] = (g / g.sum()).reshape(1, 1, h * w)
+                self._gauss_cache[key] = gauss_weight_map(
+                    h, w, fmap.device).reshape(1, 1, h * w)
             return self._gauss_cache[key].to(fmap.dtype)
         return fmap.new_full((1, 1, h * w), 1.0 / (h * w))   # mean
 
@@ -475,6 +472,53 @@ FEATURE_SPEC = {
     "tcc":    {"kind": "continuous", "scale": 100.0},
     "nlcd":   {"kind": "categorical", "vocab": 256, "dim": 16},
 }
+
+
+def config_to_model_kwargs(cfg, defaults=None):
+    """Decode a wrapped-checkpoint 'config' dict into GrouseResNet
+    constructor kwargs - the ONE place the legacy key chains live, so
+    every loader (predict.py, calibrate.py, train.score_ensemble)
+    rebuilds identical geometry and a new config key is added here
+    once instead of copy-pasted three times.
+
+    Legacy chain: early_attn_pos_mode missing -> interim checkpoints
+    stored early_attn_pos_enc (bool -> 'abs'); ones from before either
+    fix stored neither -> the 'none' default (position-blind, matching
+    how they trained).
+
+    defaults: per-call fallbacks for keys ABSENT from cfg (e.g. CLI
+    flags for bare checkpoints); unnamed keys fall back to the safe
+    architecture defaults below. 'features' is deliberately not
+    handled here - each loader owns its disk-vs-checkpoint feature
+    decision."""
+    base = dict(pool='attn', center_skip=True,
+                keep_early_resolution=False, early_attn=False,
+                early_attn_heads=4, early_attn_kv_stride=1,
+                early_attn_pos_mode='none',
+                dual_branch='off', dual_branch_channels=64)
+    if defaults:
+        base.update(defaults)
+    cfg = cfg or {}
+    kw = {k: cfg.get(k, v) for k, v in base.items()
+          if k != 'early_attn_pos_mode'}
+    pos_mode = cfg.get('early_attn_pos_mode')
+    if pos_mode is None:
+        pos_mode = ('abs' if cfg.get('early_attn_pos_enc')
+                    else base['early_attn_pos_mode'])
+    kw['early_attn_pos_mode'] = pos_mode
+    return kw
+
+
+def gauss_weight_map(h, w, device=None):
+    """Normalized center-weighted gaussian (sigma = max(h, w)/4) -
+    the single definition of 'gauss' pooling weights, shared by
+    GrouseResNet.pool_logits and DualSpatialBranch so the trunk's and
+    Branch B's 'gauss' always mean the same thing."""
+    yy = torch.arange(h, dtype=torch.float32, device=device) - (h - 1) / 2.0
+    xx = torch.arange(w, dtype=torch.float32, device=device) - (w - 1) / 2.0
+    g = torch.exp(-(yy[:, None] ** 2 + xx[None, :] ** 2)
+                  / (2 * (max(h, w) / 4.0) ** 2))
+    return g / g.sum()
 
 
 def split_features(feature_names, spec=None):
@@ -740,13 +784,9 @@ class GrouseResNet(nn.Module):
             return out_map[:, :, r0:r1, c0:c1].mean(dim=(2, 3))
         if self.pool_mode == 'gauss':
             if getattr(self, '_gauss_hw', None) != (h, w):
-                yy = torch.arange(h, dtype=torch.float32) - (h - 1) / 2.0
-                xx = torch.arange(w, dtype=torch.float32) - (w - 1) / 2.0
-                sigma = max(h, w) / 4.0
-                g = torch.exp(-(yy[:, None] ** 2 + xx[None, :] ** 2)
-                              / (2 * sigma ** 2))
-                self.register_buffer('_gauss_w', (g / g.sum()).to(
-                    out_map.device), persistent=False)
+                self.register_buffer(
+                    '_gauss_w', gauss_weight_map(h, w, out_map.device),
+                    persistent=False)
                 self._gauss_hw = (h, w)
             w_ = self._gauss_w.to(out_map.dtype)
             return (out_map * w_).sum(dim=(2, 3))

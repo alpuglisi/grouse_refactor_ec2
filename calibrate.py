@@ -58,7 +58,8 @@ _here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _here)
 
 from grouse_data import GrouseData
-from models import GrouseResNet, FEATURE_SPEC, split_features
+from models import (GrouseResNet, FEATURE_SPEC, split_features,
+                    config_to_model_kwargs)
 from model_handler import GrouseModelHandler, roc_auc, average_precision
 from train import build_datasets, discover_features
 
@@ -75,55 +76,34 @@ def load_model(path, device, cli_pool, cli_center_skip, disk_features):
     if first.startswith("_orig_mod."):
         state = {k[len("_orig_mod."):]: v for k, v in state.items()}
     if cfg is not None:
-        pool = cfg.get("pool", cli_pool)
-        center_skip = cfg.get("center_skip", cli_center_skip)
         features = cfg.get("features", disk_features)
-        keep_early_res = cfg.get("keep_early_resolution", False)
-        early_attn = cfg.get("early_attn", False)
-        early_attn_kv_stride = cfg.get("early_attn_kv_stride", 1)
-        early_attn_heads = cfg.get("early_attn_heads", 4)
-        # Position-mode legacy chain: new configs store
-        # early_attn_pos_mode; interim ones store early_attn_pos_enc
-        # (bool -> 'abs'); pre-fix ones store neither and trained
-        # position-blind ('none'). The model must be rebuilt with
-        # whatever mode it trained under.
-        early_attn_pos_mode = cfg.get("early_attn_pos_mode")
-        if early_attn_pos_mode is None:
-            early_attn_pos_mode = ('abs' if cfg.get("early_attn_pos_enc")
-                                   else 'none')
-        dual_branch = cfg.get("dual_branch", "off")
-        dual_branch_channels = cfg.get("dual_branch_channels", 64)
-        print(f"Checkpoint config: pool={pool}, center_skip={center_skip}, "
-              f"features={features}")
+    else:
+        features = disk_features
+    # config_to_model_kwargs owns every geometry key and legacy chain
+    # in one place; CLI flags are only the bare-checkpoint fallback.
+    kw = config_to_model_kwargs(cfg, defaults=dict(
+        pool=cli_pool, center_skip=cli_center_skip))
+    if cfg is not None:
+        print(f"Checkpoint config: pool={kw['pool']}, "
+              f"center_skip={kw['center_skip']}, features={features}")
         if set(features) != set(disk_features):
             print(f"  [note] checkpoint features differ from disk "
                   f"({disk_features}) - using the CHECKPOINT's list, since "
                   f"that's the geometry the weights encode.")
     else:
-        pool, center_skip, features = cli_pool, cli_center_skip, disk_features
-        keep_early_res, early_attn = False, False
-        early_attn_kv_stride, early_attn_heads = 1, 4
-        early_attn_pos_mode = 'none'
-        dual_branch, dual_branch_channels = 'off', 64
-        print(f"Bare (pre-config) checkpoint: assuming pool={pool}, "
-              f"center_skip={center_skip} from CLI flags - if loading "
-              f"fails or results look wrong, pass the flags the model "
-              f"was trained with.")
+        print(f"Bare (pre-config) checkpoint: assuming pool={kw['pool']}, "
+              f"center_skip={kw['center_skip']} from CLI flags - if "
+              f"loading fails or results look wrong, pass the flags the "
+              f"model was trained with.")
     cat_f, cont_f = split_features(features)
-    model = GrouseResNet(
-        cat_f, cont_f, pretrained=False, pool=pool, center_skip=center_skip,
-        keep_early_resolution=keep_early_res, early_attn=early_attn,
-        early_attn_heads=early_attn_heads,
-        early_attn_kv_stride=early_attn_kv_stride,
-        early_attn_pos_mode=early_attn_pos_mode,
-        dual_branch=dual_branch,
-        dual_branch_channels=dual_branch_channels).to(device)
+    model = GrouseResNet(cat_f, cont_f, pretrained=False,
+                         **kw).to(device)
     try:
         model.load_state_dict(state)
     except RuntimeError as e:
         raise SystemExit(
             f"Checkpoint doesn't match the model geometry "
-            f"(pool={pool}, center_skip={center_skip}, "
+            f"(pool={kw['pool']}, center_skip={kw['center_skip']}, "
             f"features={features}).\nOriginal error:\n{e}")
     model.eval()
     return model, features

@@ -523,16 +523,33 @@ def main():
                              "positive up-weight absorbs the resulting "
                              "false-negative noise. No focal phase; "
                              "--warmup-epochs/--focal-gamma are ignored.")
-    parser.add_argument("--an-pos-weight", type=float, default=None,
+    parser.add_argument("--an-pos-weight", "--an-lambda", type=float,
+                        default=None,
                         help="lambda for --loss an_full: multiplier on "
-                             "the positive loss terms. Default (auto): "
-                             "1.0 under stratified batching (batches "
-                             "are already class-balanced, so no "
-                             "compensation is needed); the dataset's "
-                             "neg:pos ratio when stratification is "
-                             "disabled (--batch-pos-frac -1), matching "
-                             "Cole et al.'s role for lambda of "
-                             "offsetting the assumed-negative flood.")
+                             "the positive loss terms (--an-lambda is "
+                             "an alias). Default (auto): 1.0 under "
+                             "stratified batching (batches are already "
+                             "class-balanced, so no compensation is "
+                             "needed); the dataset's neg:pos ratio when "
+                             "stratification is disabled "
+                             "(--batch-pos-frac -1), matching Cole et "
+                             "al.'s role for lambda of offsetting the "
+                             "assumed-negative flood. Takes precedence "
+                             "over --pos-neg-ratio.")
+    parser.add_argument("--pos-neg-ratio", type=float, default=None,
+                        help="Positive:negative weighting ratio of the "
+                             "LOSS, whichever loss is active. R > 1 "
+                             "weights each positive sample R times a "
+                             "negative (recall-leaning: false negatives "
+                             "cost more); R < 1 the reverse (precision-"
+                             "leaning). focal: sets alpha = R/(1+R) "
+                             "(default alpha 0.5 == ratio 1:1 - the "
+                             "balanced-data recalibration; the original "
+                             "0.25 was ratio 1:3). an_full: sets "
+                             "lambda = R unless --an-pos-weight/"
+                             "--an-lambda is given explicitly. Note "
+                             "this weights the LOSS only - batch "
+                             "composition is --batch-pos-frac.")
     parser.add_argument("--an-background", type=float, default=0.0,
                         help="Random background assumed-negatives added "
                              "to TRAINING, as a multiple of each "
@@ -669,11 +686,26 @@ def main():
     # auto lambda is 1.0. Only with stratification disabled does the
     # raw dataset imbalance hit each batch, and lambda = neg:pos
     # restores the balance.
+    if args.pos_neg_ratio is not None and args.pos_neg_ratio <= 0:
+        raise SystemExit(f"--pos-neg-ratio must be > 0, got "
+                         f"{args.pos_neg_ratio}")
+    # focal's alpha weights positives by alpha and negatives by
+    # (1-alpha), so a pos:neg ratio R maps to alpha = R/(1+R).
+    focal_alpha = 0.5
+    if args.pos_neg_ratio is not None:
+        focal_alpha = args.pos_neg_ratio / (1.0 + args.pos_neg_ratio)
+        if args.loss == 'focal':
+            print(f"Loss pos:neg weighting {args.pos_neg_ratio:g}:1 -> "
+                  f"focal alpha = {focal_alpha:.3f} (applies to the "
+                  f"BCE warmup too).")
     an_pos_weight = 1.0
     if args.loss == 'an_full':
         if args.an_pos_weight is not None:
             an_pos_weight = float(args.an_pos_weight)
-            why = "explicit"
+            why = "explicit --an-pos-weight/--an-lambda"
+        elif args.pos_neg_ratio is not None:
+            an_pos_weight = float(args.pos_neg_ratio)
+            why = "--pos-neg-ratio (lambda IS an_full's pos:neg ratio)"
         elif disable:
             n_pos = int((train_labels == 1).sum())
             n_neg = int((train_labels == 0).sum())
@@ -737,6 +769,7 @@ def main():
             ema_decay=args.ema, lr=lr,
             weight_decay=overrides.get('weight_decay', args.weight_decay),
             loss=args.loss, an_pos_weight=an_pos_weight,
+            focal_alpha=focal_alpha,
             focal_gamma=args.focal_gamma,
             backbone_lr_factor=args.backbone_lr_factor,
             sched=args.sched,

@@ -223,7 +223,13 @@ def fetch_tile(ee, image, rect, dest, retries=4):
         try:
             url = image.getDownloadURL(params)
             r = requests.get(url, timeout=300)
-            r.raise_for_status()
+            if r.status_code != 200:
+                # EE puts the ACTUAL failure reason (size cap, compute
+                # timeout, memory limit...) in the response body;
+                # raise_for_status() discards it and leaves only "400
+                # Bad Request" - which cost two blind debugging rounds.
+                raise RuntimeError(
+                    f"HTTP {r.status_code}: {r.text[:300]}")
             with open(dest, "wb") as f:
                 f.write(r.content)
             with rasterio.open(dest):     # parse check

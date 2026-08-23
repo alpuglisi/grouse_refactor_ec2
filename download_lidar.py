@@ -209,12 +209,20 @@ def main():
                         choices=list(BOXES))
     parser.add_argument("--project",
                         default=os.environ.get("EARTHENGINE_PROJECT"))
-    parser.add_argument("--tile-m", type=int, default=48000,
+    parser.add_argument("--tile-m", type=int, default=24000,
                         help=f"Download tile edge in meters, at "
-                             f"{TARGET_PIXEL_M}m/px. Smaller than "
-                             f"download_tcc_nlcd.py's default because "
-                             f"reduceResolution is heavier per-pixel "
-                             f"than a plain band select.")
+                             f"{TARGET_PIXEL_M}m/px. Much smaller than "
+                             f"download_tcc_nlcd.py's default for two "
+                             f"compounding reasons: elevation is a "
+                             f"FLOAT32 band (4 bytes/px vs TCC/NLCD's "
+                             f"1 - a 48km tile is ~92MB uncompressed, "
+                             f"double getDownloadURL's ~48MB cap and "
+                             f"the cause of a 400 on every tile), and "
+                             f"each output pixel is a server-side "
+                             f"aggregation over ~100 native 1m pixels. "
+                             f"24000 -> 2400x2400x4B = 23MB, safely "
+                             f"under the cap; lower it further if EE "
+                             f"reports compute timeouts.")
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--out-dir", default=None)
     parser.add_argument("--force", action="store_true")

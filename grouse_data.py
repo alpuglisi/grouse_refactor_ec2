@@ -77,7 +77,19 @@ PATH_TEMPLATES = {
     "diagnostic_map":    "data/maps/grouse_diagnostic_map_{region}.png",
 }
 
-RASTER_FEATURES = ["evt", "evh", "evc", "sclass", "fdist", "ch", "cc"]
+RASTER_FEATURES = ["evt", "evh", "evc", "sclass", "fdist", "ch", "cc",
+                   # Earth Engine products (download_tcc_nlcd.py):
+                   # tcc = USFS Tree Canopy Cover percent (continuous),
+                   # nlcd = Annual NLCD land-cover class (categorical).
+                   "tcc", "nlcd"]
+
+# Year-matching policy for raster_path(nearest=True): a sighting's year
+# resolves to the exact raster year when present, else the CLOSEST year
+# within this tolerance (ties -> earlier year, i.e. conditions that
+# existed at sighting time). A raster only found FURTHER away than this
+# still resolves (training shouldn't hard-crash on sparse vintages) but
+# warns loudly once per (feature, year).
+YEAR_MATCH_TOLERANCE = 1
 
 
 class MissingDataError(FileNotFoundError):
@@ -97,6 +109,7 @@ class RegionData:
         self.config = config or DataConfig()
         self._cache = {}
         self._raster_validity_cache = {}
+        self._year_gap_warned = set()
 
     # ---- path machinery -------------------------------------------------
     def path(self, kind, must_exist=True, **kw):
@@ -163,12 +176,17 @@ class RegionData:
         self._raster_validity_cache[path] = valid
         return valid
 
-    def raster_path(self, feature, year, nearest=True, validate=True):
-        """Path to a feature raster. With nearest=True (default), a year
-        with no raster resolves to the closest available year (ties ->
-        earlier year) - matches analyze_grouse.py's sighting-extraction
-        fallback (appropriate when the goal is land cover close to a
-        specific historical date).
+    def raster_path(self, feature, year, nearest=True, validate=True,
+                    max_year_gap=None):
+        """Path to a feature raster, matched to the record's year. With
+        nearest=True (default): the EXACT year when a raster for it
+        exists, otherwise the closest available year (ties -> earlier
+        year, i.e. the conditions that existed at sighting time). A
+        resolution farther than max_year_gap (default
+        YEAR_MATCH_TOLERANCE = +/-1 year) still resolves so training
+        never hard-crashes on sparse vintages, but prints a one-time
+        warning naming the gap - the +/-1-year matching policy is
+        enforced whenever the data allows and loud when it can't be.
 
         With validate=True (default), the resolved file's CONTENT is
         checked, not just its existence - a present-but-empty raster
@@ -189,7 +207,17 @@ class RegionData:
                 raise MissingDataError(
                     f"[{self.region}] no {feature} raster for {year}; "
                     f"available: {years}")
-            year = min(years, key=lambda y: (abs(y - year), y))
+            chosen = min(years, key=lambda y: (abs(y - year), y))
+            tol = (YEAR_MATCH_TOLERANCE if max_year_gap is None
+                   else int(max_year_gap))
+            gap = abs(chosen - year)
+            if gap > tol and (feature, year) not in self._year_gap_warned:
+                self._year_gap_warned.add((feature, year))
+                print(f"   [warn] [{self.region}] no {feature} raster "
+                      f"within +/-{tol} year(s) of {year} (available: "
+                      f"{years}) - using nearest overall ({chosen}, "
+                      f"{gap} years off).")
+            year = chosen
 
         path = self.path("raster", feature=feature, year=year)
         if not validate or self._is_valid_raster(path):

@@ -363,6 +363,16 @@ FEATURE_SPEC = {
     # scale brings both to roughly unit range.
     "ch":     {"kind": "continuous", "scale": 100.0},
     "cc":     {"kind": "continuous", "scale": 100.0},
+    # Earth Engine products (download_tcc_nlcd.py). TCC = USFS Tree
+    # Canopy Cover percent (0-100, Landsat-modeled, annual 1985-2023) -
+    # CONTINUOUS, same unit scaling as CC (which it complements: CC is
+    # LANDFIRE's mapped canopy, TCC an independent annual model, and
+    # their disagreement is itself signal). NLCD = Annual NLCD land-
+    # cover class - CATEGORICAL Anderson Level II codes (11 water ...
+    # 95 emergent wetland; vocab covers the 8-bit code space, nodata
+    # 250 is remapped to -9999 at download so it clamps to padding).
+    "tcc":    {"kind": "continuous", "scale": 100.0},
+    "nlcd":   {"kind": "categorical", "vocab": 256, "dim": 16},
 }
 
 

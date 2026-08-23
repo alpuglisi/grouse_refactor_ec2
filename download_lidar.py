@@ -154,9 +154,18 @@ def build_band_image(ee, geom, reducer_name):
     # approximation - the aggregation window stays ~100 native pixels
     # per 10m output cell either way.)
     mosaic = col.mosaic().setDefaultProjection(col.first().projection())
-    proj = ee.Projection("EPSG:5070").atScale(TARGET_PIXEL_M)
+    # NO explicit .reproject() here - that forced one monolithic
+    # reprojection at the 1m INPUT scale, and a 24km 5070-aligned tile
+    # expressed in the source UTM frame at 1m is a ~28.7k x 28.4k px
+    # intermediate ("Reprojection output too large"). The canonical EE
+    # export pattern instead lets the DOWNLOAD REQUEST's crs +
+    # crs_transform (EPSG:5070 @ 10m, which fetch_tile already passes)
+    # define the output grid; reduceResolution then aggregates the ~100
+    # native 1m pixels per 10m output cell during that request-driven
+    # reprojection, computed in EE's internal chunks rather than one
+    # oversized hop.
     return (mosaic.reduceResolution(reducer=reducer, maxPixels=1024)
-            .reproject(proj).clip(geom))
+            .clip(geom))
 
 
 def build_lidar_raster(ee, feature, reducer_name, bounds_lonlat,

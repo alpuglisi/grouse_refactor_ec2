@@ -467,7 +467,8 @@ class GrouseResNet(nn.Module):
         self.layer4 = resnet.layer4
         self.cbam4 = CBAM(512)
 
-        self.avgpool = resnet.avgpool   # kept for parity; unused in forward
+        self.avgpool = resnet.avgpool   # unused in forward; features()
+                                        # pools with it for SSL pretraining
         # Dropout on the 512-d feature map before the head. ~12.7k
         # training points against ~12M parameters overfits hard, and this
         # is the cheapest place to fight it that costs no features.
@@ -517,7 +518,12 @@ class GrouseResNet(nn.Module):
         pools it, as in the original."""
         return self.trunk(self.embed(cat_x, cont_x))
 
-    def trunk(self, x):
+    def backbone(self, x):
+        """Stem through cbam4: the 512-channel spatial feature map.
+        Shared by the supervised head (trunk -> conv_out) and by
+        self-supervised pretraining (features -> pooled vector), so
+        weights pretrained through one path load directly into the
+        other."""
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -533,8 +539,18 @@ class GrouseResNet(nn.Module):
         x = self.cbam3(x)
         x = self.layer4(x)
         x = self.cbam4(x)
+        return x
 
-        return self.conv_out(self.drop(x))
+    def trunk(self, x):
+        return self.conv_out(self.drop(self.backbone(x)))
+
+    def features(self, cat_x, cont_x):
+        """(B, 512) globally pooled backbone features - the encoder
+        output used by SimSiam self-supervised pretraining
+        (pretrain.py). No head, no dropout: the pretext task should
+        see the representation, not the classifier."""
+        return self.avgpool(
+            self.backbone(self.embed(cat_x, cont_x))).flatten(1)
 
     def logits(self, cat_x, cont_x):
         """The single scalar logit per sample that training optimizes:

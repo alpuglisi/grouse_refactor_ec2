@@ -433,6 +433,41 @@ class GrouseModelHandler:
             return metrics.get('strict_accuracy', float('-inf'))
         return -metrics['val_loss']
 
+    def load_backbone(self, path):
+        """Initialize matching weights from a pretraining checkpoint -
+        pretrain.py's self-supervised SimSiam backbone, or any
+        GrouseResNet-keyed state dict. Tensors absent from the
+        checkpoint (conv_out, center_head, ...) keep their fresh
+        initialization; shape mismatches (e.g. a different feature set)
+        are skipped with a report rather than failing. Every loaded
+        parameter joins fit()'s reduced-LR backbone group: after
+        pretraining it is no longer "fresh", and full-LR churn is what
+        the differential-LR scheme exists to prevent."""
+        state, cfg = self.unwrap_checkpoint(
+            torch.load(path, map_location=self.device, weights_only=True))
+        msd = self.model.state_dict()
+        matched = {k: v for k, v in state.items()
+                   if k in msd and msd[k].shape == v.shape}
+        mismatched = [k for k in state
+                      if k in msd and k not in matched]
+        absent = [k for k in state if k not in msd]
+        self.model.load_state_dict(matched, strict=False)
+        self._transfer_loaded = set(matched)
+        print(f"   Backbone init from {path}: {len(matched)} tensors "
+              f"loaded ({len(msd) - len(matched)} stay at fresh init - "
+              f"head layers etc.)"
+              f"{f'; {len(mismatched)} shape-mismatched skipped' if mismatched else ''}"
+              f"{f'; {len(absent)} checkpoint-only ignored' if absent else ''}. "
+              f"Loaded parameters train in the backbone LR group.")
+        if cfg and cfg.get("features"):
+            here = set(self.cat_features) | set(self.cont_features)
+            if set(cfg["features"]) != here:
+                print(f"   [warn] pretraining used features "
+                      f"{sorted(cfg['features'])} but this model uses "
+                      f"{sorted(here)} - shared tensors transferred, "
+                      f"the rest stay fresh.")
+        return set(matched)
+
     # ---- training --------------------------------------------------------
     def _eval_batch_size(self, batch_size, requested=None):
         """Validation batch size: explicit request wins, else widen only
@@ -588,12 +623,17 @@ class GrouseModelHandler:
         # Zero-init makes it start as identity; the reduced LR makes it
         # fade in no faster than the pretrained trunk it must cooperate
         # with.
+        # Parameters initialized from a pretraining checkpoint
+        # (load_backbone) also count as backbone: pretrained weights get
+        # the reduced LR whatever their module name. early_attn keeps
+        # its own group either way.
+        transfer = getattr(self, '_transfer_loaded', frozenset())
         backbone_params, attn_params, fresh_params = [], [], []
         for name, p in self.model.named_parameters():
-            if name.startswith(pretrained_prefixes):
-                backbone_params.append(p)
-            elif name.startswith("early_attn."):
+            if name.startswith("early_attn."):
                 attn_params.append(p)
+            elif name.startswith(pretrained_prefixes) or name in transfer:
+                backbone_params.append(p)
             else:
                 fresh_params.append(p)
         groups = [{"params": backbone_params,

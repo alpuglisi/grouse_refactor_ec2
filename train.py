@@ -325,6 +325,17 @@ def main():
                              "stratification (plain shuffling).")
     parser.add_argument("--no-pretrained", action="store_true",
                         help="Skip ImageNet weights (offline/test runs).")
+    parser.add_argument("--init-from", default=None,
+                        help="Path to a self-supervised backbone "
+                             "checkpoint from pretrain.py. Matching "
+                             "tensors (stem, embeddings, ResNet stages, "
+                             "CBAM, early-attn) are loaded and train in "
+                             "the reduced-LR backbone group; head layers "
+                             "stay fresh. Overwrites ImageNet weights "
+                             "where they overlap, so pair with "
+                             "--no-pretrained to skip the pointless "
+                             "download. Geometry flags must match the "
+                             "pretraining run for full transfer.")
     parser.add_argument("--save-path", default="grouse_single_best.pth")
     parser.add_argument("--cache-dir", default="data/cache",
                         help="Materialize patches once into a memmapped "
@@ -668,6 +679,8 @@ def main():
             on_divergence=args.on_divergence,
             divergence_dampen_factor=args.divergence_dampen_factor,
             flip_tta=args.flip_tta)
+        if args.init_from:
+            handler.load_backbone(args.init_from)
         handler.fit(train_ds, val_ds, epochs=args.epochs,
                     batch_size=args.batch_size,
                     eval_batch_size=args.eval_batch_size,

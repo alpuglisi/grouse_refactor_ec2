@@ -324,6 +324,39 @@ class GrousePatchDataset(Dataset):
         w = torch.tensor(float(row['weight']), dtype=torch.float32)
         return cat_x, cont_x, yl, w
 
+    def _augmented_view(self, stack):
+        """One randomly augmented view (jitter crop + random D4
+        orientation) of a raw padded stack -> (cat_x, cont_x). Mirrors
+        __getitem__'s augment=True path exactly; SSLPairDataset calls
+        it twice per access to draw two independent views of one tile."""
+        n, pad = self.img_size, self.pad
+        rot = int(torch.randint(0, 4, (1,)).item())
+        flip = bool(torch.randint(0, 2, (1,)).item())
+        if pad:
+            dy = int(torch.randint(-pad, pad + 1, (1,)).item())
+            dx = int(torch.randint(-pad, pad + 1, (1,)).item())
+        else:
+            dy = dx = 0
+        s = stack[:, pad + dy:pad + dy + n, pad + dx:pad + dx + n]
+        n_cat = len(self.cat_features)
+        cat_np, cont_np = s[:n_cat], s[n_cat:]
+        cat_x = (torch.from_numpy(np.ascontiguousarray(cat_np)).long()
+                 if n_cat else torch.zeros((0, n, n), dtype=torch.long))
+        if len(self.cont_features):
+            scales = np.array([[[float(self.spec[f].get("scale", 1.0))]]
+                               for f in self.cont_features], dtype=np.float32)
+            cont_x = torch.from_numpy(
+                np.ascontiguousarray(cont_np / scales)).float()
+        else:
+            cont_x = torch.zeros((0, n, n), dtype=torch.float32)
+        if rot:
+            cat_x = torch.rot90(cat_x, k=rot, dims=(1, 2))
+            cont_x = torch.rot90(cont_x, k=rot, dims=(1, 2))
+        if flip:
+            cat_x = torch.flip(cat_x, dims=(2,))
+            cont_x = torch.flip(cont_x, dims=(2,))
+        return cat_x, cont_x
+
     @property
     def labels(self):
         """Per-item labels WITHOUT reading any raster - needed by the
@@ -333,6 +366,36 @@ class GrousePatchDataset(Dataset):
         import numpy as np
         base = self.df['label'].values.astype(np.float32)
         return np.repeat(base, 4) if self.expand_rotations else base
+
+
+class SSLPairDataset(GrousePatchDataset):
+    """Two independently augmented views of the same unlabeled tile per
+    access - the input pair for SimSiam-style self-supervised
+    pretraining (pretrain.py). Each __getitem__ reads the tile's padded
+    stack once and draws two independent (jitter crop + random D4)
+    views from it: the pretext task is "recognize that two overlapping,
+    re-oriented crops show the same piece of landscape", which forces
+    the backbone to encode habitat structure rather than absolute pixel
+    arrangement. Rotation expansion is disabled (orientation is drawn
+    per view instead) and labels are irrelevant."""
+
+    def __init__(self, points_df, region_data, cat_features, cont_features,
+                 img_size=64, jitter=8, **kw):
+        kw.pop("expand_rotations", None)
+        kw.pop("augment", None)
+        kw.pop("label", None)
+        super().__init__(points_df, region_data, cat_features,
+                         cont_features, img_size=img_size,
+                         expand_rotations=False, augment=True,
+                         jitter=jitter, label=0.0, **kw)
+
+    def __getitem__(self, idx):
+        row = self.df.iloc[idx]
+        stack = self._raw_stack(idx, float(row['longitude']),
+                                float(row['latitude']), int(row['year']))
+        cat1, cont1 = self._augmented_view(stack)
+        cat2, cont2 = self._augmented_view(stack)
+        return cat1, cont1, cat2, cont2
 
 
 class StratifiedBatchSampler(torch.utils.data.Sampler):

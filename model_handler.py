@@ -25,7 +25,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from models import GrouseResNet, split_features, FEATURE_SPEC
-from losses import FocalLoss
+from losses import FocalLoss, ANFullLoss
 
 # Validation runs no optimizer, so its batch size affects only
 # throughput and peak memory - never the reported metrics. A forward
@@ -193,6 +193,7 @@ class DivergenceGuard:
 class GrouseModelHandler:
     def __init__(self, feature_names, spec=None, pretrained=True,
                  lr=0.0003, weight_decay=1e-4,
+                 loss='focal', an_pos_weight=1.0,
                  focal_alpha=0.5, focal_gamma=2.0,
                  warmup_epochs=3,
                  sched_t0=10, sched_tmult=2, grad_clip=1.0,
@@ -232,7 +233,13 @@ class GrouseModelHandler:
         self.use_sample_weights = use_sample_weights
         self.save_path = save_path
         self.grad_clip = grad_clip
+        if loss not in ('focal', 'an_full'):
+            raise ValueError(f"loss must be 'focal' or 'an_full', "
+                             f"got {loss!r}")
+        self.loss_type = loss
+        self.an_pos_weight = float(an_pos_weight)
         self.hp = dict(lr=lr, weight_decay=weight_decay,
+                       loss=loss, an_pos_weight=self.an_pos_weight,
                        focal_alpha=focal_alpha, focal_gamma=focal_gamma,
                        warmup_epochs=warmup_epochs,
                        sched_t0=sched_t0, sched_tmult=sched_tmult,
@@ -617,20 +624,39 @@ class GrouseModelHandler:
         scaler = (torch.amp.GradScaler('cuda')
                   if self.device.type == 'cuda' else None)
         reduction = 'none' if self.use_sample_weights else 'mean'
-        criterion_focal = FocalLoss(alpha=self.hp['focal_alpha'],
-                                    gamma=self.hp['focal_gamma'],
-                                    reduction=reduction)
-        # Warmup criterion: gamma=0 focal == alpha-weighted plain BCE.
-        # Focal's (1-pt)^gamma easy-example suppression, applied from
-        # step 0 on a fresh network, flattens the gradient basin around
-        # the constant-predictor stationary point (diagnosed: constant
-        # logit 0.133, loss frozen at the value the constant solution
-        # predicts). Plain BCE has no such suppression - the network is
-        # forced to learn input-dependent features first; focal then
-        # takes over to refine on hard examples.
-        criterion_warmup = FocalLoss(alpha=self.hp['focal_alpha'],
-                                     gamma=0.0, reduction=reduction)
-        n_warm = self.hp['warmup_epochs']
+        if self.loss_type == 'an_full':
+            # L_AN-full (Cole et al.): lambda-weighted BCE with every
+            # negative ASSUMED. No focal phase exists in this objective,
+            # so the BCE->focal warmup schedule is moot: the same
+            # criterion runs start to finish (and it is already plain
+            # BCE at lambda=1, i.e. the warmup's own recipe).
+            criterion_focal = ANFullLoss(pos_weight=self.an_pos_weight,
+                                         reduction=reduction)
+            criterion_warmup = criterion_focal
+            n_warm = 0
+            loss_label = "AN-full Loss"
+            print(f"   AN-full loss active (Cole et al., L_AN-full): "
+                  f"positive terms weighted x{self.an_pos_weight:g}, all "
+                  f"negatives assumed true negatives"
+                  f"{'; --warmup-epochs ignored (no focal phase).' if self.hp['warmup_epochs'] else '.'}"
+                  f" Val loss is on the AN-full scale - not comparable "
+                  f"to focal runs.")
+        else:
+            criterion_focal = FocalLoss(alpha=self.hp['focal_alpha'],
+                                        gamma=self.hp['focal_gamma'],
+                                        reduction=reduction)
+            # Warmup criterion: gamma=0 focal == alpha-weighted plain BCE.
+            # Focal's (1-pt)^gamma easy-example suppression, applied from
+            # step 0 on a fresh network, flattens the gradient basin around
+            # the constant-predictor stationary point (diagnosed: constant
+            # logit 0.133, loss frozen at the value the constant solution
+            # predicts). Plain BCE has no such suppression - the network is
+            # forced to learn input-dependent features first; focal then
+            # takes over to refine on hard examples.
+            criterion_warmup = FocalLoss(alpha=self.hp['focal_alpha'],
+                                         gamma=0.0, reduction=reduction)
+            n_warm = self.hp['warmup_epochs']
+            loss_label = "Focal Loss"
         if self.hp['sched'] == 'cosine':
             # One smooth decay to ~0 over the whole run. Warm restarts
             # re-heat the LR at epochs 10 and 30, which on a dataset this
@@ -742,7 +768,8 @@ class GrouseModelHandler:
             tr_logits = torch.cat(tr_logits).cpu()
             tr_ys = torch.cat(tr_ys).cpu()
 
-            # Validation always scored with the FOCAL criterion, even
+            # Validation always scored with the MAIN criterion (focal,
+            # or AN-full when loss='an_full'), even
             # during warmup - otherwise warmup-epoch val losses (BCE
             # scale, numerically larger) aren't comparable with focal
             # epochs and best-checkpoint selection breaks.
@@ -773,7 +800,7 @@ class GrouseModelHandler:
             metrics['lr'] = optimizer.param_groups[-1]['lr']
             metrics['rank_score'] = self.selection_score('rank', metrics)
             status = (f"   Epoch {epoch + 1}/{epochs} | "
-                      f"Focal Loss: {metrics['val_loss']:.4f} | "
+                      f"{loss_label}: {metrics['val_loss']:.4f} | "
                       f"Val Accuracy: {metrics['accuracy']:.2f}% | "
                       f"AUC: {metrics['auc']:.4f} | "
                       f"TTA AUC: {metrics.get('tta_auc', float('nan')):.4f} | "
@@ -829,7 +856,7 @@ class GrouseModelHandler:
                 break
 
         print(f"\nTraining finished{' (stopped on divergence)' if stop_early else ''}."
-             f" Best Focal Loss: {best_loss:.4f} | "
+             f" Best {loss_label}: {best_loss:.4f} | "
              f"Best TTA AUC: {best_auc:.4f} | "
              f"Best rank: {best_rank:.4f} | "
              f"Best strict acc: {best_strict:.2f}% "

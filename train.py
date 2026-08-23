@@ -115,8 +115,57 @@ def discover_features(data, regions):
     return usable
 
 
+def sample_background_points(rd, features, n, seed=0):
+    """n uniformly random locations inside the region's reference
+    raster, filtered to valid data at the center pixel - the random
+    "assumed negative" background locations of Cole et al.'s L_AN-full.
+    Deliberately NOT buffered away from known presences: assuming
+    negatives everywhere (and accepting the resulting label noise) is
+    the loss's design; its positive up-weighting is what absorbs the
+    false negatives this creates."""
+    import numpy as np
+    import pandas as pd
+    import rasterio
+    from pyproj import Transformer
+    from dataset import NODATA_SENTINELS
+
+    feat = features[0]                     # spec order: categorical first
+    path = rd.latest_raster_path(feat)
+    year = max(rd.raster_years(feat))
+    rng = np.random.default_rng(seed)
+    lons, lats = [], []
+    with rasterio.open(path) as src:
+        to_lonlat = Transformer.from_crs(src.crs, "EPSG:4326",
+                                         always_xy=True)
+        nodata = src.nodata if src.nodata is not None else -9999
+        bad = set(NODATA_SENTINELS) | {nodata, 0}
+        attempts = 0
+        while len(lons) < n and attempts < 40:
+            attempts += 1
+            m = max(64, 2 * (n - len(lons)))
+            rows = rng.integers(0, src.height, m)
+            cols = rng.integers(0, src.width, m)
+            xs, ys = rasterio.transform.xy(src.transform, rows, cols)
+            vals = np.array([v[0] for v in
+                             src.sample(zip(xs, ys))], dtype=np.float64)
+            ok = ~np.isin(vals, list(bad)) & np.isfinite(vals)
+            if ok.any():
+                glon, glat = to_lonlat.transform(
+                    np.asarray(xs)[ok], np.asarray(ys)[ok])
+                lons.extend(np.atleast_1d(glon)[:n - len(lons)])
+                lats.extend(np.atleast_1d(glat)[:n - len(lats)])
+        if len(lons) < n:
+            raise SystemExit(
+                f"Background sampling found only {len(lons)}/{n} valid "
+                f"locations in {path} after {attempts} rounds - the "
+                f"raster may be mostly nodata.")
+    return pd.DataFrame({"longitude": lons, "latitude": lats,
+                         "year": int(year), "label": 0.0, "weight": 1.0})
+
+
 def build_datasets(data, regions, features, img_size, cache_dir=None,
-                   jitter=0, augment=False):
+                   jitter=0, augment=False, background_per_pos=0.0,
+                   seed=0):
     import numpy as np
     cat_f, cont_f = split_features(features)
     train_parts, val_parts, train_labels = [], [], []
@@ -133,6 +182,21 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
                                   label=0.0, **aug)
         train_parts += [p_tr, n_tr]
         train_labels += [p_tr.labels, n_tr.labels]
+        if background_per_pos > 0:
+            n_bg = int(round(background_per_pos
+                             * len(rd.positives("train"))))
+            if n_bg > 0:
+                bg_df = sample_background_points(rd, features, n_bg,
+                                                 seed=seed)
+                bg_tr = GrousePatchDataset(bg_df, rd, cat_f, cont_f,
+                                           img_size=img_size,
+                                           expand_rotations=True,
+                                           label=0.0, **aug)
+                train_parts.append(bg_tr)
+                train_labels.append(bg_tr.labels)
+                print(f"   {region}: +{n_bg:,} random background "
+                      f"assumed-negatives (x{background_per_pos:g} per "
+                      f"positive; train only - validation unchanged).")
         # Validation is never augmented: the 4 fixed rotations are kept so
         # val scores stay comparable across runs (and so the evaluator can
         # average them per point as test-time augmentation).
@@ -367,6 +431,40 @@ def main():
                              f"{REFERENCE_BATCH_SIZE} all three are "
                              "identical.")
     parser.add_argument("--weight-decay", type=float, default=1e-4)
+    parser.add_argument("--loss", default="focal",
+                        choices=["focal", "an_full"],
+                        help="Training objective. 'focal' (default): the "
+                             "existing BCE-warmup -> FocalLoss recipe. "
+                             "'an_full': Cole et al.'s L_AN-full (full "
+                             "assume-negative) - lambda-weighted BCE "
+                             "where every negative (curated AND random "
+                             "background, see --an-background) is "
+                             "assumed to be a true negative and the "
+                             "positive up-weight absorbs the resulting "
+                             "false-negative noise. No focal phase; "
+                             "--warmup-epochs/--focal-gamma are ignored.")
+    parser.add_argument("--an-pos-weight", type=float, default=None,
+                        help="lambda for --loss an_full: multiplier on "
+                             "the positive loss terms. Default (auto): "
+                             "1.0 under stratified batching (batches "
+                             "are already class-balanced, so no "
+                             "compensation is needed); the dataset's "
+                             "neg:pos ratio when stratification is "
+                             "disabled (--batch-pos-frac -1), matching "
+                             "Cole et al.'s role for lambda of "
+                             "offsetting the assumed-negative flood.")
+    parser.add_argument("--an-background", type=float, default=0.0,
+                        help="Random background assumed-negatives added "
+                             "to TRAINING, as a multiple of each "
+                             "region's positive count (Cole et al. use "
+                             "1 random location per data location -> "
+                             "1.0). Sampled uniformly over the region's "
+                             "raster, valid-data filtered, NOT buffered "
+                             "away from presences (assumed negative is "
+                             "the point). Validation is untouched so "
+                             "metrics stay comparable. 0 = off. Usable "
+                             "with either --loss, but designed for "
+                             "an_full.")
     parser.add_argument("--focal-gamma", type=float, default=2.0)
     parser.add_argument("--backbone-lr-factor", type=float, default=0.1)
     parser.add_argument("--sched", default="cosine",
@@ -468,7 +566,8 @@ def main():
     train_ds, val_ds, train_labels = build_datasets(
         data, args.regions, features, args.img_size,
         cache_dir=args.cache_dir or None, jitter=args.jitter,
-        augment=args.augment)
+        augment=args.augment, background_per_pos=args.an_background,
+        seed=args.seed)
     print(f"Train samples: {len(train_ds):,} | Val samples: {len(val_ds):,}")
 
     disable = (args.batch_pos_frac is not None
@@ -482,6 +581,28 @@ def main():
         frac_arg = args.batch_pos_frac[0]
     else:
         frac_arg = tuple(args.batch_pos_frac)
+
+    # lambda for L_AN-full. Under the default STRATIFIED batching the
+    # sampler feeds every batch pair at net 50/50 regardless of dataset
+    # composition (minority indices recycle), so the assumed-negative
+    # flood Cole et al. offset with lambda never reaches the loss -
+    # auto lambda is 1.0. Only with stratification disabled does the
+    # raw dataset imbalance hit each batch, and lambda = neg:pos
+    # restores the balance.
+    an_pos_weight = 1.0
+    if args.loss == 'an_full':
+        if args.an_pos_weight is not None:
+            an_pos_weight = float(args.an_pos_weight)
+            why = "explicit"
+        elif disable:
+            n_pos = int((train_labels == 1).sum())
+            n_neg = int((train_labels == 0).sum())
+            an_pos_weight = n_neg / max(n_pos, 1)
+            why = f"auto = neg:pos {n_neg:,}:{n_pos:,} (plain shuffling)"
+        else:
+            why = "auto = 1.0 (stratified batches are already balanced)"
+        print(f"L_AN-full lambda (positive weight): {an_pos_weight:g} "
+              f"[{why}]")
 
     # Scale the LR to the batch size. A batch of N averages N samples
     # into one gradient and one step, so at N=128 the run takes a
@@ -533,6 +654,7 @@ def main():
                                           args.label_smoothing),
             ema_decay=args.ema, lr=lr,
             weight_decay=overrides.get('weight_decay', args.weight_decay),
+            loss=args.loss, an_pos_weight=an_pos_weight,
             focal_gamma=args.focal_gamma,
             backbone_lr_factor=args.backbone_lr_factor,
             sched=args.sched,

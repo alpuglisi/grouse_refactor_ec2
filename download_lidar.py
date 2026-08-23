@@ -63,6 +63,24 @@ from models import FEATURE_SPEC, native_scale_m
 from download_tcc_nlcd import ee_init, region_grid, tiles, fetch_tile, _fetch_all
 
 COLLECTION_ID = "USGS/3DEP/1m"
+# lidar_elev comes from the SEAMLESS 10m 3DEP product instead of
+# aggregating the 1m tiles: same LiDAR program (USGS resamples its best
+# available source, largely the same 1m lidar, to 10m), already at our
+# target resolution, and a plain single band that downloads exactly
+# like TCC/NLCD did. Aggregating 1m->10m by MEAN buys essentially
+# nothing over USGS's own 10m for the elevation value itself - and the
+# 1m pull is what kept hitting EE's reprojection size cap. lidar_rough
+# is the one feature that genuinely NEEDS the native 1m source (its
+# entire point is sub-cell variance), so it alone keeps the
+# reduceResolution chain, at a tile size derived below.
+ELEV_IMAGE_ID = "USGS/3DEP/10m"
+# Observed: a 24km 5070-aligned tile pulled through the 1m source
+# reprojects to a 28776x28433 px input ("Reprojection output too
+# large") - a 1.199x linear inflation from the UTM<->5070 rotation. At
+# 9600m tiles the input side is ~11.5k px (~1.33e8 px total, ~6x fewer
+# than the observed rejection), which also caps per-request aggregation
+# compute.
+ROUGH_TILE_M = 9600
 NODATA = -9999
 # Both features share one target resolution - models.py's FEATURE_SPEC
 # is the single source of truth so download and training can't drift
@@ -122,57 +140,55 @@ def aoi_coverage(ee, geom):
     return years, frac
 
 
-def build_band_image(ee, geom, reducer_name):
-    """3DEP 1m mosaic -> reduceResolution(reducer) -> reprojected to
-    the target grid -> clipped to the AOI RECTANGLE (geom).
-    reduceResolution aggregates the real sub-cell distribution (mean or
-    stdDev of the native 1m pixels inside each output cell) - this is
-    NOT the same as resampling, which would just pick/interpolate a
-    single value and discard the variance reduceResolution preserves.
+def elev_image(ee, geom):
+    """lidar_elev: the SEAMLESS 3DEP 10m DEM, clipped to the AOI bbox.
+    A plain single-band image already at the target resolution - no
+    reduceResolution, no 1m pull, so none of the EE size-cap failure
+    modes the 1m chain hits. See the ELEV_IMAGE_ID comment for why
+    this is the right source for the elevation VALUE (it is not the
+    right source for roughness, which needs sub-cell variance)."""
+    return ee.Image(ELEV_IMAGE_ID).select("elevation").clip(geom)
 
-    The clip is to the plain bbox rectangle, NOT the TIGER land
-    polygon: an earlier version clipped to the land geometry and every
-    tile failed with "Unable to export unbounded image" - the
-    state-polygon-intersect-rectangle geometry is complex (a
-    GeometryCollection with boundary artifacts) and EE would not treat
-    the resulting footprint as bounded. The land clip was only ever
-    defense in depth: 3DEP is CONUS-only, so ocean/Canada mask out by
-    ABSENCE OF SOURCE DATA regardless of any clip. The land polygon
-    remains in use where it matters and where it works - the coverage
-    statistics (aoi_coverage/state_land_geometry)."""
-    reducer = {"mean": ee.Reducer.mean(),
-              "stdDev": ee.Reducer.stdDev()}[reducer_name]
+
+def rough_image(ee, geom):
+    """lidar_rough: 3DEP 1m mosaic -> reduceResolution(stdDev) - the
+    real per-output-cell variance of the native 1m elevations, which is
+    the entire point of this feature and cannot come from any
+    pre-aggregated product.
+
+    Clip is to the plain bbox rectangle, NOT the TIGER land polygon: an
+    earlier version clipped to the land geometry and every tile failed
+    with "Unable to export unbounded image" (the state-polygon-
+    intersect-rectangle geometry is a GeometryCollection EE would not
+    treat as a bounded footprint). 3DEP is CONUS-only, so ocean/Canada
+    mask out by absence of source data regardless; the land polygon
+    stays in use for the coverage statistics, where it works.
+
+    mosaic() DISCARDS source projections (composites arrive in EE's
+    meaningless default WGS84 pseudo-projection and reduceResolution
+    refuses them), so the mosaic is re-stamped with a source tile's
+    native projection - EE's own documented pattern for this case.
+    There is deliberately NO .reproject(): the download request's
+    crs + crs_transform define the output grid. Even so, each request
+    must pull the full 1m input under its tile through a reprojection,
+    which EE caps - hence ROUGH_TILE_M (see its derivation above);
+    build_lidar_raster enforces it for this feature."""
     col = ee.ImageCollection(COLLECTION_ID).filterBounds(geom)
-    # mosaic() DISCARDS the source tiles' projections - the composite
-    # comes back in EE's meaningless default WGS84 pseudo-projection,
-    # and reduceResolution refuses it ("does not have a valid default
-    # projection") because it cannot know what 1m input pixels to
-    # aggregate. Re-stamp the mosaic with a source tile's native
-    # projection first - the pattern EE's own reduceResolution docs
-    # use for exactly this mosaic case. (3DEP tiles span UTM zones;
-    # declaring the first tile's projection is the documented
-    # approximation - the aggregation window stays ~100 native pixels
-    # per 10m output cell either way.)
     mosaic = col.mosaic().setDefaultProjection(col.first().projection())
-    # NO explicit .reproject() here - that forced one monolithic
-    # reprojection at the 1m INPUT scale, and a 24km 5070-aligned tile
-    # expressed in the source UTM frame at 1m is a ~28.7k x 28.4k px
-    # intermediate ("Reprojection output too large"). The canonical EE
-    # export pattern instead lets the DOWNLOAD REQUEST's crs +
-    # crs_transform (EPSG:5070 @ 10m, which fetch_tile already passes)
-    # define the output grid; reduceResolution then aggregates the ~100
-    # native 1m pixels per 10m output cell during that request-driven
-    # reprojection, computed in EE's internal chunks rather than one
-    # oversized hop.
-    return (mosaic.reduceResolution(reducer=reducer, maxPixels=1024)
+    return (mosaic.reduceResolution(reducer=ee.Reducer.stdDev(),
+                                    maxPixels=1024)
             .clip(geom))
 
 
-def build_lidar_raster(ee, feature, reducer_name, bounds_lonlat,
+def build_lidar_raster(ee, feature, bounds_lonlat,
                        out_path, tile_m, workers, valid_range):
     x0, y0, x1, y1 = region_grid(bounds_lonlat)
     geom = ee.Geometry.Rectangle([x0, y0, x1, y1], "EPSG:5070", False)
-    image = build_band_image(ee, geom, reducer_name)
+    if feature == "lidar_elev":
+        image = elev_image(ee, geom)
+    else:
+        image = rough_image(ee, geom)
+        tile_m = min(tile_m, ROUGH_TILE_M)   # 1m-pull size cap
     tile_list = list(tiles(x0, y0, x1, y1, tile_m))
     lo, hi = valid_range
     with tempfile.TemporaryDirectory() as td:
@@ -291,14 +307,13 @@ def main():
                   f"STATIC_FEATURES) they will still train, just "
                   f"without this signal.")
 
-        for feature, reducer_name, vrange in (
-                ("lidar_elev", "mean", (-100.0, 6000.0)),
-                ("lidar_rough", "stdDev", (0.0, 200.0))):
+        for feature, vrange in (("lidar_elev", (-100.0, 6000.0)),
+                                ("lidar_rough", (0.0, 200.0))):
             out_path = os.path.join(out_dir, f"{region}_{year}_{feature}.tif")
             if os.path.exists(out_path) and not args.force:
                 print(f"   {out_path} exists - skipping (--force to redo).")
                 continue
-            build_lidar_raster(ee, feature, reducer_name, BOXES[region],
+            build_lidar_raster(ee, feature, BOXES[region],
                                out_path, args.tile_m, args.workers, vrange)
 
     print("\nDone. lidar_elev/lidar_rough are discovered automatically "

@@ -135,7 +135,18 @@ def build_band_image(ee, geom, land_geom, reducer_name):
     rather than relying on absence of source data."""
     reducer = {"mean": ee.Reducer.mean(),
               "stdDev": ee.Reducer.stdDev()}[reducer_name]
-    mosaic = ee.ImageCollection(COLLECTION_ID).filterBounds(geom).mosaic()
+    col = ee.ImageCollection(COLLECTION_ID).filterBounds(geom)
+    # mosaic() DISCARDS the source tiles' projections - the composite
+    # comes back in EE's meaningless default WGS84 pseudo-projection,
+    # and reduceResolution refuses it ("does not have a valid default
+    # projection") because it cannot know what 1m input pixels to
+    # aggregate. Re-stamp the mosaic with a source tile's native
+    # projection first - the pattern EE's own reduceResolution docs
+    # use for exactly this mosaic case. (3DEP tiles span UTM zones;
+    # declaring the first tile's projection is the documented
+    # approximation - the aggregation window stays ~100 native pixels
+    # per 10m output cell either way.)
+    mosaic = col.mosaic().setDefaultProjection(col.first().projection())
     proj = ee.Projection("EPSG:5070").atScale(TARGET_PIXEL_M)
     return (mosaic.reduceResolution(reducer=reducer, maxPixels=1024)
             .reproject(proj).clip(land_geom))

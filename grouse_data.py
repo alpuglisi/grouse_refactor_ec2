@@ -83,13 +83,15 @@ RASTER_FEATURES = ["evt", "evh", "evc", "sclass", "fdist", "ch", "cc",
                    # nlcd = Annual NLCD land-cover class (categorical).
                    "tcc", "nlcd"]
 
-# Year-matching policy for raster_path(nearest=True): a sighting's year
-# resolves to the exact raster year when present, else the CLOSEST year
-# within this tolerance (ties -> earlier year, i.e. conditions that
-# existed at sighting time). A raster only found FURTHER away than this
-# still resolves (training shouldn't hard-crash on sparse vintages) but
-# warns loudly once per (feature, year).
-YEAR_MATCH_TOLERANCE = 1
+# Year-matching policy: a sighting's year resolves to the exact raster
+# year when present, else the CLOSEST year (ties -> earlier year, i.e.
+# conditions that existed at sighting time). This tolerance is the
+# ACCEPTABILITY window: train.py EXCLUDES training records whose gap to
+# every feature's nearest vintage exceeds it (data that far from the
+# sighting date describes a different landscape), and raster_path warns
+# once per feature when a lookup outside it still resolves (validation
+# and analysis paths, which are not filtered).
+YEAR_MATCH_TOLERANCE = 2
 
 
 class MissingDataError(FileNotFoundError):

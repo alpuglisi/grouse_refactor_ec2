@@ -163,28 +163,66 @@ def sample_background_points(rd, features, n, seed=0):
                          "year": int(year), "label": 0.0, "weight": 1.0})
 
 
+def filter_by_year_gap(df, rd, features, tolerance, what, region):
+    """Drop TRAINING records whose sighting year has no raster within
+    +/-tolerance years for one or more features - environmental data
+    that far from the sighting date describes a different landscape, so
+    the record is not evidence about its own label. Records with no
+    year are kept (the dataset assigns them the latest vintage, i.e.
+    they claim current conditions). tolerance < 0 disables."""
+    if (tolerance < 0 or 'year' not in df.columns
+            or df['year'].isna().all()):
+        return df
+    yrs = {f: rd.raster_years(f) for f in features}
+    yrs = {f: ys for f, ys in yrs.items() if ys}
+
+    def ok(year):
+        year = int(year)
+        return all(min(abs(y - year) for y in ys) <= tolerance
+                   for ys in yrs.values())
+
+    verdict = {int(y): ok(y) for y in df['year'].dropna().unique()}
+    keep = df['year'].map(lambda y: verdict.get(int(y), True)
+                          if not (y != y) else True)   # NaN-safe
+    dropped = int((~keep).sum())
+    if dropped:
+        bad = sorted(y for y, v in verdict.items() if not v)
+        print(f"   {region}: EXCLUDED {dropped:,} {what} records - "
+              f"sighting years {bad} have no raster within "
+              f"+/-{tolerance} years for at least one feature "
+              f"({len(df) - dropped:,} kept).")
+    return df[keep].reset_index(drop=True)
+
+
 def build_datasets(data, regions, features, img_size, cache_dir=None,
                    jitter=0, augment=False, background_per_pos=0.0,
-                   seed=0):
+                   seed=0, train_year_gap=2):
     import numpy as np
     cat_f, cont_f = split_features(features)
     train_parts, val_parts, train_labels = [], [], []
     aug = dict(cache_dir=cache_dir, jitter=jitter, augment=augment)
     for region in regions:
         rd = data[region]
+        # Year-gap exclusion applies to TRAINING only. Validation keeps
+        # every point so metrics stay comparable across runs and across
+        # this policy's introduction (old-year val points still carry
+        # the once-per-feature staleness warning from grouse_data).
+        pos_df = filter_by_year_gap(rd.positives("train"), rd, features,
+                                    train_year_gap, "positive", region)
+        neg_df = filter_by_year_gap(rd.negatives("train"), rd, features,
+                                    train_year_gap, "negative", region)
         # Rotation expansion applied to BOTH classes (symmetric 4x ->
         # 1:1 effective balance; see earlier collapse diagnosis).
-        p_tr = GrousePatchDataset(rd.positives("train"), rd, cat_f, cont_f,
+        p_tr = GrousePatchDataset(pos_df, rd, cat_f, cont_f,
                                   img_size=img_size, expand_rotations=True,
                                   label=1.0, **aug)
-        n_tr = GrousePatchDataset(rd.negatives("train"), rd, cat_f, cont_f,
+        n_tr = GrousePatchDataset(neg_df, rd, cat_f, cont_f,
                                   img_size=img_size, expand_rotations=True,
                                   label=0.0, **aug)
         train_parts += [p_tr, n_tr]
         train_labels += [p_tr.labels, n_tr.labels]
         if background_per_pos > 0:
-            n_bg = int(round(background_per_pos
-                             * len(rd.positives("train"))))
+            n_bg = int(round(background_per_pos * len(pos_df)))
             if n_bg > 0:
                 bg_df = sample_background_points(rd, features, n_bg,
                                                  seed=seed)
@@ -343,6 +381,15 @@ def main():
     parser.add_argument("--jitter", type=int, default=0,
                         help="Random center offset in pixels for training "
                              "augmentation (0 = off).")
+    parser.add_argument("--max-train-year-gap", type=int, default=2,
+                        help="TRAINING records are EXCLUDED when their "
+                             "sighting year has no raster within this "
+                             "many years for one or more features - "
+                             "environmental data that stale describes a "
+                             "different landscape than the sighting saw. "
+                             "Validation is never filtered (metrics stay "
+                             "comparable across runs). -1 disables and "
+                             "restores nearest-year-whatever-the-gap.")
     parser.add_argument("--augment", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="Random D4 orientation (+ jitter, if set) per "
@@ -578,7 +625,7 @@ def main():
         data, args.regions, features, args.img_size,
         cache_dir=args.cache_dir or None, jitter=args.jitter,
         augment=args.augment, background_per_pos=args.an_background,
-        seed=args.seed)
+        seed=args.seed, train_year_gap=args.max_train_year_gap)
     print(f"Train samples: {len(train_ds):,} | Val samples: {len(val_ds):,}")
 
     disable = (args.batch_pos_frac is not None

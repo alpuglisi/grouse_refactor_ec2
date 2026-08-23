@@ -238,20 +238,38 @@ def fetch_tile(ee, image, band, rect, dest, retries=4):
             delay *= 2
 
 
+def _fetch_all(tile_list, fetch_fn, workers, desc):
+    """Fetch every tile through fetch_fn(index, rect) concurrently.
+    Each getDownloadURL call is an EE server round-trip plus an HTTP
+    transfer, and the tiles are independent - serializing them was the
+    entire wall-clock cost. The first failure cancels the rest and
+    propagates."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futures = {ex.submit(fetch_fn, i, rect): i
+                   for i, rect in enumerate(tile_list)}
+        bar = tqdm(total=len(futures), desc=desc, leave=False)
+        try:
+            for fut in as_completed(futures):
+                fut.result()
+                bar.update(1)
+        finally:
+            bar.close()
+
+
 def build_raster(ee, feature, spec, cid, year, bounds_lonlat, out_path,
-                 tile_m):
+                 tile_m, workers=8):
     image, band = year_image(ee, cid, spec["bands"], year)
     x0, y0, x1, y1 = region_grid(bounds_lonlat)
     tile_list = list(tiles(x0, y0, x1, y1, tile_m))
     lo, hi = spec["valid_range"]
     with tempfile.TemporaryDirectory() as td:
-        paths = []
-        for i, rect in enumerate(tqdm(tile_list,
-                                      desc=f"   {os.path.basename(out_path)}",
-                                      leave=False)):
-            p = os.path.join(td, f"t{i}.tif")
-            fetch_tile(ee, image, band, rect, p)
-            paths.append(p)
+        paths = [os.path.join(td, f"t{i}.tif")
+                 for i in range(len(tile_list))]
+        _fetch_all(tile_list,
+                   lambda i, rect=None: fetch_tile(
+                       ee, image, band, tile_list[i], paths[i]),
+                   workers, f"   {os.path.basename(out_path)}")
         srcs = [rasterio.open(p) for p in paths]
         try:
             mosaic, transform = rio_merge(srcs)
@@ -293,9 +311,18 @@ def main():
                         default=os.environ.get("EARTHENGINE_PROJECT"),
                         help="Google Cloud project for Earth Engine "
                              "(or set EARTHENGINE_PROJECT).")
-    parser.add_argument("--tile-m", type=int, default=24000,
-                        help="Download tile edge in meters (kept small "
-                             "enough for getDownloadURL's size cap).")
+    parser.add_argument("--tile-m", type=int, default=96000,
+                        help="Download tile edge in meters. 96000 = "
+                             "3200x3200 px per tile, comfortably under "
+                             "getDownloadURL's ~48MB uncompressed cap "
+                             "for these 8/16-bit single-band products; "
+                             "shrink it if EE returns size errors.")
+    parser.add_argument("--workers", type=int, default=8,
+                        help="Concurrent tile downloads. Tiles are "
+                             "independent; 8 parallel requests is well "
+                             "inside EE's per-user concurrency quota. "
+                             "Lower this if you see 429 rate-limit "
+                             "retries piling up.")
     parser.add_argument("--out-dir", default=None,
                         help="Raster directory; default: the pipeline's "
                              "standard data/landfire.")
@@ -339,7 +366,7 @@ def main():
                           f"(--force to redo).")
                     continue
                 build_raster(ee, feature, spec, cid, year, BOXES[region],
-                             out_path, args.tile_m)
+                             out_path, args.tile_m, workers=args.workers)
 
     print("\nDone. grouse_data.py discovers the new rasters "
           "automatically:\n  - train.py will list tcc/nlcd under "

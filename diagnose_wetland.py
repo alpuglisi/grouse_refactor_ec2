@@ -85,6 +85,21 @@ def center_codes(rd, df, feature="nlcd"):
     return codes
 
 
+def area_composition(rd, feature="nlcd", stride=10):
+    """Decimated read of the raster's own class distribution across the
+    WHOLE region - the landscape's area share of each class, independent
+    of any point set. stride=10 -> every 10th pixel (100x fewer reads;
+    a composition estimate doesn't need full resolution)."""
+    path = rd.latest_raster_path(feature)
+    with rasterio.open(path) as src:
+        out_h = max(1, src.height // stride)
+        out_w = max(1, src.width // stride)
+        arr = src.read(1, out_shape=(out_h, out_w),
+                       resampling=rasterio.enums.Resampling.nearest)
+    vals, counts = np.unique(arr, return_counts=True)
+    return {int(v): int(c) for v, c in zip(vals, counts) if v > 0}
+
+
 def composition_table(name, codes):
     total = (codes > 0).sum()
     print(f"\n   {name} (n={total:,}):")
@@ -224,7 +239,48 @@ def main():
           "large positive 'drop' = the lean rides on the nlcd shortcut. "
           "High wetland scores that SURVIVE ablation = structural "
           "mimicry through EVH/EVC/CC/TCC - fix the negatives, not the "
-          "feature.")
+          "feature. If neither shows a wetland-specific signature, the "
+          "per-point model may be fine and part D below tests whether "
+          "the perceived map-level lean is a spatial-EXTENT effect "
+          "instead.")
+
+    # ---- D. landscape area share x mean score -------------------------
+    print("\n" + "=" * 70)
+    print("D. LANDSCAPE AREA SHARE x MEAN SCORE")
+    print("=" * 70)
+    print("   A class can dominate a RENDERED MAP's lit area without "
+          "topping the per-point score ranking above, if it simply "
+          "covers more ground (large contiguous wetland complexes vs "
+          "small scattered clearcuts). This estimates each class's "
+          "share of the map's total 'lit area' as (landscape area "
+          "share) x (mean model score) - the map-level analog of part B.")
+    area_counts = {}
+    for region in args.regions:
+        for c, n in area_composition(data[region]).items():
+            area_counts[c] = area_counts.get(c, 0) + n
+    total_area = sum(area_counts.values()) or 1
+
+    weighted = []
+    for c, n in area_counts.items():
+        m = codes == c
+        if m.sum() < 10:
+            continue
+        weighted.append((c, n / total_area, float(s[m].mean())))
+    norm = sum(a * sc for _, a, sc in weighted) or 1.0
+    print(f"\n   {'class':20s} {'area share':>11s} {'mean score':>11s} "
+          f"{'lit-area share':>15s}")
+    for c, a, sc in sorted(weighted, key=lambda r: -(r[1] * r[2])):
+        flag = "  <-- wetland" if c in WETLAND else ""
+        print(f"   {NLCD_NAMES.get(c, f'class {c}'):20s} {100 * a:10.1f}% "
+              f"{sc:11.3f} {100 * a * sc / norm:14.1f}%{flag}")
+    print("\nREADING: if a wetland class ranks much higher HERE than in "
+          "part B's per-point score ranking, the 'lean' is a landscape-"
+          "area effect, not a per-point defect - the model is scoring "
+          "correctly but wetlands simply cover more ground, so an "
+          "absolute-probability map shows them prominently. Remedy is "
+          "at the map layer, not the model: predict.py --style quantile "
+          "(ranks within the mapped area, immune to raw area) or "
+          "--prior (re-anchors the displayed threshold), not retraining.")
 
 
 if __name__ == "__main__":

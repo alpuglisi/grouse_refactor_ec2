@@ -211,12 +211,18 @@ class RegionData:
             tol = (YEAR_MATCH_TOLERANCE if max_year_gap is None
                    else int(max_year_gap))
             gap = abs(chosen - year)
-            if gap > tol and (feature, year) not in self._year_gap_warned:
-                self._year_gap_warned.add((feature, year))
-                print(f"   [warn] [{self.region}] no {feature} raster "
-                      f"within +/-{tol} year(s) of {year} (available: "
-                      f"{years}) - using nearest overall ({chosen}, "
-                      f"{gap} years off).")
+            # One notice per FEATURE, not per (feature, year): a feature
+            # whose published vintages simply don't reach the older
+            # sighting years (LANDFIRE has nothing before 2022) would
+            # otherwise flood the log with one line per year x region.
+            if gap > tol and feature not in self._year_gap_warned:
+                self._year_gap_warned.add(feature)
+                print(f"   [warn] [{self.region}] {feature}: sighting "
+                      f"year {year} has no raster within +/-{tol} "
+                      f"year(s) (vintages on disk: {years}) - using "
+                      f"nearest ({chosen}, {gap}y off). Other out-of-"
+                      f"tolerance years for this feature resolve the "
+                      f"same way; this notice prints once per feature.")
             year = chosen
 
         path = self.path("raster", feature=feature, year=year)

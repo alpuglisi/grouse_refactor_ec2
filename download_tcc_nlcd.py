@@ -127,7 +127,8 @@ def collection_years(ee, cid):
     try:
         starts = col.aggregate_array("system:time_start").getInfo()
         import datetime as dt
-        years |= {dt.datetime.utcfromtimestamp(t / 1000).year
+        years |= {dt.datetime.fromtimestamp(t / 1000,
+                                            dt.timezone.utc).year
                   for t in starts if t}
     except Exception:
         pass

@@ -488,9 +488,15 @@ FEATURE_SPEC = {
     #                 (hummocks, drainage, edge structure) that a 30m
     #                 DEM (or even a 10m one built by resampling rather
     #                 than aggregating) cannot resolve at all.
-    "lidar_elev":  {"kind": "continuous", "scale": 500.0,
+    # Storage units (download_lidar.py): lidar_elev is whole METERS -
+    # a x100 cm scale would overflow int16 above ~327m, well inside
+    # New England's actual relief (Mt. Washington 1917m). lidar_rough
+    # is CENTIMETERS (smaller magnitude, so x100 fits comfortably and
+    # buys sub-meter precision on a signal that's mostly 0-3m). Both
+    # scale divisors below are denominated in those same stored units.
+    "lidar_elev":  {"kind": "continuous", "scale": 1000.0,
                     "native_scale_m": 10},
-    "lidar_rough": {"kind": "continuous", "scale": 5.0,
+    "lidar_rough": {"kind": "continuous", "scale": 300.0,
                     "native_scale_m": 10},
 }
 

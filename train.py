@@ -61,7 +61,7 @@ if not os.path.exists(os.path.join(_here, "grouse_data.py")):
 from torch.utils.data import ConcatDataset
 
 from grouse_data import GrouseData, STATIC_FEATURES
-from models import FEATURE_SPEC, split_features
+from models import FEATURE_SPEC, split_features, resolve_patch_geometry
 from dataset import GrousePatchDataset
 from model_handler import GrouseModelHandler
 
@@ -651,6 +651,27 @@ def main():
                          f"{args.regions} - check landfire_data/.")
     print(f"Model features ({'explicit' if args.features else 'discovered'}): "
           f"{features}")
+
+    resolved_pixel_m, resolved_img_size, _ = resolve_patch_geometry(features)
+    if resolved_img_size != args.img_size:
+        print(f"   Patch geometry: {resolved_img_size}px @ "
+              f"{resolved_pixel_m}m/px (grown from the {args.img_size}px/"
+              f"30m base - a requested feature has a finer native "
+              f"resolution; 30m features are block-upsampled onto this "
+              f"grid). Ground footprint is unchanged.")
+        token_side = resolved_img_size // 2   # stem stride-2, before any maxpool
+        if args.early_attn and args.keep_early_resolution:
+            tokens = token_side * token_side
+            base_tokens = (args.img_size // 2) ** 2
+            print(f"   [warn] --early-attn --keep-early-resolution at "
+                  f"this grid holds {token_side}x{token_side}="
+                  f"{tokens:,} tokens through early-attn - "
+                  f"{tokens / base_tokens:.1f}x the {int(base_tokens**0.5)}"
+                  f"x{int(base_tokens**0.5)} grid this combination was "
+                  f"tuned at. Attention cost is QUADRATIC in token "
+                  f"count. If you OOM or training stalls, raise "
+                  f"--early-attn-kv-stride (downsamples keys/values) or "
+                  f"drop --keep-early-resolution for this run.")
 
     train_ds, val_ds, train_labels = build_datasets(
         data, args.regions, features, args.img_size,

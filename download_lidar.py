@@ -122,17 +122,24 @@ def aoi_coverage(ee, geom):
     return years, frac
 
 
-def build_band_image(ee, geom, land_geom, reducer_name):
+def build_band_image(ee, geom, reducer_name):
     """3DEP 1m mosaic -> reduceResolution(reducer) -> reprojected to
-    the target grid -> clipped to the region's actual LAND polygon
-    (land_geom, not the bbox rectangle geom). reduceResolution
-    aggregates the real sub-cell distribution (mean or stdDev of the
-    native 1m pixels inside each output cell) - this is NOT the same
-    as resampling, which would just pick/interpolate a single value
-    and discard the variance reduceResolution preserves. The clip is
-    defense in depth (3DEP already has no source pixels over ocean/
-    Canada, so those areas mask out regardless) making that explicit
-    rather than relying on absence of source data."""
+    the target grid -> clipped to the AOI RECTANGLE (geom).
+    reduceResolution aggregates the real sub-cell distribution (mean or
+    stdDev of the native 1m pixels inside each output cell) - this is
+    NOT the same as resampling, which would just pick/interpolate a
+    single value and discard the variance reduceResolution preserves.
+
+    The clip is to the plain bbox rectangle, NOT the TIGER land
+    polygon: an earlier version clipped to the land geometry and every
+    tile failed with "Unable to export unbounded image" - the
+    state-polygon-intersect-rectangle geometry is complex (a
+    GeometryCollection with boundary artifacts) and EE would not treat
+    the resulting footprint as bounded. The land clip was only ever
+    defense in depth: 3DEP is CONUS-only, so ocean/Canada mask out by
+    ABSENCE OF SOURCE DATA regardless of any clip. The land polygon
+    remains in use where it matters and where it works - the coverage
+    statistics (aoi_coverage/state_land_geometry)."""
     reducer = {"mean": ee.Reducer.mean(),
               "stdDev": ee.Reducer.stdDev()}[reducer_name]
     col = ee.ImageCollection(COLLECTION_ID).filterBounds(geom)
@@ -149,14 +156,14 @@ def build_band_image(ee, geom, land_geom, reducer_name):
     mosaic = col.mosaic().setDefaultProjection(col.first().projection())
     proj = ee.Projection("EPSG:5070").atScale(TARGET_PIXEL_M)
     return (mosaic.reduceResolution(reducer=reducer, maxPixels=1024)
-            .reproject(proj).clip(land_geom))
+            .reproject(proj).clip(geom))
 
 
-def build_lidar_raster(ee, feature, reducer_name, bounds_lonlat, land_geom,
+def build_lidar_raster(ee, feature, reducer_name, bounds_lonlat,
                        out_path, tile_m, workers, valid_range):
     x0, y0, x1, y1 = region_grid(bounds_lonlat)
     geom = ee.Geometry.Rectangle([x0, y0, x1, y1], "EPSG:5070", False)
-    image = build_band_image(ee, geom, land_geom, reducer_name)
+    image = build_band_image(ee, geom, reducer_name)
     tile_list = list(tiles(x0, y0, x1, y1, tile_m))
     lo, hi = valid_range
     with tempfile.TemporaryDirectory() as td:
@@ -283,7 +290,6 @@ def main():
                 print(f"   {out_path} exists - skipping (--force to redo).")
                 continue
             build_lidar_raster(ee, feature, reducer_name, BOXES[region],
-                               land_geom,
                                out_path, args.tile_m, args.workers, vrange)
 
     print("\nDone. lidar_elev/lidar_rough are discovered automatically "

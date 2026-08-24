@@ -209,12 +209,18 @@ def tiles(x0, y0, x1, y1, tile_m):
             yield tx, ty, min(tx + tile_m, x1), min(ty + tile_m, y1)
 
 
-def fetch_tile(ee, image, rect, dest, retries=4):
+def fetch_tile(ee, image, rect, dest, retries=4, pixel_m=None):
     """One getDownloadURL request -> GeoTIFF on disk, with backoff.
-    crs_transform pins the global 30 m grid so tiles merge exactly."""
+    crs_transform pins the shared pixel grid (default: this module's
+    30 m PIXEL_M; download_lidar.py passes its own 10 m target) so
+    tiles merge exactly. The write is ATOMIC (.part + rename): a
+    killed run can never leave a truncated file at dest, so a caller
+    that caches tiles may treat an existing dest as complete."""
+    if pixel_m is None:
+        pixel_m = PIXEL_M
     params = {
         "crs": "EPSG:5070",
-        "crs_transform": [PIXEL_M, 0, rect[0], 0, -PIXEL_M, rect[3]],
+        "crs_transform": [pixel_m, 0, rect[0], 0, -pixel_m, rect[3]],
         "region": ee.Geometry.Rectangle(list(rect), "EPSG:5070", False),
         "format": "GEO_TIFF",
     }
@@ -230,10 +236,12 @@ def fetch_tile(ee, image, rect, dest, retries=4):
                 # Bad Request" - which cost two blind debugging rounds.
                 raise RuntimeError(
                     f"HTTP {r.status_code}: {r.text[:300]}")
-            with open(dest, "wb") as f:
+            tmp = dest + ".part"
+            with open(tmp, "wb") as f:
                 f.write(r.content)
-            with rasterio.open(dest):     # parse check
+            with rasterio.open(tmp):      # parse check
                 pass
+            os.replace(tmp, dest)
             return
         except Exception as e:
             if attempt == retries:

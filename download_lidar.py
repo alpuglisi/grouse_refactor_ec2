@@ -48,10 +48,11 @@ import os
 import sys
 import argparse
 
+import shutil
+
 import numpy as np
 import rasterio
-from rasterio.merge import merge as rio_merge
-import tempfile
+from rasterio.transform import from_origin
 from tqdm import tqdm
 
 _here = os.path.dirname(os.path.abspath(__file__))
@@ -189,6 +190,48 @@ def rough_image(ee, geom):
             .clip(geom))
 
 
+def _process_tile(raw_path, out_tile_path, rect, feature, valid_range):
+    """Raw EE float tile -> the final int16/LZW tile that assembly
+    stitches. Converting at fetch time (instead of caching raw float32
+    tiles) cuts the resume cache's disk footprint roughly 10x.
+
+    3DEP's own masked/no-data cells arrive as either NaN (GeoTIFF
+    export of a masked EE image) or an implausible value outside the
+    physically valid range for this band.
+
+    Storage precision differs by band, chosen against int16's +/-32767
+    range: elevation runs to ~1900m in these states, so it's stored in
+    whole METERS (a x100 cm scale would overflow int16 above ~327m -
+    well within New England's actual relief, not a hypothetical edge
+    case). Roughness is a much smaller magnitude (mostly 0-3m, rarely
+    >20m), so it's stored in CENTIMETERS (x100) for sub-meter precision
+    without risking overflow. FEATURE_SPEC's scale divisors in
+    models.py are denominated in these SAME stored units."""
+    lo, hi = valid_range
+    precision = 1.0 if feature == "lidar_elev" else 100.0
+    with rasterio.open(raw_path) as src:
+        arr = src.read(1).astype(np.float64)
+    w = int(round((rect[2] - rect[0]) / TARGET_PIXEL_M))
+    h = int(round((rect[3] - rect[1]) / TARGET_PIXEL_M))
+    if arr.shape != (h, w):
+        raise RuntimeError(f"tile {rect}: EE returned {arr.shape}, "
+                           f"expected {(h, w)} at {TARGET_PIXEL_M}m/px")
+    out = np.where(np.isfinite(arr) & (arr >= lo) & (arr <= hi),
+                   arr, NODATA)
+    out_i16 = np.where(out == NODATA, NODATA,
+                       np.clip(out * precision, -32000, 32000)
+                       ).astype(np.int16)
+    tmp = out_tile_path + ".part"
+    with rasterio.open(tmp, "w", driver="GTiff", height=h, width=w,
+                       count=1, dtype="int16", crs="EPSG:5070",
+                       transform=from_origin(rect[0], rect[3],
+                                             TARGET_PIXEL_M,
+                                             TARGET_PIXEL_M),
+                       nodata=NODATA, compress="lzw") as dst:
+        dst.write(out_i16, 1)
+    os.replace(tmp, out_tile_path)
+
+
 def build_lidar_raster(ee, feature, bounds_lonlat,
                        out_path, tile_m, workers, valid_range):
     x0, y0, x1, y1 = region_grid(bounds_lonlat)
@@ -199,45 +242,70 @@ def build_lidar_raster(ee, feature, bounds_lonlat,
         image = rough_image(ee, geom)
         tile_m = min(tile_m, ROUGH_TILE_M)   # 1m-pull size cap
     tile_list = list(tiles(x0, y0, x1, y1, tile_m))
-    lo, hi = valid_range
-    with tempfile.TemporaryDirectory() as td:
-        paths = [os.path.join(td, f"t{i}.tif") for i in range(len(tile_list))]
-        _fetch_all(len(tile_list),
-                   lambda i: fetch_tile(ee, image, tile_list[i], paths[i]),
-                   workers, f"   {os.path.basename(out_path)}")
-        srcs = [rasterio.open(p) for p in paths]
+
+    # Tiles are cached in a PERSISTENT directory (self-describing
+    # names: the tile's grid rect), not a TemporaryDirectory: at 10m
+    # the rough download runs for HOURS per state, and losing every
+    # finished tile to one network hiccup near the end is not an
+    # acceptable failure mode. A rerun skips tiles already on disk
+    # (fetch_tile + _process_tile both write atomically, so an
+    # existing file is a complete one); the cache is removed only
+    # after the merged output is safely written.
+    tile_dir = out_path + ".tiles"
+    os.makedirs(tile_dir, exist_ok=True)
+
+    def tile_path(rect):
+        return os.path.join(
+            tile_dir, "t_{}_{}_{}_{}.tif".format(*(int(v) for v in rect)))
+
+    def fetch_one(i):
+        rect = tile_list[i]
+        final = tile_path(rect)
+        if os.path.exists(final):
+            return
+        raw = final + ".raw"
         try:
-            mosaic, transform = rio_merge(srcs)
+            fetch_tile(ee, image, rect, raw, pixel_m=TARGET_PIXEL_M)
+            _process_tile(raw, final, rect, feature, valid_range)
         finally:
-            for s in srcs:
-                s.close()
-        arr = mosaic[0].astype(np.float64)
-        # 3DEP's own masked/no-data cells arrive as either NaN (GeoTIFF
-        # export of a masked EE image) or an implausible value outside
-        # the physically valid range for this band.
-        out = np.where(np.isfinite(arr) & (arr >= lo) & (arr <= hi),
-                      arr, NODATA)
-        # Storage precision differs by band, chosen against int16's
-        # +/-32767 range: elevation runs to ~1900m in these states, so
-        # it's stored in whole METERS (a x100 cm scale would overflow
-        # int16 above ~327m - well within New England's actual relief,
-        # not a hypothetical edge case). Roughness is a much smaller
-        # magnitude (mostly 0-3m, rarely >20m), so it's stored in
-        # CENTIMETERS (x100) for sub-meter precision without risking
-        # overflow. FEATURE_SPEC's scale divisors in models.py are
-        # denominated in these SAME stored units.
-        precision = 1.0 if feature == "lidar_elev" else 100.0
-        out_i16 = np.where(out == NODATA, NODATA,
-                           np.clip(out * precision, -32000, 32000)
-                           ).astype(np.int16)
-        valid_frac = float((out_i16 != NODATA).mean())
-        with rasterio.open(out_path, "w", driver="GTiff",
-                           height=out_i16.shape[0], width=out_i16.shape[1],
-                           count=1, dtype="int16", crs="EPSG:5070",
-                           transform=transform, nodata=NODATA,
-                           compress="lzw", tiled=True) as dst:
-            dst.write(out_i16, 1)
-    print(f"   wrote {out_path} ({out_i16.shape[1]}x{out_i16.shape[0]} px, "
+            if os.path.exists(raw):
+                os.remove(raw)
+
+    n_cached = sum(os.path.exists(tile_path(r)) for r in tile_list)
+    if n_cached:
+        print(f"   resuming: {n_cached}/{len(tile_list)} tiles already "
+              f"cached in {tile_dir}")
+    _fetch_all(len(tile_list), fetch_one, workers,
+               f"   {os.path.basename(out_path)}")
+
+    # Assemble into ONE preallocated int16 canvas instead of
+    # rasterio.merge: at 10m the ME grid is ~47k x 60k px, and merge's
+    # float32 mosaic plus the float64 copy the old masking pass made
+    # would need >20GB of RAM. int16 (2 bytes/px) plus one tile in
+    # flight stays under ~6GB for the worst case; masking/scaling
+    # already happened per-tile in _process_tile.
+    width = int((x1 - x0) // TARGET_PIXEL_M)
+    height = int((y1 - y0) // TARGET_PIXEL_M)
+    canvas = np.full((height, width), NODATA, dtype=np.int16)
+    for rect in tqdm(tile_list, desc="   assembling", leave=False):
+        with rasterio.open(tile_path(rect)) as src:
+            data = src.read(1)
+        r0 = int((y1 - rect[3]) // TARGET_PIXEL_M)
+        c0 = int((rect[0] - x0) // TARGET_PIXEL_M)
+        canvas[r0:r0 + data.shape[0], c0:c0 + data.shape[1]] = data
+    valid_frac = float((canvas != NODATA).mean())
+    tmp_out = out_path + ".part"
+    with rasterio.open(tmp_out, "w", driver="GTiff",
+                       height=height, width=width,
+                       count=1, dtype="int16", crs="EPSG:5070",
+                       transform=from_origin(x0, y1, TARGET_PIXEL_M,
+                                             TARGET_PIXEL_M),
+                       nodata=NODATA,
+                       compress="lzw", tiled=True) as dst:
+        dst.write(canvas, 1)
+    os.replace(tmp_out, out_path)
+    shutil.rmtree(tile_dir)
+    print(f"   wrote {out_path} ({width}x{height} px, "
           f"{100 * valid_frac:.1f}% valid)")
     return valid_frac
 
@@ -264,7 +332,17 @@ def main():
                              f"24000 -> 2400x2400x4B = 23MB, safely "
                              f"under the cap; lower it further if EE "
                              f"reports compute timeouts.")
-    parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--workers", type=int, default=24,
+                        help="Concurrent EE download requests. Each "
+                             "lidar_rough tile is dominated by SERVER-"
+                             "side stdDev aggregation (~a minute per "
+                             "tile), so concurrency is the main wall-"
+                             "clock lever; EE permits roughly 40 "
+                             "concurrent requests per user and the "
+                             "default leaves headroom under that. "
+                             "Raise toward ~32-40 if EE isn't "
+                             "throttling you; transient 429s are "
+                             "retried with backoff either way.")
     parser.add_argument("--out-dir", default=None)
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--year", type=int, default=None,
@@ -320,8 +398,20 @@ def main():
                                 ("lidar_rough", (0.0, 200.0))):
             out_path = os.path.join(out_dir, f"{region}_{year}_{feature}.tif")
             if os.path.exists(out_path) and not args.force:
-                print(f"   {out_path} exists - skipping (--force to redo).")
-                continue
+                # Guard against outputs from the earlier pixel-size
+                # bug: fetch_tile inherited the TCC/NLCD module's 30m
+                # grid instead of this script's 10m target, so any
+                # file written before the fix is at the wrong
+                # resolution and must be rebuilt, not skipped.
+                with rasterio.open(out_path) as src:
+                    res = abs(src.transform.a)
+                if abs(res - TARGET_PIXEL_M) < 1e-6:
+                    print(f"   {out_path} exists - skipping "
+                          f"(--force to redo).")
+                    continue
+                print(f"   {out_path} exists but at {res:g}m/px, not "
+                      f"the {TARGET_PIXEL_M}m FEATURE_SPEC declares - "
+                      f"rebuilding at the correct resolution.")
             build_lidar_raster(ee, feature, BOXES[region],
                                out_path, args.tile_m, args.workers, vrange)
 

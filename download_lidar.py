@@ -73,14 +73,16 @@ COLLECTION_ID = "USGS/3DEP/1m"
 # is the one feature that genuinely NEEDS the native 1m source (its
 # entire point is sub-cell variance), so it alone keeps the
 # reduceResolution chain, at a tile size derived below.
-ELEV_IMAGE_ID = "USGS/3DEP/10m"
-# Observed: a 24km 5070-aligned tile pulled through the 1m source
-# reprojects to a 28776x28433 px input ("Reprojection output too
-# large") - a 1.199x linear inflation from the UTM<->5070 rotation. At
-# 9600m tiles the input side is ~11.5k px (~1.33e8 px total, ~6x fewer
-# than the observed rejection), which also caps per-request aggregation
-# compute.
-ROUGH_TILE_M = 9600
+ELEV_COLLECTION_ID = "USGS/3DEP/10m_collection"   # current asset
+ELEV_IMAGE_ID = "USGS/3DEP/10m"                   # deprecated fallback
+# EE's reprojection cap, measured empirically across two failed runs:
+# 28776x28433 rejected, and - decisively - 11511x11385 ALSO rejected
+# (the 9600m attempt), so the cap sits below 1.31e8 px and is almost
+# certainly the 10000px max-DIMENSION limit. A 5070-aligned tile pulled
+# through the 1m UTM source inflates 1.199x linearly (28776/24000), so
+# the tile edge must satisfy edge_m * 1.199 < 10000 -> edge <= ~8.3km.
+# 6000m -> ~7194px input side: under the dimension cap with 28% margin.
+ROUGH_TILE_M = 6000
 NODATA = -9999
 # Both features share one target resolution - models.py's FEATURE_SPEC
 # is the single source of truth so download and training can't drift
@@ -142,11 +144,18 @@ def aoi_coverage(ee, geom):
 
 def elev_image(ee, geom):
     """lidar_elev: the SEAMLESS 3DEP 10m DEM, clipped to the AOI bbox.
-    A plain single-band image already at the target resolution - no
+    A plain single-band source already at the target resolution - no
     reduceResolution, no 1m pull, so none of the EE size-cap failure
-    modes the 1m chain hits. See the ELEV_IMAGE_ID comment for why
-    this is the right source for the elevation VALUE (it is not the
-    right source for roughness, which needs sub-cell variance)."""
+    modes the 1m chain hits. Prefers the current 10m_collection asset
+    (the single-image USGS/3DEP/10m is deprecated per EE's warning);
+    falls back to the deprecated image - which still downloads
+    correctly today - if the collection is unavailable."""
+    try:
+        col = ee.ImageCollection(ELEV_COLLECTION_ID).filterBounds(geom)
+        if col.size().getInfo() > 0:
+            return col.select("elevation").mosaic().clip(geom)
+    except Exception:
+        pass
     return ee.Image(ELEV_IMAGE_ID).select("elevation").clip(geom)
 
 

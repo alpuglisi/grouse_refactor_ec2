@@ -53,6 +53,7 @@ import shutil
 import numpy as np
 import rasterio
 from rasterio.transform import from_origin
+from rasterio.windows import Window
 from tqdm import tqdm
 
 _here = os.path.dirname(os.path.abspath(__file__))
@@ -209,13 +210,25 @@ def _process_tile(raw_path, out_tile_path, rect, feature, valid_range):
     models.py are denominated in these SAME stored units."""
     lo, hi = valid_range
     precision = 1.0 if feature == "lidar_elev" else 100.0
-    with rasterio.open(raw_path) as src:
-        arr = src.read(1).astype(np.float64)
     w = int(round((rect[2] - rect[0]) / TARGET_PIXEL_M))
     h = int(round((rect[3] - rect[1]) / TARGET_PIXEL_M))
-    if arr.shape != (h, w):
-        raise RuntimeError(f"tile {rect}: EE returned {arr.shape}, "
-                           f"expected {(h, w)} at {TARGET_PIXEL_M}m/px")
+    with rasterio.open(raw_path) as src:
+        if abs(abs(src.transform.a) - TARGET_PIXEL_M) > 1e-6:
+            raise RuntimeError(f"tile {rect}: EE returned "
+                               f"{abs(src.transform.a):g}m/px, expected "
+                               f"{TARGET_PIXEL_M}m")
+        # EE's region-to-grid rasterization can include a boundary-
+        # touching extra row/column (e.g. 2401 cols for a 24km tile),
+        # on either side depending on floating-point luck. Don't trust
+        # the returned extent: read through a window pinned to the
+        # REQUESTED rect via the tile's own georeferencing, so any
+        # overhang is discarded and any shortfall fills as NaN ->
+        # NODATA through the finite mask below.
+        col_off = int(round((rect[0] - src.transform.c) / TARGET_PIXEL_M))
+        row_off = int(round((src.transform.f - rect[3]) / TARGET_PIXEL_M))
+        arr = src.read(1, window=Window(col_off, row_off, w, h),
+                       boundless=True, fill_value=float("nan")
+                       ).astype(np.float64)
     out = np.where(np.isfinite(arr) & (arr >= lo) & (arr <= hi),
                    arr, NODATA)
     out_i16 = np.where(out == NODATA, NODATA,

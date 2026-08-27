@@ -83,14 +83,10 @@ if not os.path.exists(os.path.join(_here, "grouse_data.py")):
 
 from grouse_data import GrouseData
 from models import (GrouseResNet, FEATURE_SPEC, split_features,
-                    config_to_model_kwargs, resolve_patch_geometry,
-                    native_scale_m)
+                    config_to_model_kwargs)
 from prepare_training_data import BOXES
 
-IMG_SIZE = 64   # BASE geometry (ground footprint anchor at 30m/px);
-                # the working patch size is resolved per-checkpoint via
-                # resolve_patch_geometry() in main() and threaded
-                # through explicitly - see that call.
+IMG_SIZE = 64
 NODATA_SENTINELS = (-9999, -32768, 32767, -1111)
 STRIP_TARGET_ROWS = 2048        # rows of raster processed per tile
 OUT_DIR = "data/predictions"
@@ -152,31 +148,12 @@ def load_model(model_path, disk_features, device, cli_pool="attn",
 def open_aligned_sources(rd, cat_f, cont_f):
     """Open every feature's latest valid raster; wrap all non-reference
     layers in a WarpedVRT matched to the reference grid so channel
-    alignment is guaranteed even if grids differ slightly.
-
-    The REFERENCE is whichever feature has the FINEST native_scale_m
-    (LiDAR, if present; otherwise any 30m feature, as before). Every
-    coarser feature then gets nearest-neighbor WarpedVRT-reprojected
-    onto that fine grid - for an exact integer resolution ratio this is
-    the same block-replication semantics dataset.py builds manually
-    per-point during training (each output cell copies its one nearest
-    - i.e. covering - coarse source pixel), just computed once over the
-    whole raster via GDAL instead of per-patch. Caveat: unlike
-    training's per-point read (independent per feature, keyed off each
-    raster's own transform), this reprojects a large contiguous area
-    against ONE shared grid, so if two rasters' pixel grids don't share
-    a common origin the block boundaries can wobble by a fraction of a
-    fine pixel - the same category of approximation already accepted
-    for aligning any two independently-downloaded rasters here, not a
-    new caveat lidar introduces."""
+    alignment is guaranteed even if grids differ slightly."""
     feats = cat_f + cont_f
-    ref_feat = min(feats, key=lambda f: native_scale_m(f))
     paths = {f: rd.latest_raster_path(f) for f in feats}
-    ref = rasterio.open(paths[ref_feat])
-    srcs = {ref_feat: ref}
-    for f in feats:
-        if f == ref_feat:
-            continue
+    ref = rasterio.open(paths[feats[0]])
+    srcs = {feats[0]: ref}
+    for f in feats[1:]:
         src = rasterio.open(paths[f])
         if (src.crs == ref.crs and src.transform == ref.transform
                 and src.shape == ref.shape):
@@ -186,13 +163,13 @@ def open_aligned_sources(rd, cat_f, cont_f):
                                 width=ref.width, height=ref.height,
                                 resampling=Resampling.nearest)
     for f in feats:
-        tag = " (reference grid)" if f == ref_feat else (
-            " (aligned via VRT)" if isinstance(srcs[f], WarpedVRT) else "")
-        print(f"   {f}: {os.path.basename(paths[f])}{tag}")
+        print(f"   {f}: {os.path.basename(paths[f])}"
+              + ("" if srcs[f] is ref or not isinstance(srcs[f], WarpedVRT)
+                 else " (aligned via VRT)"))
     return srcs, ref
 
 
-def bounds_to_window(ref, bounds, img_size, pad=100):
+def bounds_to_window(ref, bounds, pad=100):
     min_lon, min_lat, max_lon, max_lat = bounds
     t = Transformer.from_crs("EPSG:4326", ref.crs, always_xy=True)
     xs, ys = t.transform([min_lon, min_lon, max_lon, max_lon],
@@ -203,9 +180,9 @@ def bounds_to_window(ref, bounds, img_size, pad=100):
     c_start = max(0, min(c0, c1) - pad)
     r_end = min(ref.height, max(r0, r1) + pad)
     c_end = min(ref.width, max(c0, c1) + pad)
-    if r_end - r_start < img_size or c_end - c_start < img_size:
+    if r_end - r_start < IMG_SIZE or c_end - c_start < IMG_SIZE:
         raise SystemExit("Requested bounds cover less than one "
-                         f"{img_size}px window of the raster - enlarge "
+                         f"{IMG_SIZE}px window of the raster - enlarge "
                          "the bounding box.")
     return r_start, r_end, c_start, c_end
 
@@ -249,12 +226,11 @@ def read_strip(srcs, cat_f, cont_f, r0, rows, c0, cols):
 
 def predict_region(model, device, srcs, ref, cat_f, cont_f,
                    window_bounds, stride, batch_size, use_compile,
-                   img_size, flip_tta=True, temperature=1.0,
-                   logit_shift=0.0):
+                   flip_tta=True, temperature=1.0, logit_shift=0.0):
     r_start, r_end, c_start, c_end = window_bounds
     height, width = r_end - r_start, c_end - c_start
-    out_h = (height - img_size) // stride + 1
-    out_w = (width - img_size) // stride + 1
+    out_h = (height - IMG_SIZE) // stride + 1
+    out_w = (width - IMG_SIZE) // stride + 1
     heatmap = np.full((out_h, out_w), np.nan, dtype=np.float32)
 
     # Reference-layer nodata mask for honest masking of no-coverage cells.
@@ -265,24 +241,24 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
         model = torch.compile(model)
 
     strip_rows = max(stride, (STRIP_TARGET_ROWS // stride) * stride)
-    n_strips = math.ceil(max(height - img_size + 1, 1) / strip_rows)
+    n_strips = math.ceil(max(height - IMG_SIZE + 1, 1) / strip_rows)
     autocast = (torch.amp.autocast('cuda') if device.type == 'cuda'
                 else torch.autocast('cpu', enabled=False))
 
     with torch.no_grad():
         for s_i in range(n_strips):
             y0 = s_i * strip_rows                     # strip-local origin
-            rows_here = min(strip_rows + img_size - 1,
+            rows_here = min(strip_rows + IMG_SIZE - 1,
                             height - y0)
-            if rows_here < img_size:
+            if rows_here < IMG_SIZE:
                 break
             cat_np, cont_np = read_strip(srcs, cat_f, cont_f,
                                          r_start + y0, rows_here,
                                          c_start, width)
             ref_band = cat_np[0] if cat_f else cont_np[0]
 
-            ys = list(range(0, rows_here - img_size + 1, stride))
-            xs = list(range(0, width - img_size + 1, stride))
+            ys = list(range(0, rows_here - IMG_SIZE + 1, stride))
+            xs = list(range(0, width - IMG_SIZE + 1, stride))
             coords = [(y, x) for y in ys for x in xs]
 
             for b0 in tqdm(range(0, len(coords), batch_size),
@@ -291,13 +267,13 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                 chunk = coords[b0:b0 + batch_size]
                 keep, cat_b, cont_b = [], [], []
                 for (y, x) in chunk:
-                    cy, cx = y + img_size // 2, x + img_size // 2
+                    cy, cx = y + IMG_SIZE // 2, x + IMG_SIZE // 2
                     if ref_band[cy, cx] == 0 and ref_nodata != 0:
                         # center pixel had no data (filled to 0) - mask
                         continue
                     keep.append((y, x))
-                    cat_b.append(cat_np[:, y:y + img_size, x:x + img_size])
-                    cont_b.append(cont_np[:, y:y + img_size, x:x + img_size])
+                    cat_b.append(cat_np[:, y:y + IMG_SIZE, x:x + IMG_SIZE])
+                    cont_b.append(cont_np[:, y:y + IMG_SIZE, x:x + IMG_SIZE])
                 if not keep:
                     continue
                 t_cat = torch.from_numpy(np.stack(cat_b)).to(
@@ -343,9 +319,9 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
           f"nodata).")
     new_trans = rasterio.Affine(
         ref.transform.a * stride, ref.transform.b,
-        ref.transform.c + (c_start + img_size // 2) * ref.transform.a,
+        ref.transform.c + (c_start + IMG_SIZE // 2) * ref.transform.a,
         ref.transform.d, ref.transform.e * stride,
-        ref.transform.f + (r_start + img_size // 2) * ref.transform.e)
+        ref.transform.f + (r_start + IMG_SIZE // 2) * ref.transform.e)
     return heatmap, new_trans
 
 
@@ -448,12 +424,8 @@ def main():
     parser.add_argument("--model", default="data/models/grouse_single_best.pth")
     parser.add_argument("--stride", type=int, default=4,
                         help="Cells between prediction centers, in "
-                             "pixels of the RESOLVED reference grid - "
-                             "30m/px for an ordinary checkpoint (4 -> "
-                             "120m output resolution), or finer for a "
-                             "checkpoint trained with a finer-than-30m "
-                             "feature (e.g. LiDAR) - the startup "
-                             "'Patch geometry' line states which.")
+                             "pixels (30m each). 4 -> 120m output "
+                             "resolution.")
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--style",
                         choices=["absolute", "quantile", "stretched"],
@@ -527,18 +499,6 @@ def main():
         args.model, features, device, cli_pool=args.pool,
         cli_center_skip=args.center_skip)
 
-    # Patch geometry is resolved from the CHECKPOINT's own feature list
-    # (not disk-discovered features), so a model trained without LiDAR
-    # always predicts at the original 64px/30m grid even if lidar_elev/
-    # lidar_rough now exist on disk - only a checkpoint actually trained
-    # WITH them changes the working resolution here.
-    pixel_m, img_size, _ = resolve_patch_geometry(cat_f + cont_f)
-    if pixel_m != 30:
-        print(f"   Patch geometry: {img_size}px @ {pixel_m}m/px "
-              f"(grown from the {IMG_SIZE}px/30m base - this checkpoint "
-              f"was trained with a finer-than-30m feature). --stride is "
-              f"in units of this resolved pixel size.")
-
     temperature = 1.0
     if args.temperature is not None:
         temperature = float(args.temperature)
@@ -576,10 +536,10 @@ def main():
     srcs, ref = open_aligned_sources(rd, cat_f, cont_f)
     try:
         bounds = args.bounds or list(BOXES[args.region])
-        window_bounds = bounds_to_window(ref, bounds, img_size)
+        window_bounds = bounds_to_window(ref, bounds)
         heatmap, transform = predict_region(
             model, device, srcs, ref, cat_f, cont_f, window_bounds,
-            args.stride, args.batch_size, args.compile, img_size,
+            args.stride, args.batch_size, args.compile,
             flip_tta=args.flip_tta, temperature=temperature,
             logit_shift=logit_shift)
     finally:

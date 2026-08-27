@@ -209,18 +209,12 @@ def tiles(x0, y0, x1, y1, tile_m):
             yield tx, ty, min(tx + tile_m, x1), min(ty + tile_m, y1)
 
 
-def fetch_tile(ee, image, rect, dest, retries=4, pixel_m=None):
+def fetch_tile(ee, image, rect, dest, retries=4):
     """One getDownloadURL request -> GeoTIFF on disk, with backoff.
-    crs_transform pins the shared pixel grid (default: this module's
-    30 m PIXEL_M; download_lidar.py passes its own 10 m target) so
-    tiles merge exactly. The write is ATOMIC (.part + rename): a
-    killed run can never leave a truncated file at dest, so a caller
-    that caches tiles may treat an existing dest as complete."""
-    if pixel_m is None:
-        pixel_m = PIXEL_M
+    crs_transform pins the global 30 m grid so tiles merge exactly."""
     params = {
         "crs": "EPSG:5070",
-        "crs_transform": [pixel_m, 0, rect[0], 0, -pixel_m, rect[3]],
+        "crs_transform": [PIXEL_M, 0, rect[0], 0, -PIXEL_M, rect[3]],
         "region": ee.Geometry.Rectangle(list(rect), "EPSG:5070", False),
         "format": "GEO_TIFF",
     }
@@ -229,19 +223,11 @@ def fetch_tile(ee, image, rect, dest, retries=4, pixel_m=None):
         try:
             url = image.getDownloadURL(params)
             r = requests.get(url, timeout=300)
-            if r.status_code != 200:
-                # EE puts the ACTUAL failure reason (size cap, compute
-                # timeout, memory limit...) in the response body;
-                # raise_for_status() discards it and leaves only "400
-                # Bad Request" - which cost two blind debugging rounds.
-                raise RuntimeError(
-                    f"HTTP {r.status_code}: {r.text[:300]}")
-            tmp = dest + ".part"
-            with open(tmp, "wb") as f:
+            r.raise_for_status()
+            with open(dest, "wb") as f:
                 f.write(r.content)
-            with rasterio.open(tmp):      # parse check
+            with rasterio.open(dest):     # parse check
                 pass
-            os.replace(tmp, dest)
             return
         except Exception as e:
             if attempt == retries:

@@ -31,14 +31,9 @@ from pyproj import Transformer
 from rasterio.windows import Window
 import rasterio
 
-from models import FEATURE_SPEC, resolve_patch_geometry, native_scale_m
+from models import FEATURE_SPEC
 
 NODATA_SENTINELS = {-9999, -32768, 32767, -1111}
-
-
-def _lcm(a, b):
-    import math
-    return a * b // math.gcd(a, b)
 
 
 class GrousePatchDataset(Dataset):
@@ -52,64 +47,23 @@ class GrousePatchDataset(Dataset):
         cache_dir : materialize every point's patch stack once into a
             memmapped int16 array and serve items from it. The rasters
             are static, so re-reading them every epoch is pure waste.
-        jitter    : max random center offset IN PIXELS (of the RESOLVED
-            fine grid - see below) applied when augment=True. Patches
-            are read jitter-padded so the crop is always real data,
-            never fill.
+        jitter    : max random center offset IN PIXELS applied when
+            augment=True. Patches are read jitter-padded so the crop is
+            always real data, never fill.
         augment   : random D4 symmetry (8 orientations) + random jitter
             per access, instead of the deterministic idx%4 rotation.
-            Train only - validation must stay deterministic.
-
-        MULTI-RESOLUTION PATCHES: img_size/the ~1.9km ground footprint
-        it implies at the original 30m/px is the BASE geometry. If any
-        requested feature declares a finer native_scale_m in FEATURE_SPEC
-        (LiDAR, currently 10m), resolve_patch_geometry() grows the
-        actual working grid to that finer resolution, HOLDING THE GROUND
-        FOOTPRINT FIXED - e.g. 64px@30m -> 192px@10m. Coarser features
-        are then block-upsampled (exact nearest-neighbor replication,
-        never interpolated) so every fine-grid cell - including every
-        LiDAR subpixel - carries a complete feature vector. With no
-        finer-than-30m feature requested this resolves to exactly
-        img_size/30m and every array in this class is byte-identical to
-        before this feature existed."""
+            Train only - validation must stay deterministic."""
         self.spec = spec or FEATURE_SPEC
         self.cat_features = list(cat_features)
         self.cont_features = list(cont_features)
+        self.img_size = int(img_size)
         self.expand_rotations = bool(expand_rotations)
         self.augment = bool(augment)
-        self.rd = region_data
-
-        all_feats = self.cat_features + self.cont_features
-        self.pixel_m, self.img_size, self._ratios = resolve_patch_geometry(
-            all_feats, spec=self.spec, base_img_size=int(img_size))
-        # Every coarser feature's upsample ratio must divide the fine-
-        # pixel jitter/padding exactly, or its 30m block boundaries
-        # would need to land on a fractional fine pixel under a jitter
-        # shift - impossible to represent by block replication. Round
-        # the requested (fine-pixel) jitter down to the nearest multiple
-        # of every ratio in play (their lcm); with no coarser-than-fine
-        # feature present every ratio is 1 and this is a no-op.
-        from functools import reduce
-        # Every per-draw jitter OFFSET (not just its max range) must
-        # itself be a multiple of this ratio: a coarse feature's 3x3
-        # (or larger) block boundaries only stay pixel-exact under a
-        # crop shift that lands on a whole coarse pixel. Drawing dy/dx
-        # from the full [-pad, pad] range (rounding only the cap) was
-        # verified to break block alignment on ~all non-zero draws;
-        # _augmented_view multiplies its draw by this ratio instead.
-        self._jitter_ratio = reduce(_lcm, self._ratios.values(), 1)
-        pad = int(jitter) if augment else 0
-        if pad % self._jitter_ratio != 0:
-            pad = (pad // self._jitter_ratio) * self._jitter_ratio
-            print(f"   [note] jitter rounded down to {pad}px "
-                 f"(multiple of {self._jitter_ratio}, this dataset's "
-                 f"coarsest-to-finest feature ratio) so every "
-                 f"feature's native grid shifts by a whole pixel "
-                 f"under jitter.")
-        self.pad = pad
-        # Every read/cache entry is patch+2*pad wide (in FINE pixels); a
-        # jittered crop then lands entirely inside real raster data.
+        self.pad = int(jitter) if augment else 0
+        # Every read/cache entry is patch+2*pad wide; a jittered crop then
+        # lands entirely inside real raster data.
         self.read_size = self.img_size + 2 * self.pad
+        self.rd = region_data
 
         df = points_df.copy().reset_index(drop=True)
         if label is not None:
@@ -194,9 +148,8 @@ class GrousePatchDataset(Dataset):
             lon, lat = float(row['longitude']), float(row['latitude'])
             yr = int(row['year'])
             for k, f in enumerate(feats):
-                patch = self._read_feature(f, self._path_for[(f, yr)],
-                                           lon, lat)
-                arr[i, k] = patch.astype(np.int16)
+                patch = self._read_patch(self._path_for[(f, yr)], lon, lat)
+                arr[i, k] = np.nan_to_num(patch, nan=0.0).astype(np.int16)
         arr.flush()
         del arr
         os.replace(tmp, path)
@@ -224,18 +177,12 @@ class GrousePatchDataset(Dataset):
         feat = (self.cat_features + self.cont_features)[0]
         row = self.df.iloc[0]
         path = self._path_for[(feat, int(row['year']))]
-        # Native pixel count for THIS feature's own grid (may be finer
-        # or coarser than self.img_size, which is expressed in fine-
-        # grid pixels) - same ratio math _read_feature uses, so the
-        # probe checks the same ground footprint training actually
-        # reads, regardless of which feature happens to be first.
-        n_native = self.img_size // self._ratios[feat]
         with rasterio.open(path) as src:
             t = Transformer.from_crs("EPSG:4326", src.crs, always_xy=True)
             x, y = t.transform(float(row['longitude']), float(row['latitude']))
             r, c = src.index(x, y)
-            half = n_native // 2
-            window = Window(c - half, r - half, n_native, n_native)
+            half = self.img_size // 2
+            window = Window(c - half, r - half, self.img_size, self.img_size)
             fill = src.nodata if src.nodata is not None else -9999
             arr = src.read(1, window=window, boundless=True,
                            fill_value=fill).astype(np.float32)
@@ -281,15 +228,11 @@ class GrousePatchDataset(Dataset):
                 "EPSG:4326", src.crs, always_xy=True)
         return self._handles[path], self._transformers[path]
 
-    def _read_patch(self, path, lon, lat, n):
-        """Read an n x n window (n in THIS RASTER's own native pixel
-        units) centered on the point. n varies per feature - see
-        _read_feature, which computes it from the feature's own
-        native_scale_m so every feature's window covers the SAME
-        ground footprint regardless of its native resolution."""
+    def _read_patch(self, path, lon, lat):
         src, transformer = self._handle(path)
         x, y = transformer.transform(lon, lat)
         row, col = src.index(x, y)
+        n = self.read_size
         half = n // 2
         r0, c0 = row - half, col - half
         fill = src.nodata if src.nodata is not None else -9999
@@ -317,34 +260,14 @@ class GrousePatchDataset(Dataset):
             arr[arr == s] = np.nan
         return arr
 
-    def _read_feature(self, f, path, lon, lat):
-        """One feature's (read_size, read_size) array, on the COMMON
-        fine grid: read at the feature's own native pixel size (fewer
-        pixels for a coarser feature, covering the identical ground
-        footprint), then block-upsample by its integer ratio - exact
-        nearest-neighbor replication, so a coarse cell's single value is
-        copied across every fine subpixel it covers (never
-        interpolated: these are categorical codes and quantized
-        physical values, not continuous imagery). ratio=1 (every
-        feature, when no finer-than-base feature is in the requested
-        set) skips the repeat entirely and is byte-identical to reading
-        self.read_size directly, as before this feature existed."""
-        ratio = self._ratios[f]
-        n_native = self.read_size // ratio
-        arr = np.nan_to_num(self._read_patch(path, lon, lat, n_native),
-                            nan=0.0)
-        if ratio > 1:
-            arr = np.repeat(np.repeat(arr, ratio, axis=0), ratio, axis=1)
-        return arr
-
     def _raw_stack(self, i, lon, lat, year):
-        """(n_feat, read_size, read_size) float32, nodata already 0,
-        every feature on the common fine grid (see _read_feature)."""
+        """(n_feat, read_size, read_size) float32, nodata already 0."""
         if self.cache is not None:
             return np.asarray(self.cache[i], dtype=np.float32)
         feats = self.cat_features + self.cont_features
-        return np.stack([self._read_feature(f, self._path_for[(f, year)],
-                                            lon, lat) for f in feats])
+        return np.stack([
+            np.nan_to_num(self._read_patch(self._path_for[(f, year)], lon, lat),
+                          nan=0.0) for f in feats])
 
     def __getitem__(self, idx):
         if self.expand_rotations:
@@ -402,22 +325,12 @@ class GrousePatchDataset(Dataset):
         DataLoader reseeds it per worker AND per epoch; numpy's global
         seed is duplicated across workers. Draw order (rot, flip, dy,
         dx) is part of the reproducibility contract."""
-        n, pad, r = self.img_size, self.pad, self._jitter_ratio
+        n, pad = self.img_size, self.pad
         rot = int(torch.randint(0, 4, (1,)).item())
         flip = bool(torch.randint(0, 2, (1,)).item())
         if pad:
-            # Draw in units of r (the coarsest-to-finest feature
-            # ratio), not individual fine pixels: pad is already a
-            # multiple of r (see __init__), but the OFFSET must be too,
-            # or a coarse feature's block boundaries land mid-block
-            # after the crop (verified: this was previously drawn as
-            # any integer in [-pad, pad], which broke block alignment
-            # on virtually every non-zero draw). r=1 when every
-            # requested feature shares one resolution, making this
-            # identical to a plain torch.randint(-pad, pad+1, ...) draw.
-            steps = pad // r
-            dy = r * int(torch.randint(-steps, steps + 1, (1,)).item())
-            dx = r * int(torch.randint(-steps, steps + 1, (1,)).item())
+            dy = int(torch.randint(-pad, pad + 1, (1,)).item())
+            dx = int(torch.randint(-pad, pad + 1, (1,)).item())
         else:
             dy = dx = 0
         cat_x, cont_x = self._to_tensors(

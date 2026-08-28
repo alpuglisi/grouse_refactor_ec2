@@ -84,6 +84,7 @@ if not os.path.exists(os.path.join(_here, "grouse_data.py")):
 from grouse_data import GrouseData
 from models import (GrouseResNet, FEATURE_SPEC, split_features,
                     config_to_model_kwargs)
+from losses import loss_logit_bias
 from prepare_training_data import BOXES
 
 IMG_SIZE = 64
@@ -139,7 +140,7 @@ def load_model(model_path, disk_features, device, cli_pool="attn",
             f"(pool={kw['pool']}, center_skip={kw['center_skip']}, "
             f"features={features}).\nOriginal error:\n{e}")
     model.eval()
-    return model, cat_f, cont_f, features
+    return model, cat_f, cont_f, features, cfg
 
 
 # ==========================================
@@ -470,7 +471,14 @@ def main():
                         help="calibration.json from calibrate.py. Applied "
                              "automatically when the file exists; "
                              "--no-calibration disables.")
-    parser.add_argument("--no-calibration", action="store_true")
+    parser.add_argument("--no-calibration", action="store_true",
+                        help="Ignore calibration.json and score with raw "
+                             "logits (T=1). Use when the checkpoint was "
+                             "trained under a different --loss (or "
+                             "retrained at all) since the calibration "
+                             "was fitted - a temperature is specific to "
+                             "both the weights and the objective they "
+                             "were trained with.")
     parser.add_argument("--temperature", type=float, default=None,
                         help="Manual temperature override (logits are "
                              "divided by this before sigmoid). Overrides "
@@ -495,7 +503,7 @@ def main():
         raise SystemExit(f"No usable features on disk for {args.region}.")
     print(f"Features (discovered): {features}")
 
-    model, cat_f, cont_f, features = load_model(
+    model, cat_f, cont_f, features, ckpt_cfg = load_model(
         args.model, features, device, cli_pool=args.pool,
         cli_center_skip=args.center_skip)
 
@@ -518,6 +526,36 @@ def main():
                   f"{os.path.abspath(args.model)} - temperatures are "
                   f"model-specific; re-run calibrate.py for this "
                   f"checkpoint.")
+        # Same PATH is not same MODEL: retraining overwrites the .pth
+        # in place (possibly with a different --loss entirely), and the
+        # model_path check above cannot see that. A fit older than the
+        # checkpoint file is a fit on weights that no longer exist.
+        import datetime as dt
+        try:
+            fitted = dt.datetime.fromisoformat(cal["fitted_at"])
+            written = dt.datetime.fromtimestamp(
+                os.path.getmtime(args.model))
+            if fitted < written:
+                print(f"   [warn] calibration was fitted "
+                      f"{fitted:%Y-%m-%d %H:%M} but the checkpoint file "
+                      f"was written {written:%Y-%m-%d %H:%M} - the fit "
+                      f"predates the current weights (retrained since, "
+                      f"perhaps with a different --loss?). Re-run "
+                      f"calibrate.py, or pass --no-calibration to score "
+                      f"with raw logits.")
+        except (KeyError, ValueError, OverflowError, OSError):
+            pass
+        bias = loss_logit_bias(ckpt_cfg)
+        if bias is not None:
+            reason, off = bias
+            print(f"   [warn] this checkpoint was trained with {reason}, "
+                  f"which builds a constant logit offset (~{off:+.2f}) "
+                  f"into the model. A temperature is a pure SCALE and "
+                  f"cannot remove an offset, so calibrated probabilities "
+                  f"remain shifted. Remedies: --prior (an explicit "
+                  f"offset), --style quantile (rank-based, offset-"
+                  f"immune), or --no-calibration to drop the "
+                  f"temperature.")
     else:
         print("Calibration: none (raw probabilities). Run calibrate.py "
               "to fit one.")

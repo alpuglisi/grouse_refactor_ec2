@@ -419,7 +419,19 @@ class GrouseModelHandler:
                                 else 'none'),
                            "dual_branch": self.model.dual_branch,
                            "dual_branch_channels":
-                               self.model._dual_branch_channels}}
+                               self.model._dual_branch_channels,
+                           # Not geometry, but consumers of the LOGITS
+                           # need it: an asymmetric objective (an_full
+                           # with lambda != 1, focal with alpha != 0.5)
+                           # builds a constant logit bias into the
+                           # trained model, which temperature scaling
+                           # (a pure scale) can never remove -
+                           # predict.py/calibrate.py read these to warn
+                           # when a fitted temperature can't mean what
+                           # it claims.
+                           "loss": self.loss_type,
+                           "an_pos_weight": self.an_pos_weight,
+                           "focal_alpha": float(self.hp['focal_alpha'])}}
 
     @staticmethod
     def unwrap_checkpoint(obj):

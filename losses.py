@@ -75,3 +75,40 @@ class ANFullLoss(nn.Module):
             return torch.sum(loss)
         return loss
 
+
+
+def loss_logit_bias(cfg):
+    """The constant log-odds offset a checkpoint's training objective
+    builds into its logits, as ("description", offset), or None when
+    the objective is symmetric (or the checkpoint predates loss
+    metadata).
+
+    Asymmetric losses do this by construction: for lambda-weighted BCE
+    (ANFullLoss with pos_weight=lambda) the pointwise minimizer at true
+    conditional probability q is p* = lambda*q / (lambda*q + 1 - q),
+    i.e. every logit carries a constant +log(lambda). Focal alpha
+    weighting tilts the same way by its alpha/(1-alpha) odds ratio
+    (gamma additionally COMPRESSES logits toward 0, but that part is a
+    scale effect, which temperature scaling genuinely can fix).
+
+    Why callers care: temperature scaling divides logits by a scalar -
+    a pure scale, symmetric about logit 0 - so it can NEVER remove a
+    constant offset. calibrate.py's fitted T is therefore incomplete
+    for these checkpoints, and predict.py warns rather than silently
+    applying it as if it restored honest probabilities. An offset is
+    exactly what predict.py's --prior flag applies, so it is also the
+    right lever to counter one."""
+    import math
+    if not cfg:
+        return None
+    loss = cfg.get("loss")
+    if loss == "an_full":
+        lam = float(cfg.get("an_pos_weight", 1.0))
+        if abs(lam - 1.0) > 1e-6:
+            return f"an_full loss with lambda={lam:g}", math.log(lam)
+    elif loss == "focal":
+        alpha = float(cfg.get("focal_alpha", 0.5))
+        if abs(alpha - 0.5) > 1e-6:
+            return (f"focal loss with alpha={alpha:g}",
+                    math.log(alpha / (1.0 - alpha)))
+    return None

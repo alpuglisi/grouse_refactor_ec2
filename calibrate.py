@@ -61,6 +61,7 @@ from grouse_data import GrouseData
 from models import (GrouseResNet, FEATURE_SPEC, split_features,
                     config_to_model_kwargs)
 from model_handler import GrouseModelHandler, roc_auc, average_precision
+from losses import loss_logit_bias
 from train import build_datasets, discover_features
 
 OUT_DIR = "data/calibration"
@@ -106,7 +107,7 @@ def load_model(path, device, cli_pool, cli_center_skip, disk_features):
             f"(pool={kw['pool']}, center_skip={kw['center_skip']}, "
             f"features={features}).\nOriginal error:\n{e}")
     model.eval()
-    return model, features
+    return model, features, cfg
 
 
 # ==========================================
@@ -268,8 +269,21 @@ def main():
     print(f"Device: {device}")
     data = GrouseData()
     disk_features = discover_features(data, args.regions)
-    model, features = load_model(args.model, device, args.pool,
-                                 args.center_skip, disk_features)
+    model, features, ckpt_cfg = load_model(args.model, device, args.pool,
+                                           args.center_skip, disk_features)
+    bias = loss_logit_bias(ckpt_cfg)
+    if bias is not None:
+        reason, off = bias
+        print(f"\n[note] this checkpoint was trained with {reason}: the "
+              f"objective's asymmetric weighting builds a constant logit "
+              f"offset (~{off:+.2f}) into the model BY DESIGN. A "
+              f"temperature is a pure scale and cannot remove an offset, "
+              f"so expect residual one-sided gaps in the AFTER table "
+              f"below; the fitted T will be a compromise between fixing "
+              f"confidence scale and shrinking the offset. predict.py "
+              f"--prior applies exactly the offset correction this "
+              f"cannot, and --style quantile is immune to offsets "
+              f"entirely.")
 
     _, val_ds, _ = build_datasets(data, args.regions, features,
                                   args.img_size,
@@ -334,6 +348,13 @@ def main():
         "features": features,
         "flip_tta": bool(args.flip_tta),
         "n_points": int(len(logits)),
+        # The objective the checkpoint was trained with (None for
+        # pre-metadata checkpoints): a temperature is only a complete
+        # calibration for symmetric losses, and predict.py uses this
+        # plus the checkpoint's own config to warn about mismatches.
+        "loss": (ckpt_cfg or {}).get("loss"),
+        "an_pos_weight": (ckpt_cfg or {}).get("an_pos_weight"),
+        "focal_alpha": (ckpt_cfg or {}).get("focal_alpha"),
         "ece_before": ece_b, "ece_after": ece_a,
         "mce_before": mce_b, "mce_after": mce_a,
         "brier_before": brier(probs, y), "brier_after": brier(probs_c, y),

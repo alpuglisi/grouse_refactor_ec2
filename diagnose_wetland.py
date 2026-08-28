@@ -183,7 +183,7 @@ def main():
     from predict import load_model
     features_on_disk = [f for f in data[args.regions[0]].available_features()
                         if f in FEATURE_SPEC]
-    model, cat_f, cont_f, features = load_model(
+    model, cat_f, cont_f, features, _cfg = load_model(
         args.model, features_on_disk, device)
     if "nlcd" not in cat_f:
         print("\nModel was trained without nlcd - parts B/C skipped "

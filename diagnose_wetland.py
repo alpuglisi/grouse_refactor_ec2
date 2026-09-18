@@ -47,19 +47,11 @@ from torch.utils.data import DataLoader
 _here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _here)
 
-from grouse_data import GrouseData
+from grouse_data import GrouseData, NLCD_NAMES, WETLAND_NLCD_CLASSES
 from models import FEATURE_SPEC
 from dataset import GrousePatchDataset
 
-NLCD_NAMES = {
-    11: "Open Water", 12: "Snow/Ice",
-    21: "Developed Open", 22: "Developed Low", 23: "Developed Med",
-    24: "Developed High", 31: "Barren",
-    41: "Deciduous Forest", 42: "Evergreen Forest", 43: "Mixed Forest",
-    52: "Shrub/Scrub", 71: "Grassland", 81: "Pasture/Hay",
-    82: "Cropland", 90: "WOODY WETLANDS", 95: "EMERGENT WETLANDS",
-}
-WETLAND = (90, 95)
+WETLAND = WETLAND_NLCD_CLASSES
 
 
 def center_codes(rd, df, feature="nlcd"):

@@ -465,6 +465,20 @@ class DualSpatialBranch(nn.Module):
                           align_corners=False)
         return self.fuse(torch.cat([u, e], dim=1))
 
+    @torch.no_grad()
+    def pooling_map(self, x):
+        """Diagnostic-only: this branch's own pooling-weight map for
+        input x - the Branch-B analog of the trunk's attn-pool score
+        map, exposed as a public method purely for visualization
+        (model_handler's --tb-images). (B,1,H,W) for pool='attn'
+        (content-dependent); (1,1,H,W) for 'mean'/'center'/'gauss' (one
+        fixed map shared by every sample, since those pool modes don't
+        depend on content - the caller broadcasts it). Never called
+        during training."""
+        fmap = self.feature_map(x)
+        _, _, h, w = fmap.shape
+        return self._weights(fmap).reshape(-1, 1, h, w)
+
     def _weights(self, fmap):
         b, c, h, w = fmap.shape
         if self.pool == 'attn':

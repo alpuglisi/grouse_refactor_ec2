@@ -38,6 +38,22 @@ import rasterio
 
 
 # ==========================================
+# NLCD class metadata - shared by diagnose_wetland.py's per-class
+# breakdown and model_handler.py's live TensorBoard per-class
+# instrumentation, so the two can never name/group classes differently.
+# ==========================================
+NLCD_NAMES = {
+    11: "Open Water", 12: "Snow/Ice",
+    21: "Developed Open", 22: "Developed Low", 23: "Developed Med",
+    24: "Developed High", 31: "Barren",
+    41: "Deciduous Forest", 42: "Evergreen Forest", 43: "Mixed Forest",
+    52: "Shrub/Scrub", 71: "Grassland", 81: "Pasture/Hay",
+    82: "Cropland", 90: "WOODY WETLANDS", 95: "EMERGENT WETLANDS",
+}
+WETLAND_NLCD_CLASSES = (90, 95)
+
+
+# ==========================================
 # CONFIG
 # ==========================================
 @dataclass(frozen=True)

@@ -438,9 +438,25 @@ def main():
                         action=argparse.BooleanOptionalAction, default=True,
                         help="Under --tensorboard: log each categorical "
                              "feature's embedding table (e.g. nlcd) to "
-                             "the TensorBoard embedding projector once "
-                             "at the end of training, from the SAVED "
-                             "checkpoint's weights.")
+                             "the TensorBoard embedding projector, from "
+                             "the SAVED checkpoint's weights at the end "
+                             "of training plus periodic snapshots (see "
+                             "--tb-embeddings-every) from the live "
+                             "training weights - each snapshot lands "
+                             "under the same tag at its own step, so "
+                             "the projector's slider lets you watch a "
+                             "class's representation move over "
+                             "training instead of only seeing the "
+                             "final state.")
+    parser.add_argument("--tb-embeddings-every", type=int, default=10,
+                        help="Epoch interval for the periodic embedding "
+                             "snapshots above. 0 disables periodic "
+                             "snapshots (the end-of-training one from "
+                             "the saved checkpoint still logs if "
+                             "--tb-embeddings is on). Each snapshot "
+                             "writes real projector data files, so "
+                             "very frequent snapshots on a long run "
+                             "cost real disk space.")
     parser.add_argument("--pool", default="attn",
                         choices=["mean", "center", "gauss", "attn"],
                         help="How the spatial logit map collapses to one "
@@ -854,7 +870,8 @@ def main():
                     tb_writer=tb_writer, tb_log_every=args.tb_log_every,
                     tb_images=args.tb_images,
                     tb_attention=args.tb_attention,
-                    tb_embeddings=args.tb_embeddings)
+                    tb_embeddings=args.tb_embeddings,
+                    tb_embeddings_every=args.tb_embeddings_every)
         if tb_writer is not None:
             tb_writer.close()
         members.append((path, overrides.get('pool', args.pool)))

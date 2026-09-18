@@ -83,7 +83,7 @@ if not os.path.exists(os.path.join(_here, "grouse_data.py")):
     if os.path.exists(os.path.join(_parent, "grouse_data.py")):
         sys.path.insert(0, _parent)
 
-from grouse_data import GrouseData
+from grouse_data import GrouseData, NLCD_NAMES
 from models import (GrouseResNet, FEATURE_SPEC, split_features,
                     config_to_model_kwargs)
 from losses import loss_logit_bias
@@ -230,19 +230,32 @@ def read_strip(srcs, cat_f, cont_f, r0, rows, c0, cols):
 def predict_region(model, device, srcs, ref, cat_f, cont_f,
                    window_bounds, stride, batch_size, use_compile,
                    flip_tta=True, temperature=1.0, logit_shift=0.0,
-                   nlcd_idx=None):
-    """nlcd_idx: index of 'nlcd' within cat_f, if present. When given,
-    also returns nlcd_map (same shape as heatmap) - the center-pixel
-    NLCD class at each scored cell, read from the SAME tensor already
-    loaded for scoring (no extra raster I/O) - for a per-class score
-    breakdown over the predicted region (--tensorboard)."""
+                   capture_features=None):
+    """capture_features: iterable of feature names (from cat_f and/or
+    cont_f) to also capture per scored cell - the center-pixel value at
+    each cell, read from the SAME tensors already loaded for scoring (no
+    extra raster I/O). Returns feature_maps: {name: 2D array, same shape
+    as heatmap} - int32 (-1 = not scored) for a categorical feature,
+    float32 (NaN = not scored) for a continuous one (already the
+    model-input SCALED value - see read_strip). Empty dict if
+    capture_features is None/empty. Powers --tensorboard's per-feature
+    score-correlation breakdown over the predicted region: which
+    categorical classes and which continuous-feature ranges the model's
+    score actually tracks in this specific deployment area, not just
+    what the training data looked like."""
     r_start, r_end, c_start, c_end = window_bounds
     height, width = r_end - r_start, c_end - c_start
     out_h = (height - IMG_SIZE) // stride + 1
     out_w = (width - IMG_SIZE) // stride + 1
     heatmap = np.full((out_h, out_w), np.nan, dtype=np.float32)
-    nlcd_map = (np.full((out_h, out_w), -1, dtype=np.int32)
-               if nlcd_idx is not None else None)
+    capture_features = list(capture_features or [])
+    cat_capture = {f: cat_f.index(f) for f in capture_features if f in cat_f}
+    cont_capture = {f: cont_f.index(f) for f in capture_features
+                    if f in cont_f}
+    feature_maps = {f: np.full((out_h, out_w), -1, dtype=np.int32)
+                    for f in cat_capture}
+    feature_maps.update({f: np.full((out_h, out_w), np.nan, dtype=np.float32)
+                         for f in cont_capture})
 
     # Reference-layer nodata mask for honest masking of no-coverage cells.
     ref_nodata = ref.nodata if ref.nodata is not None else -9999
@@ -323,9 +336,14 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                     gx = x // stride
                     if gy < out_h and gx < out_w:
                         heatmap[gy, gx] = p
-                        if nlcd_map is not None:
+                        if cat_capture or cont_capture:
                             cy, cx = y + IMG_SIZE // 2, x + IMG_SIZE // 2
-                            nlcd_map[gy, gx] = int(cat_np[nlcd_idx, cy, cx])
+                            for f, idx in cat_capture.items():
+                                feature_maps[f][gy, gx] = int(
+                                    cat_np[idx, cy, cx])
+                            for f, idx in cont_capture.items():
+                                feature_maps[f][gy, gx] = float(
+                                    cont_np[idx, cy, cx])
 
     n_valid = int(np.isfinite(heatmap).sum())
     print(f"   Scored {n_valid:,}/{heatmap.size:,} cells "
@@ -336,7 +354,7 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
         ref.transform.c + (c_start + IMG_SIZE // 2) * ref.transform.a,
         ref.transform.d, ref.transform.e * stride,
         ref.transform.f + (r_start + IMG_SIZE // 2) * ref.transform.e)
-    return heatmap, new_trans, nlcd_map
+    return heatmap, new_trans, feature_maps
 
 
 # ==========================================
@@ -362,52 +380,117 @@ def _tb_suitability_image(heatmap, cmap_name="jet", max_dim=1024):
     return torch.from_numpy(arr).permute(2, 0, 1)          # (4, H, W)
 
 
-def _tb_log_class_scores(tb_writer, heatmap, nlcd_map, min_count=50):
-    """Per-class breakdown over the PREDICTED region - the live,
-    real-deployment counterpart to model_handler's per-class val
-    breakdown and diagnose_wetland.py's area-composition analysis:
-    - Class/mean_score: does any land-cover class score anomalously
-      high across this actual mapped area? No ground truth here (this
-      is inference, not validation), so no AUC - mean score is what's
-      available.
-    - Class/score_hist: the SHAPE of each class's score distribution,
-      not just its mean - a class with a high mean from a thin high
-      tail over an otherwise ordinary bulk looks very different from
-      one that's uniformly elevated, and the mean alone can't tell
-      those apart.
-    - Class/area_share: each class's share of the scored map area -
-      a high mean score over a handful of pixels is a very different
-      finding from the same mean over a large contiguous class.
-    - Class/lit_area_share: diagnose_wetland.py Part D's "landscape
-      area share x mean score", normalized to sum to 1 across classes
-      - each class's actual contribution to the map's total predicted
+def _tb_log_categorical_breakdown(tb_writer, heatmap, code_map, feature,
+                                  min_count=50, max_classes=15, names=None):
+    """Per-class breakdown over the PREDICTED region for ONE categorical
+    feature - the live, real-deployment counterpart to model_handler's
+    per-class val breakdown and diagnose_wetland.py's area-composition
+    analysis. Generalizes what used to be nlcd-only to every categorical
+    feature the model actually uses (evt/evh/evc/sclass/fdist/nlcd),
+    tagged under Class/<feature>/... so a "sticks to roads" pattern can
+    be tested against EVERY feature, not just land cover - a strong
+    fdist (disturbance) or sclass (succession stage) correlation would
+    mean something very different than an nlcd one:
+    - mean_score: does any class score anomalously high across this
+      actual mapped area? No ground truth at inference, so no AUC -
+      mean score is what's available.
+    - score_hist: the SHAPE of each class's score distribution, not
+      just its mean - a thin high tail over an otherwise ordinary bulk
+      looks very different from uniformly elevated, and the mean alone
+      can't tell those apart.
+    - area_share: each class's share of the scored map area - a high
+      mean score over a handful of pixels is a very different finding
+      from the same mean over a large contiguous class.
+    - lit_area_share: diagnose_wetland.py Part D's "landscape area
+      share x mean score", normalized to sum to 1 across classes - each
+      class's actual contribution to the map's total predicted
       suitability, the map-level answer to "does this class scoring
       high actually move the map, or is it a sliver."
-    """
-    from grouse_data import NLCD_NAMES
-    valid = np.isfinite(heatmap) & (nlcd_map >= 0)
+    max_classes caps the tile count to the most areally significant
+    classes (by area_share) - a high-cardinality feature like evt/sclass
+    can have far more distinct codes on disk than are worth a tile each;
+    the ones that don't even cover enough ground to matter for
+    lit_area_share aren't worth the clutter."""
+    valid = np.isfinite(heatmap) & (code_map >= 0)
     if not valid.any():
         return
-    codes, scores = nlcd_map[valid], heatmap[valid]
+    codes, scores = code_map[valid], heatmap[valid]
     total = float(valid.sum())
-    weighted = []
+    rows = []
     for code in sorted(set(codes.tolist())):
         m = codes == code
         if m.sum() < min_count:
             continue
-        name = NLCD_NAMES.get(int(code), f"class_{code}").replace(
-            ' ', '_').replace('/', '-')
-        class_scores = scores[m]
-        mean_score = float(class_scores.mean())
-        area_share = float(m.sum()) / total
-        tb_writer.add_scalar(f"Class/mean_score/{name}", mean_score, 0)
-        tb_writer.add_histogram(f"Class/score_hist/{name}", class_scores, 0)
-        tb_writer.add_scalar(f"Class/area_share/{name}", area_share, 0)
-        weighted.append((name, area_share, mean_score))
-    norm = sum(a * sc for _, a, sc in weighted) or 1.0
-    for name, area_share, mean_score in weighted:
-        tb_writer.add_scalar(f"Class/lit_area_share/{name}",
+        label = (names.get(int(code), f"class_{code}") if names
+                 else str(int(code))).replace(' ', '_').replace('/', '-')
+        rows.append((label, float(m.sum()) / total,
+                    float(scores[m].mean()), scores[m]))
+    rows.sort(key=lambda r: -r[1])
+    rows = rows[:max_classes]
+    norm = sum(a * sc for _, a, sc, _ in rows) or 1.0
+    for label, area_share, mean_score, class_scores in rows:
+        tb_writer.add_scalar(f"Class/{feature}/mean_score/{label}",
+                             mean_score, 0)
+        tb_writer.add_histogram(f"Class/{feature}/score_hist/{label}",
+                                class_scores, 0)
+        tb_writer.add_scalar(f"Class/{feature}/area_share/{label}",
+                             area_share, 0)
+        tb_writer.add_scalar(f"Class/{feature}/lit_area_share/{label}",
                              (area_share * mean_score) / norm, 0)
+
+
+def _tb_log_continuous_correlation(tb_writer, heatmap, value_map, feature,
+                                   n_bins=20):
+    """Does the score actually track a CONTINUOUS feature (canopy
+    height/cover, tree-canopy-cover%), not just land-cover class? Logs
+    a Pearson r scalar plus a binned mean-score-vs-value plot (quantile
+    bins, so a skewed feature like canopy cover doesn't dump most cells
+    into one or two equal-width bins) - the map-level analog of asking
+    "if I sort every scored cell by this feature's value, does the mean
+    score trend with it." A strong trend here for e.g. canopy height
+    would mean the road-hugging pattern is a height/structure effect,
+    not a discrete class one."""
+    valid = np.isfinite(heatmap) & np.isfinite(value_map)
+    if valid.sum() < n_bins * 5:
+        return
+    scores, values = heatmap[valid], value_map[valid]
+    if np.ptp(values) == 0:
+        return
+    r = float(np.corrcoef(values, scores)[0, 1])
+    tb_writer.add_scalar(f"Correlation/pearson_r/{feature}", r, 0)
+
+    edges = np.unique(np.quantile(values, np.linspace(0, 1, n_bins + 1)))
+    if len(edges) < 3:
+        return
+    bin_idx = np.clip(np.digitize(values, edges[1:-1]), 0, len(edges) - 2)
+    bin_centers, bin_means, bin_counts = [], [], []
+    for b in range(len(edges) - 1):
+        m = bin_idx == b
+        if not m.any():
+            continue
+        bin_centers.append(float(values[m].mean()))
+        bin_means.append(float(scores[m].mean()))
+        bin_counts.append(int(m.sum()))
+
+    fig, ax1 = plt.subplots(figsize=(6, 4), dpi=110)
+    ax1.plot(bin_centers, bin_means, 'o-', color='tab:blue')
+    ax1.set_xlabel(feature)
+    ax1.set_ylabel('mean predicted score', color='tab:blue')
+    ax1.tick_params(axis='y', labelcolor='tab:blue')
+    ax2 = ax1.twinx()
+    ax2.bar(bin_centers, bin_counts,
+           width=(max(bin_centers) - min(bin_centers) or 1) / n_bins * 0.8,
+           alpha=0.15, color='gray')
+    ax2.set_ylabel('cell count', color='gray')
+    ax1.set_title(f"score vs {feature} (r={r:+.3f}, n={valid.sum():,})")
+    fig.tight_layout()
+    fig.canvas.draw()
+    w, h = fig.canvas.get_width_height()
+    arr = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8).reshape(
+        h, w, 4)
+    plt.close(fig)
+    tb_writer.add_image(f"Correlation/plot/{feature}",
+                        torch.from_numpy(arr.copy()).permute(2, 0, 1), 0)
 
 
 def _tb_capture_windows(model, device, srcs, cat_f, cont_f, heatmap,
@@ -833,12 +916,16 @@ def main():
     try:
         bounds = args.bounds or list(BOXES[args.region])
         window_bounds = bounds_to_window(ref, bounds)
-        nlcd_idx = cat_f.index("nlcd") if "nlcd" in cat_f else None
-        heatmap, transform, nlcd_map = predict_region(
+        # Every feature the model actually uses, captured per scored
+        # cell for the --tensorboard per-feature correlation breakdown -
+        # cheap (reused from the tensors already loaded for scoring), so
+        # only paid when there's a writer to consume it.
+        capture_features = (cat_f + cont_f) if tb_writer is not None else None
+        heatmap, transform, feature_maps = predict_region(
             model, device, srcs, ref, cat_f, cont_f, window_bounds,
             args.stride, args.batch_size, args.compile,
             flip_tta=args.flip_tta, temperature=temperature,
-            logit_shift=logit_shift, nlcd_idx=nlcd_idx)
+            logit_shift=logit_shift, capture_features=capture_features)
         # Captured here, before srcs close below: the top/bottom-scoring
         # windows need to be re-read from the SAME open sources.
         tb_windows = (_tb_capture_windows(
@@ -886,8 +973,15 @@ def main():
             tb_writer.add_histogram("Diagnostics/predicted_scores", vals, 0)
             tb_writer.add_image("Map/suitability",
                                 _tb_suitability_image(heatmap, args.cmap), 0)
-        if nlcd_map is not None:
-            _tb_log_class_scores(tb_writer, heatmap, nlcd_map)
+        for f in cat_f:
+            if f in feature_maps:
+                _tb_log_categorical_breakdown(
+                    tb_writer, heatmap, feature_maps[f], f,
+                    names=NLCD_NAMES if f == "nlcd" else None)
+        for f in cont_f:
+            if f in feature_maps:
+                _tb_log_continuous_correlation(
+                    tb_writer, heatmap, feature_maps[f], f)
         if tb_windows is not None:
             for key, prefix in (("top", "Windows/top_score"),
                                 ("bottom", "Windows/bottom_score")):

@@ -97,7 +97,14 @@ RASTER_FEATURES = ["evt", "evh", "evc", "sclass", "fdist", "ch", "cc",
                    # Earth Engine products (download_tcc_nlcd.py):
                    # tcc = USFS Tree Canopy Cover percent (continuous),
                    # nlcd = Annual NLCD land-cover class (categorical).
-                   "tcc", "nlcd"]
+                   "tcc", "nlcd",
+                   # generate_road_distance.py: metres to the nearest
+                   # TIGER/Line road, rasterized onto this region's own
+                   # grid. Static (roads don't change on a vegetation
+                   # vintage's schedule) but written once per available
+                   # year so the year-matching policy below never has to
+                   # special-case it.
+                   "road_dist"]
 
 # Year-matching policy: a sighting's year resolves to the exact raster
 # year when present, else the CLOSEST year (ties -> earlier year, i.e.

@@ -537,7 +537,24 @@ FEATURE_SPEC = {
     # 250 is remapped to -9999 at download so it clamps to padding).
     "tcc":    {"kind": "continuous", "scale": 100.0},
     "nlcd":   {"kind": "categorical", "vocab": 256, "dim": 16},
+    # Distance to the nearest road, METRES, from TIGER/Line road vectors
+    # rasterized onto each region's own grid (generate_road_distance.py).
+    # CONTINUOUS, stored int16 capped at ROAD_DIST_MAX_M=5000 (the
+    # patch cache is int16, and past ~5km "farther" carries no more
+    # signal than "far"); scale 1000 puts it in a 0-5 unit range.
+    #
+    # Why it exists: NLCD's 30m cells cannot resolve a two-lane road
+    # from the wetland it cuts through (verified with inspect_point.py -
+    # a point ON Route 16 pavement reads nlcd=90 WOODY WETLANDS and
+    # scores 0.68, while a wider stretch reads nlcd=22 Developed Low and
+    # scores 0.09). Distance-to-road is the one input that says "there
+    # is a road here" at a resolution the land-cover rasters cannot.
+    "road_dist": {"kind": "continuous", "scale": 1000.0},
 }
+
+# Cap for the stored distance-to-road raster, metres. Kept here rather
+# than in the generator so the reader and writer can never disagree.
+ROAD_DIST_MAX_M = 5000
 
 
 def config_to_model_kwargs(cfg, defaults=None):

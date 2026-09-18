@@ -363,25 +363,51 @@ def _tb_suitability_image(heatmap, cmap_name="jet", max_dim=1024):
 
 
 def _tb_log_class_scores(tb_writer, heatmap, nlcd_map, min_count=50):
-    """Class/mean_score/<name> over the PREDICTED region - the live,
+    """Per-class breakdown over the PREDICTED region - the live,
     real-deployment counterpart to model_handler's per-class val
-    breakdown and diagnose_wetland.py's area-composition analysis: does
-    any land-cover class score anomalously high across this actual
-    mapped area? No ground truth here (this is inference, not
-    validation), so no AUC - mean score is what's available."""
+    breakdown and diagnose_wetland.py's area-composition analysis:
+    - Class/mean_score: does any land-cover class score anomalously
+      high across this actual mapped area? No ground truth here (this
+      is inference, not validation), so no AUC - mean score is what's
+      available.
+    - Class/score_hist: the SHAPE of each class's score distribution,
+      not just its mean - a class with a high mean from a thin high
+      tail over an otherwise ordinary bulk looks very different from
+      one that's uniformly elevated, and the mean alone can't tell
+      those apart.
+    - Class/area_share: each class's share of the scored map area -
+      a high mean score over a handful of pixels is a very different
+      finding from the same mean over a large contiguous class.
+    - Class/lit_area_share: diagnose_wetland.py Part D's "landscape
+      area share x mean score", normalized to sum to 1 across classes
+      - each class's actual contribution to the map's total predicted
+      suitability, the map-level answer to "does this class scoring
+      high actually move the map, or is it a sliver."
+    """
     from grouse_data import NLCD_NAMES
     valid = np.isfinite(heatmap) & (nlcd_map >= 0)
     if not valid.any():
         return
     codes, scores = nlcd_map[valid], heatmap[valid]
+    total = float(valid.sum())
+    weighted = []
     for code in sorted(set(codes.tolist())):
         m = codes == code
         if m.sum() < min_count:
             continue
         name = NLCD_NAMES.get(int(code), f"class_{code}").replace(
             ' ', '_').replace('/', '-')
-        tb_writer.add_scalar(f"Class/mean_score/{name}",
-                             float(scores[m].mean()), 0)
+        class_scores = scores[m]
+        mean_score = float(class_scores.mean())
+        area_share = float(m.sum()) / total
+        tb_writer.add_scalar(f"Class/mean_score/{name}", mean_score, 0)
+        tb_writer.add_histogram(f"Class/score_hist/{name}", class_scores, 0)
+        tb_writer.add_scalar(f"Class/area_share/{name}", area_share, 0)
+        weighted.append((name, area_share, mean_score))
+    norm = sum(a * sc for _, a, sc in weighted) or 1.0
+    for name, area_share, mean_score in weighted:
+        tb_writer.add_scalar(f"Class/lit_area_share/{name}",
+                             (area_share * mean_score) / norm, 0)
 
 
 def _tb_capture_windows(model, device, srcs, cat_f, cont_f, heatmap,
@@ -443,8 +469,9 @@ def _tb_log_windows(tb_writer, tag_prefix, model, cat_f, cont_f, window):
     """Logs one gather() result from _tb_capture_windows: each
     continuous feature's patch, the 'nlcd' category map (if present),
     the model's own pre-pool spatial logit map, and - if early_attn is
-    active - its center-query attention, one tile per window, plus the
-    windows' actual scores as text. Mirrors model_handler's
+    active - its center-query attention (head-averaged, an off-center
+    query grid, and per-head at the center), one tile per window, plus
+    the windows' actual scores as text. Mirrors model_handler's
     _tb_log_epoch_extras patch/attention visualization, rebuilt here
     since predict.py scores bare windows directly rather than through
     a GrouseModelHandler/DataLoader."""
@@ -476,12 +503,41 @@ def _tb_log_windows(tb_writer, tag_prefix, model, cat_f, cont_f, window):
         result = model.attention_diagnostics(t_cat, t_cont)
         if result is not None:
             w_attn, (h, wd, kh, kw) = result
+            num_heads = w_attn.shape[1]
             center = (h // 2) * wd + (wd // 2)
             center_map = w_attn[:, :, center, :].mean(dim=1).reshape(
                 n, 1, kh, kw)
             tb_writer.add_image(
                 f"{tag_prefix}/attn_center",
                 torchvision.utils.make_grid(norm01(center_map), nrow=n), 0)
+            # Off-center query positions (center + quadrant midpoints),
+            # head-averaged - mirrors train.py's Patches/attn_query_grid,
+            # so a window's attention behavior away from the patch
+            # center isn't invisible here the way a center-only tile
+            # would leave it.
+            positions = [(0.5, 0.5), (0.25, 0.25), (0.25, 0.75),
+                        (0.75, 0.25), (0.75, 0.75)]
+            idxs = [int(round(py * (h - 1))) * wd + int(round(px * (wd - 1)))
+                   for py, px in positions]
+            pos_maps = torch.stack(
+                [w_attn[:, :, i, :].mean(dim=1) for i in idxs],
+                dim=1).reshape(n * len(idxs), 1, kh, kw)
+            tb_writer.add_image(
+                f"{tag_prefix}/attn_query_grid",
+                torchvision.utils.make_grid(norm01(pos_maps),
+                                            nrow=len(idxs)), 0)
+            # Same center query, one tile per head instead of averaged -
+            # mirrors train.py's Patches/attn_center_per_head; a head
+            # that specializes (local vs. global, directional) is
+            # invisible in the head-averaged attn_center tile above.
+            if num_heads > 1:
+                head_maps = w_attn[:, :, center, :].reshape(
+                    n, num_heads, kh, kw
+                ).reshape(n * num_heads, 1, kh, kw)
+                tb_writer.add_image(
+                    f"{tag_prefix}/attn_center_per_head",
+                    torchvision.utils.make_grid(norm01(head_maps),
+                                                nrow=num_heads), 0)
     tb_writer.add_text(f"{tag_prefix}/scores",
                        ", ".join(f"{s:.3f}" for s in scores), 0)
 

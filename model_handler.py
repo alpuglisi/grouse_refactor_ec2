@@ -1360,6 +1360,15 @@ class GrouseModelHandler:
         this epoch improves, get saved), not the raw in-progress
         training weights EMA is smoothing over."""
         for name, params in named_groups:
+            if not params:
+                # An LR group can be genuinely empty - e.g. --init-from
+                # loading every tensor leaves 'fresh' with 0 params -
+                # and torch.cat([]) crashes outright on an empty list,
+                # unlike _tb_log_grad_step's grads list (built with a
+                # `if p.grad is not None` filter, so it degrades to
+                # empty and its own `if not grads: continue` catches it
+                # already; params here has no such filter to hide behind).
+                continue
             flat = torch.cat([p.detach().reshape(-1) for p in params])
             # NaN/Inf-safe (see _tb_log_grad_step): a NaN gradient can
             # propagate into the weights themselves via the optimizer

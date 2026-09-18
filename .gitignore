@@ -6,4 +6,12 @@
 
 # 3. Explicitly allow essential configuration files in the root
 !/.gitignore
-!/README.md
+
+# 4. Root-level docs (README.md, ARCHITECTURE.md, ...). Root only, so
+#    nothing under data/ or any other output directory sneaks in.
+!/*.md
+
+# 5. Superseded scripts, kept for history. Already tracked via git mv;
+#    this keeps them visible to `git add` if one is ever edited.
+!/legacy/
+!/legacy/*.py

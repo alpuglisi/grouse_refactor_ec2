@@ -978,15 +978,31 @@ class GrouseModelHandler:
                 for name, g in zip(group_names, optimizer.param_groups):
                     tb_writer.add_scalar(f"LR/{name}", g['lr'], step)
                 if raw_tta_logits is not None and len(raw_tta_logits):
-                    tb_writer.add_histogram("Diagnostics/val_logits",
-                                            raw_tta_logits, step)
-                    # Full precision/recall-vs-threshold curve, not just
-                    # the single accuracy number at one operating point
-                    # - cheap (numpy only, no GPU) since evaluate()
-                    # already computed both arrays.
-                    tb_writer.add_pr_curve(
-                        "PR/val_tta", raw_tta_y,
-                        1.0 / (1.0 + np.exp(-raw_tta_logits)), step)
+                    # NaN/Inf-safe (see _tb_log_grad_step): a diverging
+                    # run can hand back non-finite logits, and
+                    # add_histogram crashes outright on an all-non-
+                    # finite tensor rather than just logging it oddly.
+                    finite = np.isfinite(raw_tta_logits)
+                    n_bad = int(len(raw_tta_logits) - finite.sum())
+                    if n_bad:
+                        tb_writer.add_text(
+                            "events/nonfinite_grad",
+                            f"epoch {step}: {n_bad}/{len(raw_tta_logits)} "
+                            f"non-finite (NaN/Inf) validation logits - "
+                            f"the run is likely diverging. Histogram/PR "
+                            f"curve below use the finite remainder only.",
+                            step)
+                    fl, fy = raw_tta_logits[finite], raw_tta_y[finite]
+                    if len(fl):
+                        tb_writer.add_histogram("Diagnostics/val_logits",
+                                                fl, step)
+                        # Full precision/recall-vs-threshold curve, not
+                        # just the single accuracy number at one
+                        # operating point - cheap (numpy only, no GPU)
+                        # since evaluate() already computed both arrays.
+                        tb_writer.add_pr_curve(
+                            "PR/val_tta", fy, 1.0 / (1.0 + np.exp(-fl)),
+                            step)
                 if raw_tta_nlcd is not None:
                     self._tb_log_class_breakdown(
                         tb_writer, step, raw_tta_logits, raw_tta_y,
@@ -1059,7 +1075,17 @@ class GrouseModelHandler:
         whole network is diverging" from "one LR group (e.g.
         early_attn) is diverging while the rest is fine" directly,
         instead of requiring after-the-fact reasoning from val
-        metrics alone."""
+        metrics alone.
+
+        NaN/Inf-safe: a warm-restart LR spike (or any other instability)
+        can genuinely blow a group's gradients up to non-finite values -
+        exactly the event this instrumentation exists to catch - and
+        add_histogram crashes outright on an all-non-finite tensor
+        ("the histogram is empty"), which took down a live 150-epoch
+        run. Non-finite entries are filtered before norm/histogram
+        (computed on the finite remainder, if any) and reported as a
+        text event instead of a crash - a surfaced warning, not a
+        silent drop, since non-finite gradients are real information."""
         tb_writer.add_scalar("Grad/total_norm_preclip", float(total_norm),
                              step)
         for name, params in named_groups:
@@ -1067,6 +1093,19 @@ class GrouseModelHandler:
             if not grads:
                 continue
             flat = torch.cat([g.reshape(-1) for g in grads])
+            finite = torch.isfinite(flat)
+            n_bad = int(flat.numel() - int(finite.sum()))
+            if n_bad:
+                tb_writer.add_text(
+                    "events/nonfinite_grad",
+                    f"step {step}: {n_bad}/{flat.numel()} non-finite "
+                    f"(NaN/Inf) gradient values in '{name}' - likely an "
+                    f"LR-spike instability (e.g. a warm restart). "
+                    f"Norm/histogram below are computed on the finite "
+                    f"remainder only.", step)
+                flat = flat[finite]
+            if flat.numel() == 0:
+                continue
             tb_writer.add_scalar(f"Grad/norm_{name}", float(flat.norm()),
                                  step)
             tb_writer.add_histogram(f"Grad/hist_{name}", flat, step)
@@ -1143,6 +1182,22 @@ class GrouseModelHandler:
         training weights EMA is smoothing over."""
         for name, params in named_groups:
             flat = torch.cat([p.detach().reshape(-1) for p in params])
+            # NaN/Inf-safe (see _tb_log_grad_step): a NaN gradient can
+            # propagate into the weights themselves via the optimizer
+            # step, and add_histogram crashes outright on an all-non-
+            # finite tensor.
+            finite = torch.isfinite(flat)
+            n_bad = int(flat.numel() - int(finite.sum()))
+            if n_bad:
+                tb_writer.add_text(
+                    "events/nonfinite_grad",
+                    f"step {step}: {n_bad}/{flat.numel()} non-finite "
+                    f"(NaN/Inf) WEIGHT values in '{name}' - gradient "
+                    f"corruption has reached the weights themselves. "
+                    f"This checkpoint is likely unusable.", step)
+                flat = flat[finite]
+            if flat.numel() == 0:
+                continue
             tb_writer.add_histogram(f"Weights/{name}", flat, step)
         if (tb_embeddings and tb_embeddings_every > 0
                 and step % tb_embeddings_every == 0):

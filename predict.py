@@ -230,7 +230,7 @@ def read_strip(srcs, cat_f, cont_f, r0, rows, c0, cols):
 def predict_region(model, device, srcs, ref, cat_f, cont_f,
                    window_bounds, stride, batch_size, use_compile,
                    flip_tta=True, temperature=1.0, logit_shift=0.0,
-                   capture_features=None):
+                   capture_features=None, edge_features=None):
     """capture_features: iterable of feature names (from cat_f and/or
     cont_f) to also capture per scored cell - the center-pixel value at
     each cell, read from the SAME tensors already loaded for scoring (no
@@ -242,7 +242,20 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
     score-correlation breakdown over the predicted region: which
     categorical classes and which continuous-feature ranges the model's
     score actually tracks in this specific deployment area, not just
-    what the training data looked like."""
+    what the training data looked like.
+
+    edge_features: iterable of feature names to ALSO capture a per-cell
+    EDGE/CONTRAST magnitude for, computed over that same cell's WHOLE
+    64x64 window (not just its center pixel) from the exact tensors
+    already stacked for scoring - a hard-edge hypothesis (e.g. "the
+    model is keying on the canopy/field contrast a road cuts, not on
+    what's on either side of it") shows up here, not in
+    capture_features's plain center-pixel values. Continuous feature:
+    mean absolute finite-difference gradient. Categorical feature: rate
+    of class change between adjacent pixels. Returns edge_maps in the
+    same {name: 2D float32 array} shape as feature_maps, always
+    continuous regardless of the source feature's own kind, since an
+    edge magnitude is a continuous quantity either way."""
     r_start, r_end, c_start, c_end = window_bounds
     height, width = r_end - r_start, c_end - c_start
     out_h = (height - IMG_SIZE) // stride + 1
@@ -256,6 +269,13 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                     for f in cat_capture}
     feature_maps.update({f: np.full((out_h, out_w), np.nan, dtype=np.float32)
                          for f in cont_capture})
+    edge_features = list(edge_features or [])
+    edge_cat_capture = {f: cat_f.index(f) for f in edge_features
+                        if f in cat_f}
+    edge_cont_capture = {f: cont_f.index(f) for f in edge_features
+                         if f in cont_f}
+    edge_maps = {f: np.full((out_h, out_w), np.nan, dtype=np.float32)
+                for f in list(edge_cat_capture) + list(edge_cont_capture)}
 
     # Reference-layer nodata mask for honest masking of no-coverage cells.
     ref_nodata = ref.nodata if ref.nodata is not None else -9999
@@ -305,6 +325,28 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                 t_cont = torch.from_numpy(np.stack(cont_b)).to(
                     device, non_blocking=True)
 
+                # Edge/contrast magnitude per sample, on the canonical
+                # (untransformed) orientation only - one pass, not per
+                # TTA view, since this characterizes the WINDOW's own
+                # content, not a scoring quantity. Categorical: rate of
+                # class change between adjacent pixels (unrelated
+                # values still count as "different", which is exactly
+                # what a categorical edge is). Continuous: mean absolute
+                # finite-difference gradient.
+                edge_cat_vals, edge_cont_vals = {}, {}
+                for f, idx in edge_cat_capture.items():
+                    ch = t_cat[:, idx]
+                    neq_x = (ch[:, :, 1:] != ch[:, :, :-1]).float().mean(
+                        dim=(1, 2))
+                    neq_y = (ch[:, 1:, :] != ch[:, :-1, :]).float().mean(
+                        dim=(1, 2))
+                    edge_cat_vals[f] = (0.5 * (neq_x + neq_y)).cpu().numpy()
+                for f, idx in edge_cont_capture.items():
+                    ch = t_cont[:, idx]
+                    dx = (ch[:, :, 1:] - ch[:, :, :-1]).abs().mean(dim=(1, 2))
+                    dy = (ch[:, 1:, :] - ch[:, :-1, :]).abs().mean(dim=(1, 2))
+                    edge_cont_vals[f] = (0.5 * (dx + dy)).cpu().numpy()
+
                 # TTA over the D4 group, scored through model.logits()
                 # so the trained pooling (attn/gauss/center/mean) and the
                 # center-skip head actually apply - forward() alone
@@ -331,7 +373,7 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                     pooled_logit / temperature
                     + logit_shift).float().cpu().numpy()
 
-                for p, (y, x) in zip(probs, keep):
+                for i, (p, (y, x)) in enumerate(zip(probs, keep)):
                     gy = (y0 + y) // stride
                     gx = x // stride
                     if gy < out_h and gx < out_w:
@@ -344,6 +386,10 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                             for f, idx in cont_capture.items():
                                 feature_maps[f][gy, gx] = float(
                                     cont_np[idx, cy, cx])
+                        for f, vals in edge_cat_vals.items():
+                            edge_maps[f][gy, gx] = float(vals[i])
+                        for f, vals in edge_cont_vals.items():
+                            edge_maps[f][gy, gx] = float(vals[i])
 
     n_valid = int(np.isfinite(heatmap).sum())
     print(f"   Scored {n_valid:,}/{heatmap.size:,} cells "
@@ -354,7 +400,7 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
         ref.transform.c + (c_start + IMG_SIZE // 2) * ref.transform.a,
         ref.transform.d, ref.transform.e * stride,
         ref.transform.f + (r_start + IMG_SIZE // 2) * ref.transform.e)
-    return heatmap, new_trans, feature_maps
+    return heatmap, new_trans, feature_maps, edge_maps
 
 
 # ==========================================
@@ -440,16 +486,20 @@ def _tb_log_categorical_breakdown(tb_writer, heatmap, code_map, feature,
 
 
 def _tb_log_continuous_correlation(tb_writer, heatmap, value_map, feature,
-                                   n_bins=20):
-    """Does the score actually track a CONTINUOUS feature (canopy
-    height/cover, tree-canopy-cover%), not just land-cover class? Logs
-    a Pearson r scalar plus a binned mean-score-vs-value plot (quantile
-    bins, so a skewed feature like canopy cover doesn't dump most cells
-    into one or two equal-width bins) - the map-level analog of asking
-    "if I sort every scored cell by this feature's value, does the mean
-    score trend with it." A strong trend here for e.g. canopy height
-    would mean the road-hugging pattern is a height/structure effect,
-    not a discrete class one."""
+                                   n_bins=20, tag_prefix="Correlation"):
+    """Does the score actually track a CONTINUOUS quantity - a raw
+    feature value (canopy height/cover, tree-canopy-cover%) or, via
+    edge_maps/tag_prefix='Edge', a per-cell EDGE/CONTRAST magnitude
+    instead - not just land-cover class? Logs a Pearson r scalar plus a
+    binned mean-score-vs-value plot (quantile bins, so a skewed
+    quantity like canopy cover or an edge-density fraction doesn't dump
+    most cells into one or two equal-width bins) - the map-level analog
+    of asking "if I sort every scored cell by this quantity, does the
+    mean score trend with it." A strong trend under the default
+    'Correlation' prefix means the pattern is a height/structure/value
+    effect; a strong one under 'Edge' means it's a hard-boundary/
+    contrast effect instead - e.g. a road's canopy/field edge, not
+    what's actually on either side of it."""
     valid = np.isfinite(heatmap) & np.isfinite(value_map)
     if valid.sum() < n_bins * 5:
         return
@@ -457,7 +507,7 @@ def _tb_log_continuous_correlation(tb_writer, heatmap, value_map, feature,
     if np.ptp(values) == 0:
         return
     r = float(np.corrcoef(values, scores)[0, 1])
-    tb_writer.add_scalar(f"Correlation/pearson_r/{feature}", r, 0)
+    tb_writer.add_scalar(f"{tag_prefix}/pearson_r/{feature}", r, 0)
 
     edges = np.unique(np.quantile(values, np.linspace(0, 1, n_bins + 1)))
     if len(edges) < 3:
@@ -489,7 +539,7 @@ def _tb_log_continuous_correlation(tb_writer, heatmap, value_map, feature,
     arr = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8).reshape(
         h, w, 4)
     plt.close(fig)
-    tb_writer.add_image(f"Correlation/plot/{feature}",
+    tb_writer.add_image(f"{tag_prefix}/plot/{feature}",
                         torch.from_numpy(arr.copy()).permute(2, 0, 1), 0)
 
 
@@ -919,13 +969,19 @@ def main():
         # Every feature the model actually uses, captured per scored
         # cell for the --tensorboard per-feature correlation breakdown -
         # cheap (reused from the tensors already loaded for scoring), so
-        # only paid when there's a writer to consume it.
+        # only paid when there's a writer to consume it. edge_features
+        # (same list) additionally captures each feature's per-window
+        # edge/contrast magnitude - tests the "hard boundary" hypothesis
+        # (e.g. a road's canopy/field edge) separately from the plain
+        # value correlation above.
         capture_features = (cat_f + cont_f) if tb_writer is not None else None
-        heatmap, transform, feature_maps = predict_region(
+        edge_features = capture_features
+        heatmap, transform, feature_maps, edge_maps = predict_region(
             model, device, srcs, ref, cat_f, cont_f, window_bounds,
             args.stride, args.batch_size, args.compile,
             flip_tta=args.flip_tta, temperature=temperature,
-            logit_shift=logit_shift, capture_features=capture_features)
+            logit_shift=logit_shift, capture_features=capture_features,
+            edge_features=edge_features)
         # Captured here, before srcs close below: the top/bottom-scoring
         # windows need to be re-read from the SAME open sources.
         tb_windows = (_tb_capture_windows(
@@ -982,6 +1038,10 @@ def main():
             if f in feature_maps:
                 _tb_log_continuous_correlation(
                     tb_writer, heatmap, feature_maps[f], f)
+        for f in cat_f + cont_f:
+            if f in edge_maps:
+                _tb_log_continuous_correlation(
+                    tb_writer, heatmap, edge_maps[f], f, tag_prefix="Edge")
         if tb_windows is not None:
             for key, prefix in (("top", "Windows/top_score"),
                                 ("bottom", "Windows/bottom_score")):

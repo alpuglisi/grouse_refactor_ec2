@@ -150,6 +150,35 @@ class ModelEMA:
             for k in self._nonfloat:
                 self.shadow[k] = sd[k].detach().clone().float()
 
+    @torch.no_grad()
+    def load_shadow(self, state):
+        """Restore averaged weights from a checkpoint, IN PLACE.
+
+        Assigning self.shadow = {...} instead would silently break the
+        EMA, and silently is the operative word. _dst_float holds
+        references to the tensor OBJECTS built in __init__, and
+        update() writes through those references via torch._foreach_*.
+        Rebinding the dict leaves update() still writing into the old
+        tensors while applied() reads the new ones, so the average
+        freezes at whatever was restored - forever. Training looks
+        completely normal (the live weights keep moving, train
+        accuracy keeps climbing) while every validation metric and
+        every saved checkpoint serve the same stale weights, epoch
+        after epoch. Observed as bit-identical val loss/AUC/AP/logit
+        std across consecutive epochs on a resumed run.
+
+        Same invariant the constructor documents for _src_float: the
+        tensors these lists point at must be written through, never
+        replaced."""
+        missing = [k for k in self.shadow if k not in state]
+        if missing:
+            raise ValueError(
+                f"EMA checkpoint is missing {len(missing)} shadow "
+                f"entries (first few: {missing[:3]}) - refusing to "
+                f"restore a partial average.")
+        for k, dst in self.shadow.items():
+            dst.copy_(state[k].to(device=dst.device, dtype=dst.dtype))
+
     @contextlib.contextmanager
     def applied(self, model):
         backup = {k: v.detach().clone() for k, v in model.state_dict().items()}
@@ -878,8 +907,9 @@ class GrouseModelHandler:
             if scaler is not None and state.get('scaler_state') is not None:
                 scaler.load_state_dict(state['scaler_state'])
             if self.ema is not None and state.get('ema_state') is not None:
-                self.ema.shadow = {k: v.to(self.device)
-                                   for k, v in state['ema_state'].items()}
+                # IN PLACE - see ModelEMA.load_shadow. Rebinding the dict
+                # here froze the average on every resumed run.
+                self.ema.load_shadow(state['ema_state'])
             start_epoch = state['epoch']
             sel_ref = state.get('sel_ref')
             best_epoch = state.get('best_epoch', 0)

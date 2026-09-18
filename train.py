@@ -568,6 +568,28 @@ def main():
                              "convolutional output.")
     parser.add_argument("--dropout", type=float, default=0.2)
     parser.add_argument("--embed-dropout", type=float, default=0.0)
+    parser.add_argument("--dynamic-dropout",
+                        action=argparse.BooleanOptionalAction, default=False,
+                        help="Adjust --dropout/--embed-dropout REACTIVELY "
+                             "each epoch off the val-minus-train loss gap, "
+                             "instead of holding them fixed: the gap "
+                             "WIDENING (overfitting worsening) nudges both "
+                             "up toward --dynamic-dropout-max, NARROWING "
+                             "nudges them back down toward --dynamic-"
+                             "dropout-min, moved together in the ratio "
+                             "they started in. Starts at --dropout/--embed-"
+                             "dropout (epoch 1 behaves exactly as without "
+                             "the flag). Requires --dropout > 0.")
+    parser.add_argument("--dynamic-dropout-min", type=float, default=None,
+                        help="Floor for --dynamic-dropout. Default: 0.3x "
+                             "--dropout.")
+    parser.add_argument("--dynamic-dropout-max", type=float, default=None,
+                        help="Ceiling for --dynamic-dropout. Default: "
+                             "1.6x --dropout, capped at 0.6.")
+    parser.add_argument("--dynamic-dropout-step", type=float, default=0.01,
+                        help="Per-epoch nudge (probability units) applied "
+                             "to --dropout when --dynamic-dropout is on; "
+                             "--embed-dropout moves proportionally.")
     parser.add_argument("--label-smoothing", type=float, default=0.05)
     parser.add_argument("--ema", type=float, default=0.999,
                         help="Weight-EMA decay (e.g. 0.999); 0 = off.")
@@ -906,7 +928,11 @@ def main():
                     tb_attention=args.tb_attention,
                     tb_embeddings=args.tb_embeddings,
                     tb_embeddings_every=args.tb_embeddings_every,
-                    resume_from=resume_from)
+                    resume_from=resume_from,
+                    dynamic_dropout=args.dynamic_dropout,
+                    dynamic_dropout_min=args.dynamic_dropout_min,
+                    dynamic_dropout_max=args.dynamic_dropout_max,
+                    dynamic_dropout_step=args.dynamic_dropout_step)
         if tb_writer is not None:
             tb_writer.close()
         members.append((path, overrides.get('pool', args.pool)))

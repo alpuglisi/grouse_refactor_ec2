@@ -303,6 +303,11 @@ class GrouseModelHandler:
         # Pure inference-time gain - no extra training, no extra features.
         self.flip_tta = bool(flip_tta)
         self.threshold = 0.0
+        # Base/ceiling values for --dynamic-dropout (see _set_dropout):
+        # the network is built with these fixed values below exactly as
+        # before, dynamic scaling is opt-in per fit() call.
+        self._base_dropout = float(dropout)
+        self._base_embed_dropout = float(embed_dropout)
 
         self.model = GrouseResNet(
             self.cat_features, self.cont_features, spec=self.spec,
@@ -441,12 +446,30 @@ class GrouseModelHandler:
             return obj["state_dict"], obj.get("config")
         return obj, None
 
+    def _set_dropout(self, value):
+        """--dynamic-dropout's actuator: every plain nn.Dropout/
+        nn.Dropout2d module in the network (self.drop, plus
+        center_head's/spatial_head's if those heads are active) reads
+        its .p fresh on every forward call, so mutating it here takes
+        effect on the very next batch - no rebuild needed. embed_dropout
+        is a manually-applied float rather than a module (see
+        GrouseResNet.embed), so it's set directly, scaled by its
+        construction-time ratio to --dropout so the two move together
+        under one schedule instead of needing separate tuning."""
+        for m in self.model.modules():
+            if isinstance(m, (nn.Dropout, nn.Dropout2d)):
+                m.p = value
+        if self._base_dropout > 0:
+            self.model.embed_dropout = (
+                value * self._base_embed_dropout / self._base_dropout)
+
     def _resume_path(self):
         return self.save_path + ".resume"
 
     def _save_resume_state(self, next_epoch, optimizer, scheduler, scaler,
                            sel_ref, best_epoch, best_loss, best_auc,
-                           best_strict, best_rank):
+                           best_strict, best_rank, dd_value=None,
+                           dd_prev_gap=None):
         """Everything --resume needs to continue this exact run, not just
         the weights: optimizer momentum (Adam's moment estimates would
         otherwise restart from zero) and scheduler position (critical
@@ -473,6 +496,8 @@ class GrouseModelHandler:
             "best_auc": best_auc,
             "best_strict": best_strict,
             "best_rank": best_rank,
+            "dynamic_dropout_value": dd_value,
+            "dynamic_dropout_prev_gap": dd_prev_gap,
             "config": self._wrap_checkpoint(None)["config"],
         }, self._resume_path())
 
@@ -549,12 +574,19 @@ class GrouseModelHandler:
             train_labels=None, batch_pos_frac=None, metrics_csv=None,
             eval_batch_size=None, tb_writer=None, tb_log_every=50,
             tb_images=True, tb_attention=True, tb_embeddings=True,
-            tb_embeddings_every=10, resume_from=None):
+            tb_embeddings_every=10, resume_from=None, dynamic_dropout=False,
+            dynamic_dropout_min=None, dynamic_dropout_max=None,
+            dynamic_dropout_step=0.01):
         """train_labels + optional batch_pos_frac enable STRATIFIED
         batching: every training batch contains both classes at a fixed
         composition (dataset's global ratio by default), so a constant
         'lazy guess' predictor is penalized within every batch. Without
         train_labels, plain shuffled batching (original behavior)."""
+        if dynamic_dropout and self._base_dropout <= 0:
+            raise SystemExit(
+                "--dynamic-dropout requires --dropout > 0: it scales "
+                "dropout up/down from that value each epoch, and 0 has "
+                "nothing to scale.")
         pin = (self.device.type == 'cuda')
         # Workers are kept alive across epochs: each fork otherwise
         # re-opens every raster and rebuilds a pyproj Transformer per
@@ -802,6 +834,25 @@ class GrouseModelHandler:
         sel_ref = None
         best_epoch = 0
         start_epoch = 0
+        # --dynamic-dropout: reacts to the val/train loss gap rather than
+        # a fixed clock. dd_value starts at the CLI --dropout/--embed-
+        # dropout values (so epoch 1 behaves exactly as without the
+        # flag) and is nudged toward dd_max as the gap WIDENS
+        # (overfitting worsening) or dd_min as it NARROWS, each epoch,
+        # once a previous epoch's gap exists to compare against.
+        dd_value = self._base_dropout if dynamic_dropout else None
+        dd_prev_gap = None
+        dd_min = dd_max = None
+        if dynamic_dropout:
+            dd_min = (dynamic_dropout_min if dynamic_dropout_min is not None
+                     else 0.3 * self._base_dropout)
+            dd_max = (dynamic_dropout_max if dynamic_dropout_max is not None
+                     else min(0.6, 1.6 * self._base_dropout))
+            if not (0 <= dd_min <= dd_value <= dd_max):
+                raise SystemExit(
+                    f"--dynamic-dropout range must satisfy 0 <= min <= "
+                    f"--dropout <= max, got min={dd_min:g} dropout="
+                    f"{dd_value:g} max={dd_max:g}.")
         if resume_from:
             # A SEPARATE file from self.save_path: the deployment
             # checkpoint stays the lean {state_dict, config} predict.py/
@@ -836,6 +887,15 @@ class GrouseModelHandler:
             best_auc = state.get('best_auc', best_auc)
             best_strict = state.get('best_strict', best_strict)
             best_rank = state.get('best_rank', best_rank)
+            if dynamic_dropout:
+                # Falls back to the fresh-start values above if this
+                # resume file predates --dynamic-dropout (key absent) or
+                # the original run didn't use it (value stored as None)
+                # - a crash-and-resume shouldn't reset an in-progress
+                # dropout schedule back to the base value either way.
+                saved_dd = state.get('dynamic_dropout_value')
+                dd_value = saved_dd if saved_dd is not None else dd_value
+                dd_prev_gap = state.get('dynamic_dropout_prev_gap')
             if start_epoch >= epochs:
                 raise SystemExit(
                     f"--resume checkpoint is already at epoch "
@@ -848,6 +908,11 @@ class GrouseModelHandler:
                  f"Pass the SAME hyperparameters as the original run - "
                  f"only geometry is verified above, not LR/schedule/loss "
                  f"settings.")
+        if dynamic_dropout:
+            self._set_dropout(dd_value)
+            print(f"   Dynamic dropout: starting at {dd_value:.3f} "
+                 f"(range [{dd_min:.3f}, {dd_max:.3f}]), reacting to the "
+                 f"val/train loss gap each epoch.")
         guard = DivergenceGuard(self._divergence_patience,
                                 self.on_divergence,
                                 self._divergence_dampen_factor)
@@ -990,6 +1055,23 @@ class GrouseModelHandler:
                 ema_state = None
             metrics['train_loss'] = tr_loss_sum / max(tr_steps, 1)
             metrics['train_accuracy'] = 100.0 * tr_correct / max(tr_total, 1)
+            if dynamic_dropout:
+                # Reacts to the TREND (this epoch's gap vs. last epoch's),
+                # not the gap's absolute size - a small-but-widening gap
+                # and a large-but-shrinking one call for opposite moves,
+                # which a threshold on the raw gap can't tell apart. No
+                # prior epoch to compare against yet on the very first
+                # one (or the epoch right after a resume) - hold and just
+                # record it.
+                gap = metrics['val_loss'] - metrics['train_loss']
+                if dd_prev_gap is not None:
+                    if gap > dd_prev_gap:
+                        dd_value = min(dd_max, dd_value + dynamic_dropout_step)
+                    elif gap < dd_prev_gap:
+                        dd_value = max(dd_min, dd_value - dynamic_dropout_step)
+                    self._set_dropout(dd_value)
+                dd_prev_gap = gap
+                metrics['dropout'] = dd_value
             thr = self.best_threshold(tr_logits.numpy(), tr_ys.numpy())
             metrics['threshold'] = thr
             self.threshold = thr
@@ -1043,7 +1125,8 @@ class GrouseModelHandler:
             # self.save_path (see the resume_from block above for why).
             self._save_resume_state(
                 epoch + 1, optimizer, scheduler, scaler, sel_ref,
-                best_epoch, best_loss, best_auc, best_strict, best_rank)
+                best_epoch, best_loss, best_auc, best_strict, best_rank,
+                dd_value, dd_prev_gap)
             if metrics_csv:
                 self._log_metrics(metrics_csv, metrics)
             if tb_writer is not None:
@@ -1060,9 +1143,15 @@ class GrouseModelHandler:
                                  ("Strict/hedged_pct", "hedged_pct"),
                                  ("Diagnostics/logit_std", "logit_std"),
                                  ("Diagnostics/logit_mean", "logit_mean"),
-                                 ("Diagnostics/pred_pos_pct", "pred_pos_pct")):
+                                 ("Diagnostics/pred_pos_pct", "pred_pos_pct"),
+                                 ("Regularization/dropout", "dropout")):
                     if key in metrics:
                         tb_writer.add_scalar(tag, metrics[key], step)
+                if dynamic_dropout:
+                    tb_writer.add_scalar("Regularization/embed_dropout",
+                                         self.model.embed_dropout, step)
+                    tb_writer.add_scalar("Regularization/val_train_gap",
+                                         dd_prev_gap, step)
                 tb_writer.add_scalar(f"Selection/{self.select_by}_score",
                                      sel, step)
                 for name, g in zip(group_names, optimizer.param_groups):

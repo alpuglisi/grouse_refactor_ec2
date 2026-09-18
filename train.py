@@ -39,6 +39,8 @@ Usage:
 import argparse
 import sys
 import os
+import json
+import datetime as dt
 
 # grouse_data.py may sit next to this script (flat layout) or one
 # directory up (the original ml/ subfolder layout). Search for it rather
@@ -391,6 +393,20 @@ def main():
                              "rotation. --no-augment for the old behavior.")
     parser.add_argument("--metrics-csv", default=None,
                         help="Append per-epoch metrics to this CSV.")
+    parser.add_argument("--tensorboard", action="store_true",
+                        help="Log per-epoch loss/AUC/AP/rank curves, "
+                             "per-group learning rates, the val logit "
+                             "distribution, and checkpoint/divergence "
+                             "events to TensorBoard, under "
+                             "--tensorboard-dir/<timestamp>_<run name>. "
+                             "View with: tensorboard --logdir "
+                             "<--tensorboard-dir>. Requires the "
+                             "tensorboard package (pip install "
+                             "tensorboard).")
+    parser.add_argument("--tensorboard-dir", default="runs",
+                        help="Base directory for --tensorboard logs; "
+                             "each run gets its own timestamped "
+                             "subdirectory underneath it.")
     parser.add_argument("--pool", default="attn",
                         choices=["mean", "center", "gauss", "attn"],
                         help="How the spatial logit map collapses to one "
@@ -736,6 +752,24 @@ def main():
                   f"{overrides} ===")
         else:
             path = args.save_path
+        tb_writer = None
+        if args.tensorboard:
+            try:
+                from torch.utils.tensorboard import SummaryWriter
+            except ImportError:
+                raise SystemExit(
+                    "--tensorboard requires the tensorboard package: "
+                    "pip install tensorboard")
+            run_name = (f"{dt.datetime.now():%Y%m%d_%H%M%S}_"
+                       f"{os.path.splitext(os.path.basename(path))[0]}")
+            tb_logdir = os.path.join(args.tensorboard_dir, run_name)
+            tb_writer = SummaryWriter(tb_logdir)
+            tb_writer.add_text("run/command", " ".join(sys.argv), 0)
+            tb_writer.add_text("run/args",
+                               f"```\n{json.dumps(vars(args), indent=2, default=str)}\n```",
+                               0)
+            print(f"   TensorBoard logging to {tb_logdir} (view with: "
+                  f"tensorboard --logdir {args.tensorboard_dir})")
         handler = GrouseModelHandler(
             features,
             pretrained=not args.no_pretrained,
@@ -782,7 +816,10 @@ def main():
                     workers=args.workers,
                     train_labels=None if disable else train_labels,
                     batch_pos_frac=frac_arg,
-                    metrics_csv=args.metrics_csv)
+                    metrics_csv=args.metrics_csv,
+                    tb_writer=tb_writer)
+        if tb_writer is not None:
+            tb_writer.close()
         members.append((path, overrides.get('pool', args.pool)))
 
     if len(members) > 1:

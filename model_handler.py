@@ -511,7 +511,7 @@ class GrouseModelHandler:
 
     def fit(self, train_ds, val_ds, epochs=30, batch_size=32, workers=4,
             train_labels=None, batch_pos_frac=None, metrics_csv=None,
-            eval_batch_size=None):
+            eval_batch_size=None, tb_writer=None):
         """train_labels + optional batch_pos_frac enable STRATIFIED
         batching: every training batch contains both classes at a fixed
         composition (dataset's global ratio by default), so a constant
@@ -666,11 +666,14 @@ class GrouseModelHandler:
                 fresh_params.append(p)
         groups = [{"params": backbone_params,
                    "lr": self.hp['lr'] * BACKBONE_LR_FACTOR}]
+        group_names = ["backbone"]
         if attn_params:
             groups.append({"params": attn_params,
                            "lr": self.hp['lr']
                                  * self.hp['early_attn_lr_factor']})
+            group_names.append("early_attn")
         groups.append({"params": fresh_params, "lr": self.hp['lr']})
+        group_names.append("fresh")
         optimizer = torch.optim.AdamW(
             groups,
             weight_decay=self.hp['weight_decay'],
@@ -862,6 +865,7 @@ class GrouseModelHandler:
                     ykey = "_y" if src == "_logits" else "_tta_y"
                     metrics[dst] = 100.0 * float(
                         ((metrics[src] >= thr) == (metrics[ykey] == 1)).mean())
+            raw_tta_logits = metrics.get('_tta_logits')
             metrics = {k: v for k, v in metrics.items()
                        if not k.startswith('_')}
             metrics['epoch'] = epoch + 1
@@ -898,28 +902,61 @@ class GrouseModelHandler:
                 print(status)
             if metrics_csv:
                 self._log_metrics(metrics_csv, metrics)
+            if tb_writer is not None:
+                step = metrics['epoch']
+                for tag, key in (("Loss/train", "train_loss"),
+                                 ("Loss/val", "val_loss"),
+                                 ("Accuracy/train", "train_accuracy"),
+                                 ("Accuracy/val", "accuracy"),
+                                 ("Accuracy/tuned_tta", "tuned_tta_accuracy"),
+                                 ("AUC/val", "auc"), ("AUC/tta", "tta_auc"),
+                                 ("AP/val", "ap"), ("AP/tta", "tta_ap"),
+                                 ("Rank/score", "rank_score"),
+                                 ("Strict/accuracy", "strict_accuracy"),
+                                 ("Strict/hedged_pct", "hedged_pct"),
+                                 ("Diagnostics/logit_std", "logit_std"),
+                                 ("Diagnostics/logit_mean", "logit_mean"),
+                                 ("Diagnostics/pred_pos_pct", "pred_pos_pct")):
+                    if key in metrics:
+                        tb_writer.add_scalar(tag, metrics[key], step)
+                tb_writer.add_scalar(f"Selection/{self.select_by}_score",
+                                     sel, step)
+                for name, g in zip(group_names, optimizer.param_groups):
+                    tb_writer.add_scalar(f"LR/{name}", g['lr'], step)
+                if raw_tta_logits is not None and len(raw_tta_logits):
+                    tb_writer.add_histogram("Diagnostics/val_logits",
+                                            raw_tta_logits, step)
+                if improved:
+                    tb_writer.add_text(
+                        "events/checkpoint",
+                        f"Saved at epoch {step} ({self.select_by} "
+                        f"score={sel:.4f})", step)
 
             if guard.update(metrics.get('strict_accuracy', float('-inf')),
                             metrics['tta_auc'], metrics['ap']):
                 streak_epochs = f"epochs {epoch - self._divergence_patience + 2}-{epoch + 1}"
                 if self.on_divergence == 'warn':
-                    print(f"   [!] DIVERGENCE: strict accuracy rose while "
-                         f"AUC and AP both fell for "
-                         f"{self._divergence_patience} straight epochs "
-                         f"({streak_epochs}) - the model may be buying "
-                         f"confidence at ranking's expense.")
+                    msg = (f"   [!] DIVERGENCE: strict accuracy rose while "
+                          f"AUC and AP both fell for "
+                          f"{self._divergence_patience} straight epochs "
+                          f"({streak_epochs}) - the model may be buying "
+                          f"confidence at ranking's expense.")
                 elif self.on_divergence == 'dampen':
                     self._m_pos *= self._divergence_dampen_factor
                     self._m_neg *= self._divergence_dampen_factor
-                    print(f"   [!] DIVERGENCE over {streak_epochs} - "
-                         f"DAMPENING margins to +{self._m_pos:.3f}/"
-                         f"{self._m_neg:.3f} (x{self._divergence_dampen_factor}) "
-                         f"to ease off the strict objective.")
+                    msg = (f"   [!] DIVERGENCE over {streak_epochs} - "
+                          f"DAMPENING margins to +{self._m_pos:.3f}/"
+                          f"{self._m_neg:.3f} (x{self._divergence_dampen_factor}) "
+                          f"to ease off the strict objective.")
                 elif self.on_divergence == 'stop':
-                    print(f"   [!] DIVERGENCE over {streak_epochs} - "
-                         f"STOPPING at epoch {epoch + 1}/{epochs}. Best "
-                         f"checkpoint on disk is unaffected.")
+                    msg = (f"   [!] DIVERGENCE over {streak_epochs} - "
+                          f"STOPPING at epoch {epoch + 1}/{epochs}. Best "
+                          f"checkpoint on disk is unaffected.")
                     stop_early = True
+                print(msg)
+                if tb_writer is not None:
+                    tb_writer.add_text("events/divergence", msg,
+                                       metrics['epoch'])
             if stop_early:
                 break
 

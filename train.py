@@ -407,6 +407,40 @@ def main():
                         help="Base directory for --tensorboard logs; "
                              "each run gets its own timestamped "
                              "subdirectory underneath it.")
+    parser.add_argument("--tb-log-every", type=int, default=50,
+                        help="Step interval for gradient norm/histogram "
+                             "logging (per LR group: backbone/"
+                             "early_attn/fresh), under --tensorboard. "
+                             "This is the one place instrumentation "
+                             "re-introduces a GPU sync into the "
+                             "training loop, so it's an interval, not "
+                             "every step; 0 disables step-level "
+                             "gradient logging (epoch-level metrics "
+                             "still log).")
+    parser.add_argument("--tb-images",
+                        action=argparse.BooleanOptionalAction, default=True,
+                        help="Under --tensorboard: log a fixed batch of "
+                             "validation patches (per continuous "
+                             "feature), the model's spatial logit map, "
+                             "and (pool=attn) its attention-pool score "
+                             "map, once per epoch. The same patches are "
+                             "reused every epoch so you can watch them "
+                             "evolve.")
+    parser.add_argument("--tb-attention",
+                        action=argparse.BooleanOptionalAction, default=True,
+                        help="Under --tensorboard, with --early-attn: "
+                             "also log the early-attention block's "
+                             "actual softmax attention weights (center "
+                             "token's distribution across the patch) "
+                             "for the same fixed batch. No-op without "
+                             "--early-attn.")
+    parser.add_argument("--tb-embeddings",
+                        action=argparse.BooleanOptionalAction, default=True,
+                        help="Under --tensorboard: log each categorical "
+                             "feature's embedding table (e.g. nlcd) to "
+                             "the TensorBoard embedding projector once "
+                             "at the end of training, from the SAVED "
+                             "checkpoint's weights.")
     parser.add_argument("--pool", default="attn",
                         choices=["mean", "center", "gauss", "attn"],
                         help="How the spatial logit map collapses to one "
@@ -817,7 +851,10 @@ def main():
                     train_labels=None if disable else train_labels,
                     batch_pos_frac=frac_arg,
                     metrics_csv=args.metrics_csv,
-                    tb_writer=tb_writer)
+                    tb_writer=tb_writer, tb_log_every=args.tb_log_every,
+                    tb_images=args.tb_images,
+                    tb_attention=args.tb_attention,
+                    tb_embeddings=args.tb_embeddings)
         if tb_writer is not None:
             tb_writer.close()
         members.append((path, overrides.get('pool', args.pool)))

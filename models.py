@@ -103,6 +103,32 @@ class RelativeMultiheadAttention(nn.Module):
             dropout_p=self.dropout if self.training else 0.0)
         return self.out_proj(out.transpose(1, 2).reshape(b, lq, c))
 
+    @torch.no_grad()
+    def attention_weights(self, query, key, rope_q=None, rope_k=None,
+                          bias=None):
+        """Diagnostic-only: the (B, heads, Lq, Lk) softmax attention
+        weights this block would use, via an explicit softmax(QK^T)
+        instead of the fused SDPA kernel forward() uses (which never
+        materializes them). Not called anywhere on the training path -
+        see EarlyAttentionBlock.attention_weights / model_handler's
+        --tb-attention."""
+        b, lq, _ = query.shape
+        lk = key.shape[1]
+        w_q, w_k = self.in_proj_weight.chunk(3)[:2]
+        b_q, b_k = self.in_proj_bias.chunk(3)[:2]
+        q = F.linear(query, w_q, b_q).view(
+            b, lq, self.num_heads, self.head_dim).transpose(1, 2)
+        k = F.linear(key, w_k, b_k).view(
+            b, lk, self.num_heads, self.head_dim).transpose(1, 2)
+        if rope_q is not None:
+            q = _apply_rope(q, *rope_q)
+            k = _apply_rope(k, *rope_k)
+        scores = torch.matmul(q, k.transpose(-2, -1)) / (
+            self.head_dim ** 0.5)
+        if bias is not None:
+            scores = scores + bias.unsqueeze(0).to(scores.dtype)
+        return torch.softmax(scores, dim=-1)
+
 
 def sincos_position_encoding(h, w, channels, stride=1, device=None):
     """(1, h*w, channels) fixed 2D sin-cos position encoding.
@@ -304,7 +330,12 @@ class EarlyAttentionBlock(nn.Module):
         mask = t.new_empty(t.shape[0], 1, 1).bernoulli_(keep)
         return t * (mask / keep)
 
-    def forward(self, x):
+    def _qk_inputs(self, x):
+        """Shared by forward() and the diagnostic attention_weights():
+        the token sequences and position tensors (rope_q, rope_k,
+        bias) that go INTO attention, exactly as forward() builds
+        them. Factored out so the diagnostic path can never drift from
+        what training actually computes."""
         b, c, h, w = x.shape
         q_tokens = x.flatten(2).transpose(1, 2)           # (B, HW, C)
         q_normed = self.norm1(q_tokens)
@@ -335,11 +366,32 @@ class EarlyAttentionBlock(nn.Module):
             k_in = (q_in if self.kv_stride == 1 else
                     kv_normed + self._pe(kh, kw, self.kv_stride,
                                          x.device).to(kv_normed.dtype))
+        return q_tokens, q_in, k_in, kv_normed, rope_q, rope_k, bias, \
+            (h, w, kh, kw)
+
+    def forward(self, x):
+        b, c, h, w = x.shape
+        q_tokens, q_in, k_in, kv_normed, rope_q, rope_k, bias, _ = \
+            self._qk_inputs(x)
         attn_out = self.attn(q_in, k_in, kv_normed,
                              rope_q=rope_q, rope_k=rope_k, bias=bias)
         x_tokens = q_tokens + self._drop_path(attn_out)
         x_tokens = x_tokens + self._drop_path(self.mlp(self.norm2(x_tokens)))
         return x_tokens.transpose(1, 2).reshape(b, c, h, w)
+
+    @torch.no_grad()
+    def attention_weights(self, x):
+        """Diagnostic-only: the (B, heads, Lq, Lk) softmax attention
+        weights this block's forward() pass actually uses internally,
+        plus the (h, w, kh, kw) grid shape to reshape them. Built from
+        the exact same inputs forward() computes (_qk_inputs), just
+        routed through an explicit softmax instead of the fused SDPA
+        kernel that never materializes them. Never called during
+        training - see model_handler's --tb-attention."""
+        _, q_in, k_in, _, rope_q, rope_k, bias, shape = \
+            self._qk_inputs(x)
+        return self.attn.attention_weights(
+            q_in, k_in, rope_q=rope_q, rope_k=rope_k, bias=bias), shape
 
 def _conv_bn_relu(cin, cout, dilation=1, stride=1):
     return nn.Sequential(
@@ -723,6 +775,25 @@ class GrouseResNet(nn.Module):
 
     def trunk(self, x):
         return self.conv_out(self.drop(self.backbone(x)))
+
+    @torch.no_grad()
+    def attention_diagnostics(self, cat_x, cont_x):
+        """Diagnostic-only: early_attn's actual softmax attention
+        weights for this input (None if early_attn is inactive). Mirrors
+        backbone()'s stem-through-cbam1 prefix (the input early_attn
+        consumes) rather than adding a return value to backbone()'s hot
+        path - keep the two in sync if that prefix ever changes. See
+        model_handler's --tb-attention."""
+        if self.early_attn is None:
+            return None
+        x = self.embed(cat_x, cont_x)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+        x = self.layer1(x)
+        x = self.cbam1(x)
+        return self.early_attn.attention_weights(x)
 
     def features(self, cat_x, cont_x):
         """(B, 512) globally pooled backbone features - the encoder

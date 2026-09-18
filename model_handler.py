@@ -511,7 +511,8 @@ class GrouseModelHandler:
 
     def fit(self, train_ds, val_ds, epochs=30, batch_size=32, workers=4,
             train_labels=None, batch_pos_frac=None, metrics_csv=None,
-            eval_batch_size=None, tb_writer=None):
+            eval_batch_size=None, tb_writer=None, tb_log_every=50,
+            tb_images=True, tb_attention=True, tb_embeddings=True):
         """train_labels + optional batch_pos_frac enable STRATIFIED
         batching: every training batch contains both classes at a fixed
         composition (dataset's global ratio by default), so a constant
@@ -577,6 +578,17 @@ class GrouseModelHandler:
                                 num_workers=workers, pin_memory=pin,
                                 persistent_workers=keep,
                                 **_loader_extra(workers))
+        # ONE fixed batch (loader is unshuffled), grabbed once and
+        # reused every epoch: image/attention diagnostics then show the
+        # SAME patches evolving across training, which is what makes
+        # them useful for troubleshooting (a per-epoch random batch
+        # would make "did this change" impossible to eyeball).
+        vis_batch = None
+        if tb_writer is not None and tb_images:
+            try:
+                vis_batch = next(iter(val_loader))
+            except StopIteration:
+                vis_batch = None
 
         # Init-time feed sanity check: a fresh network MUST produce
         # input-DEPENDENT logits (different patches -> different
@@ -789,7 +801,7 @@ class GrouseModelHandler:
                                      dtype=torch.long)
             tr_total, tr_steps = 0, 0
             tr_logits, tr_ys = [], []
-            for cat_x, cont_x, y, w in train_bar:
+            for batch_idx, (cat_x, cont_x, y, w) in enumerate(train_bar):
                 cat_x = cat_x.to(self.device, non_blocking=True)
                 cont_x = cont_x.to(self.device, non_blocking=True,
                                    memory_format=chan_last)
@@ -804,8 +816,8 @@ class GrouseModelHandler:
                                                     margin=True)
                     scaler.scale(loss).backward()
                     scaler.unscale_(optimizer)
-                    torch.nn.utils.clip_grad_norm_(self._clip_params,
-                                                   self.grad_clip)
+                    total_norm = torch.nn.utils.clip_grad_norm_(
+                        self._clip_params, self.grad_clip)
                     scaler.step(optimizer)
                     scaler.update()
                 else:
@@ -813,9 +825,28 @@ class GrouseModelHandler:
                     loss = self._batch_loss(criterion, outputs, y, w,
                                                 margin=True)
                     loss.backward()
-                    torch.nn.utils.clip_grad_norm_(self._clip_params,
-                                                   self.grad_clip)
+                    total_norm = torch.nn.utils.clip_grad_norm_(
+                        self._clip_params, self.grad_clip)
                     optimizer.step()
+
+                # Gradient diagnostics, gated to every tb_log_every-th
+                # step: this is the ONE place in the loop that
+                # deliberately re-introduces a device sync (float() on
+                # the norms) the accumulate-on-device pattern above
+                # exists to avoid - opt-in only, and it's what would
+                # have shown directly (rather than requiring offline
+                # reasoning) whether the original epoch-8 divergence
+                # was the whole network or just the early_attn group
+                # blowing up.
+                if (tb_writer is not None and tb_log_every > 0
+                        and batch_idx % tb_log_every == 0):
+                    gstep = epoch * len(train_loader) + batch_idx
+                    named_groups = [("backbone", backbone_params)]
+                    if attn_params:
+                        named_groups.append(("early_attn", attn_params))
+                    named_groups.append(("fresh", fresh_params))
+                    self._tb_log_grad_step(tb_writer, gstep, total_norm,
+                                           named_groups)
 
                 if self.ema is not None:
                     self.ema.update(self.model)
@@ -844,15 +875,33 @@ class GrouseModelHandler:
             # during warmup - otherwise warmup-epoch val losses (BCE
             # scale, numerically larger) aren't comparable with focal
             # epochs and best-checkpoint selection breaks.
+            named_groups = [("backbone", backbone_params)]
+            if attn_params:
+                named_groups.append(("early_attn", attn_params))
+            named_groups.append(("fresh", fresh_params))
+
+            def _eval_with_extras():
+                # Weight histograms / sample patches / attention maps
+                # must be computed against whatever weights JUST
+                # produced this epoch's metrics - called inside the EMA
+                # context below when EMA is on, so what's visualized
+                # matches what was evaluated (and, if this epoch
+                # improves, what gets saved) rather than the raw
+                # in-progress training weights.
+                m = self.evaluate(val_loader, criterion_focal, epoch, epochs)
+                if tb_writer is not None:
+                    self._tb_log_epoch_extras(
+                        tb_writer, epoch + 1, vis_batch, tb_images,
+                        tb_attention, named_groups)
+                return m
+
             if self.ema is not None:
                 with self.ema.applied(self.model):
-                    metrics = self.evaluate(val_loader, criterion_focal,
-                                            epoch, epochs)
+                    metrics = _eval_with_extras()
                     ema_state = {k: v.detach().clone()
                                  for k, v in self.model.state_dict().items()}
             else:
-                metrics = self.evaluate(val_loader, criterion_focal,
-                                        epoch, epochs)
+                metrics = _eval_with_extras()
                 ema_state = None
             metrics['train_loss'] = tr_loss_sum / max(tr_steps, 1)
             metrics['train_accuracy'] = 100.0 * tr_correct / max(tr_total, 1)
@@ -866,6 +915,7 @@ class GrouseModelHandler:
                     metrics[dst] = 100.0 * float(
                         ((metrics[src] >= thr) == (metrics[ykey] == 1)).mean())
             raw_tta_logits = metrics.get('_tta_logits')
+            raw_tta_y = metrics.get('_tta_y')
             metrics = {k: v for k, v in metrics.items()
                        if not k.startswith('_')}
             metrics['epoch'] = epoch + 1
@@ -926,6 +976,13 @@ class GrouseModelHandler:
                 if raw_tta_logits is not None and len(raw_tta_logits):
                     tb_writer.add_histogram("Diagnostics/val_logits",
                                             raw_tta_logits, step)
+                    # Full precision/recall-vs-threshold curve, not just
+                    # the single accuracy number at one operating point
+                    # - cheap (numpy only, no GPU) since evaluate()
+                    # already computed both arrays.
+                    tb_writer.add_pr_curve(
+                        "PR/val_tta", raw_tta_y,
+                        1.0 / (1.0 + np.exp(-raw_tta_logits)), step)
                 if improved:
                     tb_writer.add_text(
                         "events/checkpoint",
@@ -969,6 +1026,8 @@ class GrouseModelHandler:
              f"{f', min delta {self.select_min_delta:g}' if self.select_min_delta else ''}"
              f" -> saved checkpoint is epoch {best_epoch})"
              f"{f' | divergence triggers: {guard.n_triggers}' if guard.n_triggers else ''}")
+        if tb_writer is not None and tb_embeddings:
+            self._tb_log_embeddings(tb_writer)
         return self.save_path
 
     @staticmethod
@@ -982,6 +1041,116 @@ class GrouseModelHandler:
             if new:
                 w.writeheader()
             w.writerow({k: metrics[k] for k in keys})
+
+    @staticmethod
+    def _tb_log_grad_step(tb_writer, step, total_norm, named_groups):
+        """Gradient diagnostics for one training step: the pre-clip
+        total norm (clip_grad_norm_'s own return value - no extra
+        compute) plus, per LR group, its own gradient norm and a
+        histogram. This is the resolution that would have told "the
+        whole network is diverging" from "one LR group (e.g.
+        early_attn) is diverging while the rest is fine" directly,
+        instead of requiring after-the-fact reasoning from val
+        metrics alone."""
+        tb_writer.add_scalar("Grad/total_norm_preclip", float(total_norm),
+                             step)
+        for name, params in named_groups:
+            grads = [p.grad.detach() for p in params if p.grad is not None]
+            if not grads:
+                continue
+            flat = torch.cat([g.reshape(-1) for g in grads])
+            tb_writer.add_scalar(f"Grad/norm_{name}", float(flat.norm()),
+                                 step)
+            tb_writer.add_histogram(f"Grad/hist_{name}", flat, step)
+
+    def _tb_log_epoch_extras(self, tb_writer, step, vis_batch, tb_images,
+                             tb_attention, named_groups):
+        """Once-per-epoch diagnostics beyond the scalar metrics: weight
+        histograms per LR group, a grid of sample validation patches
+        per continuous feature, the model's own pre-pool spatial logit
+        map (and attn-pool score map, if pool='attn') for those same
+        patches, and - if early_attn is active - the center token's
+        attention distribution across the patch. Called from inside
+        fit()'s EMA context when EMA is on, so what's visualized is
+        the SAME weights that just produced this epoch's metrics (and,
+        if this epoch improves, get saved), not the raw in-progress
+        training weights EMA is smoothing over."""
+        for name, params in named_groups:
+            flat = torch.cat([p.detach().reshape(-1) for p in params])
+            tb_writer.add_histogram(f"Weights/{name}", flat, step)
+        if vis_batch is None:
+            return
+        import torchvision
+        cat_x, cont_x, _, _ = vis_batch
+        cat_x = cat_x.to(self.device)
+        cont_x = cont_x.to(self.device, memory_format=self._mem_fmt)
+        n = min(8, cont_x.shape[0])
+        cat_x, cont_x = cat_x[:n], cont_x[:n]
+
+        def norm01(m):
+            lo = m.amin(dim=(2, 3), keepdim=True)
+            hi = m.amax(dim=(2, 3), keepdim=True)
+            return ((m - lo) / (hi - lo).clamp_min(1e-6)).float().cpu()
+
+        with torch.no_grad():
+            if tb_images:
+                for ci, fname in enumerate(self.cont_features):
+                    grid = torchvision.utils.make_grid(
+                        norm01(cont_x[:, ci:ci + 1]), nrow=n)
+                    tb_writer.add_image(f"Patches/{fname}", grid, step)
+                spatial = self.model.trunk(self.model.embed(cat_x, cont_x))
+                tb_writer.add_image(
+                    "Patches/logit_map",
+                    torchvision.utils.make_grid(norm01(spatial[:, :1]),
+                                                nrow=n), step)
+                if spatial.shape[1] > 1:      # pool='attn' score channel
+                    b, _, h, w = spatial.shape
+                    sm = torch.softmax(
+                        spatial[:, 1:2].reshape(b, 1, h * w), dim=2
+                    ).reshape(b, 1, h, w)
+                    tb_writer.add_image(
+                        "Patches/attn_pool_map",
+                        torchvision.utils.make_grid(norm01(sm), nrow=n),
+                        step)
+            if tb_attention and self.model.early_attn is not None:
+                na = min(4, n)
+                result = self.model.attention_diagnostics(cat_x[:na],
+                                                           cont_x[:na])
+                if result is not None:
+                    w_attn, (h, wd, kh, kw) = result
+                    # Center query token's attention distribution over
+                    # keys, averaged over heads - "what does the center
+                    # pixel attend to across the patch."
+                    center = (h // 2) * wd + (wd // 2)
+                    center_map = w_attn[:, :, center, :].mean(dim=1)
+                    center_map = center_map.reshape(na, 1, kh, kw)
+                    tb_writer.add_image(
+                        "Patches/attn_center_query",
+                        torchvision.utils.make_grid(norm01(center_map),
+                                                    nrow=na), step)
+
+    def _tb_log_embeddings(self, tb_writer):
+        """Categorical feature embedding tables from the SAVED (best)
+        checkpoint - not necessarily the model's current live weights,
+        since checkpoint selection may have kept an earlier epoch - via
+        TensorBoard's embedding projector. Once at the end of training
+        (not per epoch): add_embedding writes its own projector data
+        files, sized for a one-off inspection rather than a per-epoch
+        log line."""
+        state, _ = self.unwrap_checkpoint(
+            torch.load(self.save_path, map_location='cpu',
+                      weights_only=True))
+        first = next(iter(state))
+        if first.startswith("_orig_mod."):
+            state = {k[len("_orig_mod."):]: v for k, v in state.items()}
+        for name in self.cat_features:
+            key = f"embeddings.{name}.weight"
+            if key not in state:
+                continue
+            w = state[key]
+            tb_writer.add_embedding(w, metadata=[str(i) for i in
+                                                 range(w.shape[0])],
+                                    tag=f"Embedding/{name}")
 
     # ---- evaluation ------------------------------------------------------
     def evaluate(self, val_loader, criterion=None, epoch=0, epochs=1,

@@ -39,7 +39,7 @@ from pyproj import Transformer
 from grouse_data import GrouseData, NLCD_NAMES
 from predict import (load_model, open_aligned_sources, _safe_windowed_read,
                      IMG_SIZE, NODATA_SENTINELS)
-from models import FEATURE_SPEC, road_dist_decode
+from models import FEATURE_SPEC, split_features, road_dist_decode
 from rasterio.windows import Window
 
 
@@ -55,6 +55,11 @@ def main():
                     default=True)
     ap.add_argument("--flip-tta", action=argparse.BooleanOptionalAction,
                     default=True)
+    ap.add_argument("--no-model", action="store_true",
+                    help="Report raw feature values only, skipping the "
+                         "model entirely - for verifying a newly "
+                         "generated raster before any checkpoint exists "
+                         "that was trained with it.")
     ap.add_argument("--temperature", type=float, default=1.0,
                     help="Manual override; default 1.0 (raw, uncalibrated "
                          "probability) - this tool is about the INPUT "
@@ -65,12 +70,28 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     data = GrouseData()
     rd = data[args.region]
-    features = [f for f in rd.available_features() if f in FEATURE_SPEC]
-    model, cat_f, cont_f, features, ckpt_cfg = load_model(
-        args.model, features, device, cli_pool=args.pool,
-        cli_center_skip=args.center_skip)
+    # Raw values are reported for everything ON DISK, deliberately NOT
+    # for the checkpoint's feature list: a newly generated raster (e.g.
+    # road_dist) has to be verifiable BEFORE any model has been trained
+    # on it, which is exactly when no checkpoint knows about it yet.
+    # The model, when loaded, still runs on its own feature list - the
+    # two are read separately below.
+    disk_features = [f for f in rd.available_features() if f in FEATURE_SPEC]
+    disk_cat, disk_cont = split_features(disk_features)
 
-    srcs, ref = open_aligned_sources(rd, cat_f, cont_f)
+    model = cat_f = cont_f = None
+    if not args.no_model:
+        model, cat_f, cont_f, _, _ = load_model(
+            args.model, disk_features, device, cli_pool=args.pool,
+            cli_center_skip=args.center_skip)
+        missing = [f for f in disk_features
+                   if f not in (list(cat_f) + list(cont_f))]
+        if missing:
+            print(f"   [note] on disk but NOT in this checkpoint: "
+                 f"{missing} - reported below, but the score comes from "
+                 f"a model that never saw them. Retrain to include them.")
+
+    srcs, ref = open_aligned_sources(rd, disk_cat, disk_cont)
     try:
         t = Transformer.from_crs("EPSG:4326", ref.crs, always_xy=True)
         x, y = t.transform(args.lon, args.lat)
@@ -92,27 +113,27 @@ def main():
         window = Window(col - IMG_SIZE // 2, row - IMG_SIZE // 2,
                         IMG_SIZE, IMG_SIZE)
         cat = np.stack([_safe_windowed_read(srcs[f], window)
-                       for f in cat_f]).astype(np.int64)
+                       for f in disk_cat]).astype(np.int64)
         cont = np.stack([_safe_windowed_read(srcs[f], window)
-                        for f in cont_f]).astype(np.float32)
+                        for f in disk_cont]).astype(np.float32)
         for s in NODATA_SENTINELS:
             cat[cat == s] = 0
             cont[cont == s] = 0.0
-        for i, f in enumerate(cont_f):
+        for i, f in enumerate(disk_cont):
             cont[i] /= float(FEATURE_SPEC[f].get("scale", 1.0))
 
         cy_px, cx_px = IMG_SIZE // 2, IMG_SIZE // 2
         print(f"\nRaw feature values AT THE REQUESTED POINT (center pixel "
              f"of the {IMG_SIZE}x{IMG_SIZE} window the model actually "
              f"scores):")
-        for i, f in enumerate(cat_f):
+        for i, f in enumerate(disk_cat):
             code = int(cat[i, cy_px, cx_px])
             label = f" ({NLCD_NAMES[code]})" if f == "nlcd" and code in NLCD_NAMES else ""
             frac_same = float((cat[i] == code).mean())
             print(f"   {f:8s} = {code}{label}  "
                  f"[{frac_same * 100:.0f}% of the surrounding window "
                  f"shares this code]")
-        for i, f in enumerate(cont_f):
+        for i, f in enumerate(disk_cont):
             val = float(cont[i, cy_px, cx_px])
             window_mean = float(cont[i].mean())
             extra = ""
@@ -126,8 +147,17 @@ def main():
                  f"(window mean {window_mean:.3f}, model-input scale)"
                  f"{extra}")
 
-        t_cat = torch.from_numpy(cat[None]).to(device)
-        t_cont = torch.from_numpy(cont[None]).to(device)
+        if model is None:
+            print("\n--no-model: raw feature values only, no score.")
+            return
+
+        # Select the CHECKPOINT's features, in ITS channel order, out of
+        # everything read from disk - the two lists legitimately differ
+        # whenever a raster has been generated but not yet trained on.
+        cat_idx = [disk_cat.index(f) for f in cat_f]
+        cont_idx = [disk_cont.index(f) for f in cont_f]
+        t_cat = torch.from_numpy(cat[cat_idx][None]).to(device)
+        t_cont = torch.from_numpy(cont[cont_idx][None]).to(device)
         model.eval()
         with torch.no_grad():
             tta_logits = []

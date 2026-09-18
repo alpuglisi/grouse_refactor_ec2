@@ -55,10 +55,12 @@ Usage:
 """
 import os
 import sys
+import json
 import math
 import zipfile
 import argparse
 import tempfile
+import datetime as dt
 
 import numpy as np
 import torch
@@ -227,12 +229,20 @@ def read_strip(srcs, cat_f, cont_f, r0, rows, c0, cols):
 
 def predict_region(model, device, srcs, ref, cat_f, cont_f,
                    window_bounds, stride, batch_size, use_compile,
-                   flip_tta=True, temperature=1.0, logit_shift=0.0):
+                   flip_tta=True, temperature=1.0, logit_shift=0.0,
+                   nlcd_idx=None):
+    """nlcd_idx: index of 'nlcd' within cat_f, if present. When given,
+    also returns nlcd_map (same shape as heatmap) - the center-pixel
+    NLCD class at each scored cell, read from the SAME tensor already
+    loaded for scoring (no extra raster I/O) - for a per-class score
+    breakdown over the predicted region (--tensorboard)."""
     r_start, r_end, c_start, c_end = window_bounds
     height, width = r_end - r_start, c_end - c_start
     out_h = (height - IMG_SIZE) // stride + 1
     out_w = (width - IMG_SIZE) // stride + 1
     heatmap = np.full((out_h, out_w), np.nan, dtype=np.float32)
+    nlcd_map = (np.full((out_h, out_w), -1, dtype=np.int32)
+               if nlcd_idx is not None else None)
 
     # Reference-layer nodata mask for honest masking of no-coverage cells.
     ref_nodata = ref.nodata if ref.nodata is not None else -9999
@@ -313,6 +323,9 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                     gx = x // stride
                     if gy < out_h and gx < out_w:
                         heatmap[gy, gx] = p
+                        if nlcd_map is not None:
+                            cy, cx = y + IMG_SIZE // 2, x + IMG_SIZE // 2
+                            nlcd_map[gy, gx] = int(cat_np[nlcd_idx, cy, cx])
 
     n_valid = int(np.isfinite(heatmap).sum())
     print(f"   Scored {n_valid:,}/{heatmap.size:,} cells "
@@ -323,7 +336,154 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
         ref.transform.c + (c_start + IMG_SIZE // 2) * ref.transform.a,
         ref.transform.d, ref.transform.e * stride,
         ref.transform.f + (r_start + IMG_SIZE // 2) * ref.transform.e)
-    return heatmap, new_trans
+    return heatmap, new_trans, nlcd_map
+
+
+# ==========================================
+# TensorBoard instrumentation
+# ==========================================
+def _tb_suitability_image(heatmap, cmap_name="jet", max_dim=1024):
+    """The heatmap itself, colorized (nodata fully transparent) and
+    downsampled to a sane TensorBoard image size - the region-scan
+    analog of train.py's Patches/logit_map, at the scale that's
+    actually the point of running predict.py at all."""
+    valid = np.isfinite(heatmap)
+    shown = np.nan_to_num(heatmap, nan=0.0)
+    rgba = (plt.get_cmap(cmap_name)(np.clip(shown, 0, 1)) * 255
+           ).astype(np.uint8)
+    rgba[..., 3] = np.where(valid, 255, 0).astype(np.uint8)
+    img = Image.fromarray(rgba, "RGBA")
+    if max(img.size) > max_dim:
+        ratio = max_dim / max(img.size)
+        img = img.resize((max(1, int(img.width * ratio)),
+                          max(1, int(img.height * ratio))),
+                         Image.NEAREST)
+    arr = np.asarray(img).astype(np.float32) / 255.0
+    return torch.from_numpy(arr).permute(2, 0, 1)          # (4, H, W)
+
+
+def _tb_log_class_scores(tb_writer, heatmap, nlcd_map, min_count=50):
+    """Class/mean_score/<name> over the PREDICTED region - the live,
+    real-deployment counterpart to model_handler's per-class val
+    breakdown and diagnose_wetland.py's area-composition analysis: does
+    any land-cover class score anomalously high across this actual
+    mapped area? No ground truth here (this is inference, not
+    validation), so no AUC - mean score is what's available."""
+    from grouse_data import NLCD_NAMES
+    valid = np.isfinite(heatmap) & (nlcd_map >= 0)
+    if not valid.any():
+        return
+    codes, scores = nlcd_map[valid], heatmap[valid]
+    for code in sorted(set(codes.tolist())):
+        m = codes == code
+        if m.sum() < min_count:
+            continue
+        name = NLCD_NAMES.get(int(code), f"class_{code}").replace(
+            ' ', '_').replace('/', '-')
+        tb_writer.add_scalar(f"Class/mean_score/{name}",
+                             float(scores[m].mean()), 0)
+
+
+def _tb_capture_windows(model, device, srcs, cat_f, cont_f, heatmap,
+                        window_bounds, stride, top_n, temperature,
+                        logit_shift, flip_tta):
+    """Re-reads the actual top-N and bottom-N scoring windows' input
+    patches - cheap (top_n*2 windows total, not a rescan of the region)
+    - so --tensorboard can show what the model literally saw at its
+    most and least confident locations. srcs must still be open (call
+    this before the caller's finally closes them). None if nothing
+    scored."""
+    r_start, r_end, c_start, c_end = window_bounds
+    finite = np.isfinite(heatmap)
+    if not finite.any():
+        return None
+    flat_idx = np.flatnonzero(finite)
+    vals = heatmap.flat[flat_idx]
+    order = np.argsort(vals)
+    n = min(top_n, len(order))
+
+    def gather(idxs):
+        cat_list, cont_list = [], []
+        for flat in idxs:
+            gy, gx = np.unravel_index(flat, heatmap.shape)
+            window = Window(c_start + int(gx) * stride,
+                            r_start + int(gy) * stride, IMG_SIZE, IMG_SIZE)
+            cat = np.stack([_safe_windowed_read(srcs[f], window)
+                           for f in cat_f]).astype(np.int64)
+            cont = np.stack([_safe_windowed_read(srcs[f], window)
+                            for f in cont_f]).astype(np.float32)
+            for s in NODATA_SENTINELS:
+                cat[cat == s] = 0
+                cont[cont == s] = 0.0
+            for i, f in enumerate(cont_f):
+                cont[i] /= float(FEATURE_SPEC[f].get("scale", 1.0))
+            cat_list.append(cat)
+            cont_list.append(cont)
+        t_cat = torch.from_numpy(np.stack(cat_list)).to(device)
+        t_cont = torch.from_numpy(np.stack(cont_list)).to(device)
+        with torch.no_grad():
+            tta = []
+            for k in range(4):
+                rc = torch.rot90(t_cat, k, dims=(2, 3))
+                rn = torch.rot90(t_cont, k, dims=(2, 3))
+                lg = model.logits(rc, rn).float()
+                if flip_tta:
+                    lg = 0.5 * (lg + model.logits(
+                        rc.flip(-1), rn.flip(-1)).float())
+                tta.append(lg.flatten())
+            score = torch.sigmoid(torch.stack(tta).mean(dim=0)
+                                  / temperature + logit_shift)
+        return t_cat, t_cont, score.cpu().numpy()
+
+    return {"top": gather(flat_idx[order[-n:][::-1]]),
+           "bottom": gather(flat_idx[order[:n]])}
+
+
+def _tb_log_windows(tb_writer, tag_prefix, model, cat_f, cont_f, window):
+    """Logs one gather() result from _tb_capture_windows: each
+    continuous feature's patch, the 'nlcd' category map (if present),
+    the model's own pre-pool spatial logit map, and - if early_attn is
+    active - its center-query attention, one tile per window, plus the
+    windows' actual scores as text. Mirrors model_handler's
+    _tb_log_epoch_extras patch/attention visualization, rebuilt here
+    since predict.py scores bare windows directly rather than through
+    a GrouseModelHandler/DataLoader."""
+    import torchvision
+    from model_handler import GrouseModelHandler
+    t_cat, t_cont, scores = window
+    n = t_cat.shape[0]
+
+    def norm01(m):
+        lo = m.amin(dim=(2, 3), keepdim=True)
+        hi = m.amax(dim=(2, 3), keepdim=True)
+        return ((m - lo) / (hi - lo).clamp_min(1e-6)).float().cpu()
+
+    with torch.no_grad():
+        for ci, fname in enumerate(cont_f):
+            grid = torchvision.utils.make_grid(
+                norm01(t_cont[:, ci:ci + 1]), nrow=n)
+            tb_writer.add_image(f"{tag_prefix}/{fname}", grid, 0)
+        if "nlcd" in cat_f:
+            ni = cat_f.index("nlcd")
+            grid = torchvision.utils.make_grid(
+                GrouseModelHandler._class_map_rgb(t_cat[:, ni:ni + 1]),
+                nrow=n)
+            tb_writer.add_image(f"{tag_prefix}/nlcd", grid, 0)
+        spatial = model.trunk(model.embed(t_cat, t_cont))
+        tb_writer.add_image(
+            f"{tag_prefix}/logit_map",
+            torchvision.utils.make_grid(norm01(spatial[:, :1]), nrow=n), 0)
+        result = model.attention_diagnostics(t_cat, t_cont)
+        if result is not None:
+            w_attn, (h, wd, kh, kw) = result
+            center = (h // 2) * wd + (wd // 2)
+            center_map = w_attn[:, :, center, :].mean(dim=1).reshape(
+                n, 1, kh, kw)
+            tb_writer.add_image(
+                f"{tag_prefix}/attn_center",
+                torchvision.utils.make_grid(norm01(center_map), nrow=n), 0)
+    tb_writer.add_text(f"{tag_prefix}/scores",
+                       ", ".join(f"{s:.3f}" for s in scores), 0)
 
 
 # ==========================================
@@ -490,11 +650,50 @@ def main():
     parser.add_argument("--center-skip",
                         action=argparse.BooleanOptionalAction, default=True,
                         help="Only used for old bare checkpoints.")
+    parser.add_argument("--tensorboard", action="store_true",
+                        help="Log coverage/score-distribution scalars, "
+                             "the rendered suitability map, a per-NLCD-"
+                             "class mean-score breakdown, and the "
+                             "model's own top/bottom-scoring window "
+                             "patches (+ spatial logit map, + attention "
+                             "if --early-attn was active) to "
+                             "TensorBoard, under --tensorboard-dir/"
+                             "<timestamp>_predict_<region>. Uses the "
+                             "SAME base directory train.py does by "
+                             "default, so a prediction run and the "
+                             "training runs that produced its "
+                             "checkpoint show up side by side. Requires "
+                             "the tensorboard package (pip install "
+                             "tensorboard).")
+    parser.add_argument("--tensorboard-dir", default="runs",
+                        help="Base directory for --tensorboard logs.")
+    parser.add_argument("--tb-top-n", type=int, default=8,
+                        help="Number of highest- and lowest-scoring "
+                             "windows to visualize under --tensorboard.")
     args = parser.parse_args()
 
     os.makedirs(OUT_DIR, exist_ok=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
+
+    tb_writer = None
+    if args.tensorboard:
+        try:
+            from torch.utils.tensorboard import SummaryWriter
+        except ImportError:
+            raise SystemExit(
+                "--tensorboard requires the tensorboard package: "
+                "pip install tensorboard")
+        run_name = (f"{dt.datetime.now():%Y%m%d_%H%M%S}_predict_"
+                   f"{args.region}{'_custom' if args.bounds else ''}")
+        tb_logdir = os.path.join(args.tensorboard_dir, run_name)
+        tb_writer = SummaryWriter(tb_logdir)
+        tb_writer.add_text("run/command", " ".join(sys.argv), 0)
+        tb_writer.add_text("run/args",
+                           f"```\n{json.dumps(vars(args), indent=2, default=str)}\n```",
+                           0)
+        print(f"   TensorBoard logging to {tb_logdir} (view with: "
+              f"tensorboard --logdir {args.tensorboard_dir})")
 
     data = GrouseData()
     rd = data[args.region]
@@ -507,79 +706,89 @@ def main():
         args.model, features, device, cli_pool=args.pool,
         cli_center_skip=args.center_skip)
 
+    def _say(msg, tag="events/calibration"):
+        print(msg)
+        if tb_writer is not None:
+            tb_writer.add_text(tag, msg.strip(), 0)
+
     temperature = 1.0
     if args.temperature is not None:
         temperature = float(args.temperature)
-        print(f"Calibration: manual temperature T={temperature:.3f}")
+        _say(f"Calibration: manual temperature T={temperature:.3f}")
     elif not args.no_calibration and os.path.exists(args.calibration):
-        import json
         with open(args.calibration) as f:
             cal = json.load(f)
         temperature = float(cal.get("temperature", 1.0))
-        print(f"Calibration: T={temperature:.3f} from {args.calibration} "
-              f"(fitted {cal.get('fitted_at', '?')}, "
-              f"ECE {cal.get('ece_before', float('nan')):.3f} -> "
-              f"{cal.get('ece_after', float('nan')):.3f})")
+        _say(f"Calibration: T={temperature:.3f} from {args.calibration} "
+             f"(fitted {cal.get('fitted_at', '?')}, "
+             f"ECE {cal.get('ece_before', float('nan')):.3f} -> "
+             f"{cal.get('ece_after', float('nan')):.3f})")
         if cal.get("model_path") and os.path.abspath(args.model) !=                 cal["model_path"]:
-            print(f"   [warn] calibration was fitted on "
-                  f"{cal['model_path']}, but you're predicting with "
-                  f"{os.path.abspath(args.model)} - temperatures are "
-                  f"model-specific; re-run calibrate.py for this "
-                  f"checkpoint.")
+            _say(f"   [warn] calibration was fitted on "
+                 f"{cal['model_path']}, but you're predicting with "
+                 f"{os.path.abspath(args.model)} - temperatures are "
+                 f"model-specific; re-run calibrate.py for this "
+                 f"checkpoint.")
         # Same PATH is not same MODEL: retraining overwrites the .pth
         # in place (possibly with a different --loss entirely), and the
         # model_path check above cannot see that. A fit older than the
         # checkpoint file is a fit on weights that no longer exist.
-        import datetime as dt
         try:
             fitted = dt.datetime.fromisoformat(cal["fitted_at"])
             written = dt.datetime.fromtimestamp(
                 os.path.getmtime(args.model))
             if fitted < written:
-                print(f"   [warn] calibration was fitted "
-                      f"{fitted:%Y-%m-%d %H:%M} but the checkpoint file "
-                      f"was written {written:%Y-%m-%d %H:%M} - the fit "
-                      f"predates the current weights (retrained since, "
-                      f"perhaps with a different --loss?). Re-run "
-                      f"calibrate.py, or pass --no-calibration to score "
-                      f"with raw logits.")
+                _say(f"   [warn] calibration was fitted "
+                     f"{fitted:%Y-%m-%d %H:%M} but the checkpoint file "
+                     f"was written {written:%Y-%m-%d %H:%M} - the fit "
+                     f"predates the current weights (retrained since, "
+                     f"perhaps with a different --loss?). Re-run "
+                     f"calibrate.py, or pass --no-calibration to score "
+                     f"with raw logits.")
         except (KeyError, ValueError, OverflowError, OSError):
             pass
         bias = loss_logit_bias(ckpt_cfg)
         if bias is not None:
             reason, off = bias
-            print(f"   [warn] this checkpoint was trained with {reason}, "
-                  f"which builds a constant logit offset (~{off:+.2f}) "
-                  f"into the model. A temperature is a pure SCALE and "
-                  f"cannot remove an offset, so calibrated probabilities "
-                  f"remain shifted. Remedies: --prior (an explicit "
-                  f"offset), --style quantile (rank-based, offset-"
-                  f"immune), or --no-calibration to drop the "
-                  f"temperature.")
+            _say(f"   [warn] this checkpoint was trained with {reason}, "
+                 f"which builds a constant logit offset (~{off:+.2f}) "
+                 f"into the model. A temperature is a pure SCALE and "
+                 f"cannot remove an offset, so calibrated probabilities "
+                 f"remain shifted. Remedies: --prior (an explicit "
+                 f"offset), --style quantile (rank-based, offset-"
+                 f"immune), or --no-calibration to drop the "
+                 f"temperature.", tag="events/bias_warning")
     else:
-        print("Calibration: none (raw probabilities). Run calibrate.py "
-              "to fit one.")
+        _say("Calibration: none (raw probabilities). Run calibrate.py "
+             "to fit one.")
 
     logit_shift = 0.0
     if args.prior is not None:
         if not (0.0 < args.prior < 1.0):
             raise SystemExit(f"--prior must be in (0, 1), got {args.prior}")
         logit_shift = math.log(args.prior / (1.0 - args.prior))
-        print(f"Prior correction: deployment prevalence {args.prior:g} "
-              f"(training design 0.5) -> calibrated logits shifted by "
-              f"{logit_shift:+.3f}. A displayed 0.5 now requires a raw "
-              f"calibrated score of "
+        _say(f"Prior correction: deployment prevalence {args.prior:g} "
+             f"(training design 0.5) -> calibrated logits shifted by "
+             f"{logit_shift:+.3f}. A displayed 0.5 now requires a raw "
+             f"calibrated score of "
               f"{1.0 / (1.0 + args.prior / (1.0 - args.prior)):.3f}.")
 
     srcs, ref = open_aligned_sources(rd, cat_f, cont_f)
     try:
         bounds = args.bounds or list(BOXES[args.region])
         window_bounds = bounds_to_window(ref, bounds)
-        heatmap, transform = predict_region(
+        nlcd_idx = cat_f.index("nlcd") if "nlcd" in cat_f else None
+        heatmap, transform, nlcd_map = predict_region(
             model, device, srcs, ref, cat_f, cont_f, window_bounds,
             args.stride, args.batch_size, args.compile,
             flip_tta=args.flip_tta, temperature=temperature,
-            logit_shift=logit_shift)
+            logit_shift=logit_shift, nlcd_idx=nlcd_idx)
+        # Captured here, before srcs close below: the top/bottom-scoring
+        # windows need to be re-read from the SAME open sources.
+        tb_windows = (_tb_capture_windows(
+            model, device, srcs, cat_f, cont_f, heatmap, window_bounds,
+            args.stride, args.tb_top_n, temperature, logit_shift,
+            args.flip_tta) if tb_writer is not None else None)
     finally:
         for s in srcs.values():
             s.close()
@@ -603,6 +812,34 @@ def main():
                 "probabilities, or --style quantile to color/threshold "
                 "by within-map rank (--alpha-below 0.8 then shows only "
                 "the top 20% of the box).")
+
+    if tb_writer is not None:
+        coverage = 100.0 * len(vals) / heatmap.size if heatmap.size else 0.0
+        tb_writer.add_scalar("Predict/coverage_pct", coverage, 0)
+        tb_writer.add_scalar("Predict/temperature", temperature, 0)
+        tb_writer.add_scalar("Predict/prior_logit_shift", logit_shift, 0)
+        if len(vals):
+            tb_writer.add_scalar("Predict/score_min", float(vals.min()), 0)
+            tb_writer.add_scalar("Predict/score_median",
+                                 float(np.median(vals)), 0)
+            tb_writer.add_scalar("Predict/score_p90",
+                                 float(np.percentile(vals, 90)), 0)
+            tb_writer.add_scalar("Predict/score_max", float(vals.max()), 0)
+            tb_writer.add_scalar("Predict/pct_ge_0.5", float(pct5), 0)
+            tb_writer.add_scalar("Predict/pct_ge_0.8", float(pct8), 0)
+            tb_writer.add_histogram("Diagnostics/predicted_scores", vals, 0)
+            tb_writer.add_image("Map/suitability",
+                                _tb_suitability_image(heatmap, args.cmap), 0)
+        if nlcd_map is not None:
+            _tb_log_class_scores(tb_writer, heatmap, nlcd_map)
+        if tb_windows is not None:
+            for key, prefix in (("top", "Windows/top_score"),
+                                ("bottom", "Windows/bottom_score")):
+                w = tb_windows.get(key)
+                if w is not None:
+                    _tb_log_windows(tb_writer, prefix, model, cat_f,
+                                    cont_f, w)
+        tb_writer.close()
 
     tag = args.region + ("_custom" if args.bounds else "")
     tif_path = os.path.join(OUT_DIR, f"{tag}_suitability.tif")

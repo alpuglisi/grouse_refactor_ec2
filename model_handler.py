@@ -441,6 +441,41 @@ class GrouseModelHandler:
             return obj["state_dict"], obj.get("config")
         return obj, None
 
+    def _resume_path(self):
+        return self.save_path + ".resume"
+
+    def _save_resume_state(self, next_epoch, optimizer, scheduler, scaler,
+                           sel_ref, best_epoch, best_loss, best_auc,
+                           best_strict, best_rank):
+        """Everything --resume needs to continue this exact run, not just
+        the weights: optimizer momentum (Adam's moment estimates would
+        otherwise restart from zero) and scheduler position (critical
+        for warm restarts - losing schedule phase means silently
+        reheating the LR right where a previous run may have just
+        crashed from doing that). self.model.state_dict() here is the
+        LIVE training weights (any EMA context has already exited by
+        this point in the epoch loop, restoring them - see ModelEMA.
+        applied), which is what the optimizer actually stepped and what
+        resuming must continue from, not the EMA snapshot that gets
+        saved to self.save_path instead."""
+        torch.save({
+            "model_state": self.model.state_dict(),
+            "optimizer_state": optimizer.state_dict(),
+            "scheduler_state": scheduler.state_dict(),
+            "scaler_state": scaler.state_dict() if scaler is not None
+                           else None,
+            "ema_state": ({k: v.cpu() for k, v in self.ema.shadow.items()}
+                         if self.ema is not None else None),
+            "epoch": next_epoch,
+            "sel_ref": sel_ref,
+            "best_epoch": best_epoch,
+            "best_loss": best_loss,
+            "best_auc": best_auc,
+            "best_strict": best_strict,
+            "best_rank": best_rank,
+            "config": self._wrap_checkpoint(None)["config"],
+        }, self._resume_path())
+
     @staticmethod
     def selection_score(select_by, metrics):
         """Sign-normalized checkpoint-selection score (HIGHER = better,
@@ -514,7 +549,7 @@ class GrouseModelHandler:
             train_labels=None, batch_pos_frac=None, metrics_csv=None,
             eval_batch_size=None, tb_writer=None, tb_log_every=50,
             tb_images=True, tb_attention=True, tb_embeddings=True,
-            tb_embeddings_every=10):
+            tb_embeddings_every=10, resume_from=None):
         """train_labels + optional batch_pos_frac enable STRATIFIED
         batching: every training batch contains both classes at a fixed
         composition (dataset's global ratio by default), so a constant
@@ -766,11 +801,58 @@ class GrouseModelHandler:
         # must beat this by select_min_delta - see __init__.
         sel_ref = None
         best_epoch = 0
+        start_epoch = 0
+        if resume_from:
+            # A SEPARATE file from self.save_path: the deployment
+            # checkpoint stays the lean {state_dict, config} predict.py/
+            # calibrate.py load with weights_only=True, while resuming
+            # needs optimizer/scheduler momentum and step position too
+            # (without them, Adam's moment estimates restart from zero
+            # and a warm-restart schedule loses its phase - a "resume"
+            # that silently reheats the LR at the exact point that just
+            # crashed the run is worse than a clean restart).
+            state = torch.load(resume_from, map_location=self.device,
+                               weights_only=False)
+            saved_cfg = state.get('config')
+            cur_cfg = self._wrap_checkpoint(None)['config']
+            if saved_cfg is not None and saved_cfg != cur_cfg:
+                raise SystemExit(
+                    f"--resume checkpoint geometry doesn't match this "
+                    f"run's model - rebuild with the SAME flags as the "
+                    f"original run.\n  saved:   {saved_cfg}\n"
+                    f"  current: {cur_cfg}")
+            self.model.load_state_dict(state['model_state'])
+            optimizer.load_state_dict(state['optimizer_state'])
+            scheduler.load_state_dict(state['scheduler_state'])
+            if scaler is not None and state.get('scaler_state') is not None:
+                scaler.load_state_dict(state['scaler_state'])
+            if self.ema is not None and state.get('ema_state') is not None:
+                self.ema.shadow = {k: v.to(self.device)
+                                   for k, v in state['ema_state'].items()}
+            start_epoch = state['epoch']
+            sel_ref = state.get('sel_ref')
+            best_epoch = state.get('best_epoch', 0)
+            best_loss = state.get('best_loss', best_loss)
+            best_auc = state.get('best_auc', best_auc)
+            best_strict = state.get('best_strict', best_strict)
+            best_rank = state.get('best_rank', best_rank)
+            if start_epoch >= epochs:
+                raise SystemExit(
+                    f"--resume checkpoint is already at epoch "
+                    f"{start_epoch}/{epochs} - raise --epochs to "
+                    f"continue past it.")
+            print(f"   Resumed from {resume_from}: continuing at epoch "
+                 f"{start_epoch + 1}/{epochs} (best so far: epoch "
+                 f"{best_epoch}, {self.select_by} sel_ref="
+                 f"{sel_ref if sel_ref is None else f'{sel_ref:.4f}'}). "
+                 f"Pass the SAME hyperparameters as the original run - "
+                 f"only geometry is verified above, not LR/schedule/loss "
+                 f"settings.")
         guard = DivergenceGuard(self._divergence_patience,
                                 self.on_divergence,
                                 self._divergence_dampen_factor)
         stop_early = False
-        for epoch in range(epochs):
+        for epoch in range(start_epoch, epochs):
             criterion = criterion_warmup if epoch < n_warm else criterion_focal
             if epoch == 0:
                 if self.strict_objective:
@@ -954,6 +1036,14 @@ class GrouseModelHandler:
                 print(f"{status} (Saved)")
             else:
                 print(status)
+            # UNCONDITIONAL, every epoch (not just on improvement) - a
+            # crash between two improving epochs should only cost the
+            # epochs since the last one COMPLETED, not force a restart
+            # from the last SAVED (best) checkpoint. Separate file from
+            # self.save_path (see the resume_from block above for why).
+            self._save_resume_state(
+                epoch + 1, optimizer, scheduler, scaler, sel_ref,
+                best_epoch, best_loss, best_auc, best_strict, best_rank)
             if metrics_csv:
                 self._log_metrics(metrics_csv, metrics)
             if tb_writer is not None:

@@ -371,6 +371,28 @@ def main():
                              "download. Geometry flags must match the "
                              "pretraining run for full transfer.")
     parser.add_argument("--save-path", default="grouse_single_best.pth")
+    parser.add_argument("--resume", default=None,
+                        help="Continue an interrupted run from "
+                             "<checkpoint>.resume (written automatically, "
+                             "every epoch, alongside any --save-path "
+                             "checkpoint - NOT the same file as the "
+                             "checkpoint itself, which stays the lean "
+                             "predict.py/calibrate.py-loadable weights "
+                             "file). Restores optimizer momentum and "
+                             "scheduler position too, not just weights - "
+                             "without those a 'resume' would restart "
+                             "Adam's moment estimates from zero and, "
+                             "under --sched warm_restarts, silently "
+                             "reheat the LR at the wrong point in the "
+                             "cycle. Pass the SAME hyperparameters "
+                             "(--epochs, --sched, --lr, --loss, ...) as "
+                             "the original run - only model geometry is "
+                             "verified automatically. --epochs is the "
+                             "TOTAL target, not additional epochs: "
+                             "--resume ... --epochs 150 on a run that "
+                             "crashed at epoch 85 continues to 150, not "
+                             "150 more. Incompatible with --ensemble > 1 "
+                             "(resumes only the first member).")
     parser.add_argument("--cache-dir", default="data/cache",
                         help="Materialize patches once into a memmapped "
                              "array here. '' disables.")
@@ -859,7 +881,19 @@ def main():
             divergence_dampen_factor=args.divergence_dampen_factor,
             flip_tta=args.flip_tta)
         if args.init_from:
-            handler.load_backbone(args.init_from)
+            if args.resume and i == 0:
+                print("   [note] --resume restores full weights from "
+                      "where it left off, overriding whatever "
+                      "--init-from would have loaded.")
+            else:
+                handler.load_backbone(args.init_from)
+        resume_from = None
+        if args.resume:
+            if i == 0:
+                resume_from = args.resume + ".resume"
+            elif i == 1:
+                print("   [note] --resume only resumes the first "
+                      "ensemble member; later members start fresh.")
         handler.fit(train_ds, val_ds, epochs=args.epochs,
                     batch_size=args.batch_size,
                     eval_batch_size=args.eval_batch_size,
@@ -871,7 +905,8 @@ def main():
                     tb_images=args.tb_images,
                     tb_attention=args.tb_attention,
                     tb_embeddings=args.tb_embeddings,
-                    tb_embeddings_every=args.tb_embeddings_every)
+                    tb_embeddings_every=args.tb_embeddings_every,
+                    resume_from=resume_from)
         if tb_writer is not None:
             tb_writer.close()
         members.append((path, overrides.get('pool', args.pool)))

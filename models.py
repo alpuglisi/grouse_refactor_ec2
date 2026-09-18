@@ -537,11 +537,11 @@ FEATURE_SPEC = {
     # 250 is remapped to -9999 at download so it clamps to padding).
     "tcc":    {"kind": "continuous", "scale": 100.0},
     "nlcd":   {"kind": "categorical", "vocab": 256, "dim": 16},
-    # Distance to the nearest road, METRES, from TIGER/Line road vectors
-    # rasterized onto each region's own grid (generate_road_distance.py).
-    # CONTINUOUS, stored int16 capped at ROAD_DIST_MAX_M=5000 (the
-    # patch cache is int16, and past ~5km "farther" carries no more
-    # signal than "far"); scale 1000 puts it in a 0-5 unit range.
+    # Distance to the nearest paved road, LOG-ENCODED, from TIGER/Line
+    # vectors rasterized onto each region's own grid
+    # (generate_road_distance.py). See road_dist_encode below for the
+    # stored units; scale 10000 puts them in a ~0-1.1 unit range,
+    # matching the other continuous features.
     #
     # Why it exists: NLCD's 30m cells cannot resolve a two-lane road
     # from the wetland it cuts through (verified with inspect_point.py -
@@ -549,12 +549,47 @@ FEATURE_SPEC = {
     # scores 0.68, while a wider stretch reads nlcd=22 Developed Low and
     # scores 0.09). Distance-to-road is the one input that says "there
     # is a road here" at a resolution the land-cover rasters cannot.
-    "road_dist": {"kind": "continuous", "scale": 1000.0},
+    "road_dist": {"kind": "continuous", "scale": 10000.0},
 }
 
-# Cap for the stored distance-to-road raster, metres. Kept here rather
-# than in the generator so the reader and writer can never disagree.
-ROAD_DIST_MAX_M = 5000
+# ---- road_dist encoding ------------------------------------------------
+# Stored as round(log1p(metres) * ROAD_DIST_LOG_SCALE) in int16, NOT as
+# raw metres. Two reasons, both learned the hard way:
+#
+#  1. SATURATION. A linear cap has to be set somewhere, and wherever it
+#     goes it erases everything beyond it. At --mtfcc S1100 S1200
+#     (highways only) Maine's MEDIAN distance-to-road exceeded a 5km cap
+#     - more than half the state pinned to one constant - while
+#     diagnose_road_bias.py measured training positives sitting at a
+#     median 2,951-4,875m from exactly those roads. The cap was deleting
+#     the signal in the range the data actually occupies.
+#  2. DYNAMIC RANGE. Raising the cap instead (30km+, to cover remote
+#     Maine) would squeeze 0-500m - the near field, which is the whole
+#     reason this feature exists - into a few percent of the range. log1p
+#     spends resolution where it matters: 0m/100m/500m/1km land at
+#     0.00/0.46/0.62/0.69 after scaling, while 5km-50km all compress
+#     into the 0.85-1.08 tail.
+#
+# ROAD_DIST_MAX_M is now only a sanity bound, not a signal-carrying
+# threshold - log1p(50000)*1000 = 10820, comfortably inside int16 (and
+# inside dataset.py's int16 patch cache).
+ROAD_DIST_MAX_M = 50000
+ROAD_DIST_LOG_SCALE = 1000.0
+
+
+def road_dist_encode(metres):
+    """Metres -> stored int16 units. Array-safe."""
+    import numpy as _np
+    m = _np.clip(_np.asarray(metres, dtype=_np.float64), 0, ROAD_DIST_MAX_M)
+    return _np.rint(_np.log1p(m) * ROAD_DIST_LOG_SCALE).astype(_np.int16)
+
+
+def road_dist_decode(stored):
+    """Stored int16 units -> metres. The inverse of road_dist_encode, for
+    diagnostics that want to report a human-readable distance."""
+    import numpy as _np
+    return _np.expm1(_np.asarray(stored, dtype=_np.float64)
+                     / ROAD_DIST_LOG_SCALE)
 
 
 def config_to_model_kwargs(cfg, defaults=None):

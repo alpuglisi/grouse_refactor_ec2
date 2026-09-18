@@ -46,11 +46,13 @@ S1100 S1200 for a strict highways-only definition.
 
 OUTPUT
 ------
-data/landfire/{REGION}_{YEAR}_road_dist.tif - int16 metres, capped at
-models.ROAD_DIST_MAX_M (past ~5km, "farther" carries no more signal
-than "far", and int16 is what dataset.py's patch cache stores). Written
-once per year already present for that region, since roads are static
-but the pipeline's year-matching expects a vintage per feature.
+data/landfire/{REGION}_{YEAR}_road_dist.tif - int16, LOG-ENCODED as
+round(log1p(metres) * 1000), not raw metres: see models.road_dist_encode
+for why (a linear cap saturated Maine's median at highways-only MTFCC,
+and raising it instead would have squeezed the near field flat).
+models.road_dist_decode inverts it for anything that wants metres back.
+Written once per year already present for that region, since roads are
+static but the pipeline's year-matching expects a vintage per feature.
 
 MEMORY: the distance transform runs on the whole region grid at once
 (it has to - a pixel's nearest road can be arbitrarily far), so peak
@@ -73,7 +75,7 @@ import rasterio.features
 from scipy.ndimage import distance_transform_edt
 
 from grouse_data import GrouseData
-from models import ROAD_DIST_MAX_M
+from models import ROAD_DIST_MAX_M, road_dist_encode
 
 CACHE_DIR = "data/roads"
 TIGER_YEAR = 2023
@@ -146,9 +148,8 @@ def build_distance_raster(roads, template_path):
         raise SystemExit("No road pixels landed on this grid - check the "
                          "CRS/extent match between roads and rasters.")
     res_y, res_x = abs(transform.e), abs(transform.a)
-    dist = distance_transform_edt(mask == 0, sampling=(res_y, res_x))
-    dist = np.clip(dist, 0, ROAD_DIST_MAX_M).astype(np.int16)
-    return dist, transform, crs
+    dist_m = distance_transform_edt(mask == 0, sampling=(res_y, res_x))
+    return road_dist_encode(dist_m), dist_m, transform, crs
 
 
 def process_region(region, data, mtfcc):
@@ -176,19 +177,33 @@ def process_region(region, data, mtfcc):
     with rasterio.open(template) as src:
         target_crs = src.crs
     roads = load_paved_roads(region, mtfcc, target_crs)
-    dist, transform, crs = build_distance_raster(roads, template)
-    print(f"      distance: min {dist.min()}m, median "
-         f"{int(np.median(dist))}m, max {dist.max()}m (capped at "
-         f"{ROAD_DIST_MAX_M}m)")
+    encoded, dist_m, transform, crs = build_distance_raster(roads, template)
+    # Reported in METRES (the encoded raster is log-scaled - see
+    # models.road_dist_encode). A median anywhere near ROAD_DIST_MAX_M
+    # would mean the sanity bound is actually binding, which it should
+    # not be at any sane --mtfcc choice.
+    pct = [float(np.percentile(dist_m, p)) for p in (50, 90, 99)]
+    print(f"      distance: min {dist_m.min():.0f}m | median {pct[0]:.0f}m "
+         f"| p90 {pct[1]:.0f}m | p99 {pct[2]:.0f}m | max "
+         f"{dist_m.max():.0f}m")
+    print(f"      encoded (log1p) int16 range: {encoded.min()}-"
+         f"{encoded.max()}")
+    if pct[0] >= ROAD_DIST_MAX_M * 0.5:
+        print(f"      [warn] median distance is more than half the "
+             f"{ROAD_DIST_MAX_M}m sanity bound - this road set is very "
+             f"sparse for this region. Consider a broader --mtfcc (adding "
+             f"S1400 local/rural roads) so the feature carries near-field "
+             f"structure rather than mostly 'far'.")
 
     raster_dir = data.config.resolve(data.config.raster_dir)
     for year in years:
         out = os.path.join(raster_dir, f"{region}_{year}_road_dist.tif")
-        with rasterio.open(out, "w", driver="GTiff", height=dist.shape[0],
-                           width=dist.shape[1], count=1, dtype="int16",
+        with rasterio.open(out, "w", driver="GTiff",
+                           height=encoded.shape[0], width=encoded.shape[1],
+                           count=1, dtype="int16",
                            crs=crs, transform=transform, nodata=-9999,
                            compress="deflate", predictor=2, tiled=True) as dst:
-            dst.write(dist, 1)
+            dst.write(encoded, 1)
         print(f"      wrote {os.path.basename(out)} "
              f"({os.path.getsize(out) / 1e6:.1f} MB)")
 

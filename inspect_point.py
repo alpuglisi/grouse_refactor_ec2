@@ -39,7 +39,7 @@ from pyproj import Transformer
 from grouse_data import GrouseData, NLCD_NAMES
 from predict import (load_model, open_aligned_sources, _safe_windowed_read,
                      IMG_SIZE, NODATA_SENTINELS)
-from models import FEATURE_SPEC
+from models import FEATURE_SPEC, road_dist_decode
 from rasterio.windows import Window
 
 
@@ -115,8 +115,16 @@ def main():
         for i, f in enumerate(cont_f):
             val = float(cont[i, cy_px, cx_px])
             window_mean = float(cont[i].mean())
+            extra = ""
+            if f == "road_dist":
+                # Stored log-encoded (models.road_dist_encode), so the
+                # model-input number is meaningless to read directly.
+                scale = float(FEATURE_SPEC[f].get("scale", 1.0))
+                extra = (f"  -> {road_dist_decode(val * scale):,.0f} m "
+                        f"to nearest paved road")
             print(f"   {f:8s} = {val:.3f}  "
-                 f"(window mean {window_mean:.3f}, model-input scale)")
+                 f"(window mean {window_mean:.3f}, model-input scale)"
+                 f"{extra}")
 
         t_cat = torch.from_numpy(cat[None]).to(device)
         t_cont = torch.from_numpy(cont[None]).to(device)

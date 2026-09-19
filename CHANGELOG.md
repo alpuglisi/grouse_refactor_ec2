@@ -16,6 +16,29 @@ the diff.
 
 ---
 
+## prune_empty.sh: a free check that doesn't require a re-run (2026-09-19)
+
+Asked for a way to check whether tonight's downloads had left anything
+blank without re-running `generate_treemap_features.py`'s own (now
+content-validating) pass, which reads and warps real data and isn't
+free. `prune_empty.sh` is the cheap complement: pure filesystem checks
+(zero-byte files, empty directories), no rasterio, no opening anything
+- instant even across the full multi-GB data tree.
+
+Deliberately scoped to NOT attempt content validation (an all-zero-but-
+nonempty GeoTIFF, e.g., won't be caught) - that's a different, more
+expensive check, and conflating the two would have made this slow for
+no reason. Dry-run by default; `--delete` required to remove anything.
+Directory deletion runs AFTER file deletion within one invocation,
+since removing a zero-byte file can leave its parent newly empty - a
+scan taken before any deletion wouldn't see that. Verified against a
+synthetic tree with a zero-byte file sitting in an otherwise-real
+directory, a directly-empty directory, and a nested one that only
+becomes empty once its child is removed - all three handled correctly
+in one pass.
+
+---
+
 ## generate_treemap_features.py: existence was not enough (2026-09-19)
 
 Asked directly, mid-run, whether the script could be reading from a
@@ -99,6 +122,26 @@ correct but under a name the fixed scripts will no longer look for.
 
 ---
 
+## download_treemap.py: default tile size too large for Float32 (2026-09-19)
+
+First real download run: auth succeeded, TreeMap 2016 opened, then
+every tile failed with "Total request size (51232005 bytes) must be
+less than or equal to 50331648 bytes." `--tile-m 96000` had been
+copied from `download_tcc_nlcd.py` unchanged - correctly sized for
+THAT script's int16 output (2 bytes/px: 3200px tiles = 20.48MB,
+comfortably under the 48MB cap) but never re-derived for this script's
+Float32 output (4 bytes/px). The actual failure size implies Earth
+Engine charges closer to 5 bytes/px for a single-band export here, not
+4 - an observed, undocumented overhead, not something the API
+guarantees.
+
+Default dropped to 48000m (1600px tiles, ~12.8MB worst case at the
+observed rate) - real margin under the cap, not the bare minimum, so
+the same silent assumption can't bite again at a slightly larger
+region.
+
+---
+
 ## Earth Engine auth: Workspace-blocked shared client, and a latent
 ## ee_init() bug (2026-09-19)
 
@@ -168,6 +211,28 @@ tractable requests, and band resolution fails loudly with the real band
 list on a deliberately-missing attribute. The live download path itself
 is unverified — run it on the EC2 box, which already holds working EE
 credentials for `download_tcc_nlcd.py`.
+
+---
+
+## document_tree.sh: making the data-vintage situation reviewable (2026-09-19)
+
+Data files are gitignored and never reach a clone, so which features
+exist for which years - the thing every question about training-record
+retention actually turns on - was invisible from the repo alone.
+`document_tree.sh` parses the `{REGION}_{YEAR}_{feature}.tif`
+convention into a feature x year coverage matrix per region (gaps
+marked explicitly), plus directory sizes, a checkpoint listing, and
+the full per-file tree. Reads names, sizes and timestamps only, never
+file contents, so it can't copy a credential out of a config file into
+the repo.
+
+`-r` (the directory to document) and `-o` (where to write/stage the
+result) may point at different repositories - the normal case here,
+since the rasters live in the training working directory and the repo
+is a separate checkout. Verified against a synthetic tree with a
+deliberate coverage hole (the matrix flags it), a repository with no
+commits yet, and an output path under a `.gitignore` rule that would
+otherwise swallow it silently.
 
 ---
 

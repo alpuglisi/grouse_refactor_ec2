@@ -1,10 +1,10 @@
 # Project inventory
 
-Generated `2026-09-19 12:34 UTC` on `ip-172-31-36-176.us-east-2.compute.internal`
+Generated `2026-09-19 13:41 UTC` on `ip-172-31-36-176.us-east-2.compute.internal`
 
 - Directory: `/home/ec2-user/grouse2`
-- Git: branch `claude/train-py-visibility-kcez7t` at `e250691`, 2 uncommitted change(s)
-- 36381 files, 58.9 GB total
+- Git: branch `claude/train-py-visibility-kcez7t` at `0e28879`, 2 uncommitted change(s)
+- 36414 files, 66.3 GB total
 - Excluded: `.git`, `__pycache__`, `.ipynb_checkpoints`, `.mypy_cache`, `.pytest_cache`
 
 Names, sizes and dates only - no file contents are read.
@@ -12,11 +12,11 @@ Names, sizes and dates only - no file contents are read.
 ## Directory sizes
 
 ```
-  data                               56.6 GB     3537 files
+  data                               64.0 GB     3568 files
   sweep                             989.7 MB       90 files
   runs                              513.8 MB      422 files
   google-cloud-sdk                  460.6 MB    32250 files
-  (root)                            393.6 MB       50 files
+  (root)                            396.8 MB       52 files
   scripts_backup                    317.2 KB       24 files
   legacy                            109.1 KB        7 files
   .claude                            71.0 B         1 file
@@ -131,10 +131,11 @@ Directories over 500 files are truncated with a count.
 .claude/  (1 file, 71.0 B)
     settings.local.json                                    71.0 B  2026-09-18
 
-./  (50 files, 393.6 MB)
+./  (52 files, 396.8 MB)
     .gitignore                                            778.0 B  2026-09-19
     ARCHITECTURE.md                                       13.1 KB  2026-09-19
-    CHANGELOG.md                                          17.5 KB  2026-09-19
+    CHANGELOG.md                                          21.8 KB  2026-09-19
+    PROJECT_TREE.md                                        3.1 MB  2026-09-19
     WETLAND_LEAN_FINDINGS.md                               3.3 KB  2026-09-18
     analyze_grouse.py                                     49.5 KB  2026-09-19
     blocks.py                                              2.0 KB  2026-09-18
@@ -151,16 +152,17 @@ Directories over 500 files are truncated with a count.
     document_tree.sh                                      11.2 KB  2026-09-19
     download_attribute_tables.py                           7.1 KB  2026-09-18
     download_rev.py                                       14.4 KB  2026-09-18
-    download_tcc_nlcd.py                                  15.8 KB  2026-09-18
-    download_treemap.py                                   15.2 KB  2026-09-19
+    download_tcc_nlcd.py                                  18.3 KB  2026-09-19
+    download_treemap.py                                   18.9 KB  2026-09-19
     dupe_check.py                                          6.5 KB  2026-09-18
     ebird.py                                               5.0 KB  2026-09-18
     envelope_metrics.csv                                  107.0 B  2026-09-18
     evaluated_sightings.csv                                9.4 MB  2026-09-18
+    gee-key.json                                          403.0 B  2026-09-19
     generate_negatives.py                                 15.5 KB  2026-09-18
     generate_road_distance.py                             10.4 KB  2026-09-18
     generate_time_since_disturbance.py                    14.3 KB  2026-09-19
-    generate_treemap_features.py                          14.5 KB  2026-09-19
+    generate_treemap_features.py                          16.2 KB  2026-09-19
     get_negatives.py                                      15.2 KB  2026-09-18
     google-cloud-cli-linux-x86_64.tar.gz                  92.1 MB  2026-09-18
     grouse_data.py                                        21.8 KB  2026-09-19
@@ -183,7 +185,7 @@ Directories over 500 files are truncated with a count.
     tune.py                                                9.6 KB  2026-09-18
     tune_bins.py                                          10.1 KB  2026-09-18
 
-data/cache/  (131 files, 15.5 GB)
+data/cache/  (135 files, 16.3 GB)
     patches_00475ddbda34cbdf.npy                         337.4 MB  2026-09-18
     patches_0511f22dcb6288f5.npy                          42.2 MB  2026-09-18
     patches_05c0308ba525b05a.npy                          69.9 MB  2026-09-18
@@ -203,6 +205,7 @@ data/cache/  (131 files, 15.5 GB)
     patches_22ff2c4baf1fee46.npy                          24.6 MB  2026-09-18
     patches_268fcb8c81d25147.npy                         187.4 MB  2026-09-18
     patches_2745cc684d73307d.npy                          60.3 MB  2026-09-18
+    patches_28ec060defa263de.npy.tmp10058                 66.3 MB  2026-09-19
     patches_2ca112648ec45e8b.npy                         854.5 MB  2026-09-18
     patches_2df9169dd26c6117.npy                         217.1 MB  2026-09-18
     patches_3c849f1c90963767.npy                          96.5 MB  2026-09-18
@@ -229,6 +232,7 @@ data/cache/  (131 files, 15.5 GB)
     patches_5f5730680fdb69b3.npy                          96.5 MB  2026-09-18
     patches_60c27cd1a4a269d7.npy                          35.2 MB  2026-09-18
     patches_611cfd8015cf3525.npy                          42.2 MB  2026-09-18
+    patches_635e0ef6f3276ddb.npy                         265.4 MB  2026-09-19
     patches_6428db2135198c8b.npy                         217.1 MB  2026-09-18
     patches_666f5f8408d3ca8c.npy                          96.5 MB  2026-09-18
     patches_68b584aca7536221.npy                          96.5 MB  2026-09-18
@@ -236,6 +240,7 @@ data/cache/  (131 files, 15.5 GB)
     patches_6a88d0a640b702c8.npy                          19.9 MB  2026-09-18
     patches_6c0dcc647c9b6d43.npy                         168.7 MB  2026-09-18
     patches_6d5f3cea13d6ee96.npy                          94.9 MB  2026-09-18
+    patches_6ee542c7c1b6258a.npy                         206.2 MB  2026-09-19
     patches_6eee941e05e83675.npy                         126.1 MB  2026-09-18
     patches_6fdc95df5b63c039.npy                          31.6 MB  2026-09-18
     patches_74ce85aaaa088285.npy                          21.5 MB  2026-09-18
@@ -273,6 +278,7 @@ data/cache/  (131 files, 15.5 GB)
     patches_abf0085c886445d8.npy                         111.7 MB  2026-09-18
     patches_ad624f09e096a9b1.npy                          96.5 MB  2026-09-18
     patches_ae1a28a55873fb5c.npy                         217.1 MB  2026-09-18
+    patches_b0854540868b4a57.npy                         206.2 MB  2026-09-19
     patches_b4af96c96f6b7099.npy                          98.6 MB  2026-09-18
     patches_b5812e4f15c14a94.npy                          73.8 MB  2026-09-18
     patches_b6b4c1b73ac3fc14.npy                         107.2 MB  2026-09-18
@@ -3366,6 +3372,35 @@ data/sightings/  (27 files, 21.8 MB)
     vt_sightings_2022.csv                                  1.2 MB  2026-09-18
     vt_sightings_2023.csv                                904.6 KB  2026-09-18
     vt_sightings_2024.csv                                911.6 KB  2026-09-18
+
+data/treemap_raw/  (27 files, 6.6 GB)
+    TreeMap2016_ME_BALIVE.tif                            355.9 MB  2026-09-19
+    TreeMap2016_ME_CARBON_DWN.tif                        352.4 MB  2026-09-19
+    TreeMap2016_ME_TPA_LIVE.tif                          359.5 MB  2026-09-19
+    TreeMap2016_NH_BALIVE.tif                            217.3 MB  2026-09-19
+    TreeMap2016_NH_CARBON_DWN.tif                        214.0 MB  2026-09-19
+    TreeMap2016_NH_TPA_LIVE.tif                          219.2 MB  2026-09-19
+    TreeMap2016_VT_BALIVE.tif                            200.9 MB  2026-09-19
+    TreeMap2016_VT_CARBON_DWN.tif                        197.6 MB  2026-09-19
+    TreeMap2016_VT_TPA_LIVE.tif                          202.6 MB  2026-09-19
+    TreeMap2020_ME_BALIVE.tif                            348.8 MB  2026-09-19
+    TreeMap2020_ME_CARBON_DWN.tif                        345.4 MB  2026-09-19
+    TreeMap2020_ME_TPA_LIVE.tif                          336.5 MB  2026-09-19
+    TreeMap2020_NH_BALIVE.tif                            209.6 MB  2026-09-19
+    TreeMap2020_NH_CARBON_DWN.tif                        206.8 MB  2026-09-19
+    TreeMap2020_NH_TPA_LIVE.tif                          201.7 MB  2026-09-19
+    TreeMap2020_VT_BALIVE.tif                            191.4 MB  2026-09-19
+    TreeMap2020_VT_CARBON_DWN.tif                        189.2 MB  2026-09-19
+    TreeMap2020_VT_TPA_LIVE.tif                          184.6 MB  2026-09-19
+    TreeMap2022_ME_BALIVE.tif                            349.0 MB  2026-09-19
+    TreeMap2022_ME_CARBON_DWN.tif                        345.6 MB  2026-09-19
+    TreeMap2022_ME_TPA_LIVE.tif                          336.7 MB  2026-09-19
+    TreeMap2022_NH_BALIVE.tif                            209.9 MB  2026-09-19
+    TreeMap2022_NH_CARBON_DWN.tif                        207.1 MB  2026-09-19
+    TreeMap2022_NH_TPA_LIVE.tif                          202.0 MB  2026-09-19
+    TreeMap2022_VT_BALIVE.tif                            191.6 MB  2026-09-19
+    TreeMap2022_VT_CARBON_DWN.tif                        189.4 MB  2026-09-19
+    TreeMap2022_VT_TPA_LIVE.tif                          184.8 MB  2026-09-19
 
 google-cloud-sdk/.install/  (28 files, 1.9 MB)
     bq-nix.manifest                                         7.0 B  2026-09-18

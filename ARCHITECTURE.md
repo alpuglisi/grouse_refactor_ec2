@@ -8,6 +8,10 @@ This file exists to make the project reviewable: what is core, what
 order things run in, and — the last section — the invariants that are
 not visible from the code you happen to be editing.
 
+`CHANGELOG.md` is the companion: what changed, why, which hypotheses
+were tested and **disproven** (so they are not re-run), and which bugs
+were introduced along the way.
+
 ---
 
 ## Library modules (no `__main__`, imported by everything else)

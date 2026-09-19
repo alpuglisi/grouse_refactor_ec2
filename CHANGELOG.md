@@ -16,6 +16,32 @@ the diff.
 
 ---
 
+## predict.py: same TensorBoard magnitude bug, found by searching for
+## the pattern instead of waiting to trip over it (2026-09-19, e00d956)
+
+Asked where else the model_handler.py tile bug (below) might be
+hiding. `_tb_log_windows`' own docstring already says it "mirrors
+model_handler's _tb_log_epoch_extras patch/attention visualization,
+rebuilt here" - and a grep for `amin(dim` / `amax(dim` found the
+literal duplicate: same `norm01` per-sample min/max stretch, same
+`t_cont` arriving pre-divided by FEATURE_SPEC scale (this file's own
+`read_window_stack`, not dataset.py's, but the identical scaling
+contract). Same fix, same scope - `clip01` for the raw input-feature
+loop only, `norm01` stays for the logit map and attention weights,
+which are model outputs with no fixed physical scale.
+
+Checked the rest of the codebase for the same shape of bug
+(`imshow`/`matshow`/per-sample `.min(dim`/`.max(dim` immediately
+before a rendered or logged image) and found nothing else - the
+diagnostic scripts (diagnose_road_bias.py, diagnose_water_bias.py,
+inspect_point.py, analyze_grouse.py) print statistics or use
+matplotlib with deliberate, documented percentile stretches (predict.py's
+own `--style stretched`), not this "silently re-derive the display
+range from data that already had a real one" pattern. pretrain.py logs
+no images at all.
+
+---
+
 ## model_handler.py: TensorBoard input-feature tiles were rendering
 ## magnitude as a coin flip (2026-09-19, 5ab679c)
 

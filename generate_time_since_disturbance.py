@@ -63,10 +63,14 @@ INDEPENDENT in the filenames - LF2020_Dist17_CONUS is the 2017
 disturbance year published in the 2020 release. This script parses the
 Dist{yy} portion and ignores the LF{yyyy} prefix.
 
-The final (Dist) series currently ends at 2023. For later vintages
-LANDFIRE publishes Limited and Preliminary series; point --dist-dir at
-their extracted contents too if you want 2024/2025 covered by
-observation rather than by the clock running on 2023 data.
+The final (Dist) series' upper year can move as LANDFIRE publishes new
+releases (LF2024_Dist24_CONUS appeared alongside this project's other
+LF2024 downloads) - this script reads whatever years are actually on
+disk rather than assuming a fixed end year, and prints the range it
+found. For anything past the newest Dist year, LANDFIRE publishes
+Limited and Preliminary series; point --dist-dir at their extracted
+contents too if you want those years covered by observation rather than
+by the clock running on the last final year.
 
 Usage:
     python generate_time_since_disturbance.py
@@ -105,6 +109,35 @@ def _dist_year(path):
     return 1900 + yy if yy >= 90 else 2000 + yy
 
 
+def _extract_nested_zips(dist_dir):
+    """LANDFIRE's CONUS bundle is a zip OF zips: unpacking
+    USAnnualDisturbance_1999_present.zip yields one
+    LF{release}_Dist{yy}_CONUS.zip per disturbance year, each of which
+    still has to be opened to reach the actual .tif - a single
+    extractall() on the outer zip never sees the rasters at all, which
+    is what produced 'No Dist{yy} rasters found' on a directory that
+    plainly had them.
+
+    Looped rather than one pass, in case a year's zip itself contains
+    another zip (seen elsewhere in LANDFIRE's downloads); it stops as
+    soon as a pass extracts nothing new. Each inner zip gets its own
+    '.tif' marker so a second run does not re-extract 25 archives to
+    discover there is nothing new to do."""
+    for _ in range(4):
+        pending = [p for p in glob.glob(
+                       os.path.join(dist_dir, "**", "*.zip"), recursive=True)
+                   if not os.path.exists(p + ".extracted")]
+        if not pending:
+            return
+        for zp in pending:
+            print(f"      extracting {os.path.basename(zp)} ...")
+            out_dir = zp[:-len(".zip")]
+            os.makedirs(out_dir, exist_ok=True)
+            with zipfile.ZipFile(zp) as z:
+                z.extractall(out_dir)
+            open(zp + ".extracted", "w").close()
+
+
 def fetch_disturbance(dist_dir):
     """Return {disturbance_year: tif_path}, downloading and extracting
     the CONUS bundle on first use unless --dist-dir already has it."""
@@ -122,6 +155,13 @@ def fetch_disturbance(dist_dir):
             with zipfile.ZipFile(zpath) as z:
                 z.extractall(dist_dir)
             open(marker, "w").close()
+    # Runs for an explicit --dist-dir too, not just the downloaded
+    # default: pointing --dist-dir at a raw, un-extracted copy of the
+    # bundle hits the exact same zip-of-zips problem. Idempotent and
+    # cheap (one glob, no-op) once every inner zip has its marker, so
+    # there is no cost to always checking rather than trying to guess
+    # whether it is needed.
+    _extract_nested_zips(dist_dir)
 
     found = {}
     for p in glob.glob(os.path.join(dist_dir, "**", "*.tif"),

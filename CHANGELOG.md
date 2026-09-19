@@ -34,10 +34,24 @@ disturbance signal — `fdist` boundary density at −0.509, twice any canopy
 correlation — and `fdist` is a categorical *embedding*. Embedding indices
 carry no order, so the network cannot learn that the code meaning "3
 years" sits nearer to "5 years" than to "20 years". `tsd` supplies that
-ordered magnitude, from 25 annual LANDFIRE vintages (1999–2023) rather
+ordered magnitude, from the annual LANDFIRE disturbance record (1999–2024, 26 vintages as of this run) rather
 than the four `fdist` vintages on disk. Not redundant: `fdist` says what
 happened, `tsd` says how long ago as a number the network can do
 arithmetic on.
+
+**Fixed same day: the CONUS bundle is a zip of zips.** `fetch_disturbance`
+originally `extractall()`'d only the outer
+`USAnnualDisturbance_1999_present.zip`, which yields one
+`LF{release}_Dist{yy}_CONUS.zip` per year — never a `.tif`. First real run
+failed with "No Dist{yy} rasters found" against a directory that plainly
+had 26 zip files in it. `_extract_nested_zips` now unpacks those too,
+looped (in case of a third level) and marked per-archive so a second run
+doesn't re-extract 26 zips to learn there was nothing new. Runs for an
+explicit `--dist-dir` as well as the downloaded default, since pointing
+`--dist-dir` at a raw copy of the bundle hits the same problem. Verified
+against a synthetic zip-of-zips fixture: four nested archives extract on
+the first call, none re-extract on the second, and `fetch_disturbance`
+returns the correct year → path mapping both times.
 
 Two decisions inside it. The undisturbed value is a **fixed**
 `TSD_MAX_YEARS`, not "years since the record began" — a cap that grew with

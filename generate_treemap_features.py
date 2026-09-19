@@ -99,16 +99,29 @@ That guarantees a file exists for every year the rest of the stack has,
 which is what stops these features from shrinking the year-gap filter's
 retention - the binding constraint stays LANDFIRE, as it already was.
 
+PARALLELISM
+------------
+write_vintage()'s actual work (warp, median filter, derive, encode)
+depends only on (region, vintage) and touches no state any other
+(region, vintage) pair touches - separate source reads, separate
+output files. Every such pair is therefore dispatched to its own
+worker process instead of running one region, one vintage at a time
+on a single core; --jobs caps how many run at once (default: every
+vCPU). The copy step for years sharing a vintage stays sequential
+afterwards - it's pure shutil.copy2, not worth a worker.
+
 Usage:
     python generate_treemap_features.py --src-dir /data/treemap
     python generate_treemap_features.py --src-dir /data/treemap --regions NH
     python generate_treemap_features.py --src-dir /data/treemap --smooth 0
+    python generate_treemap_features.py --src-dir /data/treemap --jobs 8
 """
 import os
 import glob
 import shutil
 import argparse
 import functools
+import concurrent.futures
 
 import numpy as np
 import rasterio
@@ -340,14 +353,20 @@ def write_vintage(region, year, vintage, src_dir, ref_path, profile,
           f"(non-forest counted as 0) {means}")
 
 
-def process_region(region, data, src_dir, vintages, smooth, block_rows):
+def plan_region(region, data, vintages):
+    """Everything about one region that's cheap to work out up front:
+    the template grid, the output profile, and which of our years map
+    to which TreeMap vintage. No raster data is read or written here -
+    just one header - so this stays sequential; only write_vintage's
+    real work (in main()) gets parallelized across processes. Returns
+    None if the region has nothing to build features onto yet."""
     print(f"\n{'=' * 60}\n{region}\n{'=' * 60}")
     rd = data[region]
     derived = {"balive", "tpa_live", "qmd", "carbon_dwn"}
     others = [f for f in rd.available_features() if f not in derived]
     if not others:
         print(f"   [!] No rasters on disk for {region} - skipping.")
-        return
+        return None
     ref_path = rd.latest_raster_path(others[0])
     years = sorted({y for f in others for y in rd.raster_years(f)})
     print(f"   template grid: {os.path.basename(ref_path)}")
@@ -366,31 +385,15 @@ def process_region(region, data, src_dir, vintages, smooth, block_rows):
                    compress="deflate", predictor=2, tiled=True)
 
     raster_dir = data.config.resolve(data.config.raster_dir)
-    # write_vintage's actual work - opening the three source rasters,
-    # warping them onto THIS region's grid, the smoothing pass,
-    # deriving QMD, encoding - depends only on (region, vintage). `year`
-    # only names the output file. Several of our years can map to the
-    # SAME vintage (e.g. 2016/2017/2018 -> TreeMap 2016), and re-running
-    # the full pipeline for each one was producing byte-identical output
-    # from scratch every time - up to 4x the actual work for no reason,
-    # against 200-360MB source rasters. Compute once per vintage, copy
-    # the result to every other year sharing it.
+    # Several of our years can map to the SAME TreeMap vintage (e.g.
+    # 2016/2017/2018 -> TreeMap 2016); write_vintage only needs to run
+    # once per vintage, for one representative year, and the result
+    # gets copied to every other year sharing it (see main()).
     by_vintage = {}
     for y in years:
         by_vintage.setdefault(mapping[y], []).append(y)
-    for vintage in sorted(by_vintage):
-        yrs = sorted(by_vintage[vintage])
-        first_year = yrs[0]
-        write_vintage(region, first_year, vintage, src_dir, ref_path,
-                      profile, raster_dir, smooth, block_rows)
-        for y in yrs[1:]:
-            for feat in ("balive", "tpa_live", "qmd", "carbon_dwn"):
-                shutil.copy2(
-                    os.path.join(raster_dir, f"{region}_{first_year}_{feat}.tif"),
-                    os.path.join(raster_dir, f"{region}_{y}_{feat}.tif"))
-            print(f"      {y} <- copied from {first_year} (same "
-                  f"TreeMap vintage {vintage}: byte-identical output, "
-                  f"not re-derived)")
+    return {"ref_path": ref_path, "profile": profile,
+            "raster_dir": raster_dir, "by_vintage": by_vintage}
 
 
 def main():
@@ -410,6 +413,10 @@ def main():
                          "disables. Default: %(default)s (3x3 = 90m).")
     ap.add_argument("--block-rows", type=int, default=512,
                     help="Rows per streaming block. Default: %(default)s")
+    ap.add_argument("--jobs", type=int, default=None,
+                    help="Worker processes for the (region, vintage) "
+                         "writes, which are independent of each other. "
+                         "Default: one per vCPU (os.cpu_count()).")
     args = ap.parse_args()
 
     print(f"TreeMap source: {args.src_dir}")
@@ -422,9 +429,56 @@ def main():
     regions = args.regions or data.discover_regions()
     vintages = discover_vintages(args.src_dir, regions)
 
+    plans = {}
     for region in regions:
-        process_region(region, data, args.src_dir, vintages,
-                       args.smooth, args.block_rows)
+        plan = plan_region(region, data, vintages)
+        if plan is not None:
+            plans[region] = plan
+
+    # The unit of parallelism is one (region, vintage) pair: build the
+    # full job list across every region up front, then hand it to a
+    # process pool sized to the machine instead of the old one
+    # region/vintage at a time, single-core loop.
+    jobs = [(region, sorted(years)[0], vintage, plan["ref_path"],
+            plan["profile"], plan["raster_dir"])
+           for region, plan in plans.items()
+           for vintage, years in plan["by_vintage"].items()]
+
+    if jobs:
+        n_workers = max(1, min(args.jobs or os.cpu_count() or 1, len(jobs)))
+        print(f"\n{len(jobs)} (region, vintage) write job(s) across "
+              f"{n_workers} worker process(es)")
+        with concurrent.futures.ProcessPoolExecutor(
+                max_workers=n_workers) as ex:
+            futures = [
+                ex.submit(write_vintage, region, first_year, vintage,
+                          args.src_dir, ref_path, profile, raster_dir,
+                          args.smooth, args.block_rows)
+                for region, first_year, vintage, ref_path, profile,
+                    raster_dir in jobs]
+            # .result() re-raises any worker exception here, in the
+            # main process, instead of it vanishing into the pool.
+            for fut in concurrent.futures.as_completed(futures):
+                fut.result()
+
+    # Pure I/O and dependent on the write above having finished for
+    # each vintage's representative year - cheap and sequential-only,
+    # not worth a worker of its own.
+    for region, plan in plans.items():
+        for vintage, years in plan["by_vintage"].items():
+            yrs = sorted(years)
+            first_year = yrs[0]
+            for y in yrs[1:]:
+                for feat in ("balive", "tpa_live", "qmd", "carbon_dwn"):
+                    shutil.copy2(
+                        os.path.join(plan["raster_dir"],
+                                    f"{region}_{first_year}_{feat}.tif"),
+                        os.path.join(plan["raster_dir"],
+                                    f"{region}_{y}_{feat}.tif"))
+                print(f"   {region}: {y} <- copied from {first_year} "
+                      f"(same TreeMap vintage {vintage}: byte-identical "
+                      f"output, not re-derived)")
+
     print("\nDone. Remember: new features are a GEOMETRY change - "
           "train.py needs a cold start, and --resume/--init-from are "
           "invalid against any older checkpoint.")

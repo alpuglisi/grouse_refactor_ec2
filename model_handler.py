@@ -1435,11 +1435,26 @@ class GrouseModelHandler:
             hi = m.amax(dim=(2, 3), keepdim=True)
             return ((m - lo) / (hi - lo).clamp_min(1e-6)).float().cpu()
 
+        def clip01(m):
+            """For raw INPUT feature channels only, not model outputs:
+            cont_x arrives here already divided by that feature's
+            FEATURE_SPEC scale (dataset.py's _to_tensors), so it's
+            already a fixed, physically-anchored quantity comparable
+            across samples and epochs - clamp it into display range
+            instead of re-stretching per-sample like norm01 does.
+            norm01's per-sample min/max was making every TreeMap tile
+            unreadable: those bands are ~0 (non-forest) against one
+            near-uniform value across a whole imputed forest plot, so
+            ANY nonzero pixel - whether it was 50 ft2/acre or 380 -
+            got stretched to identical pure white, and real magnitude
+            never reached the pixel."""
+            return m.clamp(0, 1).float().cpu()
+
         with torch.no_grad():
             if tb_images:
                 for ci, fname in enumerate(self.cont_features):
                     grid = torchvision.utils.make_grid(
-                        norm01(cont_x[:, ci:ci + 1]), nrow=n)
+                        clip01(cont_x[:, ci:ci + 1]), nrow=n)
                     tb_writer.add_image(f"Patches/{fname}", grid, step)
                 for ci, fname in enumerate(self.cat_features):
                     grid = torchvision.utils.make_grid(

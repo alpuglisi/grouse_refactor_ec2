@@ -117,6 +117,30 @@ ASSET_TEMPLATE = "USFS/GTAC/TreeMap/v{year}"
 
 
 def ee_init(project):
+    """Two auth paths, tried in order.
+
+    1. Earth Engine's own stored credentials (written by
+       `earthengine authenticate`). This is the normal case and needs
+       nothing extra.
+    2. Application Default Credentials, i.e. `gcloud auth
+       application-default login`. This exists because `earthengine
+       authenticate` (and ee.Authenticate(auth_mode='gcloud'), DESPITE
+       its name) both drive their sign-in through Earth Engine's own
+       shared OAuth client - and Google Workspace-managed accounts can
+       have that specific client blocked outright ("This app is
+       blocked... Google blocked this access", with no bypass link),
+       while still allowing gcloud's own client through. When that
+       happens, the fix is NOT to keep retrying `earthengine
+       authenticate` - it is the same blocked client every time. Run:
+           gcloud auth application-default login --scopes=\
+               https://www.googleapis.com/auth/earthengine,\
+               https://www.googleapis.com/auth/cloud-platform
+           gcloud auth application-default set-quota-project <project>
+       once, and this function picks the resulting credentials up
+       automatically from then on - ee.Initialize(project=...)'s
+       default path never looks for them on its own, which is why path
+       1 fails first before this ever runs.
+    """
     try:
         import ee
     except ImportError:
@@ -124,11 +148,35 @@ def ee_init(project):
                          "pip install earthengine-api")
     try:
         ee.Initialize(project=project) if project else ee.Initialize()
-    except Exception as e:
+        return ee
+    except Exception as persistent_err:
+        pass
+    try:
+        import google.auth
+        credentials, adc_project = google.auth.default(scopes=[
+            "https://www.googleapis.com/auth/earthengine",
+            "https://www.googleapis.com/auth/cloud-platform",
+        ])
+        ee.Initialize(credentials, project=project or adc_project)
+        print("   (authenticated via Application Default Credentials, "
+             "not Earth Engine's own stored credentials - see ee_init's "
+             "docstring if this is unexpected)")
+        return ee
+    except Exception as adc_err:
         raise SystemExit(
-            f"Earth Engine init failed ({e}).\nRun 'earthengine "
-            f"authenticate' once on this machine, and pass a Google "
-            f"Cloud project via --project or EARTHENGINE_PROJECT.")
+            f"Earth Engine init failed via both paths.\n"
+            f"  earthengine's own credentials: {persistent_err}\n"
+            f"  Application Default Credentials: {adc_err}\n"
+            f"Run 'earthengine authenticate' once on this machine, and "
+            f"pass a Google Cloud project via --project or "
+            f"EARTHENGINE_PROJECT. If that specifically fails with "
+            f"\"This app is blocked\" (common on Google Workspace-managed "
+            f"accounts), run instead:\n"
+            f"  gcloud auth application-default login --scopes="
+            f"https://www.googleapis.com/auth/earthengine,"
+            f"https://www.googleapis.com/auth/cloud-platform\n"
+            f"  gcloud auth application-default set-quota-project "
+            f"<project-id>")
     return ee
 
 

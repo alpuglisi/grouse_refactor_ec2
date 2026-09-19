@@ -16,6 +16,37 @@ the diff.
 
 ---
 
+## Earth Engine auth: Workspace-blocked shared client, and a latent
+## ee_init() bug (2026-09-19)
+
+First real run on the EC2 box: `earthengine authenticate` failed with
+Google's "This app is blocked... Google blocked this access" - no bypass
+link. That message is Google Workspace org policy rejecting Earth
+Engine's own shared OAuth client (`764086051850-...`) outright, not a
+transient error to retry. Confusingly, `ee.Authenticate(auth_mode='gcloud')`
+does NOT do what its name implies either - it still drives its consent
+screen through that same blocked client, so it failed identically.
+
+What actually worked: `gcloud auth application-default login` (gcloud's
+OAuth client is Google-verified and wasn't blocked), producing
+Application Default Credentials Earth Engine's own init path never looks
+for on its own. `ee_init()` in both `download_tcc_nlcd.py` and
+`download_treemap.py` now tries the normal `ee.Initialize(project=...)`
+path first, and falls back to loading ADC via `google.auth.default()`
+and passing it to `ee.Initialize(credentials, project=...)` explicitly
+if that fails - so this is a one-time `gcloud` command on an affected
+account, not a manual workaround needed on every run.
+
+**Also fixed, found while patching this: neither script's `ee_init()`
+ever `return`ed the `ee` module.** Both callers do `ee = ee_init(args.project)`
+expecting it back; the original function implicitly returned `None` on
+success. `download_tcc_nlcd.py` would have crashed on its first real
+Earth Engine call (`AttributeError` on a `None`) independent of any auth
+problem - this suggests it had not actually been run to completion
+before. Both scripts now `return ee` explicitly.
+
+---
+
 ## TreeMap acquisition via Earth Engine (2026-09-19)
 
 `generate_treemap_features.py --src-dir` needed the three raw attribute

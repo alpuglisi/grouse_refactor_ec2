@@ -11,7 +11,13 @@
 #    nothing under data/ or any other output directory sneaks in.
 !/*.md
 
-# 5. Superseded scripts, kept for history. Already tracked via git mv;
+# 5. Root-level shell utilities (document_tree.sh, ...). Root only, for
+#    the same reason as the docs above. Without this the deny-by-default
+#    rule at the top swallows them and `git add` reports nothing wrong
+#    on a later edit - the file simply never gets staged again.
+!/*.sh
+
+# 6. Superseded scripts, kept for history. Already tracked via git mv;
 #    this keeps them visible to `git add` if one is ever edited.
 !/legacy/
 !/legacy/*.py

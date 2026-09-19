@@ -77,6 +77,7 @@ assignments).
 | `diagnose_training.py` | Training-set sanity checks. |
 | `check_exotic.py`, `check_raster.py`, `dupe_check.py` | One-off data-integrity checks. |
 | `smoke_test_training.py` | Fast end-to-end training smoke test. |
+| `document_tree.sh` | Inventories the working directory — every file with size and date, plus a **feature × year raster coverage matrix per region**. Data files are gitignored and never reach a clone, so this is how the year-vintage situation becomes reviewable from the repo. |
 | `tune.py`, `tune_bins.py` | Hyperparameter / envelope-bin sweeps. |
 
 `predict.py --tensorboard` also emits per-feature `Class/`, `Correlation/`

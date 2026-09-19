@@ -16,6 +16,87 @@ the diff.
 
 ---
 
+## Five stand-structure / disturbance features added (2026-09-19)
+
+`tsd`, `balive`, `tpa_live`, `qmd`, `carbon_dwn`. Stem input channels
+116 → 121; **cold start required**, `--resume` and `--init-from` invalid
+against every older checkpoint.
+
+**Five at once is a deliberate choice by the user, against a
+recommendation of two.** Flagged here because it has a known cost: the
+result will not be attributable to any individual feature, exactly as the
+cold-start + `road_dist` change before it is still unattributable. If the
+run improves, an ablation is the only way to learn which channel did it.
+
+**`tsd` — years since last disturbance** (`generate_time_since_disturbance.py`).
+Added because the strongest signal ever measured on this model is a
+disturbance signal — `fdist` boundary density at −0.509, twice any canopy
+correlation — and `fdist` is a categorical *embedding*. Embedding indices
+carry no order, so the network cannot learn that the code meaning "3
+years" sits nearer to "5 years" than to "20 years". `tsd` supplies that
+ordered magnitude, from 25 annual LANDFIRE vintages (1999–2023) rather
+than the four `fdist` vintages on disk. Not redundant: `fdist` says what
+happened, `tsd` says how long ago as a number the network can do
+arithmetic on.
+
+Two decisions inside it. The undisturbed value is a **fixed**
+`TSD_MAX_YEARS`, not "years since the record began" — a cap that grew with
+the vintage (24 in 2022, 27 in 2025) would make the feature's single most
+common value a vintage label. And unlike `road_dist`, which writes
+identical copies because roads are static, `tsd` is **recomputed per
+vintage from the record up to and including that year**; the clock runs,
+and using later disturbance would leak the future into a sighting's
+landscape.
+
+**TreeMap stand structure** (`generate_treemap_features.py`). The stack
+measures cover three ways and height two ways and had **nothing** for stem
+density or stem size — so 60% cover at 50 ft could be 80 large stems per
+acre or 2,000 saplings, identical in every feature, opposite habitats for
+an early-successional obligate.
+
+Four attributes, not the twelve with no LANDFIRE counterpart: QMD is
+exactly `sqrt(BALIVE/(0.005454·TPA))`, and `SDIsum`/`ALSTK`/`GSSTK`/
+`DRYBIO_L`/`CARBON_L`/`VOLCFNET_L` are all functions of the same two
+numbers. Twelve channels would buy about three dimensions. `CANOPYPCT` and
+`STANDHT` are excluded outright — TreeMap is imputed *from* LANDFIRE, and
+USFS report 94.2% / 99.0% within-class agreement with the `evc`/`evh`
+already present.
+
+`qmd` is **derived rather than downloaded**: TreeMap publishes it only for
+2020/2022/2023, and 2016's `QMD_RMRS` is a different definition, so
+downloading would open a vintage seam or cost the 2016 vintage. The
+identity was verified numerically (`BALIVE` reconstructs exactly from the
+derived QMD).
+
+Three things that had to be decided rather than defaulted:
+- **Smoothing is on by default (3×3).** TreeMap's fine texture is
+  imputation artifact, and it has no reference data for boundaries at all
+  — only single-condition, 100%-forested plots were eligible, so plots
+  straddling a stand edge were excluded by construction. This
+  architecture computes edge magnitude from every channel it is given and
+  cannot be told to skip one, so the detail is destroyed at generation
+  time instead.
+- **Non-forest is written as 0, not a sentinel.** Zero basal area, zero
+  stems and zero down wood are true of a hayfield. `qmd=0` is undefined
+  rather than true, but `qmd=0 ∧ tpa_live=0` is exactly the non-forest
+  signature, so the joint pattern replaces a mask channel. TreeMap's own
+  NoData (`4.2949673e+09`) is not GDAL-detectable and cannot survive the
+  int16 patch cache, so it is remapped on read.
+- **Vintages map by nearest year.** Writing every one of our years from
+  the nearest of TreeMap's 2016/2020/2022/2023 keeps a file present for
+  each, so the `all()` year-gap filter sees no change and LANDFIRE stays
+  the binding constraint — these features cost zero training records. The
+  cost is that the filter also cannot warn about a stale mapping, so the
+  generator prints it and flags gaps over 2 years itself.
+
+**Not added, and why.** `elev` was recommended alongside `tsd` and was
+declined with slope; the model still has no terrain input at all (`slope`
+and `gradient` are downloaded by `download_rev.py` but appear in neither
+`FEATURE_SPEC` nor `RASTER_FEATURES`). `dist_type` was rejected as
+redundant with `fdist`, which already encodes type and severity.
+
+---
+
 ## Code structure and reviewability (2026-09-18 → 19)
 
 **Three silent-divergence duplications collapsed** — `b60e480`.

@@ -123,7 +123,21 @@ RASTER_FEATURES = ["evt", "evh", "evc", "sclass", "fdist", "ch", "cc",
                    # vintage's schedule) but written once per available
                    # year so the year-matching policy below never has to
                    # special-case it.
-                   "road_dist"]
+                   "road_dist",
+                   # generate_time_since_disturbance.py: years since the
+                   # most recent LANDFIRE Annual Disturbance event, log-
+                   # encoded. Genuinely per-year (unlike road_dist) - the
+                   # value at a pixel changes every vintage even with no
+                   # new disturbance, because the clock keeps running.
+                   "tsd",
+                   # generate_treemap_features.py: USFS TreeMap stand
+                   # structure, imputed FIA plot attributes. TreeMap
+                   # publishes only 2016/2020/2022/2023, so each of our
+                   # vintages is written from the NEAREST TreeMap year -
+                   # that keeps a file present for every year the rest of
+                   # the stack has, which is what stops these features
+                   # from shrinking the year-gap filter's retention.
+                   "balive", "tpa_live", "qmd", "carbon_dwn"]
 
 # Year-matching policy: a sighting's year resolves to the exact raster
 # year when present, else the CLOSEST year (ties -> earlier year, i.e.

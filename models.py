@@ -550,6 +550,34 @@ FEATURE_SPEC = {
     # scores 0.09). Distance-to-road is the one input that says "there
     # is a road here" at a resolution the land-cover rasters cannot.
     "road_dist": {"kind": "continuous", "scale": 10000.0},
+    # Years since the most recent stand-replacing or partial disturbance,
+    # LOG-ENCODED, from the LANDFIRE Annual Disturbance stack
+    # (generate_time_since_disturbance.py). See tsd_encode below.
+    #
+    # Why it exists alongside fdist, which also encodes disturbance:
+    # fdist is a CATEGORICAL embedding lookup, so the network has no way
+    # to learn that the code meaning "3 years" sits nearer to the one
+    # meaning "5 years" than to the one meaning "20 years" - embedding
+    # indices carry no order. tsd supplies that ordered magnitude, and
+    # it does so from 25 annual vintages (1999-2023) rather than fdist's
+    # four, at annual resolution rather than binned.
+    "tsd": {"kind": "continuous", "scale": 4000.0},
+    # USFS TreeMap stand-structure attributes (generate_treemap_features.py).
+    # These are the axes LANDFIRE carries NOTHING for: the stack measures
+    # cover three ways (evc/cc/tcc) and height two ways (evh/ch), but a
+    # stand reading 60% cover at 50ft could be 80 big stems per acre or
+    # 2,000 saplings - identical in every other feature, and opposite
+    # habitats for an early-successional obligate.
+    #
+    # balive/qmd/carbon_dwn are stored as FIXED-POINT integers (see
+    # TREEMAP_FIXED); tpa_live is log-encoded because its distribution is
+    # heavily skewed - the difference between 200 and 2,000 stems/acre is
+    # the difference between mature forest and grouse cover, while 15,000
+    # vs 17,000 is noise.
+    "balive":     {"kind": "continuous", "scale": 1000.0},
+    "tpa_live":   {"kind": "continuous", "scale": 10000.0},
+    "qmd":        {"kind": "continuous", "scale": 1000.0},
+    "carbon_dwn": {"kind": "continuous", "scale": 500.0},
 }
 
 # ---- road_dist encoding ------------------------------------------------
@@ -590,6 +618,119 @@ def road_dist_decode(stored):
     import numpy as _np
     return _np.expm1(_np.asarray(stored, dtype=_np.float64)
                      / ROAD_DIST_LOG_SCALE)
+
+
+# =======================================================================
+# Time since disturbance (tsd)
+# =======================================================================
+# Log-encoded for the same reason road_dist is: a grouse's use of a stand
+# changes enormously between 2 and 8 years post-cut and not at all
+# between 40 and 46, so linear years would spend most of the input range
+# resolving distinctions the species does not make.
+#
+# TSD_MAX_YEARS is a FIXED cap, deliberately not "years since the start
+# of the disturbance record". An undisturbed pixel must encode to the
+# same value in every vintage - if the cap grew with the vintage year
+# (24 in the 2022 raster, 27 in the 2025 one) then the single most
+# common value in the feature would itself identify the vintage, and a
+# network this size will happily learn the year instead of the habitat.
+TSD_MAX_YEARS = 30
+TSD_LOG_SCALE = 1000.0
+
+
+def tsd_encode(years):
+    """Years since last disturbance -> stored int16 units. Array-safe."""
+    import numpy as _np
+    y = _np.clip(_np.asarray(years, dtype=_np.float64), 0, TSD_MAX_YEARS)
+    return _np.rint(_np.log1p(y) * TSD_LOG_SCALE).astype(_np.int16)
+
+
+def tsd_decode(stored):
+    """Stored int16 units -> years. Inverse of tsd_encode."""
+    import numpy as _np
+    return _np.expm1(_np.asarray(stored, dtype=_np.float64) / TSD_LOG_SCALE)
+
+
+# =======================================================================
+# TreeMap stand structure (balive / tpa_live / qmd / carbon_dwn)
+# =======================================================================
+# The patch cache (dataset.py) stores int16, so every continuous feature
+# has to survive integer truncation BEFORE the FEATURE_SPEC scale is
+# applied. `mult` is that fixed-point multiplier; `cap` bounds the value
+# so the product stays inside int16 and so a single absurd pixel cannot
+# stretch the whole channel's range.
+#
+# Non-forest is stored as 0, NOT as a nodata sentinel. TreeMap is NoData
+# off forest, but "no trees" is a real measurement for three of these
+# four - a hayfield genuinely has zero basal area, zero stems and zero
+# down wood. qmd=0 is the one fudge (an undefined mean diameter rather
+# than a true zero), and it stays self-consistent: qmd=0 AND tpa_live=0
+# is exactly the non-forest signature, so the joint pattern carries the
+# forest/non-forest distinction without spending a mask channel on it.
+TREEMAP_FIXED = {
+    "balive":     {"mult": 10.0,  "cap": 400.0, "unit": "ft2/acre"},
+    "qmd":        {"mult": 100.0, "cap": 40.0,  "unit": "inches"},
+    "carbon_dwn": {"mult": 100.0, "cap": 20.0,  "unit": "tons/acre"},
+}
+TPA_LIVE_MAX = 30000.0
+TPA_LIVE_LOG_SCALE = 1000.0
+
+# QMD is exactly reconstructible from the other two, and this project
+# derives it rather than downloading it. 0.005454 = pi/(4*144), the
+# constant converting a diameter in inches to basal area in square feet;
+# QMD is the RMS diameter, so BALIVE = 0.005454 * TPA * QMD^2.
+#
+# Deriving it is not just convenient. TreeMap publishes QMD only for the
+# 2020/2022/2023 vintages - 2016 ships QMD_RMRS instead, under a
+# different definition - so a downloaded QMD would either open a
+# definitional seam across vintages or drop the 2016 vintage entirely.
+# One formula applied to all four vintages has neither problem.
+QMD_BA_CONSTANT = 0.005454
+
+
+def qmd_from_balive_tpa(balive, tpa_live):
+    """Quadratic mean diameter (inches) from basal area (ft2/acre) and
+    stems/acre. Returns 0 where there are no stems (see the non-forest
+    note above) rather than dividing by zero."""
+    import numpy as _np
+    ba = _np.asarray(balive, dtype=_np.float64)
+    tpa = _np.asarray(tpa_live, dtype=_np.float64)
+    out = _np.zeros(_np.broadcast(ba, tpa).shape, dtype=_np.float64)
+    ok = tpa > 0
+    _np.divide(ba, QMD_BA_CONSTANT * tpa, out=out, where=ok)
+    return _np.sqrt(out, out=out)
+
+
+def tpa_live_encode(stems_per_acre):
+    """Stems/acre -> stored int16 units (log). Array-safe."""
+    import numpy as _np
+    t = _np.clip(_np.asarray(stems_per_acre, dtype=_np.float64),
+                 0, TPA_LIVE_MAX)
+    return _np.rint(_np.log1p(t) * TPA_LIVE_LOG_SCALE).astype(_np.int16)
+
+
+def tpa_live_decode(stored):
+    """Stored int16 units -> stems/acre. Inverse of tpa_live_encode."""
+    import numpy as _np
+    return _np.expm1(_np.asarray(stored, dtype=_np.float64)
+                     / TPA_LIVE_LOG_SCALE)
+
+
+def treemap_encode(feature, values):
+    """Native TreeMap units -> stored int16, for the fixed-point three.
+    tpa_live has its own log pair above."""
+    import numpy as _np
+    spec = TREEMAP_FIXED[feature]
+    v = _np.clip(_np.asarray(values, dtype=_np.float64), 0, spec["cap"])
+    return _np.rint(v * spec["mult"]).astype(_np.int16)
+
+
+def treemap_decode(feature, stored):
+    """Stored int16 -> native TreeMap units, for anything reporting a
+    number to a human."""
+    import numpy as _np
+    return (_np.asarray(stored, dtype=_np.float64)
+            / TREEMAP_FIXED[feature]["mult"])
 
 
 @torch.no_grad()

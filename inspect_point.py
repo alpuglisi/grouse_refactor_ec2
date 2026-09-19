@@ -39,7 +39,8 @@ from grouse_data import GrouseData, NLCD_NAMES
 from predict import (load_model, open_aligned_sources, read_window_stack,
                      IMG_SIZE)
 from models import (FEATURE_SPEC, split_features, road_dist_decode,
-                    d4_tta_logits)
+                    tsd_decode, tpa_live_decode, treemap_decode,
+                    TREEMAP_FIXED, d4_tta_logits)
 from rasterio.windows import Window
 
 
@@ -128,13 +129,24 @@ def main():
         for i, f in enumerate(disk_cont):
             val = float(cont[i, cy_px, cx_px])
             window_mean = float(cont[i].mean())
+            # Several continuous features are stored log-encoded or
+            # fixed-point, so the model-input number is meaningless to
+            # read directly - undo the FEATURE_SPEC scale, then the
+            # storage encoding, to get back to the real-world unit.
             extra = ""
+            stored = val * float(FEATURE_SPEC[f].get("scale", 1.0))
             if f == "road_dist":
-                # Stored log-encoded (models.road_dist_encode), so the
-                # model-input number is meaningless to read directly.
-                scale = float(FEATURE_SPEC[f].get("scale", 1.0))
-                extra = (f"  -> {road_dist_decode(val * scale):,.0f} m "
-                        f"to nearest paved road")
+                extra = (f"  -> {road_dist_decode(stored):,.0f} m to "
+                        f"nearest paved road")
+            elif f == "tsd":
+                extra = (f"  -> {tsd_decode(stored):.1f} years since "
+                        f"last recorded disturbance")
+            elif f == "tpa_live":
+                extra = (f"  -> {tpa_live_decode(stored):,.0f} live "
+                        f"stems/acre")
+            elif f in TREEMAP_FIXED:
+                extra = (f"  -> {treemap_decode(f, stored):,.1f} "
+                        f"{TREEMAP_FIXED[f]['unit']}")
             print(f"   {f:8s} = {val:.3f}  "
                  f"(window mean {window_mean:.3f}, model-input scale)"
                  f"{extra}")

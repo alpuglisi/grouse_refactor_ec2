@@ -16,6 +16,39 @@ the diff.
 
 ---
 
+## model_handler.py: TensorBoard input-feature tiles were rendering
+## magnitude as a coin flip (2026-09-19, 5ab679c)
+
+Reported directly: the new balive/tpa_live/qmd/carbon_dwn tiles showed
+up (train.py's discovered-features line confirmed they were in
+`cont_features`), but were "just colored tiles that don't mean
+anything" - a screenshot showed an identical white silhouette shape
+repeated across every one of the 8 validation samples, for both
+balive and carbon_dwn.
+
+Root cause: `cont_x` reaches the visualization code already divided
+by each feature's FEATURE_SPEC `scale` (dataset.py's `_to_tensors`) -
+a fixed, physically-anchored quantity, comparable across samples and
+epochs by design. The viz code's `norm01()` then re-stretched it
+PER-SAMPLE using that sample's own min/max before display. For
+TreeMap's four features - ~0 outside forest, then near-uniform across
+however much of the patch one imputed FIA plot covers - that meant
+any nonzero pixel, at basal area 50 ft2/acre or 380, got stretched to
+identical pure white: the tile could only ever show a forest/
+non-forest silhouette, never the actual stand-structure value the
+feature exists to carry. `ch`/`cc` hid the same bug better only
+because LANDFIRE's canopy surfaces vary continuously within a patch,
+so per-sample stretching still left some texture behind, at the cost
+of the same lost cross-sample comparability.
+
+Fixed by adding `clip01` - clamp the already-scaled value into
+display range - used ONLY for the raw input-feature loop. `norm01`'s
+per-sample dynamic stretch stays for actual model outputs (logit map,
+attention weights, branch activations), which have no fixed physical
+scale and need it.
+
+---
+
 ## generate_treemap_features.py: median smoothing removed, only after
 ## being asked to justify it (2026-09-19)
 

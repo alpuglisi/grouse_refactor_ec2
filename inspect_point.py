@@ -32,14 +32,14 @@ Usage:
 """
 import argparse
 
-import numpy as np
 import torch
 from pyproj import Transformer
 
 from grouse_data import GrouseData, NLCD_NAMES
-from predict import (load_model, open_aligned_sources, _safe_windowed_read,
-                     IMG_SIZE, NODATA_SENTINELS)
-from models import FEATURE_SPEC, split_features, road_dist_decode
+from predict import (load_model, open_aligned_sources, read_window_stack,
+                     IMG_SIZE)
+from models import (FEATURE_SPEC, split_features, road_dist_decode,
+                    d4_tta_logits)
 from rasterio.windows import Window
 
 
@@ -112,15 +112,7 @@ def main():
 
         window = Window(col - IMG_SIZE // 2, row - IMG_SIZE // 2,
                         IMG_SIZE, IMG_SIZE)
-        cat = np.stack([_safe_windowed_read(srcs[f], window)
-                       for f in disk_cat]).astype(np.int64)
-        cont = np.stack([_safe_windowed_read(srcs[f], window)
-                        for f in disk_cont]).astype(np.float32)
-        for s in NODATA_SENTINELS:
-            cat[cat == s] = 0
-            cont[cont == s] = 0.0
-        for i, f in enumerate(disk_cont):
-            cont[i] /= float(FEATURE_SPEC[f].get("scale", 1.0))
+        cat, cont = read_window_stack(srcs, disk_cat, disk_cont, window)
 
         cy_px, cx_px = IMG_SIZE // 2, IMG_SIZE // 2
         print(f"\nRaw feature values AT THE REQUESTED POINT (center pixel "
@@ -160,16 +152,8 @@ def main():
         t_cont = torch.from_numpy(cont[cont_idx][None]).to(device)
         model.eval()
         with torch.no_grad():
-            tta_logits = []
-            for k in range(4):
-                rc = torch.rot90(t_cat, k, dims=(2, 3))
-                rn = torch.rot90(t_cont, k, dims=(2, 3))
-                lg = model.logits(rc, rn).float()
-                if args.flip_tta:
-                    lg = 0.5 * (lg + model.logits(
-                        rc.flip(-1), rn.flip(-1)).float())
-                tta_logits.append(lg.flatten())
-            logit = torch.stack(tta_logits).mean(dim=0)
+            logit = d4_tta_logits(model, t_cat, t_cont,
+                                  flip_tta=args.flip_tta)
             prob = torch.sigmoid(logit / args.temperature).item()
         print(f"\nModel score at this exact point (raw, uncalibrated, "
              f"T={args.temperature:g}): {prob:.4f}")

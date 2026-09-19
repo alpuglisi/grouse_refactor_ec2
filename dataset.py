@@ -32,8 +32,7 @@ from rasterio.windows import Window
 import rasterio
 
 from models import FEATURE_SPEC
-
-NODATA_SENTINELS = {-9999, -32768, 32767, -1111}
+from grouse_data import NODATA_SENTINELS
 
 
 class GrousePatchDataset(Dataset):

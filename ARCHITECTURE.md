@@ -17,9 +17,9 @@ Dependency order, bottom up. Nothing below imports anything above it.
 | Module | Owns |
 |---|---|
 | `blocks.py` | `ChannelAttention`, `SpatialAttention`, `CBAM`. |
-| `grouse_data.py` | Disk layout. `GrouseData` / `RegionData`, `PATH_TEMPLATES`, `RASTER_FEATURES`, year-matching policy, `NLCD_NAMES`. **Every path in the project resolves through here.** Dependency-free leaf, so diagnostics can import it without pulling in torch. |
+| `grouse_data.py` | Disk layout. `GrouseData` / `RegionData`, `PATH_TEMPLATES`, `RASTER_FEATURES`, `NODATA_SENTINELS`, year-matching policy, `NLCD_NAMES`. **Every path and raster convention in the project resolves through here.** Dependency-free leaf, so diagnostics can import it without pulling in torch. |
 | `losses.py` | `FocalLoss`, `ANFullLoss`, and `loss_logit_bias` (the constant logit offset an asymmetric objective bakes in). |
-| `models.py` | `FEATURE_SPEC` (the feature registry), `GrouseResNet`, `split_features`, `config_to_model_kwargs`, `road_dist_encode/decode`. Imports `blocks`. |
+| `models.py` | `FEATURE_SPEC` (the feature registry), `GrouseResNet`, `split_features`, `config_to_model_kwargs`, `road_dist_encode/decode`, `d4_tta_logits` (the single inference-side scorer). Imports `blocks`. |
 | `dataset.py` | `GrousePatchDataset` (point → patch stack), `SSLPairDataset`, `StratifiedBatchSampler`, and the int16 patch cache. Imports `models`. |
 | `model_handler.py` | `GrouseModelHandler` (the `fit()` loop, checkpoint selection, TensorBoard instrumentation), `ModelEMA`, `DivergenceGuard`. Imports `grouse_data`, `losses`, `models`. |
 
@@ -152,3 +152,20 @@ look hot at any temperature. Calibration is never the explanation for
 WETLANDS` where the road is narrow, and `nlcd=22 Developed Low` where it
 is wide. Land-cover-derived conclusions about narrow linear features are
 unsound; that is what `road_dist` exists to supply.
+
+**There is exactly one inference-side scorer and one inference-side
+patch reader.** `models.d4_tta_logits` (4 rotations × optional mirror,
+averaged BEFORE the sigmoid) and `predict.read_window_stack` (sentinels
+zeroed, continuous channels divided by their `FEATURE_SPEC` scale) each
+had three copies. Nothing about a divergence between copies would
+crash — the deployed map and the diagnostics meant to explain it would
+simply stop agreeing, each internally consistent. Add a new inference
+path by calling these, never by re-deriving them.
+
+**The training path deliberately does NOT share those two.** Its D4
+comes from the dataset (`expand_rotations=True`) with only the mirror
+added in code (`GrouseModelHandler._pooled_logits`), and its patch read
+routes sentinels through NaN first so the 100%-nodata geolocation probe
+can fire (impossible once 0 is in the array, since 0 is a legitimate
+value). Same numbers by different routes, for reasons — do not "unify"
+them without reading both.

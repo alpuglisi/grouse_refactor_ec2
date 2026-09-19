@@ -592,6 +592,48 @@ def road_dist_decode(stored):
                      / ROAD_DIST_LOG_SCALE)
 
 
+@torch.no_grad()
+def d4_tta_logits(model, cat_x, cont_x, flip_tta=True, autocast=None):
+    """Pooled logit over the D4 symmetry group: 4 rotations, each
+    optionally averaged with its mirror, averaged BEFORE the sigmoid.
+
+    THE single inference-side definition of how this model is scored.
+    It was written out three times (predict_region,
+    _tb_capture_windows, inspect_point) and the failure mode if they
+    drift apart is silent: each path stays internally consistent while
+    the deployed map and the diagnostics that are supposed to explain
+    it stop agreeing. Averaging before the sigmoid is load-bearing -
+    it is what matches model_handler's validation path.
+
+    Scores through model.logits() rather than forward(): forward()
+    returns the raw spatial map and would silently bypass both the
+    trained pooling (attn/gauss/center/mean) and the center-skip head.
+
+    Callers apply their own temperature / prior shift / sigmoid to the
+    returned logit; this returns the part they all share. `autocast`
+    takes a context manager (predict_region passes its CUDA AMP one);
+    None means no autocast, matching the CPU/diagnostic paths.
+
+    The training side is NOT this function: there the 4 rotations come
+    from the dataset (expand_rotations=True) and only the mirror is
+    added in code, by GrouseModelHandler._pooled_logits. Same D4 group,
+    assembled differently because the data pipeline already did half
+    the work."""
+    import contextlib
+    ctx = autocast if autocast is not None else contextlib.nullcontext()
+    views = []
+    for k in range(4):
+        rc = torch.rot90(cat_x, k, dims=(2, 3))
+        rn = torch.rot90(cont_x, k, dims=(2, 3))
+        with ctx:
+            lg = model.logits(rc, rn).float()
+            if flip_tta:
+                lg = 0.5 * (lg + model.logits(
+                    rc.flip(-1), rn.flip(-1)).float())
+        views.append(lg.flatten())
+    return torch.stack(views).mean(dim=0)
+
+
 def config_to_model_kwargs(cfg, defaults=None):
     """Decode a wrapped-checkpoint 'config' dict into GrouseResNet
     constructor kwargs - the ONE place the legacy key chains live, so

@@ -8,6 +8,8 @@ from sklearn.neighbors import KernelDensity
 from pyproj import Transformer
 import matplotlib.pyplot as plt
 
+from grouse_data import NODATA_SENTINELS
+
 # ==========================================
 # 1. CONFIGURATION
 # ==========================================
@@ -86,15 +88,8 @@ SELECT_W_LO = 0.5           # w <= this -> 'Avoided'
 # Features exactly as named by download.py: {region}_{year}_{feature}.tif
 FEATURES = ["evt", "evh", "evc", "sclass", "fdist", "ch", "cc"]
 
-NODATA_SENTINELS = {-9999, -32768, 32767, -1111}
-# -1111 confirmed as SClass's nodata value (e.g. Open Water pixels have
-# no succession class) - it wasn't in this set, so it passed through
-# sample_raster as a literal value instead of becoming NaN. Real
-# sightings almost never land on those specific cells, so this was
-# invisible on the sightings side; 20,000 random background points hit
-# them constantly, manufacturing fake 'SCLASS:-1111' envelopes with 0
-# sightings but real availability -> spurious Selection_Ratio=0.00
-# entries that dominated the Avoided table without being real avoidance.
+# Nodata sentinels (incl. the SClass -1111 case) live in grouse_data -
+# see the import at the top; it is the project's single definition.
 
 COLUMN_FOR_FEATURE = {
     "evt": "evt", "evh": "evh", "evc": "evc", "sclass": "sclass",

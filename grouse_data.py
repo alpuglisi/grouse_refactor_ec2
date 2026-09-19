@@ -54,6 +54,25 @@ WETLAND_NLCD_CLASSES = (90, 95)
 
 
 # ==========================================
+# Raster nodata sentinels - the single definition for the whole project.
+# Lived in three places (analyze_grouse, dataset, predict) as two
+# different container types, which is one "fixed it in one place" bug
+# waiting to happen: a sentinel discovered in the data has to be added
+# everywhere or some paths silently treat it as a real value.
+#
+# -1111 is SClass's nodata (e.g. Open Water pixels have no succession
+# class). It was originally absent from the set, so it passed through
+# raster sampling as a literal value instead of becoming NaN. Real
+# sightings almost never land on those cells, so it was invisible on
+# the sightings side; 20,000 random background points hit them
+# constantly, manufacturing fake 'SCLASS:-1111' envelopes with zero
+# sightings but real availability -> spurious Selection_Ratio=0.00
+# entries that dominated the Avoided table without being real avoidance.
+# ==========================================
+NODATA_SENTINELS = (-9999, -32768, 32767, -1111)
+
+
+# ==========================================
 # CONFIG
 # ==========================================
 @dataclass(frozen=True)

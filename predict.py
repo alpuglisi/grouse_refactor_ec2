@@ -83,14 +83,13 @@ if not os.path.exists(os.path.join(_here, "grouse_data.py")):
     if os.path.exists(os.path.join(_parent, "grouse_data.py")):
         sys.path.insert(0, _parent)
 
-from grouse_data import GrouseData, NLCD_NAMES
+from grouse_data import GrouseData, NLCD_NAMES, NODATA_SENTINELS
 from models import (GrouseResNet, FEATURE_SPEC, split_features,
-                    config_to_model_kwargs)
+                    config_to_model_kwargs, d4_tta_logits)
 from losses import loss_logit_bias
 from prepare_training_data import BOXES
 
 IMG_SIZE = 64
-NODATA_SENTINELS = (-9999, -32768, 32767, -1111)
 STRIP_TARGET_ROWS = 2048        # rows of raster processed per tile
 OUT_DIR = "data/predictions"
 
@@ -211,20 +210,38 @@ def _safe_windowed_read(src, window, fill_value=0):
     return out
 
 
-def read_strip(srcs, cat_f, cont_f, r0, rows, c0, cols):
-    window = Window(c0, r0, cols, rows)
-    cat = np.stack([
-        _safe_windowed_read(srcs[f], window, fill_value=0)
-        for f in cat_f]).astype(np.int64)
-    cont = np.stack([
-        _safe_windowed_read(srcs[f], window, fill_value=0)
-        for f in cont_f]).astype(np.float32)
+def read_window_stack(srcs, cat_f, cont_f, window):
+    """One raster window -> the (cat int64, cont float32) stacks the
+    model consumes: sentinels zeroed, continuous channels divided by
+    their FEATURE_SPEC scale.
+
+    THE single inference-side definition of "raw pixels -> model
+    input". It was written out three times (read_strip,
+    _tb_capture_windows, inspect_point) and a divergence between them
+    would not crash - it would silently feed differently-scaled inputs
+    at different points in the same pipeline.
+
+    Note this is deliberately NOT shared with dataset.py's training
+    path, which routes sentinels through NaN first so it can run its
+    100%-nodata geolocation probe (impossible once 0 is in the array,
+    since 0 is also a legitimate value). The two converge on the same
+    numbers - dataset.py nan_to_num's to 0 - by different routes, for
+    a reason."""
+    cat = np.stack([_safe_windowed_read(srcs[f], window)
+                   for f in cat_f]).astype(np.int64)
+    cont = np.stack([_safe_windowed_read(srcs[f], window)
+                    for f in cont_f]).astype(np.float32)
     for s in NODATA_SENTINELS:
         cat[cat == s] = 0
         cont[cont == s] = 0.0
     for i, f in enumerate(cont_f):
         cont[i] /= float(FEATURE_SPEC[f].get("scale", 1.0))
     return cat, cont
+
+
+def read_strip(srcs, cat_f, cont_f, r0, rows, c0, cols):
+    return read_window_stack(srcs, cat_f, cont_f,
+                             Window(c0, r0, cols, rows))
 
 
 def predict_region(model, device, srcs, ref, cat_f, cont_f,
@@ -347,25 +364,12 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                     dy = (ch[:, 1:, :] - ch[:, :-1, :]).abs().mean(dim=(1, 2))
                     edge_cont_vals[f] = (0.5 * (dx + dy)).cpu().numpy()
 
-                # TTA over the D4 group, scored through model.logits()
-                # so the trained pooling (attn/gauss/center/mean) and the
-                # center-skip head actually apply - forward() alone
-                # returns the raw spatial map and would silently ignore
-                # both. Logits are averaged across views BEFORE sigmoid,
-                # matching model_handler's evaluation exactly, then
-                # divided by the calibration temperature (T=1.0 when no
-                # calibration is loaded).
-                tta_logits = []
-                for k in range(4):
-                    rc = torch.rot90(t_cat, k, dims=(2, 3))
-                    rn = torch.rot90(t_cont, k, dims=(2, 3))
-                    with autocast:
-                        lg = model.logits(rc, rn).float()
-                        if flip_tta:
-                            lg = 0.5 * (lg + model.logits(
-                                rc.flip(-1), rn.flip(-1)).float())
-                    tta_logits.append(lg.flatten())
-                pooled_logit = torch.stack(tta_logits).mean(dim=0)
+                # D4 TTA through the shared scorer (models.d4_tta_logits
+                # - the single definition, also used by
+                # _tb_capture_windows and inspect_point.py).
+                pooled_logit = d4_tta_logits(model, t_cat, t_cont,
+                                             flip_tta=flip_tta,
+                                             autocast=autocast)
                 # Temperature first (calibrates the val-design scale),
                 # then the prior shift (converts calibrated logits from
                 # the 50/50 training prior to the deployment prior).
@@ -567,31 +571,15 @@ def _tb_capture_windows(model, device, srcs, cat_f, cont_f, heatmap,
             gy, gx = np.unravel_index(flat, heatmap.shape)
             window = Window(c_start + int(gx) * stride,
                             r_start + int(gy) * stride, IMG_SIZE, IMG_SIZE)
-            cat = np.stack([_safe_windowed_read(srcs[f], window)
-                           for f in cat_f]).astype(np.int64)
-            cont = np.stack([_safe_windowed_read(srcs[f], window)
-                            for f in cont_f]).astype(np.float32)
-            for s in NODATA_SENTINELS:
-                cat[cat == s] = 0
-                cont[cont == s] = 0.0
-            for i, f in enumerate(cont_f):
-                cont[i] /= float(FEATURE_SPEC[f].get("scale", 1.0))
+            cat, cont = read_window_stack(srcs, cat_f, cont_f, window)
             cat_list.append(cat)
             cont_list.append(cont)
         t_cat = torch.from_numpy(np.stack(cat_list)).to(device)
         t_cont = torch.from_numpy(np.stack(cont_list)).to(device)
         with torch.no_grad():
-            tta = []
-            for k in range(4):
-                rc = torch.rot90(t_cat, k, dims=(2, 3))
-                rn = torch.rot90(t_cont, k, dims=(2, 3))
-                lg = model.logits(rc, rn).float()
-                if flip_tta:
-                    lg = 0.5 * (lg + model.logits(
-                        rc.flip(-1), rn.flip(-1)).float())
-                tta.append(lg.flatten())
-            score = torch.sigmoid(torch.stack(tta).mean(dim=0)
-                                  / temperature + logit_shift)
+            score = torch.sigmoid(
+                d4_tta_logits(model, t_cat, t_cont, flip_tta=flip_tta)
+                / temperature + logit_shift)
         return t_cat, t_cont, score.cpu().numpy()
 
     return {"top": gather(flat_idx[order[-n:][::-1]]),

@@ -357,11 +357,22 @@ def main():
                          "written. Pass this same path to "
                          "generate_treemap_features.py --src-dir. "
                          "Default: %(default)s")
-    ap.add_argument("--tile-m", type=int, default=96000,
-                    help="Download tile edge in meters. Same default "
-                         "as download_tcc_nlcd.py; shrink it if Earth "
-                         "Engine returns a size-limit error for a "
-                         "large region. Default: %(default)s")
+    ap.add_argument("--tile-m", type=int, default=48000,
+                    help="Download tile edge in meters. NOT the same "
+                         "default as download_tcc_nlcd.py: that script "
+                         "writes int16 (2 bytes/px) and 96000m (3200px "
+                         "tiles) fits its 48MB getDownloadURL cap "
+                         "comfortably. This script writes Float32 - and "
+                         "a real request that should have been 4 "
+                         "bytes/px * 3200*3200px = 40.96MB instead came "
+                         "back at 51.2MB, implying ~5 bytes/px (an "
+                         "undocumented per-pixel overhead on top of the "
+                         "raw data, observed rather than guaranteed by "
+                         "the API). 48000m (1600px tiles) budgets for "
+                         "that at ~12.8MB/tile - a 4x margin under the "
+                         "cap, not just enough to clear it. Shrink "
+                         "further if Earth Engine still returns a "
+                         "size-limit error. Default: %(default)s")
     ap.add_argument("--workers", type=int, default=8,
                     help="Concurrent tile downloads. Default: %(default)s")
     ap.add_argument("--force", action="store_true",

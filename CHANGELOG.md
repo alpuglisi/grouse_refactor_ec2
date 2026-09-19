@@ -45,7 +45,6 @@ times, not 10, with every copied year's output verified byte-identical
 to its source year.
 
 ---
----
 
 ## prune_empty.sh: a free check that doesn't require a re-run (2026-09-19)
 

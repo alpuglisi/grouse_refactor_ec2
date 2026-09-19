@@ -16,6 +16,37 @@ the diff.
 
 ---
 
+## generate_treemap_features.py: existence was not enough (2026-09-19)
+
+Asked directly, mid-run, whether the script could be reading from a
+blank/empty source - a fair question given the region-collision bug
+above was exactly this class of failure (a path that resolved without
+error but pointed at the wrong content). `find_source` previously
+returned the first glob hit unconditionally; a zero-byte file from an
+interrupted download, or a GeoTIFF that opens fine but is entirely
+zero (wrong bbox, an empty Earth Engine tile), would have been
+silently accepted and warped into a real training feature with no
+error anywhere in the pipeline.
+
+`_source_is_valid` (`functools.lru_cache`d, so the same handful of
+underlying files aren't re-opened on every one of the ~90 find_source
+calls one run makes) now gates every path find_source returns.
+Deliberately NOT an all-nodata test like `grouse_data._is_valid_raster`:
+`download_treemap.py` writes non-forest as 0 with `nodata=None` (a
+real value, not a sentinel), so a raster with no nodata pixels at all
+is the NORMAL case here. Instead it checks for at least one nonzero
+pixel - a state-sized clip with literally none anywhere is the failure
+signature, not a plausible outcome for ME/NH/VT. A name-matching but
+invalid file is reported by name and treated as not found, not
+silently skipped.
+
+Verified with three synthetic files: a zero-byte file, a GeoTIFF that
+opens but is entirely zero, and one with real content - the first two
+correctly return `None` with a warning naming the file, the third is
+accepted.
+
+---
+
 ## download_treemap.py / generate_treemap_features.py: region collision
 ## in TreeMap filenames (2026-09-19)
 

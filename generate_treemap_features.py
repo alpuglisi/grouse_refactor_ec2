@@ -107,6 +107,7 @@ Usage:
 import os
 import glob
 import argparse
+import functools
 
 import numpy as np
 import rasterio
@@ -137,6 +138,41 @@ def nearest_vintage(year, available):
     return min(available, key=lambda v: (abs(v - year), v))
 
 
+@functools.lru_cache(maxsize=None)
+def _source_is_valid(path, min_valid_frac=0.001):
+    """True if a candidate source file has REAL content, not just a
+    path that exists. Catches an interrupted or failed download that
+    left a zero-byte or truncated GeoTIFF on disk - the same class of
+    failure grouse_data._is_valid_raster exists to catch for the
+    model's own rasters, applied here to TreeMap's raw sources before
+    anything reads them.
+
+    Deliberately NOT an all-nodata test like that one:
+    download_treemap.py writes non-forest as 0 with nodata=None (a
+    real value, not a sentinel - see its docstring), so a raster with
+    no nodata pixels at all is the NORMAL case here, not evidence of
+    validity. Instead this checks for at least some NONZERO pixels - a
+    state-sized clip with literally zero forested pixels anywhere is
+    itself the failure signature (wrong bbox landed outside the
+    region, an empty EE tile, a truncated partial read), not a
+    plausible real outcome for ME/NH/VT. Cached per path: this can run
+    dozens of times across discover_vintages and every write_vintage
+    call for the same handful of underlying files."""
+    try:
+        if os.path.getsize(path) == 0:
+            return False
+        with rasterio.open(path) as src:
+            # A decimated probe read, not the real data read - this
+            # only needs to answer "is there any signal here at all",
+            # and these are CONUS-scale clips.
+            arr = src.read(1, out_shape=(1, min(src.height, 1024),
+                                         min(src.width, 1024)))
+            frac = float((arr > 0).mean()) if arr.size else 0.0
+            return frac >= min_valid_frac
+    except Exception:
+        return False
+
+
 def find_source(src_dir, vintage, attr, region=None):
     """Locate one attribute raster for one vintage.
 
@@ -155,6 +191,12 @@ def find_source(src_dir, vintage, attr, region=None):
          there, so one file legitimately serves every region). 2016
          omits the study-area element 2020+ carries, hence two
          spellings.
+
+    A path that MATCHES the naming but fails _source_is_valid is
+    treated as not found, not returned - existence alone was already
+    proven insufficient once tonight (see the region-collision bug
+    above); an empty or truncated file at the right name is the same
+    class of silent failure with a different cause.
     """
     pats = []
     if region:
@@ -162,9 +204,17 @@ def find_source(src_dir, vintage, attr, region=None):
     pats += [f"TreeMap{vintage}_CONUS_{attr}.tif",
             f"TreeMap{vintage}_{attr}.tif"]
     for pat in pats:
-        hits = glob.glob(os.path.join(src_dir, "**", pat), recursive=True)
+        hits = sorted(glob.glob(os.path.join(src_dir, "**", pat),
+                                recursive=True))
+        for h in hits:
+            if _source_is_valid(h):
+                return h
         if hits:
-            return sorted(hits)[0]
+            print(f"   [warn] {[os.path.basename(h) for h in hits]} "
+                 f"matches TreeMap {vintage} {attr}"
+                 f"{f' ({region})' if region else ''} by name, but has "
+                 f"no real content (empty/corrupt/zero valid pixels) - "
+                 f"treating as not found, not falling back to it.")
     return None
 
 

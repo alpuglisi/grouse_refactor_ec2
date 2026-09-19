@@ -55,11 +55,6 @@ has no reference data for boundaries at all: only single-condition,
 straddling a stand boundary were excluded by construction. A TreeMap
 "edge" is the imputation switching between two interior plots.
 
-Hence --smooth: a median filter over the raw bands before encoding,
-deliberately destroying detail that is not real. Default 3 (a 3x3, i.e.
-90m). --smooth 0 disables it, which is the right setting only if you
-intend to measure how much of the signal was artifact.
-
 Non-forest is NoData in TreeMap and is written here as 0, not as a
 nodata sentinel: a hayfield genuinely has zero basal area, zero stems
 and zero down wood. qmd=0 is the one fudge, and it stays consistent -
@@ -101,19 +96,18 @@ retention - the binding constraint stays LANDFIRE, as it already was.
 
 PARALLELISM
 ------------
-write_vintage()'s actual work (warp, median filter, derive, encode)
-depends only on (region, vintage) and touches no state any other
-(region, vintage) pair touches - separate source reads, separate
-output files. Every such pair is therefore dispatched to its own
-worker process instead of running one region, one vintage at a time
-on a single core; --jobs caps how many run at once (default: every
-vCPU). The copy step for years sharing a vintage stays sequential
-afterwards - it's pure shutil.copy2, not worth a worker.
+write_vintage()'s actual work (warp, derive, encode) depends only on
+(region, vintage) and touches no state any other (region, vintage)
+pair touches - separate source reads, separate output files. Every
+such pair is therefore dispatched to its own worker process instead of
+running one region, one vintage at a time on a single core; --jobs
+caps how many run at once (default: every vCPU). The copy step for
+years sharing a vintage stays sequential afterwards - it's pure
+shutil.copy2, not worth a worker.
 
 Usage:
     python generate_treemap_features.py --src-dir /data/treemap
     python generate_treemap_features.py --src-dir /data/treemap --regions NH
-    python generate_treemap_features.py --src-dir /data/treemap --smooth 0
     python generate_treemap_features.py --src-dir /data/treemap --jobs 8
 """
 import os
@@ -128,7 +122,6 @@ import rasterio
 from rasterio.vrt import WarpedVRT
 from rasterio.enums import Resampling
 from rasterio.windows import Window
-from scipy.ndimage import median_filter
 
 from grouse_data import GrouseData
 from models import (TREEMAP_FIXED, qmd_from_balive_tpa, tpa_live_encode,
@@ -270,13 +263,12 @@ def _clean(arr):
 
 
 def write_vintage(region, year, vintage, src_dir, ref_path, profile,
-                  raster_dir, smooth, block_rows):
+                  raster_dir, block_rows):
     """One region, one of OUR vintage years, from one TreeMap vintage."""
     with rasterio.open(ref_path) as ref:
         height, width = ref.height, ref.width
         ref_crs, ref_transform = ref.crs, ref.transform
 
-    halo = smooth // 2
     srcs, vrts, outs = [], {}, {}
     totals = {}
     try:
@@ -293,8 +285,7 @@ def write_vintage(region, year, vintage, src_dir, ref_path, profile,
             # NEAREST, not bilinear: every TreeMap value is one imputed
             # plot's measurement, and interpolating across an imputation
             # boundary produces a number that corresponds to no plot at
-            # all. Smoothing happens afterwards, on purpose and at a
-            # stated radius, rather than as a resampling side effect.
+            # all.
             vrts[attr] = WarpedVRT(s, crs=ref_crs, transform=ref_transform,
                                    width=width, height=height,
                                    resampling=Resampling.nearest)
@@ -305,35 +296,22 @@ def write_vintage(region, year, vintage, src_dir, ref_path, profile,
 
         for r0 in range(0, height, block_rows):
             nrows = min(block_rows, height - r0)
-            # Read with a halo so the median filter sees real neighbours
-            # across block seams instead of edge-replicated ones, then
-            # trim it back off before writing.
-            hr0 = max(0, r0 - halo)
-            hr1 = min(height, r0 + nrows + halo)
-            hwin = Window(0, hr0, width, hr1 - hr0)
-            raw = {a: _clean(vrts[a].read(1, window=hwin))
+            win = Window(0, r0, width, nrows)
+            raw = {a: _clean(vrts[a].read(1, window=win))
                    for a in SOURCE_ATTRS}
 
-            # QMD from the RAW bands, before smoothing: this is the exact
-            # per-pixel quantity, and smoothing it afterwards alongside
-            # the others keeps all four as the same operation applied to
-            # the same definition.
             bands = {
                 "balive": raw["BALIVE"],
                 "tpa_live": raw["TPA_LIVE"],
                 "qmd": qmd_from_balive_tpa(raw["BALIVE"], raw["TPA_LIVE"]),
                 "carbon_dwn": raw["CARBON_DWN"],
             }
-            top = r0 - hr0
             for feat, band in bands.items():
-                if smooth > 1:
-                    band = median_filter(band, size=smooth, mode="nearest")
-                band = band[top:top + nrows]
                 if feat == "tpa_live":
                     enc = tpa_live_encode(band)
                 else:
                     enc = treemap_encode(feat, band)
-                outs[feat].write(enc, 1, window=Window(0, r0, width, nrows))
+                outs[feat].write(enc, 1, window=win)
                 totals[feat][0] += float(band.sum())
                 totals[feat][1] += band.size
     finally:
@@ -406,11 +384,6 @@ def main():
                          f"Needs {SOURCE_ATTRS} for at least one vintage.")
     ap.add_argument("--regions", nargs="+", default=None,
                     help="Default: every region discovered on disk.")
-    ap.add_argument("--smooth", type=int, default=3,
-                    help="Median filter window in pixels applied before "
-                         "encoding, to suppress imputation texture that "
-                         "is artifact rather than ground truth. 0 or 1 "
-                         "disables. Default: %(default)s (3x3 = 90m).")
     ap.add_argument("--block-rows", type=int, default=512,
                     help="Rows per streaming block. Default: %(default)s")
     ap.add_argument("--jobs", type=int, default=None,
@@ -420,8 +393,6 @@ def main():
     args = ap.parse_args()
 
     print(f"TreeMap source: {args.src_dir}")
-    print(f"Smoothing: {args.smooth}x{args.smooth} median"
-          if args.smooth > 1 else "Smoothing: DISABLED")
     print(f"Encodings: tpa_live log1p; "
           + ", ".join(f"{f} x{s['mult']:g} ({s['unit']})"
                       for f, s in TREEMAP_FIXED.items()))
@@ -453,7 +424,7 @@ def main():
             futures = [
                 ex.submit(write_vintage, region, first_year, vintage,
                           args.src_dir, ref_path, profile, raster_dir,
-                          args.smooth, args.block_rows)
+                          args.block_rows)
                 for region, first_year, vintage, ref_path, profile,
                     raster_dir in jobs]
             # .result() re-raises any worker exception here, in the

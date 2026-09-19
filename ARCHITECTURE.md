@@ -44,8 +44,12 @@ Each stage consumes the previous stage's files. Paths are all defined in
 - `generate_road_distance.py` — road_dist, from TIGER/Line vectors
 - `generate_time_since_disturbance.py` — tsd, from the LANDFIRE Annual
   Disturbance stack (1999–2023, one raster per disturbance year)
+- `download_treemap.py` — pulls BALIVE, TPA_LIVE, CARBON_DWN from
+  the Earth Engine TreeMap collections (2016/2020/2022; 2023 isn't
+  ingested yet) into the naming `generate_treemap_features.py` reads
 - `generate_treemap_features.py` — balive, tpa_live, qmd, carbon_dwn,
-  from USFS TreeMap per-attribute CONUS rasters
+  from those rasters (`--src-dir`) or any other source in the same
+  naming convention
 
 **3. Analyse** — `analyze_grouse.py` → `evaluated_sightings_{region}.csv`,
 `envelope_metrics_{region}.csv`. Collapses duplicate coordinates, flags

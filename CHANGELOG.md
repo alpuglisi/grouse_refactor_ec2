@@ -16,6 +16,47 @@ the diff.
 
 ---
 
+## TreeMap acquisition via Earth Engine (2026-09-19)
+
+`generate_treemap_features.py --src-dir` needed the three raw attribute
+rasters (BALIVE, TPA_LIVE, CARBON_DWN) already on disk, and its own
+docstring explained why it couldn't fetch them itself: the rastergateway
+serves per-attribute downloads through an HTML `<select>` whose option
+values aren't visible in the page's markup, so no URL template could be
+constructed from it.
+
+`download_treemap.py` sources the same numbers from Earth Engine instead
+(`USFS/GTAC/TreeMap/v2016`, `v2020`, `v2022`), reusing
+`download_tcc_nlcd.py`'s tiled-download/retry/merge machinery rather than
+writing new fetch code. **2023 is not available this way** — not yet
+ingested into the EE catalog — so this covers three of TreeMap's four
+vintages; `generate_treemap_features.py` already tolerates a partial
+vintage set by design (nearest-year mapping), so this costs nothing
+beyond what a missing vintage always would.
+
+Two decisions worth recording:
+- **Band names are verified at runtime, not hardcoded.** The exact band
+  list was not independently confirmed for each vintage before writing
+  this — only that BALIVE/TPA_LIVE/CARBON_DWN-shaped attributes exist
+  somewhere in the image. `resolve_band` matches case-insensitively
+  against the real `bandNames()` and fails loud with the actual list if
+  an expected one is missing, rather than assuming the name matches.
+- **Non-forest is `unmask(0)` at download time**, not left as TreeMap's
+  own NoData sentinel (`4.2949673e+09`, which GDAL won't auto-detect).
+  This is also the correct value, not a placeholder — a non-forest pixel
+  genuinely has zero basal area, zero live stems, zero down dead wood —
+  and it matches `generate_treemap_features.py`'s own non-forest
+  convention, so no scrubbing is needed downstream.
+
+Verified offline (no live Earth Engine credentials in this environment):
+region-grid math snaps to the 30 m lattice, tiling divides a state into
+tractable requests, and band resolution fails loudly with the real band
+list on a deliberately-missing attribute. The live download path itself
+is unverified — run it on the EC2 box, which already holds working EE
+credentials for `download_tcc_nlcd.py`.
+
+---
+
 ## Five stand-structure / disturbance features added (2026-09-19)
 
 `tsd`, `balive`, `tpa_live`, `qmd`, `carbon_dwn`. Stem input channels

@@ -325,12 +325,17 @@ def build_raster(ee, image, band, bounds_lonlat, out_path, tile_m,
          f"{arr[arr > 0].mean() if nonzero else 0:.1f})")
 
 
-def out_filename(vintage, attr):
-    """generate_treemap_features.find_source()'s exact naming: 2016
-    omits the study-area element that 2020+ carries."""
-    if vintage == 2016:
-        return f"TreeMap{vintage}_{attr}.tif"
-    return f"TreeMap{vintage}_CONUS_{attr}.tif"
+def out_filename(vintage, attr, region):
+    """TreeMap{vintage}_{region}_{attr}.tif - NOT the rastergateway's
+    own CONUS-wide naming (TreeMap{vintage}_CONUS_{attr}.tif /
+    TreeMap{vintage}_{attr}.tif for 2016), because this script clips
+    PER REGION rather than downloading one CONUS-wide file, and every
+    region's clip needs its own distinct filename.
+    generate_treemap_features.find_source() reads this naming when a
+    `region` is passed, and still accepts the CONUS naming as a
+    fallback for anyone who downloaded from the rastergateway by
+    hand instead of running this script."""
+    return f"TreeMap{vintage}_{region}_{attr}.tif"
 
 
 def main():
@@ -393,7 +398,8 @@ def main():
             print(f"   {region}:")
             for attr, band in resolved.items():
                 out_path = os.path.join(args.out_dir,
-                                        out_filename(vintage, attr))
+                                        out_filename(vintage, attr,
+                                                     region))
                 if os.path.exists(out_path) and not args.force:
                     print(f"      {out_path} exists - skipping "
                          f"(--force to redo).")

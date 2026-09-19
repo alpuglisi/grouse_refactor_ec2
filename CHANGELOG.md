@@ -16,6 +16,58 @@ the diff.
 
 ---
 
+## download_treemap.py / generate_treemap_features.py: region collision
+## in TreeMap filenames (2026-09-19)
+
+First live run: ME's TreeMap 2016 download wrote
+`TreeMap2016_BALIVE.tif`, and NH/VT then reported that same file as
+"exists - skipping" - not because they had their own data, but because
+`out_filename()` never included the region in the name, so all three
+regions raced for one path. NH and VT would have silently trained on
+Maine's TreeMap numbers if `generate_treemap_features.py` had been run
+on the result.
+
+Root cause: `generate_treemap_features.py` was written for the USFS
+rastergateway's actual behavior - one CONUS-wide file shared by every
+region, no per-region subsetting offered there (verified in the
+external research this project commissioned). `download_treemap.py`
+clips PER REGION instead, like `download_tcc_nlcd.py` does, but kept
+writing the CONUS-implying filename anyway. Two scripts, incompatible
+assumptions about what a filename means.
+
+Fixed on both sides:
+- `download_treemap.py` now writes `TreeMap{vintage}_{region}_{attr}.tif`
+  - always region-qualified, no CONUS naming for anything it downloads
+  itself.
+- `generate_treemap_features.py`'s `find_source()` takes an optional
+  `region` and tries the region-specific name first, falling back to
+  the CONUS naming only for someone who downloaded from the
+  rastergateway by hand (where one file legitimately does serve every
+  region).
+- `discover_vintages()` now requires a vintage to be complete for
+  EVERY region being processed, not just found somewhere - mirroring
+  the `discover_features` intersects-across-regions rule already
+  documented for the model's own feature list. A vintage present for
+  ME but missing for NH/VT is excluded entirely rather than run for a
+  subset, with the exact regions/attributes missing named in the
+  warning.
+- `write_vintage()` fails loud with a clear message if `find_source`
+  ever returns `None` despite `discover_vintages` having approved the
+  vintage, instead of crashing inside `rasterio.open(None)`.
+
+Verified with a fixture reproducing the exact failure: ME's files
+present, NH/VT absent. `find_source(..., region="NH")` correctly
+returns `None` (no fallback to ME's file); `discover_vintages` for all
+three regions raises, naming every missing (region, attribute) pair;
+restricted to `["ME"]` alone it correctly reports 2016 available.
+
+**Action needed on the box: delete `data/treemap_raw/` and re-run
+`download_treemap.py` from scratch.** Every file currently in there was
+written under the old, colliding naming - Maine's data is numerically
+correct but under a name the fixed scripts will no longer look for.
+
+---
+
 ## Earth Engine auth: Workspace-blocked shared client, and a latent
 ## ee_init() bug (2026-09-19)
 

@@ -137,11 +137,29 @@ def nearest_vintage(year, available):
     return min(available, key=lambda v: (abs(v - year), v))
 
 
-def find_source(src_dir, vintage, attr):
-    """Locate one attribute raster for one vintage. The 2016 vintage
-    omits the study-area element that 2020+ carries, so match on both
-    spellings rather than formatting one pattern."""
-    pats = [f"TreeMap{vintage}_CONUS_{attr}.tif",
+def find_source(src_dir, vintage, attr, region=None):
+    """Locate one attribute raster for one vintage.
+
+    Tries, in order:
+      1. A REGION-SPECIFIC clip - download_treemap.py's own naming
+         (TreeMap{vintage}_{region}_{attr}.tif). Required first: that
+         script downloads a separate clip per region rather than one
+         CONUS-wide file, and two regions' files are NOT
+         interchangeable - an earlier version of this pair of scripts
+         had no region in the filename at all, so New Hampshire and
+         Vermont silently "found" Maine's file (same name, already on
+         disk) and would have been trained on Maine's TreeMap data.
+      2. A CONUS-wide file, the USFS rastergateway's own naming for
+         anyone who downloaded by hand instead of running
+         download_treemap.py (no per-region subsetting is offered
+         there, so one file legitimately serves every region). 2016
+         omits the study-area element 2020+ carries, hence two
+         spellings.
+    """
+    pats = []
+    if region:
+        pats.append(f"TreeMap{vintage}_{region}_{attr}.tif")
+    pats += [f"TreeMap{vintage}_CONUS_{attr}.tif",
             f"TreeMap{vintage}_{attr}.tif"]
     for pat in pats:
         hits = glob.glob(os.path.join(src_dir, "**", pat), recursive=True)
@@ -150,25 +168,31 @@ def find_source(src_dir, vintage, attr):
     return None
 
 
-def discover_vintages(src_dir):
-    """Which vintages have a COMPLETE set of the three source
-    attributes. An incomplete vintage is skipped loudly rather than
-    written from a partial read."""
+def discover_vintages(src_dir, regions):
+    """Which TreeMap vintages have a COMPLETE set of the three source
+    attributes for EVERY region being processed. A vintage present for
+    some regions but missing for others is excluded ENTIRELY rather
+    than silently run for a subset - the same rule this project's
+    model already applies to its own feature list (discover_features
+    intersects across regions; see ARCHITECTURE.md). Checked once,
+    up front, so a missing file is a clear message here instead of a
+    cryptic rasterio crash three functions deep during write_vintage.
+    """
     ok = []
     for v in TREEMAP_YEARS:
-        have = {a: find_source(src_dir, v, a) for a in SOURCE_ATTRS}
-        missing = [a for a, p in have.items() if p is None]
+        missing = [(region, a) for region in regions for a in SOURCE_ATTRS
+                  if find_source(src_dir, v, a, region) is None]
         if missing:
-            if len(missing) < len(SOURCE_ATTRS):
-                print(f"   [warn] TreeMap {v}: missing {missing} - "
-                      f"skipping this vintage entirely.")
+            print(f"   [warn] TreeMap {v}: missing {missing} - "
+                  f"skipping this vintage entirely.")
             continue
         ok.append(v)
     if not ok:
         raise SystemExit(
-            f"No complete TreeMap vintage under {src_dir}. Need "
-            f"{SOURCE_ATTRS} for at least one of {TREEMAP_YEARS}.")
-    print(f"   complete TreeMap vintages available: {ok}")
+            f"No TreeMap vintage under {src_dir} has {SOURCE_ATTRS} for "
+            f"every region in {regions}. Need at least one of "
+            f"{TREEMAP_YEARS} complete for ALL requested regions.")
+    print(f"   complete TreeMap vintages available (all regions): {ok}")
     return ok
 
 
@@ -193,7 +217,14 @@ def write_vintage(region, year, vintage, src_dir, ref_path, profile,
     totals = {}
     try:
         for attr in SOURCE_ATTRS:
-            s = rasterio.open(find_source(src_dir, vintage, attr))
+            path = find_source(src_dir, vintage, attr, region)
+            if path is None:
+                raise SystemExit(
+                    f"{region}: no {attr} source for TreeMap {vintage} "
+                    f"under {src_dir} (checked region-specific and "
+                    f"CONUS naming). discover_vintages should have "
+                    f"caught this before we got here - report as a bug.")
+            s = rasterio.open(path)
             srcs.append(s)
             # NEAREST, not bilinear: every TreeMap value is one imputed
             # plot's measurement, and interpolating across an imputation
@@ -314,10 +345,10 @@ def main():
     print(f"Encodings: tpa_live log1p; "
           + ", ".join(f"{f} x{s['mult']:g} ({s['unit']})"
                       for f, s in TREEMAP_FIXED.items()))
-    vintages = discover_vintages(args.src_dir)
-
     data = GrouseData()
     regions = args.regions or data.discover_regions()
+    vintages = discover_vintages(args.src_dir, regions)
+
     for region in regions:
         process_region(region, data, args.src_dir, vintages,
                        args.smooth, args.block_rows)

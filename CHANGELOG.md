@@ -16,6 +16,37 @@ the diff.
 
 ---
 
+## generate_treemap_features.py: recomputing identical output per year
+## instead of copying it (2026-09-19)
+
+Asked directly, mid-run: was this re-deriving the same TreeMap output
+for multiple years instead of reusing it. Yes. `write_vintage`'s actual
+work - opening the three 200-360MB source rasters, warping them onto
+the region's grid, the median smoothing pass, deriving QMD, encoding -
+depends only on `(region, vintage)`; `year` only names the output
+file. `process_region` looped over every one of OUR years and called
+`write_vintage` for each one independently, so any group of years
+mapping to the same TreeMap vintage (ME's actual mapping that night:
+2016/2017/2018 -> 2016, 2019/2020/2021 -> 2020, 2022/2023/2024/2025 ->
+2022) reran the full pipeline from scratch for each year in the group
+- 10 full passes for 3 actually-distinct results.
+
+Fixed by grouping years by vintage first: the expensive path runs once
+per unique vintage, and every other year sharing it gets `shutil.copy2`
+of that output instead of an independent re-derivation.
+
+Verified two things separately, since the fix's correctness rests on
+both: (1) `write_vintage` invoked independently with `year=2016` and
+`year=2017` against the same vintage produces byte-identical output
+(the precondition for copying being safe at all - proven with a
+SHA-256 comparison, not assumed), and (2) `process_region` on a
+synthetic 10-year/3-vintage mapping calls the expensive path exactly 3
+times, not 10, with every copied year's output verified byte-identical
+to its source year.
+
+---
+---
+
 ## prune_empty.sh: a free check that doesn't require a re-run (2026-09-19)
 
 Asked for a way to check whether tonight's downloads had left anything

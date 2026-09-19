@@ -106,6 +106,7 @@ Usage:
 """
 import os
 import glob
+import shutil
 import argparse
 import functools
 
@@ -365,9 +366,31 @@ def process_region(region, data, src_dir, vintages, smooth, block_rows):
                    compress="deflate", predictor=2, tiled=True)
 
     raster_dir = data.config.resolve(data.config.raster_dir)
-    for year in years:
-        write_vintage(region, year, mapping[year], src_dir, ref_path,
+    # write_vintage's actual work - opening the three source rasters,
+    # warping them onto THIS region's grid, the smoothing pass,
+    # deriving QMD, encoding - depends only on (region, vintage). `year`
+    # only names the output file. Several of our years can map to the
+    # SAME vintage (e.g. 2016/2017/2018 -> TreeMap 2016), and re-running
+    # the full pipeline for each one was producing byte-identical output
+    # from scratch every time - up to 4x the actual work for no reason,
+    # against 200-360MB source rasters. Compute once per vintage, copy
+    # the result to every other year sharing it.
+    by_vintage = {}
+    for y in years:
+        by_vintage.setdefault(mapping[y], []).append(y)
+    for vintage in sorted(by_vintage):
+        yrs = sorted(by_vintage[vintage])
+        first_year = yrs[0]
+        write_vintage(region, first_year, vintage, src_dir, ref_path,
                       profile, raster_dir, smooth, block_rows)
+        for y in yrs[1:]:
+            for feat in ("balive", "tpa_live", "qmd", "carbon_dwn"):
+                shutil.copy2(
+                    os.path.join(raster_dir, f"{region}_{first_year}_{feat}.tif"),
+                    os.path.join(raster_dir, f"{region}_{y}_{feat}.tif"))
+            print(f"      {y} <- copied from {first_year} (same "
+                  f"TreeMap vintage {vintage}: byte-identical output, "
+                  f"not re-derived)")
 
 
 def main():

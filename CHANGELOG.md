@@ -16,6 +16,32 @@ the diff.
 
 ---
 
+## generate_treemap_features.py: median smoothing removed, only after
+## being asked to justify it (2026-09-19)
+
+Asked how the default 3x3 `--smooth` worked. Answer: `scipy.ndimage.
+median_filter`, median (not mean) of the 9-pixel neighborhood, applied
+to the raw TreeMap-derived bands before encoding - a real, nontrivial
+transform of the data, on by default, that I explained the mechanics
+of without flagging it as a decision point. It took an explicit "undo
+that" to get it removed; I did not raise on my own that anyone running
+this script with default flags was silently getting filtered values,
+not raw ones.
+
+Removed `--smooth`, the `median_filter` call, the halo/window
+bookkeeping it required to read block seams correctly, and the now-
+unused `scipy` import. `write_vintage` now writes the resampled
+per-pixel values straight through, unfiltered.
+
+The mistake wasn't the smoothing itself (it predates this session -
+see the original script's own docstring rationale for it). It's that
+when asked a mechanics question about a default that changes output
+data, "here's how it works" isn't a complete answer - "and here's why
+it's on by default, tell me if you don't want that" is the part that
+was missing, and the user had to supply it.
+
+---
+
 ## generate_treemap_features.py: recomputing identical output per year
 ## instead of copying it (2026-09-19)
 

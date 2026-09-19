@@ -606,10 +606,20 @@ def _tb_log_windows(tb_writer, tag_prefix, model, cat_f, cont_f, window):
         hi = m.amax(dim=(2, 3), keepdim=True)
         return ((m - lo) / (hi - lo).clamp_min(1e-6)).float().cpu()
 
+    def clip01(m):
+        """For raw INPUT feature channels only, not model outputs: see
+        model_handler.py's _tb_log_epoch_extras.clip01 - the same bug,
+        mirrored here since this function reimplements that
+        visualization for bare windows. t_cont arrives already divided
+        by FEATURE_SPEC scale (read_window_stack), so it's fixed and
+        comparable across windows; norm01's per-sample min/max stretch
+        was throwing that away."""
+        return m.clamp(0, 1).float().cpu()
+
     with torch.no_grad():
         for ci, fname in enumerate(cont_f):
             grid = torchvision.utils.make_grid(
-                norm01(t_cont[:, ci:ci + 1]), nrow=n)
+                clip01(t_cont[:, ci:ci + 1]), nrow=n)
             tb_writer.add_image(f"{tag_prefix}/{fname}", grid, 0)
         if "nlcd" in cat_f:
             ni = cat_f.index("nlcd")

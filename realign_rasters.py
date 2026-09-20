@@ -27,8 +27,11 @@ to the template with grouse_data.grid_mismatch (same CRS, same pixel
 size, coincident pixel edges; extent may differ). Files that fail are
 warped onto the template's exact grid with NEAREST resampling (these
 are categorical codes and integer-encoded quantities - interpolating
-them would invent values) and written back in place, atomically. Files
-that pass are left untouched. Dry run by default; --apply writes.
+them would invent values). NOTHING IS OVERWRITTEN: the original file is
+moved, unchanged, into a backup directory (default
+data/landfire/unaligned/, outside every discovery glob) before the
+realigned raster is written at the original path. Files that pass are
+left untouched. Dry run by default; --apply writes.
 
 The patch cache keys on raster modification times, so it rebuilds
 itself on the next training run. The model must then be retrained from
@@ -39,11 +42,13 @@ Usage:
     python realign_rasters.py                # report only
     python realign_rasters.py --apply
     python realign_rasters.py --apply --regions NH --features tcc nlcd
+    python realign_rasters.py --apply --backup-dir /somewhere/else
 """
 import argparse
 import glob
 import os
 import re
+import shutil
 
 import rasterio
 from rasterio.enums import Resampling
@@ -63,7 +68,12 @@ def warp_to_grid(src_path, ref_path, out_path, block_rows=1024):
     """Resample `src_path` onto `ref_path`'s exact grid (CRS, transform,
     width, height) with nearest-neighbour, streaming by row blocks, and
     write it to `out_path` atomically (temp file + os.replace). Nodata
-    is carried over (-9999 when the source declares none)."""
+    is carried over (-9999 when the source declares none). Refuses to
+    write over its own input - callers that want the result at the
+    source path move the source aside first (see realign_file)."""
+    if os.path.abspath(src_path) == os.path.abspath(out_path):
+        raise ValueError(f"warp_to_grid would overwrite its input "
+                         f"{src_path}; move the source aside first.")
     tmp = out_path + f".tmp{os.getpid()}"
     with rasterio.open(ref_path) as ref, rasterio.open(src_path) as src:
         nodata = src.nodata if src.nodata is not None else -9999
@@ -85,6 +95,28 @@ def warp_to_grid(src_path, ref_path, out_path, block_rows=1024):
     os.replace(tmp, out_path)
 
 
+def realign_file(path, template, backup_dir, block_rows=1024):
+    """Move the unaligned original to backup_dir (same basename, never
+    overwriting an earlier backup), then write the realigned raster at
+    the original path from that moved copy. The original bytes are
+    never modified or deleted."""
+    os.makedirs(backup_dir, exist_ok=True)
+    backup = os.path.join(backup_dir, os.path.basename(path))
+    if os.path.exists(backup):
+        raise SystemExit(
+            f"{backup} already exists - refusing to overwrite an earlier "
+            f"backup. Move it aside or pass a different --backup-dir.")
+    shutil.move(path, backup)
+    try:
+        warp_to_grid(backup, template, path, block_rows)
+    except BaseException:
+        # Put the original back rather than leave the feature missing.
+        if not os.path.exists(path):
+            shutil.move(backup, path)
+        raise
+    return backup
+
+
 def region_files(raster_dir, region, features):
     pat = re.compile(rf"^{region}_(\d{{4}})_([a-z_]+)\.tif$")
     out = []
@@ -95,7 +127,8 @@ def region_files(raster_dir, region, features):
     return out
 
 
-def process_region(region, data, features, apply, block_rows):
+def process_region(region, data, features, apply, block_rows,
+                   backup_dir):
     print(f"\n{'=' * 60}\n{region}\n{'=' * 60}")
     rd = data[region]
     if not rd.raster_years(TEMPLATE_FEATURE):
@@ -118,10 +151,10 @@ def process_region(region, data, features, apply, block_rows):
             n_bad += 1
             print(f"   {os.path.basename(path):28s} {why}")
             if apply:
-                warp_to_grid(path, template, path, block_rows)
+                backup = realign_file(path, template, backup_dir, block_rows)
                 with rasterio.open(path) as chk:
                     left = grid_mismatch(chk, ref)
-                print(f"      -> realigned"
+                print(f"      -> realigned; original kept at {backup}"
                       + (f"  [!] STILL MISMATCHED: {left}" if left else ""))
     print(f"   {n_ok} on the template grid, {n_bad} "
           f"{'realigned' if apply else 'NOT on it (dry run - use --apply)'}")
@@ -140,17 +173,26 @@ def main():
                     help="Rewrite mismatched files in place. Default: "
                          "report only.")
     ap.add_argument("--block-rows", type=int, default=1024)
+    ap.add_argument("--backup-dir", default=None,
+                    help="Where the unaligned originals are moved before "
+                         "the realigned files are written. Default: "
+                         "<raster dir>/unaligned/ - a subdirectory, so "
+                         "the discovery globs never pick the originals "
+                         "up as features. Never overwritten.")
     args = ap.parse_args()
 
     data = GrouseData()
     regions = args.regions or data.discover_regions()
+    backup_dir = args.backup_dir or os.path.join(
+        data.config.resolve(data.config.raster_dir), "unaligned")
     total_bad = 0
     for region in regions:
         _, bad = process_region(region, data, args.features, args.apply,
-                                args.block_rows)
+                                args.block_rows, backup_dir)
         total_bad += bad
     if args.apply and total_bad:
-        print(f"\nRealigned {total_bad} file(s). The patch cache under "
+        print(f"\nRealigned {total_bad} file(s); originals kept under "
+              f"{backup_dir}. The patch cache under "
               f"data/cache rebuilds itself (its key includes raster "
               f"mtimes). Retrain from scratch - a checkpoint trained on "
               f"the old, rotated channels is not valid for the aligned "

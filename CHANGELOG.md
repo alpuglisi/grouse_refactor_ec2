@@ -136,7 +136,11 @@ Fixed in three places, one definition:
   "same grid": same CRS, same pixel size, no rotation, pixel edges
   coincident. Extent may differ (a clip of the grid is still the grid).
 - `realign_rasters.py` warps every raster that fails it onto the
-  region's template grid, nearest-neighbour, in place and atomically.
+  region's template grid, nearest-neighbour. It never overwrites data:
+  the unaligned original is moved, byte-for-byte, into
+  `data/landfire/unaligned/` (a subdirectory, so no discovery glob sees
+  it; `--backup-dir` relocates it; an existing backup is never
+  replaced) and the realigned raster is written at the original path.
   Dry run by default, `--apply` writes. The patch cache keys on raster
   mtimes so it rebuilds itself.
 - `dataset.py` now checks every raster it will read against the first

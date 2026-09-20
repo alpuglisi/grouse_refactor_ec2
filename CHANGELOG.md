@@ -16,6 +16,27 @@ the diff.
 
 ---
 
+## Validation now filtered by the same year-gap rule as training
+## (2026-09-20)
+
+`filter_by_year_gap` applied to training records only; validation kept
+every point, resolving old sightings to whatever vintage was nearest,
+however far. The original reason was comparability across the policy's
+introduction (`6659f57`). Reversed on request: a validation point scored
+against a raster more than 2 years from its sighting is not evidence
+about that landscape either, so the metric it contributes to measures
+the wrong thing, and predict.py's latest-vintage rule means deployment
+never sees such a gap. Training, validation and (by construction)
+prediction now all sit inside one tolerance. `--max-year-gap` is the
+flag's new name; `--max-train-year-gap` remains as an alias. Expect the
+validation count to drop on the next run (the exclusion lines name how
+many, per region and set) and validation metrics to shift accordingly -
+they are not comparable with runs before this change. calibrate.py
+builds its validation set through the same function, so calibration
+sees the filtered set too.
+
+---
+
 ## Data-access findings adopted from an external source review
 ## (2026-09-20)
 

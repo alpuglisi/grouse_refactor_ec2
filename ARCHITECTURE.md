@@ -231,7 +231,7 @@ problem, and it is one fewer CONUS download.
 never shrink retention.** TreeMap has 2016/2020/2022/2023; the stack has
 its own vintages. Writing every one of our years from the nearest TreeMap
 year keeps a file present for each, so the `all()` year-gap filter
-(`train.py:182`) sees no change and LANDFIRE remains the binding
+(`train.py`'s `filter_by_year_gap`, applied to training and validation alike) sees no change and LANDFIRE remains the binding
 constraint. The cost is that the filter also cannot warn when a mapping is
 stale — `generate_treemap_features.py` prints the mapping and flags any
 gap over 2 years itself.

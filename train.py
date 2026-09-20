@@ -166,12 +166,13 @@ def sample_background_points(rd, features, n, seed=0):
 
 
 def filter_by_year_gap(df, rd, features, tolerance, what, region):
-    """Drop TRAINING records whose sighting year has no raster within
-    +/-tolerance years for one or more features - environmental data
-    that far from the sighting date describes a different landscape, so
-    the record is not evidence about its own label. Records with no
-    year are kept (the dataset assigns them the latest vintage, i.e.
-    they claim current conditions). tolerance < 0 disables."""
+    """Drop records (training and validation alike) whose sighting year
+    has no raster within +/-tolerance years for one or more features -
+    environmental data that far from the sighting date describes a
+    different landscape, so the record is not evidence about its own
+    label. Records with no year are kept (the dataset assigns them the
+    latest vintage, i.e. they claim current conditions). tolerance < 0
+    disables."""
     if (tolerance < 0 or 'year' not in df.columns
             or df['year'].isna().all()):
         return df
@@ -251,14 +252,27 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
                                     flip_tta=flip_tta)
     for region_i, region in enumerate(regions):
         rd = data[region]
-        # Year-gap exclusion applies to TRAINING only. Validation keeps
-        # every point so metrics stay comparable across runs and across
-        # this policy's introduction (old-year val points still carry
-        # the once-per-feature staleness warning from grouse_data).
+        # Year-gap exclusion applies to training AND validation with the
+        # same tolerance: a validation point scored against a raster
+        # more than `train_year_gap` years from its sighting is not
+        # evidence about that landscape either, and predict.py's
+        # latest-vintage rule already means deployment never sees such
+        # a gap. (Validation was previously left unfiltered to keep
+        # metrics comparable across the policy's introduction; that
+        # comparability has been spent, and a val set holding records
+        # the training set would refuse measured the wrong thing.)
         pos_df = filter_by_year_gap(rd.positives("train"), rd, features,
-                                    train_year_gap, "positive", region)
+                                    train_year_gap, "train positive",
+                                    region)
         neg_df = filter_by_year_gap(rd.negatives("train"), rd, features,
-                                    train_year_gap, "negative", region)
+                                    train_year_gap, "train negative",
+                                    region)
+        val_pos_df = filter_by_year_gap(rd.positives("val"), rd, features,
+                                        train_year_gap, "val positive",
+                                        region)
+        val_neg_df = filter_by_year_gap(rd.negatives("val"), rd, features,
+                                        train_year_gap, "val negative",
+                                        region)
         # Rotation expansion applied to BOTH classes (symmetric 4x ->
         # 1:1 effective balance; see earlier collapse diagnosis).
         p_tr = GrousePatchDataset(pos_df, rd, cat_f, cont_f,
@@ -294,10 +308,10 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
         # val scores stay comparable across runs (and so the evaluator can
         # average them per point as test-time augmentation).
         val_parts.append(GrousePatchDataset(
-            rd.positives("val"), rd, cat_f, cont_f, img_size=img_size,
+            val_pos_df, rd, cat_f, cont_f, img_size=img_size,
             expand_rotations=True, label=1.0, cache_dir=cache_dir))
         val_parts.append(GrousePatchDataset(
-            rd.negatives("val"), rd, cat_f, cont_f, img_size=img_size,
+            val_neg_df, rd, cat_f, cont_f, img_size=img_size,
             expand_rotations=True, label=0.0, cache_dir=cache_dir))
     return (ConcatDataset(train_parts), ConcatDataset(val_parts),
             np.concatenate(train_labels))
@@ -450,15 +464,19 @@ def main():
     parser.add_argument("--jitter", type=int, default=0,
                         help="Random center offset in pixels for training "
                              "augmentation (0 = off).")
-    parser.add_argument("--max-train-year-gap", type=int, default=2,
-                        help="TRAINING records are EXCLUDED when their "
-                             "sighting year has no raster within this "
-                             "many years for one or more features - "
-                             "environmental data that stale describes a "
-                             "different landscape than the sighting saw. "
-                             "Validation is never filtered (metrics stay "
-                             "comparable across runs). -1 disables and "
-                             "restores nearest-year-whatever-the-gap.")
+    parser.add_argument("--max-year-gap", "--max-train-year-gap",
+                        dest="max_train_year_gap", type=int, default=2,
+                        help="Training AND validation records are "
+                             "EXCLUDED when their sighting year has no "
+                             "raster within this many years for one or "
+                             "more features - environmental data that "
+                             "stale describes a different landscape than "
+                             "the sighting saw. Same rule for both sets, "
+                             "and predict.py's latest-vintage rule means "
+                             "deployment never sees a larger gap either. "
+                             "(--max-train-year-gap is the old name, kept "
+                             "as an alias.) -1 disables and restores "
+                             "nearest-year-whatever-the-gap.")
     parser.add_argument("--augment", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="Random D4 orientation (+ jitter, if set) per "

@@ -142,11 +142,11 @@ RASTER_FEATURES = ["evt", "evh", "evc", "sclass", "fdist", "ch", "cc",
 # Year-matching policy: a sighting's year resolves to the exact raster
 # year when present, else the CLOSEST year (ties -> earlier year, i.e.
 # conditions that existed at sighting time). This tolerance is the
-# ACCEPTABILITY window: train.py EXCLUDES training records whose gap to
-# every feature's nearest vintage exceeds it (data that far from the
-# sighting date describes a different landscape), and raster_path warns
-# once per feature when a lookup outside it still resolves (validation
-# and analysis paths, which are not filtered).
+# ACCEPTABILITY window: train.py EXCLUDES training AND validation
+# records whose gap to any feature's nearest vintage exceeds it (data
+# that far from the sighting date describes a different landscape), and
+# raster_path warns once per feature when a lookup outside it still
+# resolves (the analysis scripts, which are not filtered).
 YEAR_MATCH_TOLERANCE = 2
 
 
@@ -275,7 +275,7 @@ class RegionData:
         year, i.e. the conditions that existed at sighting time). A
         resolution farther than max_year_gap (default: the shared
         YEAR_MATCH_TOLERANCE constant, currently +/-2 years) still
-        resolves so unfiltered paths (validation, analysis) never
+        resolves so unfiltered paths (the analysis scripts) never
         hard-crash on sparse vintages, but prints a one-time
         warning naming the gap - the +/-1-year matching policy is
         enforced whenever the data allows and loud when it can't be.

@@ -16,6 +16,58 @@ the diff.
 
 ---
 
+## train.py: `--distill-from` - collapse an ensemble into one deployable
+## checkpoint via distillation, not weight-averaging (2026-09-20)
+
+`--ensemble N` only ever averaged *predictions* at scoring time
+(`score_ensemble`, val set only, nothing written to disk) - there was no
+artifact representing "the ensemble" as a single model, and `predict.py`
+only ever accepted one `--model` checkpoint, so an ensemble run had no
+path to the GeoTIFF/KMZ deployment step at all.
+
+Considered literally averaging the N members' weights into one
+state_dict instead (no `predict.py` change needed either way, since a
+weight-average is just another single checkpoint). Rejected: two of the
+four `ENSEMBLE_MEMBERS` recipes use `pool: attn` and two use `pool:
+gauss`, which are different submodules with different parameters, not
+just different values - there is nothing to average for those tensors
+across pool types. And even restricted to same-pool members, this
+codebase's whole ensemble strategy is built on the opposite premise
+(the `ENSEMBLE_MEMBERS` comment: same-shaped models trained here agree
+with each other and barely help when averaged) - members that diverged
+enough in weight space for prediction-averaging to help are exactly the
+members naive weight-averaging tends to hurt, unlike "model soup"-style
+averaging (which works because it averages fine-tunes of a *common*
+checkpoint, not independent from-scratch runs).
+
+Implemented knowledge distillation instead: `--distill-from <ckpt...>`
+loads N already-trained checkpoints (any mix of geometry - each rebuilt
+from its own stored config, same pattern as `score_ensemble`), scores
+every TRAINING point once up front with fixed 4-rotation TTA (+ mirror
+if `--flip-tta`), sigmoids each teacher's own-scale logit to a
+probability and averages across teachers - unlike `score_ensemble`'s
+z-scored-logit average (built only for rank metrics), this needs a real
+`[0, 1]` BCE target. That per-point probability is attached to
+`GrousePatchDataset` via a new `soft_labels=` constructor arg
+(`dataset.py`): opt-in only, `__getitem__` yields a 5th tensor solely
+when set, so every existing caller (val sets, plain training, `pretrain.py`,
+`score_ensemble`) is byte-for-byte unaffected. `GrouseModelHandler.fit()`
+gained `distill_alpha` (`model_handler.py`): the strict-objective margin
+shift is deliberately excluded from the new soft-BCE term (it's keyed to
+the hard label, not to teacher agreement). Output is ONE normal wrapped
+checkpoint at the usual `--save-path` - `predict.py` needs no changes at
+all to deploy it.
+
+Verified with a synthetic dry run (no real raster data in this
+environment - a fake `RegionData` + monkeypatched `_read_patch`):
+teacher scoring returns correctly-shaped, bounds-checked probabilities;
+`train_ds` items are 5-tuples only when `soft_labels` is set while
+`val_ds` stays a 4-tuple; one full `fit()` epoch runs end to end under
+`distill_alpha` with no shape/device errors. Not run against the real
+pipeline - that needs the actual training box.
+
+---
+
 ## predict.py: same TensorBoard magnitude bug, found by searching for
 ## the pattern instead of waiting to trip over it (2026-09-19, e00d956)
 

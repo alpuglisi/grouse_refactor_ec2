@@ -196,13 +196,59 @@ def filter_by_year_gap(df, rd, features, tolerance, what, region):
     return df[keep].reset_index(drop=True)
 
 
+def _score_teacher_probs(models, df, label, rd, cat_f, cont_f, img_size,
+                         cache_dir, flip_tta=True, batch_size=256):
+    """--distill-from: per-point averaged probability from a set of
+    already-loaded, eval-mode teacher models, over df's points (fixed
+    4-rotation TTA, deterministic - a soft training target has to be a
+    stable number, not a moving one under --augment's random D4/jitter).
+
+    Each model's rotations (+ mirror, if flip_tta) are TTA-averaged in
+    ITS OWN logit scale first (matching score_ensemble's per-member TTA),
+    then sigmoid'd to a probability, and probabilities are averaged
+    across models. That differs from score_ensemble's z-scored-logit
+    average - z-scoring is built for ranking metrics (AUC/AP don't care
+    about scale) and doesn't produce a valid [0, 1] target, which the
+    distillation BCE needs."""
+    import numpy as np
+    import torch
+    from torch.utils.data import DataLoader
+    device = next(models[0].parameters()).device
+    ds = GrousePatchDataset(df, rd, cat_f, cont_f, img_size=img_size,
+                            expand_rotations=True, label=label,
+                            augment=False, cache_dir=cache_dir)
+    loader = DataLoader(ds, batch_size=batch_size)
+    per_model = []
+    with torch.no_grad():
+        for model in models:
+            outs = []
+            for cat_x, cont_x, _y, _w in loader:
+                cat_x, cont_x = cat_x.to(device), cont_x.to(device)
+                o = model.logits(cat_x, cont_x).float()
+                if flip_tta:
+                    o = 0.5 * (o + model.logits(cat_x.flip(-1),
+                                                cont_x.flip(-1)).float())
+                outs.append(o.squeeze(1).cpu())
+            lo = torch.cat(outs).numpy().reshape(-1, 4).mean(axis=1)
+            per_model.append(1.0 / (1.0 + np.exp(-lo)))
+    return np.mean(per_model, axis=0)
+
+
 def build_datasets(data, regions, features, img_size, cache_dir=None,
                    jitter=0, augment=False, background_per_pos=0.0,
-                   seed=0, train_year_gap=2):
+                   seed=0, train_year_gap=2, distill_models=None,
+                   flip_tta=True):
     import numpy as np
     cat_f, cont_f = split_features(features)
     train_parts, val_parts, train_labels = [], [], []
     aug = dict(cache_dir=cache_dir, jitter=jitter, augment=augment)
+
+    def soft_labels_for(df, label, rd):
+        if distill_models is None:
+            return None
+        return _score_teacher_probs(distill_models, df, label, rd, cat_f,
+                                    cont_f, img_size, cache_dir,
+                                    flip_tta=flip_tta)
     for region_i, region in enumerate(regions):
         rd = data[region]
         # Year-gap exclusion applies to TRAINING only. Validation keeps
@@ -217,10 +263,14 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
         # 1:1 effective balance; see earlier collapse diagnosis).
         p_tr = GrousePatchDataset(pos_df, rd, cat_f, cont_f,
                                   img_size=img_size, expand_rotations=True,
-                                  label=1.0, **aug)
+                                  label=1.0,
+                                  soft_labels=soft_labels_for(pos_df, 1.0, rd),
+                                  **aug)
         n_tr = GrousePatchDataset(neg_df, rd, cat_f, cont_f,
                                   img_size=img_size, expand_rotations=True,
-                                  label=0.0, **aug)
+                                  label=0.0,
+                                  soft_labels=soft_labels_for(neg_df, 0.0, rd),
+                                  **aug)
         train_parts += [p_tr, n_tr]
         train_labels += [p_tr.labels, n_tr.labels]
         if background_per_pos > 0:
@@ -231,10 +281,10 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
                 # every region replaying identical row/col sequences.
                 bg_df = sample_background_points(rd, features, n_bg,
                                                  seed=seed + region_i)
-                bg_tr = GrousePatchDataset(bg_df, rd, cat_f, cont_f,
-                                           img_size=img_size,
-                                           expand_rotations=True,
-                                           label=0.0, **aug)
+                bg_tr = GrousePatchDataset(
+                    bg_df, rd, cat_f, cont_f, img_size=img_size,
+                    expand_rotations=True, label=0.0,
+                    soft_labels=soft_labels_for(bg_df, 0.0, rd), **aug)
                 train_parts.append(bg_tr)
                 train_labels.append(bg_tr.labels)
                 print(f"   {region}: +{n_bg:,} random background "
@@ -762,7 +812,34 @@ def main():
                              "- disagreement between differently-shaped "
                              "models is what makes the average beat its "
                              "members. Saved as <save-path>.member<i>.")
+    parser.add_argument("--distill-from", nargs="+", default=None,
+                        metavar="CKPT",
+                        help="Train ONE model (this run's normal --pool/"
+                             "--dropout/etc. recipe, geometry independent "
+                             "of the sources) against a blend of the true "
+                             "labels and these checkpoints' averaged "
+                             "probability - e.g. every "
+                             "<save-path>.member<i> from a finished "
+                             "--ensemble run, distilled into a single "
+                             "deployable file predict.py can load as-is. "
+                             "The teacher probability is computed ONCE per "
+                             "training point up front (fixed 4-rotation "
+                             "TTA, sigmoid'd per source then averaged), "
+                             "not recomputed per epoch. Incompatible with "
+                             "--ensemble > 1 (ambiguous which model would "
+                             "be the student).")
+    parser.add_argument("--distill-alpha", type=float, default=0.5,
+                        help="With --distill-from: weight on the true-"
+                             "label loss in the blend against the "
+                             "teachers' soft BCE (1 - this). 1.0 = "
+                             "teachers ignored, 0.0 = true labels ignored.")
     args = parser.parse_args()
+
+    if args.distill_from and args.ensemble > 1:
+        raise SystemExit(
+            "--distill-from trains a single student model - incompatible "
+            "with --ensemble > 1 (ambiguous which of N members would be "
+            "distilled). Use --ensemble 1 (the default).")
 
     import numpy as _np
     import torch as _torch
@@ -778,11 +855,44 @@ def main():
     print(f"Model features ({'explicit' if args.features else 'discovered'}): "
           f"{features}")
 
+    distill_models = None
+    if args.distill_from:
+        import torch as _torch2
+        from models import GrouseResNet, config_to_model_kwargs
+        _device = _torch2.device("cuda" if _torch2.cuda.is_available()
+                                 else "cpu")
+        cat_f, cont_f = split_features(features)
+        distill_models = []
+        for ckpt_path in args.distill_from:
+            state, cfg = GrouseModelHandler.unwrap_checkpoint(
+                _torch2.load(ckpt_path, map_location=_device,
+                            weights_only=True))
+            # Rebuild from the checkpoint's OWN config (see score_ensemble)
+            # - a teacher's architecture doesn't have to, and here mostly
+            # won't, match this run's --pool/etc.
+            kw = config_to_model_kwargs(cfg, defaults=dict(
+                pool=args.pool, center_skip=args.center_skip,
+                keep_early_resolution=args.keep_early_resolution,
+                early_attn=args.early_attn,
+                early_attn_heads=args.early_attn_heads,
+                early_attn_kv_stride=args.early_attn_kv_stride,
+                dual_branch=args.dual_branch,
+                dual_branch_channels=args.dual_branch_channels))
+            m = GrouseResNet(cat_f, cont_f, pretrained=False,
+                             **kw).to(_device).eval()
+            m.load_state_dict(state)
+            distill_models.append(m)
+        print(f"   --distill-from: {len(distill_models)} teacher(s) loaded "
+              f"({', '.join(args.distill_from)}), alpha="
+              f"{args.distill_alpha:g} true-label weight. Scoring every "
+              f"training point once before training starts...")
+
     train_ds, val_ds, train_labels = build_datasets(
         data, args.regions, features, args.img_size,
         cache_dir=args.cache_dir or None, jitter=args.jitter,
         augment=args.augment, background_per_pos=args.an_background,
-        seed=args.seed, train_year_gap=args.max_train_year_gap)
+        seed=args.seed, train_year_gap=args.max_train_year_gap,
+        distill_models=distill_models, flip_tta=args.flip_tta)
     print(f"Train samples: {len(train_ds):,} | Val samples: {len(val_ds):,}")
 
     disable = (args.batch_pos_frac is not None
@@ -950,7 +1060,9 @@ def main():
                     dynamic_dropout=args.dynamic_dropout,
                     dynamic_dropout_min=args.dynamic_dropout_min,
                     dynamic_dropout_max=args.dynamic_dropout_max,
-                    dynamic_dropout_step=args.dynamic_dropout_step)
+                    dynamic_dropout_step=args.dynamic_dropout_step,
+                    distill_alpha=(args.distill_alpha if args.distill_from
+                                   else None))
         if tb_writer is not None:
             tb_writer.close()
         members.append((path, overrides.get('pool', args.pool)))

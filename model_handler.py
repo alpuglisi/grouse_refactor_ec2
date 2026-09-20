@@ -21,6 +21,7 @@ import contextlib
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
@@ -395,7 +396,12 @@ class GrouseModelHandler:
         return out
 
     def _batch_loss(self, criterion, outputs, y, w, smooth=None,
-                    margin=False):
+                    margin=False, teacher_p=None, distill_alpha=None):
+        # Un-margin-shifted logits, for the distillation term below - the
+        # strict-objective margin is keyed to the RAW hard label and has
+        # nothing to do with matching a teacher's probability, so it
+        # must not leak into that term.
+        raw_outputs = outputs
         # Margin shift keyed to the RAW 0/1 labels (before smoothing):
         # positives are scored as (z - m_pos), negatives as (z - m_neg),
         # making the loss's low-cost region start AT the strict band's
@@ -417,8 +423,21 @@ class GrouseModelHandler:
             y = y * (1.0 - eps) + 0.5 * eps
         if self.use_sample_weights:
             per_sample = criterion(outputs, y)          # reduction='none'
-            return (per_sample * w.unsqueeze(1)).mean()
-        return criterion(outputs, y)
+            hard = (per_sample * w.unsqueeze(1)).mean()
+        else:
+            hard = criterion(outputs, y)
+        if distill_alpha is None:
+            return hard
+        # Distillation: blend the true-label loss against a soft BCE
+        # toward the ensemble teachers' averaged probability (see fit()'s
+        # distill_alpha). teacher_p is already in [0, 1] (mean of
+        # sigmoid'd per-member TTA logits) - not run through label
+        # smoothing again, that's a separate, already-soft signal.
+        soft = F.binary_cross_entropy_with_logits(raw_outputs, teacher_p,
+                                                   reduction='none')
+        soft = ((soft * w.unsqueeze(1)).mean() if self.use_sample_weights
+                else soft.mean())
+        return distill_alpha * hard + (1.0 - distill_alpha) * soft
 
     # ---- checkpoint format ------------------------------------------------
     def _wrap_checkpoint(self, state):
@@ -605,12 +624,20 @@ class GrouseModelHandler:
             tb_images=True, tb_attention=True, tb_embeddings=True,
             tb_embeddings_every=10, resume_from=None, dynamic_dropout=False,
             dynamic_dropout_min=None, dynamic_dropout_max=None,
-            dynamic_dropout_step=0.01):
+            dynamic_dropout_step=0.01, distill_alpha=None):
         """train_labels + optional batch_pos_frac enable STRATIFIED
         batching: every training batch contains both classes at a fixed
         composition (dataset's global ratio by default), so a constant
         'lazy guess' predictor is penalized within every batch. Without
-        train_labels, plain shuffled batching (original behavior)."""
+        train_labels, plain shuffled batching (original behavior).
+
+        distill_alpha : None = off. Otherwise the weight on the true-
+        label loss in a blend against a soft BCE toward each batch's
+        5th element (a distillation teacher's per-point probability) -
+        see _batch_loss. train_ds MUST have been built with soft_labels
+        on every one of its parts (GrousePatchDataset.__getitem__ then
+        yields 5-tuples); this is the caller's contract to keep, not
+        checked here beyond the unpack itself failing loudly if broken."""
         if dynamic_dropout and self._base_dropout <= 0:
             raise SystemExit(
                 "--dynamic-dropout requires --dropout > 0: it scales "
@@ -967,6 +994,10 @@ class GrouseModelHandler:
             print(f"   Dynamic dropout: starting at {dd_value:.3f} "
                  f"(range [{dd_min:.3f}, {dd_max:.3f}]), reacting to the "
                  f"val/train loss gap each epoch.")
+        if distill_alpha is not None:
+            print(f"   Distillation: blending {distill_alpha:.2f} true-"
+                 f"label loss + {1 - distill_alpha:.2f} soft BCE toward "
+                 f"each point's precomputed teacher probability.")
         guard = DivergenceGuard(self._divergence_patience,
                                 self.on_divergence,
                                 self._divergence_dampen_factor)
@@ -1004,7 +1035,13 @@ class GrouseModelHandler:
                                      dtype=torch.long)
             tr_total, tr_steps = 0, 0
             tr_logits, tr_ys = [], []
-            for batch_idx, (cat_x, cont_x, y, w) in enumerate(train_bar):
+            for batch_idx, batch in enumerate(train_bar):
+                if distill_alpha is not None:
+                    cat_x, cont_x, y, w, sl = batch
+                    sl = sl.to(self.device, non_blocking=True).unsqueeze(1)
+                else:
+                    cat_x, cont_x, y, w = batch
+                    sl = None
                 cat_x = cat_x.to(self.device, non_blocking=True)
                 cont_x = cont_x.to(self.device, non_blocking=True,
                                    memory_format=chan_last)
@@ -1016,7 +1053,8 @@ class GrouseModelHandler:
                     with torch.amp.autocast('cuda'):
                         outputs = self._pooled_logits(cat_x, cont_x)
                         loss = self._batch_loss(criterion, outputs, y, w,
-                                                    margin=True)
+                                                    margin=True, teacher_p=sl,
+                                                    distill_alpha=distill_alpha)
                     scaler.scale(loss).backward()
                     scaler.unscale_(optimizer)
                     total_norm = torch.nn.utils.clip_grad_norm_(
@@ -1026,7 +1064,8 @@ class GrouseModelHandler:
                 else:
                     outputs = self._pooled_logits(cat_x, cont_x)
                     loss = self._batch_loss(criterion, outputs, y, w,
-                                                margin=True)
+                                                margin=True, teacher_p=sl,
+                                                distill_alpha=distill_alpha)
                     loss.backward()
                     total_norm = torch.nn.utils.clip_grad_norm_(
                         self._clip_params, self.grad_clip)

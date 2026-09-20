@@ -38,7 +38,8 @@ from grouse_data import NODATA_SENTINELS
 class GrousePatchDataset(Dataset):
     def __init__(self, points_df, region_data, cat_features, cont_features,
                  img_size=64, expand_rotations=False, label=None,
-                 spec=None, cache_dir=None, jitter=0, augment=False):
+                 spec=None, cache_dir=None, jitter=0, augment=False,
+                 soft_labels=None):
         """points_df needs longitude/latitude/year columns; 'label' column
         used unless the label argument overrides it; 'weight' column used
         when present (else 1.0). region_data: a grouse_data.RegionData.
@@ -51,7 +52,13 @@ class GrousePatchDataset(Dataset):
             always real data, never fill.
         augment   : random D4 symmetry (8 orientations) + random jitter
             per access, instead of the deterministic idx%4 rotation.
-            Train only - validation must stay deterministic."""
+            Train only - validation must stay deterministic.
+        soft_labels : optional per-point array, same length and row
+            order as points_df, of a distillation teacher's averaged
+            probability. When given, __getitem__ returns a 5th tensor
+            (cat_x, cont_x, label, weight, soft_label) instead of 4 -
+            opt-in only, so every caller that doesn't pass this sees no
+            change at all."""
         self.spec = spec or FEATURE_SPEC
         self.cat_features = list(cat_features)
         self.cont_features = list(cont_features)
@@ -73,6 +80,14 @@ class GrousePatchDataset(Dataset):
         if 'weight' not in df.columns:
             df['weight'] = 1.0
         df['weight'] = df['weight'].fillna(1.0)
+        if soft_labels is not None:
+            soft_labels = np.asarray(soft_labels, dtype=np.float64)
+            if len(soft_labels) != len(df):
+                raise ValueError(
+                    f"soft_labels length {len(soft_labels)} doesn't match "
+                    f"points_df length {len(df)} - must be aligned "
+                    f"row-for-row with the (pre-rotation-expansion) points.")
+            df['soft_label'] = soft_labels
         if 'year' not in df.columns or df['year'].isna().all():
             df['year'] = max(self.rd.raster_years(self.cat_features[0])
                              if self.cat_features else
@@ -295,6 +310,9 @@ class GrousePatchDataset(Dataset):
 
         yl = torch.tensor(float(row['label']), dtype=torch.float32)
         w = torch.tensor(float(row['weight']), dtype=torch.float32)
+        if 'soft_label' in self.df.columns:
+            sl = torch.tensor(float(row['soft_label']), dtype=torch.float32)
+            return cat_x, cont_x, yl, w, sl
         return cat_x, cont_x, yl, w
 
     def _to_tensors(self, s):

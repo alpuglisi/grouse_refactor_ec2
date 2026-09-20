@@ -765,11 +765,35 @@ class GrouseModelHandler:
         # (load_backbone) also count as backbone: pretrained weights get
         # the reduced LR whatever their module name. early_attn keeps
         # its own group either way.
+        #
+        # HEAD_PREFIXES is an exception to that rule, added after
+        # --init-from grouse_single_best.pth (a full supervised
+        # checkpoint, not a pretrain.py backbone-only one) matched by
+        # name+shape against every tensor in the model - including
+        # conv_out/center_head/spatial_head, which load_backbone's own
+        # docstring assumes stay at fresh init and never reach this
+        # branch. Silently landing them in the throttled backbone group
+        # is wrong for two reasons: conv_out/center_head are meant to
+        # move at full LR whether their starting weights came from
+        # scratch or from a decent prior checkpoint, and spatial_head
+        # is ZERO-INITIALIZED BY DESIGN (see its construction) so Branch
+        # B fades in only as gradients justify - --init-from overwrote
+        # that zero-init with whatever spatial_head the source
+        # checkpoint had, and pinning it to the slow group on top of
+        # that would compound it further. Excluded from the "in
+        # transfer" backbone test regardless of whether they were
+        # actually transferred, so this is a no-op for a genuine
+        # backbone-only pretrain.py load (they were never in `transfer`
+        # to begin with) and only changes behavior for the case that
+        # motivated it.
+        HEAD_PREFIXES = ("conv_out.", "center_head.", "spatial_head.")
         transfer = getattr(self, '_transfer_loaded', frozenset())
         backbone_params, attn_params, fresh_params = [], [], []
         for name, p in self.model.named_parameters():
             if name.startswith("early_attn."):
                 attn_params.append(p)
+            elif name.startswith(HEAD_PREFIXES):
+                fresh_params.append(p)
             elif name.startswith(pretrained_prefixes) or name in transfer:
                 backbone_params.append(p)
             else:

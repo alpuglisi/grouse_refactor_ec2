@@ -101,6 +101,48 @@ was missing, and the user had to supply it.
 
 ---
 
+## model_handler.py: head layers no longer inherit the throttled
+## backbone LR from --init-from (2026-09-19)
+
+Option B of two, after finding `--init-from grouse_single_best.pth`
+loaded literally everything (0 tensors stayed fresh) because the
+source is a full supervised checkpoint with matching geometry, not a
+`pretrain.py` backbone-only one. `load_backbone`'s docstring assumes
+`conv_out`/`center_head`/`spatial_head` are absent from the source and
+stay at fresh init; here they weren't absent, so they silently joined
+`_transfer_loaded` and trained at the throttled `backbone_lr_factor`
+rate - and `spatial_head` (Branch B's head, zero-initialized by design
+so it "fades in only as its gradients justify") had that zero-init
+overwritten by the source checkpoint's own Branch B weights on top of
+losing its intended learning rate too.
+
+Declined the alternative (exclude head tensors from loading entirely,
+restoring true backbone-only semantics) because it would discard head
+weights this run's results suggest are working. Instead:
+`HEAD_PREFIXES = ("conv_out.", "center_head.", "spatial_head.")` is now
+excluded from the `name in transfer` backbone test in the LR-group
+split, regardless of whether those tensors were actually transferred -
+so they always land in the full-rate "fresh" group. Does NOT restore
+`spatial_head`'s zero-init guarantee (that would need excluding it from
+loading, the option not taken); only changes which LR it trains at.
+
+Deliberately does not touch `spatial_branch` (Branch B's feature
+extractor, as opposed to its head) - undocumented either way in
+`load_backbone`'s own list, but closer in kind to the parallel
+feature-extraction modules ("stem, embeddings, ResNet stages, CBAM,
+early-attn") than to a scoring head, so it stays in the backbone group.
+
+Verified against the real model (dual_branch='unet', center_skip=True,
+early_attn=True): in the all-tensors-transferred scenario, zero head
+params land in backbone-group logic and all land in fresh; embeddings
+(6 params) and spatial_branch (20 params) correctly stay backbone. In
+the transfer-empty scenario (genuine backbone-only load), head routing
+is IDENTICAL to the all-transferred case - proving this is a no-op for
+the normal, documented use of --init-from and only changes behavior
+for the case that motivated it.
+
+---
+
 ## train.py: expose --grad-clip (2026-09-19)
 
 `grad_clip=1.0` was a `GrouseModelHandler` constructor default with no

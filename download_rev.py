@@ -82,6 +82,15 @@ DOWNLOAD_URL_RE = re.compile(r'https?://[^\s"\']+\.zip')
 SERVICES_URL = "https://lfps.usgs.gov/arcgis/rest/services"
 
 OUT_DIR = "data/landfire"
+# Existing files are NEVER overwritten or deleted by this script. A
+# download is written to a temp file and content-validated there; only
+# a valid result is moved into place, and any file already at that path
+# (e.g. an empty placeholder clip kept on disk while a vintage is
+# awaited, or a hand-obtained file) is first moved, unchanged, into
+# REPLACED_DIR - a subdirectory, so the raster discovery globs never see
+# it. An earlier backup of the same name is never replaced either: the
+# new one gets a timestamp suffix.
+REPLACED_DIR = os.path.join(OUT_DIR, "replaced")
 
 # A job can report "Succeeded" and produce a well-formed, correctly-
 # georeferenced GeoTIFF that is nonetheless entirely nodata - this
@@ -145,6 +154,31 @@ def published_products(year, session=None):
         if m:
             codes.add(m.group(1))
     return codes or None
+
+
+def _backup_existing(path):
+    """Move whatever is at `path` into REPLACED_DIR without overwriting
+    an earlier backup. Returns the backup path, or None if nothing was
+    there."""
+    if not os.path.exists(path):
+        return None
+    os.makedirs(REPLACED_DIR, exist_ok=True)
+    dest = os.path.join(REPLACED_DIR, os.path.basename(path))
+    if os.path.exists(dest):
+        stamp = time.strftime("%Y%m%d_%H%M%S")
+        root, ext = os.path.splitext(dest)
+        dest = f"{root}.{stamp}{ext}"
+    shutil.move(path, dest)
+    return dest
+
+
+def _place_result(tmp_path, out_filepath):
+    """Install a validated download at out_filepath. The previous file,
+    if any, is backed up first (never deleted). Returns a note for the
+    log."""
+    backup = _backup_existing(out_filepath)
+    os.replace(tmp_path, out_filepath)
+    return f" (previous file kept at {backup})" if backup else ""
 
 
 def make_session():
@@ -226,6 +260,7 @@ def download_one(region, year, feature):
         return task, "no download URL in status payload"
 
     zip_path = os.path.join(OUT_DIR, f"temp_{job_id}.zip")
+    tmp_tif = os.path.join(OUT_DIR, f"temp_{job_id}.tif")
     # The LFPS job has already succeeded server-side at this point; the
     # result zip stays downloadable, so transient transfer failures
     # (IncompleteRead / broken connections, common with several
@@ -249,7 +284,7 @@ def download_one(region, year, feature):
                     tifs = [n for n in names if n.lower().endswith('.tif')]
                     if not tifs:
                         return task, "no .tif inside downloaded zip"
-                    with z.open(tifs[0]) as zf, open(out_filepath, "wb") as f:
+                    with z.open(tifs[0]) as zf, open(tmp_tif, "wb") as f:
                         shutil.copyfileobj(zf, f)
 
                     # Content validation: a "Succeeded" job can still
@@ -257,9 +292,9 @@ def download_one(region, year, feature):
                     # entirely-empty raster (see MIN_VALID_PIXEL_FRAC
                     # comment above). Job status can't catch this -
                     # check the actual pixel content before accepting.
-                    pct_valid = _raster_valid_fraction(out_filepath)
+                    pct_valid = _raster_valid_fraction(tmp_tif)
                     if pct_valid is not None and pct_valid < MIN_VALID_PIXEL_FRAC:
-                        os.remove(out_filepath)
+                        os.remove(tmp_tif)      # the existing file, if any, is untouched
                         return task, (
                             f"job succeeded but raster is empty "
                             f"({pct_valid * 100:.2f}% valid pixels) - "
@@ -282,14 +317,18 @@ def download_one(region, year, feature):
                         for name in meta_files:
                             dest = os.path.join(meta_dir,
                                                 os.path.basename(name))
+                            if os.path.exists(dest):
+                                continue          # never overwrite
                             with z.open(name) as zf, open(dest, "wb") as f:
                                 shutil.copyfileobj(zf, f)
-                return task, "ok"
+                    note = _place_result(tmp_tif, out_filepath)
+                return task, "ok" + note
             except (requests.exceptions.RequestException,
                     zipfile.BadZipFile, EOFError, OSError) as e:
                 last_err = e
-                if os.path.exists(out_filepath):
-                    os.remove(out_filepath)   # never leave a partial tif
+                if os.path.exists(tmp_tif):
+                    os.remove(tmp_tif)        # never leave a partial tif;
+                                              # the existing file is untouched
                 if attempt < DOWNLOAD_RETRIES:
                     log(f"  [~] {task}: transfer failed "
                        f"(attempt {attempt}/{DOWNLOAD_RETRIES}: {e}) - "
@@ -297,18 +336,24 @@ def download_one(region, year, feature):
                     time.sleep(5 * attempt)
         return task, f"download/extract error after {DOWNLOAD_RETRIES} attempts: {last_err}"
     finally:
-        if os.path.exists(zip_path):
-            os.remove(zip_path)
+        for p in (zip_path, tmp_tif):
+            if os.path.exists(p):
+                os.remove(p)
 
 
 # =======================================================================
 # 4. TASK PLANNING + TWO-PHASE EXECUTION
 # =======================================================================
-def plan_tasks():
+def plan_tasks(refetch_empty=True):
     """Everything that needs an actual network download. Topo features
     are planned for 2020 only; other years get filesystem copies of the
     2020 baseline in phase 2 (can't run concurrently with phase 1
-    because the copies depend on the baseline existing)."""
+    because the copies depend on the baseline existing).
+
+    refetch_empty: re-plan an existing file whose content is (near-)
+    empty - a placeholder from an unpublished vintage. A successful
+    re-fetch backs the placeholder up (see REPLACED_DIR) rather than
+    overwriting it; a failed one leaves it exactly as it was."""
     tasks = []
     listings = {}
     for region in BOXES_COORDINATES:
@@ -339,6 +384,8 @@ def plan_tasks():
                     continue
                 out = os.path.join(OUT_DIR, f"{region}_{year}_{feature}.tif")
                 if os.path.exists(out):
+                    if not refetch_empty:
+                        continue
                     # A file that exists but is (near-)empty is a
                     # placeholder from a vintage LANDFIRE had not yet
                     # published for this GeoArea when it was fetched -
@@ -350,8 +397,10 @@ def plan_tasks():
                     if frac is None or frac >= MIN_VALID_PIXEL_FRAC:
                         continue
                     log(f"  [~] {region} {year} {feature}: existing file "
-                        f"is {frac * 100:.2f}% valid - treating as "
-                        f"missing and re-downloading.")
+                        f"is {frac * 100:.2f}% valid - will re-download; "
+                        f"the existing file is kept (backed up under "
+                        f"{REPLACED_DIR} only if a valid replacement "
+                        f"arrives).")
                 tasks.append((region, year, feature))
     return tasks
 
@@ -376,8 +425,19 @@ def copy_topo_baselines():
 
 
 def main():
+    import argparse
+    ap = argparse.ArgumentParser(
+        description="Download LANDFIRE clips via LFPS. Never overwrites "
+                    "or deletes an existing file: replaced files are "
+                    f"moved to {REPLACED_DIR}.")
+    ap.add_argument("--skip-existing", action="store_true",
+                    help="Skip every existing file, even an empty "
+                         "placeholder. Default: re-fetch empty ones, "
+                         "keeping the placeholder unless a valid "
+                         "replacement arrives.")
+    args = ap.parse_args()
     os.makedirs(OUT_DIR, exist_ok=True)
-    tasks = plan_tasks()
+    tasks = plan_tasks(refetch_empty=not args.skip_existing)
     skipped_known = sum(1 for r in BOXES_COORDINATES for y in YEARS
                         for f in FEATURES if (y, f) in KNOWN_UNAVAILABLE)
     log(f"Planned {len(tasks)} download job(s) "
@@ -391,9 +451,9 @@ def main():
             futures = {pool.submit(download_one, *t): t for t in tasks}
             for fut in as_completed(futures):
                 task, status = fut.result()
-                if status == "ok":
+                if status.startswith("ok"):
                     results["ok"] += 1
-                    log(f"  [+] {task}: saved")
+                    log(f"  [+] {task}: saved{status[2:]}")
                 else:
                     results["failed"].append((task, status))
                     log(f"  [!] {task}: {status}")

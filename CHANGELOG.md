@@ -16,6 +16,73 @@ the diff.
 
 ---
 
+## tcc/nlcd were on a different pixel grid from every other feature:
+## rotated 11 px against the rest of every training patch (2026-09-20)
+
+Found by tracing the raster-to-tensor path after the vocab review, and
+measured on the training box before anything was changed. Every
+feature writer but one builds on the region's template grid (the
+latest EVT clip, in the LFPS per-request local Albers):
+`generate_road_distance.py` rasterizes onto it, and
+`generate_time_since_disturbance.py` / `generate_treemap_features.py`
+warp onto it. `download_tcc_nlcd.py` did not - it wrote tcc and nlcd on
+Earth Engine's EPSG:5070 lattice. Two Albers projections with different
+central meridians have grid norths that differ by the meridian
+convergence, so the two grids are rotated relative to each other.
+
+That matters because `dataset.py` cuts each feature's 64x64 window
+from that feature's OWN raster grid (it transforms the point into each
+raster's CRS and reads around the pixel it lands in). The centre pixel
+agrees across channels; the window axes do not. Measured for a point in
+Maine: road_dist and tsd 0 px off the evt window at every corner, nlcd
+and tcc **11 px** off. So every training patch carried land cover and
+canopy cover rotated against the other thirteen channels, out to a
+third of the patch width at the corners.
+
+Nothing could show it. Validation is built by the same reader, so val
+metrics were internally consistent with the rotated data. `predict.py`
+wraps every raster in a WarpedVRT onto the reference grid, so the
+deployed model saw ALIGNED inputs it had never trained on - and
+`inspect_point.py` goes through that same aligned path, so "checking
+the model's raw inputs" could never reveal what training actually
+saw. The train/serve skew is silent by construction.
+
+Fixed in three places, one definition:
+- `grouse_data.grid_mismatch(src, ref)` is the single definition of
+  "same grid": same CRS, same pixel size, no rotation, pixel edges
+  coincident. Extent may differ (a clip of the grid is still the grid).
+- `realign_rasters.py` warps every raster that fails it onto the
+  region's template grid, nearest-neighbour, in place and atomically.
+  Dry run by default, `--apply` writes. The patch cache keys on raster
+  mtimes so it rebuilds itself.
+- `dataset.py` now checks every raster it will read against the first
+  one at construction and REFUSES a mixed set, naming the files and the
+  fix. Hard failure on purpose: a model trained on rotated channels is
+  wrong in a way nothing downstream can detect.
+- `download_tcc_nlcd.py` warps its merged 5070 mosaic onto the template
+  before writing, so new downloads land aligned; with no LANDFIRE clip
+  on disk yet it keeps 5070 and says so, and the dataset guard catches
+  it later.
+
+**Action on the box: `python realign_rasters.py --apply`, then retrain
+from scratch.** Every existing checkpoint was trained on the rotated
+channels; the aligned inputs are a different distribution.
+
+Not changed: `predict.py`'s VRT alignment stays as a safety net, but it
+is no longer the mechanism by which inputs become co-registered - the
+files are.
+
+Verified with synthetic rasters (a local-Albers template and an
+EPSG:5070 raster carrying a ground-truth field keyed to lon/lat):
+11 px corner misregistration before, the same figure the box reported;
+the dataset guard refuses the pair by name; after `warp_to_grid` the
+misregistration is 0 px, the warped pixels agree with the template's
+ground truth at 94% (the rest is checkerboard-edge nearest-neighbour
+noise), and the dataset builds. A same-CRS clip at a different extent
+passes `grid_mismatch`; a 0.4 px edge offset fails it.
+
+---
+
 ## models.py: evh/evc vocab 300 was clamping LANDFIRE's entire
 ## herbaceous block onto one shrub code (2026-09-20)
 

@@ -80,6 +80,8 @@ assignments).
 | `diagnose_wetland.py` | Per-NLCD-class composition and score breakdown. |
 | `diagnose_training.py` | Training-set sanity checks. |
 | `check_exotic.py`, `check_raster.py`, `dupe_check.py` | One-off data-integrity checks. |
+| `scan_codes.py` | Per raster: code range on disk vs each categorical feature's `FEATURE_SPEC` vocab (what the clamp would destroy). |
+| `realign_rasters.py` | Per region: which rasters are off the template pixel grid, and (`--apply`) warps them onto it. |
 | `smoke_test_training.py` | Fast end-to-end training smoke test. |
 | `document_tree.sh` | Inventories the working directory — every file with size and date, plus a **feature × year raster coverage matrix per region**. Data files are gitignored and never reach a clone, so this is how the year-vintage situation becomes reviewable from the repo. |
 | `tune.py`, `tune_bins.py` | Hyperparameter / envelope-bin sweeps. |
@@ -137,6 +139,20 @@ the weights themselves: each categorical embedding's row count (its
 `embeddings.<f>.weight` via `models.spec_with_checkpoint_vocab`, never
 from today's `FEATURE_SPEC`, so a checkpoint keeps loading after the
 spec changes. Any new loader must do both.
+
+**Every feature raster of a region must sit on ONE pixel grid - the
+region's template (its latest EVT clip).** The training reader cuts
+each feature's window from that feature's own raster grid, so it only
+produces co-registered channels when the grids are the same grid; two
+projections give windows whose axes point different ways (tcc/nlcd in
+EPSG:5070 were 11 px off the LFPS local-Albers evt window at the patch
+corners, in every training patch, undetectable by any metric because
+validation reads the same way). `grouse_data.grid_mismatch` is the one
+definition of "same grid"; `dataset.py` refuses a mixed set at
+construction; `realign_rasters.py --apply` fixes files; every raster
+writer warps onto the template. `predict.py`'s VRT alignment is a safety
+net, not the mechanism. A new raster source must be written on the
+template grid, not merely in the same nominal projection family.
 
 **A categorical `vocab` must cover the raster's whole code domain, or
 the top of it silently disappears.** `GrouseResNet.embed` clamps codes

@@ -155,6 +155,39 @@ class MissingDataError(FileNotFoundError):
     message so the fix is obvious."""
 
 
+def grid_mismatch(src, ref, tol=1e-3):
+    """None when raster `src` sits on raster `ref`'s pixel grid - same
+    CRS, same pixel size, no rotation, pixel edges coincident (the
+    EXTENT may differ; a clip of the same grid is still the same grid).
+    Otherwise a short reason string.
+
+    The single definition of "same grid" for the project. dataset.py
+    refuses to build a training set from features that fail it,
+    realign_rasters.py fixes files that fail it, and
+    download_tcc_nlcd.py checks its output against it. Why it exists:
+    the training reader cuts each feature's 64x64 window from THAT
+    raster's own pixel grid, so two rasters in different projections
+    give windows whose axes point in different directions - measured at
+    11 px of corner misregistration between the Earth Engine products
+    (EPSG:5070) and the LFPS clips (a local Albers) before this check
+    existed. predict.py warps everything onto one grid, so the model
+    trained on rotated channels and was deployed on aligned ones."""
+    if src.crs != ref.crs:
+        return (f"CRS differs: {src.crs.to_string()[:60]!r} vs "
+                f"{ref.crs.to_string()[:60]!r}")
+    s, r = src.transform, ref.transform
+    if (abs(s.a - r.a) > tol * abs(r.a) or abs(s.e - r.e) > tol * abs(r.e)
+            or max(abs(s.b), abs(s.d), abs(r.b), abs(r.d)) > tol):
+        return (f"pixel size/rotation differs: ({s.a:g}, {s.e:g}) vs "
+                f"({r.a:g}, {r.e:g})")
+    dx = (s.c - r.c) / r.a
+    dy = (s.f - r.f) / r.e
+    if abs(dx - round(dx)) > tol or abs(dy - round(dy)) > tol:
+        return (f"pixel edges offset by ({dx - round(dx):+.3f}, "
+                f"{dy - round(dy):+.3f}) px")
+    return None
+
+
 # ==========================================
 # PER-REGION ACCESSOR
 # ==========================================

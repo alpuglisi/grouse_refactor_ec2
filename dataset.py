@@ -32,7 +32,7 @@ from rasterio.windows import Window
 import rasterio
 
 from models import FEATURE_SPEC
-from grouse_data import NODATA_SENTINELS
+from grouse_data import NODATA_SENTINELS, grid_mismatch
 
 
 class GrousePatchDataset(Dataset):
@@ -116,6 +116,7 @@ class GrousePatchDataset(Dataset):
         self._transformers = None
         self._cache_pid = None
 
+        self._check_grid_alignment()
         self._probe_first_point()
 
         self.cache = None
@@ -178,6 +179,49 @@ class GrousePatchDataset(Dataset):
                 except Exception:
                     pass
         self._handles, self._transformers, self._cache_pid = None, None, None
+
+    def _check_grid_alignment(self):
+        """Every raster this dataset reads must sit on ONE pixel grid.
+        _read_patch cuts each feature's window from that feature's own
+        raster grid (transforming the point into each raster's CRS
+        independently), which is only a stack of co-registered channels
+        if the grids are the same grid. Two rasters in different
+        projections give windows whose axes point in different
+        directions: the centre pixel agrees, the corners do not. That
+        is exactly what happened with tcc/nlcd (written in EPSG:5070)
+        against the LFPS clips (a local Albers) - 11 px of corner
+        misregistration in every training patch, invisible to every
+        metric because validation is built the same way, and absent at
+        prediction time because predict.py warps onto one grid.
+
+        Header reads only (no data), with throwaway handles that are
+        closed before any DataLoader worker forks. Hard failure, not a
+        warning: a model trained on rotated channels is wrong in a way
+        nothing downstream can detect."""
+        paths = sorted(set(self._path_for.values()))
+        if len(paths) < 2:
+            return
+        feats = self.cat_features + self.cont_features
+        first_year = int(sorted(self.df['year'].unique())[0])
+        ref_path = self._path_for[(feats[0], first_year)]
+        bad = []
+        with rasterio.open(ref_path) as ref:
+            for p in paths:
+                if p == ref_path:
+                    continue
+                with rasterio.open(p) as src:
+                    why = grid_mismatch(src, ref)
+                if why:
+                    bad.append(f"{os.path.basename(p)}: {why}")
+        if bad:
+            raise ValueError(
+                f"Feature rasters are not on one pixel grid (reference: "
+                f"{os.path.basename(ref_path)}). The training reader "
+                f"would stack misregistered channels:\n  "
+                + "\n  ".join(bad)
+                + "\nRun `python realign_rasters.py --apply` to warp them "
+                f"onto the region's template grid (the patch cache "
+                f"rebuilds itself), then retrain from scratch.")
 
     def _probe_first_point(self):
         """Read one patch for the first point at construction time, with

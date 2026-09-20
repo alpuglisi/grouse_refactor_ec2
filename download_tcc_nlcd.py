@@ -28,6 +28,16 @@ NODATA: product nodata/non-processing values (NLCD 250/0, TCC >100) are
 remapped to -9999 (int16), which the dataset layer already treats as
 nodata -> padding.
 
+GRID: Earth Engine delivers tiles on its own EPSG:5070 lattice, but the
+LANDFIRE clips every other feature is built on sit in the LFPS local
+Albers - and the training reader cuts each feature's window from that
+feature's own grid, so a file left in 5070 is rotated against every
+other channel (11 px at the patch corners, measured). The merged mosaic
+is therefore warped onto the region's template grid (latest EVT clip,
+nearest-neighbour) before it is written, exactly as realign_rasters.py
+does for existing files. Without a LANDFIRE clip on disk the file stays
+in 5070 and dataset.py will refuse it until realigned.
+
 AUTH (one-time, on the machine that runs this):
     pip install earthengine-api
     earthengine authenticate          # opens a browser / prints a URL
@@ -61,7 +71,8 @@ _here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _here)
 
 from prepare_training_data import BOXES
-from grouse_data import GrouseData, DataConfig, YEAR_MATCH_TOLERANCE
+from grouse_data import (GrouseData, DataConfig, YEAR_MATCH_TOLERANCE,
+                         grid_mismatch)
 
 NODATA = -9999
 PIXEL_M = 30
@@ -308,8 +319,17 @@ def _fetch_all(n_tiles, fetch_fn, workers, desc):
             bar.close()
 
 
+def template_raster(rd):
+    """The region's template grid (its latest EVT clip - the grid
+    road_dist/tsd/TreeMap are written on and dataset.py requires every
+    feature to share), or None when no LANDFIRE clip exists yet."""
+    if not rd.raster_years("evt"):
+        return None
+    return rd.latest_raster_path("evt")
+
+
 def build_raster(ee, feature, spec, cid, year, bounds_lonlat, out_path,
-                 tile_m, workers=8):
+                 tile_m, workers=8, template=None):
     image, band = year_image(ee, cid, spec["bands"], year)
     x0, y0, x1, y1 = region_grid(bounds_lonlat)
     tile_list = list(tiles(x0, y0, x1, y1, tile_m))
@@ -334,14 +354,42 @@ def build_raster(ee, feature, spec, cid, year, bounds_lonlat, out_path,
             raise RuntimeError(
                 f"{out_path}: <1% valid pixels after masking - wrong "
                 f"collection/band/region? (band={band})")
-        with rasterio.open(out_path, "w", driver="GTiff",
+        # The mosaic is on Earth Engine's EPSG:5070 lattice. The
+        # training reader cuts every feature's window from that
+        # feature's own grid, so this file MUST end up on the region's
+        # template grid (the LFPS local Albers the LANDFIRE clips use)
+        # or its windows are rotated against every other channel's -
+        # 11 px at the corners, measured. Written to a temp file in
+        # 5070 first, then warped onto the template exactly as
+        # realign_rasters.py does for files already on disk. Nearest:
+        # nlcd is categorical and tcc an integer percent.
+        merged = os.path.join(td, "merged_5070.tif")
+        with rasterio.open(merged, "w", driver="GTiff",
                            height=out.shape[0], width=out.shape[1],
                            count=1, dtype="int16", crs="EPSG:5070",
                            transform=transform, nodata=NODATA,
                            compress="lzw", tiled=True) as dst:
             dst.write(out, 1)
-    print(f"   wrote {out_path} ({out.shape[1]}x{out.shape[0]} px, "
-          f"{100 * valid_frac:.1f}% valid, band={band})")
+        if template is not None:
+            from realign_rasters import warp_to_grid
+            warp_to_grid(merged, template, out_path)
+            with rasterio.open(out_path) as chk, \
+                    rasterio.open(template) as ref:
+                why = grid_mismatch(chk, ref)
+                shape = (chk.width, chk.height)
+            if why:
+                raise RuntimeError(f"{out_path}: still not on the "
+                                   f"template grid after warping: {why}")
+            grid_note = f"on template grid {os.path.basename(template)}"
+        else:
+            import shutil
+            shutil.copyfile(merged, out_path)
+            shape = (out.shape[1], out.shape[0])
+            grid_note = ("EPSG:5070 - NO LANDFIRE template yet; run "
+                         "realign_rasters.py --apply once the LANDFIRE "
+                         "clips exist, or dataset.py will refuse it")
+    print(f"   wrote {out_path} ({shape[0]}x{shape[1]} px, "
+          f"{100 * valid_frac:.1f}% valid, band={band}, {grid_note})")
 
 
 def main():
@@ -408,6 +456,12 @@ def main():
                     need = {max(pub_years)}
                 years = choose_product_years(pub_years, need)
             print(f"   {region}: downloading years {years}")
+            template = template_raster(data[region])
+            if template is None:
+                print(f"   [warn] {region}: no LANDFIRE evt clip on disk "
+                      f"yet - output stays in EPSG:5070 and must be "
+                      f"realigned (realign_rasters.py --apply) before "
+                      f"training; dataset.py refuses mixed grids.")
             for year in years:
                 out_path = os.path.join(out_dir,
                                         f"{region}_{year}_{feature}.tif")
@@ -416,7 +470,8 @@ def main():
                           f"(--force to redo).")
                     continue
                 build_raster(ee, feature, spec, cid, year, BOXES[region],
-                             out_path, args.tile_m, workers=args.workers)
+                             out_path, args.tile_m, workers=args.workers,
+                             template=template)
 
     print("\nDone. grouse_data.py discovers the new rasters "
           "automatically:\n  - train.py will list tcc/nlcd under "

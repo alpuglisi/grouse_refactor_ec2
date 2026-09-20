@@ -16,6 +16,73 @@ the diff.
 
 ---
 
+## Data-access findings adopted from an external source review
+## (2026-09-20)
+
+An external research pass over the five raster sources reported these
+points; each was weighed against the code rather than taken on faith,
+and the network here could not reach any of the hosts to verify them,
+so every change below is written to be correct under either outcome.
+
+**LF2025 for New England does not exist yet.** LANDFIRE's delivery
+schedule puts the NE vegetation GeoArea (EVT/EVH/EVC/CH/CC) at
+November 2026 and SClass for every extent at December 2026; the live
+`Landfire_LF2025` folder lists no SClass at all. The empty 2025 clips
+on the box are therefore expected, and the placeholder handling in the
+entry below is the right posture until then. Adopted: `download_rev.py`
+now reads the per-vintage ArcGIS folder listing
+(`.../arcgis/rest/services/Landfire_LF{year}?f=pjson`) before planning
+and skips any product the vintage does not publish, with one line per
+skipped product. An unreachable listing degrades to the old behaviour
+(try the job) rather than blocking. The post-download content check
+stays: a product can be listed for CONUS and still be empty for one
+GeoArea.
+
+**TCC v2025-6 asset ID spelling.** The report says the Earth Engine
+asset is `.../TCC/Product_Version/2025-6` (slash) while the code probed
+`.../TCC/Product_Version_2025-6` (underscore, the catalog page slug).
+Unverifiable from here - and it matters because a wrong spelling fails
+the probe SILENTLY and `resolve_collection` falls back to v2023-5,
+losing 2024 and 2025 TCC. Adopted: both spellings are probed, slash
+first, and `resolve_collection` now prints which collection it settled
+on and which it skipped. **Check on the box:** if
+`data/landfire/ME_2024_tcc.tif` or `ME_2025_tcc.tif` do not exist, the
+probe had been failing; re-run `download_tcc_nlcd.py --features tcc`
+after pulling and watch the `[note] using ...` line.
+
+**Annual Disturbance bundle filename.** Seen under both
+`USAnnualDisturbance_1999_present.zip` and (post-January-2026
+renaming) `AnnualDisturbance_1999_present.zip`. Adopted: both names
+tried in order, partial downloads removed on failure, and an existing
+cached copy under either name is reused. Final Dist25 is scheduled for
+September 2026: re-pull the bundle once it lands so `tsd` for 2025
+reflects observed disturbance rather than the clock running on 2024.
+
+**TIGER/Line vintage.** 2025 shapefiles were released September 2025.
+Adopted: `TIGER_YEAR` 2023 -> 2025, exposed as `--tiger-year` for the
+2026 release once confirmed. This changes road_dist VALUES (new roads,
+realigned geometry) not model geometry; re-run
+`generate_road_distance.py` to take it, the cache rebuilds itself.
+
+**Not adopted, deliberately:**
+- Topo codes: the report flags `LF{year}_SlpD` for years other than
+  2020 and `SlpD` meaning degrees. The code already fetches topo at
+  LF2020 only and copies it; neither slope nor aspect is in
+  `FEATURE_SPEC`, so the unit is moot until terrain is revisited.
+- Switching LFPS jobs to per-layer ImageServer `exportImage`, and
+  per-year `exportImage` clips instead of the 1.9 GB disturbance
+  bundle: real transfer savings, but a rewrite of two working
+  downloaders for data that is already on disk. Recorded here as the
+  route to take if either downloader has to be redone.
+- Caching Annual NLCD from MRLC instead of the community Earth Engine
+  asset: the EE asset is current (2025 layers added August 2026); the
+  risk is real but not worth a new ingestion path today.
+- TreeMap 2023 via the RDS archive: the EE probe-and-fallback picks
+  v2023 up automatically once it is catalogued; band names are already
+  verified at runtime by `resolve_band`.
+
+---
+
 ## Empty placeholder vintages: keep them, but say so and re-fetch them
 ## (2026-09-20)
 

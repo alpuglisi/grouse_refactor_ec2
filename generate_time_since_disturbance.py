@@ -94,8 +94,17 @@ from grouse_data import GrouseData
 from models import TSD_MAX_YEARS, tsd_encode
 
 CACHE_DIR = "data/disturbance"
-DIST_URL = ("https://landfire.gov/data-downloads/AnnualDist/"
-            "USAnnualDisturbance_1999_present.zip")
+# LANDFIRE renamed its products in January 2026 (product + extent +
+# version only), and the all-years bundle has been seen under both the
+# older `US`-prefixed name and the newer one; which is live depends on
+# when the page was last regenerated. Tried in order; the first that
+# answers is used. The cached local copy keeps whichever name it was
+# fetched under.
+DIST_URLS = ("https://landfire.gov/data-downloads/AnnualDist/"
+             "USAnnualDisturbance_1999_present.zip",
+             "https://landfire.gov/data-downloads/AnnualDist/"
+             "AnnualDisturbance_1999_present.zip")
+DIST_URL = DIST_URLS[0]
 # LF{release}_Dist{yy}_CONUS.tif - only the Dist{yy} half is the
 # disturbance year. Two digits, so 99 is 1999 and everything else 20xx.
 DIST_NAME_RE = re.compile(r"Dist(\d{2})", re.IGNORECASE)
@@ -138,17 +147,47 @@ def _extract_nested_zips(dist_dir):
             open(zp + ".extracted", "w").close()
 
 
+def _download_first(urls, dist_dir):
+    """Fetch the first of `urls` that answers, into dist_dir, and return
+    its local path. A name that 404s (or any transfer error) moves on
+    to the next; only when every name fails is it an error, naming
+    each attempt."""
+    import urllib.error
+    errors = []
+    for url in urls:
+        zpath = os.path.join(dist_dir, os.path.basename(url))
+        print(f"   downloading {os.path.basename(zpath)} "
+              f"(~1.9 GB, one time) ...")
+        try:
+            urllib.request.urlretrieve(url, zpath)
+            return zpath
+        except (urllib.error.URLError, OSError) as e:
+            errors.append(f"{url}: {e}")
+            if os.path.exists(zpath):
+                os.remove(zpath)          # never keep a partial bundle
+            print(f"      not available under this name ({e}); trying "
+                  f"the next.")
+    raise SystemExit("Annual Disturbance bundle could not be downloaded "
+                     "under any known name:\n  " + "\n  ".join(errors)
+                     + "\nCheck https://www.landfire.gov/disturbance/"
+                     "annualdisturbance for the current filename and pass "
+                     "--dist-dir at a manual download.")
+
+
 def fetch_disturbance(dist_dir):
     """Return {disturbance_year: tif_path}, downloading and extracting
     the CONUS bundle on first use unless --dist-dir already has it."""
     if dist_dir is None:
         dist_dir = CACHE_DIR
         os.makedirs(dist_dir, exist_ok=True)
-        zpath = os.path.join(dist_dir, os.path.basename(DIST_URL))
-        if not os.path.exists(zpath):
-            print(f"   downloading {os.path.basename(zpath)} "
-                  f"(~1.9 GB, one time) ...")
-            urllib.request.urlretrieve(DIST_URL, zpath)
+        existing = [os.path.join(dist_dir, os.path.basename(u))
+                    for u in DIST_URLS
+                    if os.path.exists(os.path.join(dist_dir,
+                                                   os.path.basename(u)))]
+        if existing:
+            zpath = existing[0]
+        else:
+            zpath = _download_first(DIST_URLS, dist_dir)
         marker = os.path.join(dist_dir, ".extracted")
         if not os.path.exists(marker):
             print("   extracting ...")

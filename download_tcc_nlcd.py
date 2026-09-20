@@ -82,6 +82,14 @@ PIXEL_M = 30
 PRODUCTS = {
     "tcc": {
         "collections": [
+            # v2025-6 (1985-2025). Two spellings are probed because the
+            # catalog PAGE slug (underscores) and the asset ID (a slash
+            # before the version) are easy to confuse, and a wrong
+            # spelling fails the probe SILENTLY - resolve_collection
+            # then falls back to v2023-5 and the last two years of TCC
+            # quietly vanish. resolve_collection now prints which one
+            # it settled on so that fallback is visible.
+            "projects/gtac-data-publish/assets/TCC/Product_Version/2025-6",
             "projects/gtac-data-publish/assets/TCC/Product_Version_2025-6",
             "USGS/NLCD_RELEASES/2023_REL/TCC/v2023-5",
         ],
@@ -166,15 +174,23 @@ def ee_init(project):
 
 
 def resolve_collection(ee, candidates):
-    """First candidate collection that exists and is non-empty."""
+    """First candidate collection that exists and is non-empty. Says
+    which - and which were skipped - because a fallback to an older
+    product version is a silent loss of the newest years otherwise."""
+    skipped = []
     for cid in candidates:
         try:
             if ee.ImageCollection(cid).limit(1).size().getInfo() > 0:
+                if skipped:
+                    print(f"   [note] using {cid}; not readable/empty: "
+                          f"{skipped}")
                 return cid
-        except Exception:
+        except Exception as e:
+            skipped.append(f"{cid} ({type(e).__name__})")
             continue
+        skipped.append(f"{cid} (empty)")
     raise SystemExit(f"None of the candidate collections exist/are "
-                     f"readable: {candidates}")
+                     f"readable: {skipped}")
 
 
 def collection_years(ee, cid):

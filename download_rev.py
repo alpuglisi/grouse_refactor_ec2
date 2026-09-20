@@ -70,6 +70,16 @@ BASE_URL = "https://lfps.usgs.gov/api/job"
 SUBMIT_URL = f"{BASE_URL}/submit"
 STATUS_URL = f"{BASE_URL}/status"
 DOWNLOAD_URL_RE = re.compile(r'https?://[^\s"\']+\.zip')
+# The same host publishes one ArcGIS ImageServer per product and
+# vintage, and the per-vintage folder listing is a release-status API:
+# a product absent from Landfire_LF{year}'s listing does not exist for
+# that vintage at all, so there is no point submitting (and polling,
+# and content-validating) a job for it. Checked once per vintage before
+# planning. LANDFIRE rolls vintages out by GeoArea, so a product CAN be
+# listed and still be empty for the Northeast (LF2025 vegetation for
+# ME/NH/VT is scheduled for November 2026, SClass for December 2026) -
+# the post-download content check stays as the second line of defence.
+SERVICES_URL = "https://lfps.usgs.gov/arcgis/rest/services"
 
 OUT_DIR = "data/landfire"
 
@@ -107,6 +117,34 @@ def _raster_valid_fraction(path):
             return n_valid / data.size if data.size else 0.0
     except Exception:
         return None
+
+
+def published_products(year, session=None):
+    """Product codes LFPS lists for one vintage (e.g. {'EVT', 'EVH',
+    'FDist', ...}), parsed from the ArcGIS folder listing's service
+    names (`Landfire_LF2024/LF2024_EVT_CONUS`). None when the listing
+    can't be fetched or parsed - callers then fall back to trying the
+    job, exactly as before this check existed. Topo products live in a
+    separate `Landfire_Topo` folder and only at the LF2020 vintage, so
+    they are looked up there."""
+    session = session or make_session()
+    folder = "Landfire_Topo" if year == "2020" else f"Landfire_LF{year}"
+    try:
+        res = session.get(f"{SERVICES_URL}/{folder}", params={"f": "pjson"},
+                          timeout=30)
+        if res.status_code != 200:
+            return None
+        services = res.json().get("services") or []
+    except Exception:
+        return None
+    codes = set()
+    pat = re.compile(rf"^LF{year}_([A-Za-z0-9]+)(?:_|$)")
+    for svc in services:
+        name = str(svc.get("name", "")).split("/")[-1]
+        m = pat.match(name)
+        if m:
+            codes.add(m.group(1))
+    return codes or None
 
 
 def make_session():
@@ -272,12 +310,32 @@ def plan_tasks():
     2020 baseline in phase 2 (can't run concurrently with phase 1
     because the copies depend on the baseline existing)."""
     tasks = []
+    listings = {}
     for region in BOXES_COORDINATES:
         for year in YEARS:
             for feature in FEATURES:
                 if feature in TOPO_FEATURES and year != "2020":
                     continue
                 if (year, feature) in KNOWN_UNAVAILABLE:
+                    continue
+                # Pre-flight: skip a product LFPS does not list for this
+                # vintage (e.g. LF2025 SClass) instead of submitting a
+                # job that fails or returns nothing. None = listing
+                # unavailable -> try the job as before.
+                if year not in listings:
+                    listings[year] = published_products(year)
+                    if listings[year] is None:
+                        log(f"  [~] LF{year}: product listing unreachable "
+                            f"- will try jobs without a pre-flight check.")
+                    else:
+                        log(f"  [i] LF{year} publishes: "
+                            f"{sorted(listings[year])}")
+                codes = listings[year]
+                if codes is not None and LAYER_CODES[feature] not in codes:
+                    if region == list(BOXES_COORDINATES)[0]:
+                        log(f"  [-] LF{year}_{LAYER_CODES[feature]}: not "
+                            f"published for this vintage - skipped for "
+                            f"every region.")
                     continue
                 out = os.path.join(OUT_DIR, f"{region}_{year}_{feature}.tif")
                 if os.path.exists(out):

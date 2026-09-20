@@ -58,9 +58,16 @@ accumulate-then-read-once pattern. Kept on device, gathered at the end.
 
 **4. `--compile` (opt-in)** (`train.py`, `model_handler.fit`). Compiles
 `model.logits` - the module's `forward()` is never what training calls,
-which is why predict.py's `--compile` was a no-op. Outputs match eager
-to floating-point rounding (1.5e-8 on CPU fp32), NOT bit-for-bit,
-because inductor fuses and reorders elementwise chains; hence a flag.
+which is why predict.py's `--compile` was a no-op. Eval outputs match
+eager to floating-point rounding (1.5e-8 on CPU fp32), NOT bit-for-bit,
+because inductor fuses and reorders elementwise chains. In train mode
+the difference is larger and worth knowing: inductor lowers dropout to
+its own RNG, so the masks are different draws from the same
+Bernoulli(p) and the run follows a different random trajectory - the
+same kind of difference as a different `--seed`, not a change to what
+dropout does (2-epoch synthetic run: epoch-1 loss 0.1217 eager vs
+0.1219 compiled, epoch-2 0.1174 vs 0.1196, val metrics equal to 3
+decimals). Hence a flag, off by default.
 With `--dynamic-dropout` every new dropout value recompiles (measured:
 `nn.Dropout.p` is a module attribute dynamo treats as a constant); the
 recompile cache limit is raised so it can never silently fall back to

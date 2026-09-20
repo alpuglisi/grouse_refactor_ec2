@@ -654,8 +654,16 @@ class GrouseModelHandler:
         traced graph sees the final parameter tensors.
 
         Numerics: inductor fuses and reorders elementwise chains, so
-        outputs match eager to floating-point rounding (measured 1.5e-8
-        on CPU, fp32), not bit-for-bit. Opt-in for that reason.
+        eval-mode outputs match eager to floating-point rounding
+        (measured 1.5e-8 on CPU, fp32), not bit-for-bit. In TRAIN mode
+        there is a second, larger difference: inductor lowers dropout
+        to its own RNG, so the dropout masks are different draws from
+        the same Bernoulli(p) - the training trajectory is therefore a
+        different random path, like a different seed, not a rounding
+        perturbation (measured on a 2-epoch synthetic run: epoch-1 loss
+        0.1217 eager vs 0.1219 compiled, epoch-2 0.1174 vs 0.1196, same
+        val metrics to 3 decimals). Dropout VALUES and their schedule
+        are unchanged. Opt-in for both reasons.
 
         --dynamic-dropout: _set_dropout mutates nn.Dropout.p and
         model.embed_dropout - module attributes, which dynamo guards on

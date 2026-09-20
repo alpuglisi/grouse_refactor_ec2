@@ -32,10 +32,23 @@ This version excludes two more things before searching:
      of the raster, which read_window_stack pads with 0 fill - so even
      a point with a genuinely valid CENTER pixel can have a partially
      fake surrounding window.
-  2. Pixels where nlcd reads as 0 (padding/nodata - real Anderson
-     classes start at 11) once warped onto tsd's own grid. nlcd is a
-     reliable, always-populated-where-real proxy for "this location has
-     actual data coverage," cheaper than checking every feature.
+  2. Pixels where nlcd is nodata, once warped onto tsd's own grid.
+     nlcd is a reliable, always-populated-where-real proxy for "this
+     location has actual data coverage," cheaper than checking every
+     feature.
+
+     FIRST ATTEMPT AT THIS CHECK WAS WRONG: it tested the raw on-disk
+     value against literal 0. read_window_stack (predict.py) zeroes
+     NODATA_SENTINELS - (-9999, -32768, 32767, -1111) - to 0 for
+     categorical features AFTER reading; inspect_point.py's printed
+     "nlcd = 0" is that POST-zeroing model-input value, not the raw
+     disk value. The raw disk nodata value is -9999 (NLCD's own native
+     250 gets remapped to -9999 at download - see download_tcc_nlcd.py),
+     which is never equal to 0, so the old check let every pixel
+     through - verified by running it and getting nlcd=0 at both
+     picked points again, unchanged from before the "fix". Checks the
+     actual NODATA_SENTINELS set now, on the raw value, matching what
+     read_window_stack itself treats as invalid.
 
 Usage:
     python find_tsd_contrast_points.py --region NH
@@ -48,7 +61,7 @@ from rasterio.vrt import WarpedVRT
 from rasterio.enums import Resampling
 from pyproj import Transformer
 
-from grouse_data import GrouseData
+from grouse_data import GrouseData, NODATA_SENTINELS
 from models import tsd_decode, TSD_MAX_YEARS
 from predict import IMG_SIZE
 
@@ -105,11 +118,13 @@ def main():
                                width=width, height=height,
                                resampling=Resampling.nearest) as vrt:
                     nlcd_arr = vrt.read(1)
-        has_coverage = nlcd_arr != 0
+        has_coverage = ~np.isin(nlcd_arr, NODATA_SENTINELS) & (nlcd_arr != 0)
         before = valid.sum()
         valid &= has_coverage
-        print(f"   excluding nlcd=0 (padding, not a real class): "
-             f"{valid.sum():,} pixels remain (dropped {before - valid.sum():,})")
+        print(f"   excluding nlcd nodata ({NODATA_SENTINELS}, the RAW "
+             f"disk values - not the post-read_window_stack 0 "
+             f"inspect_point.py prints): {valid.sum():,} pixels remain "
+             f"(dropped {before - valid.sum():,})")
     else:
         print("   [warn] no nlcd raster found for this region - "
              "skipping the coverage gate, margin exclusion only.")

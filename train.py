@@ -665,6 +665,23 @@ def main():
                              "an_full.")
     parser.add_argument("--focal-gamma", type=float, default=2.0)
     parser.add_argument("--backbone-lr-factor", type=float, default=0.1)
+    parser.add_argument("--grad-clip", type=float, default=1.0,
+                        help="Max GLOBAL L2 norm across every trainable "
+                             "parameter's gradient, combined into one "
+                             "value (torch.nn.utils.clip_grad_norm_, not "
+                             "per-layer) - exceeding it rescales every "
+                             "gradient by the same factor, preserving "
+                             "direction, only shrinking magnitude. Was "
+                             "hardcoded here; exposed after observing "
+                             "the true (pre-clip) norm sitting at 2-6.5 "
+                             "on most steps against the old fixed 1.0 - "
+                             "clipping was engaging almost every step, "
+                             "not as the rare safety valve it's meant "
+                             "to be, making it (not --lr) the thing "
+                             "actually setting step size most of the "
+                             "time. See Grad/total_norm_preclip in "
+                             "--tensorboard to check where yours sits "
+                             "before deciding whether to raise this.")
     parser.add_argument("--sched", default="cosine",
                         choices=["warm_restarts", "cosine"])
     parser.add_argument("--warmup-epochs", type=int, default=3,
@@ -891,6 +908,7 @@ def main():
             focal_alpha=focal_alpha,
             focal_gamma=args.focal_gamma,
             backbone_lr_factor=args.backbone_lr_factor,
+            grad_clip=args.grad_clip,
             sched=args.sched,
             warmup_epochs=args.warmup_epochs,
             select_by=args.select_by,

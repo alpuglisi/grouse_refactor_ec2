@@ -101,6 +101,27 @@ was missing, and the user had to supply it.
 
 ---
 
+## train.py: expose --grad-clip (2026-09-19)
+
+`grad_clip=1.0` was a `GrouseModelHandler` constructor default with no
+CLI flag reaching it. Exposed after finding, via the new `Grad/*`
+TensorBoard tiles, that the true (pre-clip) global gradient norm was
+regularly sitting at 2-6.5 against that fixed 1.0 ceiling - clipping
+was engaging on most steps, not as the rare safety valve it's meant to
+be, making the clip threshold (not `--lr`) the thing actually setting
+step size most of the time.
+
+`--grad-clip` (default 1.0, matching the prior hardcoded behavior - no
+change to any run that doesn't pass it) flows straight into the
+existing constructor parameter; no new logic, same
+`clip_grad_norm_(self._clip_params, self.grad_clip)` call already
+computing this correctly (confirmed while explaining the mechanism:
+`scaler.unscale_()` runs before clipping, so the reported norm is the
+real, non-AMP-scaled value, and `_clip_params` is every trainable
+parameter combined into one global norm, not per-layer).
+
+---
+
 ## generate_treemap_features.py: recomputing identical output per year
 ## instead of copying it (2026-09-19)
 

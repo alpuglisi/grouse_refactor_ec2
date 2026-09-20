@@ -84,6 +84,28 @@ views (out of this pass's scope: train loop only).
 idle, `eval` seconds for one validation pass, `train` samples/s over
 N real fit() steps; run once per revision, twice each, keep the second.
 
+**Measured on the training box** (ME+NH+VT, 47,244 train items, batch
+32, 14 workers, early_attn + keep_early_resolution + dual_branch unet):
+
+| | loader /s | validation pass | train step /s |
+|---|---|---|---|
+| before (6499e43) | 5,590 | 5.6 s | ~930 |
+| after, eager | 5,560 | 4.1 s | ~900 |
+| after, `--compile` | 5,676 | 3.3 s | 1,436 |
+
+Reading: the loader has 6x headroom over the GPU at 14 workers, so
+change 1 cannot show here (it would with fewer workers). The step rate
+is GPU-bound and unchanged by changes 2-3; the validation pass is 27%
+faster (41% compiled). `--compile` is a 1.6x on the step itself, about
+a third off an epoch - BUT the train-mode compile costs ~25 s, and with
+`--dynamic-dropout` every new dropout value recompiles, so a 36 s
+compiled epoch plus a 25 s recompile is slower than the 56 s eager
+epoch. Guidance: `--compile` without dynamic dropout, eager with it.
+Holding the dropout probability in a tensor buffer (a custom dropout
+module) would remove the recompile entirely; not done, since it
+changes the model's dropout implementation and the eager random
+stream, which is a decision for the owner.
+
 ---
 
 ## Validation now filtered by the same year-gap rule as training

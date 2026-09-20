@@ -16,23 +16,34 @@ Three stages, each timed separately so a change to one shows up in one:
 
 Same flags as train.py for everything that affects geometry or the
 data path, so the measurement is of the run you actually make.
-Two runs, one per git revision, is the protocol:
 
-    git checkout <before>; python bench_pipeline.py --steps 200 > before.txt
-    git checkout <after>;  python bench_pipeline.py --steps 200 > after.txt
-    diff before.txt after.txt
+PROTOCOL - one run per git revision, from the project directory. The
+script imports the project code from the CURRENT DIRECTORY (not from
+wherever the script file sits), so a copy kept outside the repo can
+benchmark an older commit that does not contain this script:
 
-Add --compile to measure --compile. Run each configuration TWICE and
-keep the second (the first pays cache builds, cudnn autotuning and,
-with --compile, compilation). Nothing here changes any file.
+    cp bench_pipeline.py /tmp/bench.py            # survives the checkout
+    git checkout <before-commit>
+    python /tmp/bench.py --steps 200 <your train.py geometry flags> | tee before.txt
+    git checkout <your branch>
+    python /tmp/bench.py --steps 200 <same flags> | tee after.txt
+    python /tmp/bench.py --steps 200 <same flags> --compile | tee after_compile.txt
+
+Run each configuration TWICE and keep the second (the first pays cache
+builds, cudnn autotuning and, with --compile, compilation). Nothing
+here changes any file; the checkpoint fit() writes is deleted after.
+--compile needs the newer code and is ignored, with a note, on a
+revision whose fit() has no compile_model argument.
 """
 import argparse
+import inspect
 import os
 import sys
 import time
 
-_here = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, _here)
+# The project directory is wherever this is RUN from, so a copy of this
+# file outside the repo benchmarks whatever revision is checked out.
+sys.path.insert(0, os.getcwd())
 
 import torch
 from torch.utils.data import DataLoader
@@ -121,6 +132,10 @@ def main():
         if handler.device.type == 'cuda':
             handler.model = handler.model.to(memory_format=torch.channels_last)
             handler._mem_fmt = torch.channels_last
+        if args.compile and not hasattr(handler, "_install_compiled_logits"):
+            print("   --compile: this revision has no compile support; "
+                  "measuring eager.")
+            args.compile = False
         if args.compile:
             handler._install_compiled_logits(False)
             handler.evaluate(val_loader, None, 0, 1)      # pay the compile
@@ -144,9 +159,10 @@ def main():
         import dataset as _d
         _d.StratifiedBatchSampler = _Capped
         sync(); t0 = time.perf_counter()
+        extra = ({"compile_model": True} if args.compile and "compile_model"
+                 in inspect.signature(handler.fit).parameters else {})
         handler.fit(train_ds, val_ds, epochs=1, batch_size=args.batch_size,
-                    workers=args.workers, train_labels=train_labels,
-                    compile_model=args.compile)
+                    workers=args.workers, train_labels=train_labels, **extra)
         sync(); dt = time.perf_counter() - t0
         print(f"train: {args.steps * args.batch_size / dt:,.0f} samples/s "
               f"end-to-end over {args.steps} steps of {args.batch_size} "

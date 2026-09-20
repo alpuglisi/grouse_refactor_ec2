@@ -73,7 +73,9 @@ def main():
     ap.add_argument("--steps", type=int, default=0,
                     help="Optimizer steps for the train stage (0 = skip). "
                          "Runs fit() for one epoch capped at this many "
-                         "batches via a sampler-sized epoch.")
+                         "batches via a sampler-sized epoch. Use 1000+: "
+                         "fit() includes one validation pass, and at 200 "
+                         "steps that pass was ~45%% of the measured time.")
     ap.add_argument("--compile", action="store_true")
     ap.add_argument("--no-eval", action="store_true")
     # geometry flags, same defaults as train.py
@@ -143,6 +145,7 @@ def main():
         sync(); t0 = time.perf_counter()
         handler.evaluate(val_loader, None, 0, 1)
         sync(); dt = time.perf_counter() - t0
+        eval_dt = dt
         print(f"eval: {dt:.1f}s for one validation pass "
               f"({len(val_ds):,} items, batch {eval_bs}, "
               f"flip_tta={args.flip_tta}, compile={args.compile})")
@@ -158,16 +161,35 @@ def main():
                 self.n_batches = args.steps
         import dataset as _d
         _d.StratifiedBatchSampler = _Capped
-        sync(); t0 = time.perf_counter()
         extra = ({"compile_model": True} if args.compile and "compile_model"
                  in inspect.signature(handler.fit).parameters else {})
-        handler.fit(train_ds, val_ds, epochs=1, batch_size=args.batch_size,
-                    workers=args.workers, train_labels=train_labels, **extra)
-        sync(); dt = time.perf_counter() - t0
-        print(f"train: {args.steps * args.batch_size / dt:,.0f} samples/s "
-              f"end-to-end over {args.steps} steps of {args.batch_size} "
-              f"(includes one validation pass and, with --compile, the "
-              f"compile itself - run twice, keep the second)")
+        # With --compile the first fit() pays the train-mode compile
+        # inside the timed region (tens of seconds, which at 200 steps
+        # swamped the measurement: 171 vs 571 samples/s). Dynamo caches
+        # compiled code on the function, so a second fit() on the same
+        # handler runs the compiled graph without recompiling - time
+        # that one.
+        rounds = 2 if extra else 1
+        for r in range(rounds):
+            sync(); t0 = time.perf_counter()
+            handler.fit(train_ds, val_ds, epochs=1,
+                        batch_size=args.batch_size, workers=args.workers,
+                        train_labels=train_labels, **extra)
+            sync(); dt = time.perf_counter() - t0
+            if r < rounds - 1:
+                print(f"   (warm-up fit() with compile: {dt:.1f}s, "
+                      f"discarded)")
+        n = args.steps * args.batch_size
+        print(f"train: {n / dt:,.0f} samples/s end-to-end over {args.steps} "
+              f"steps of {args.batch_size} (includes one validation pass"
+              f"{', compiled' if extra else ''})")
+        if not args.no_eval:
+            # The eval stage above timed exactly the validation pass
+            # fit() also runs, so subtracting it isolates the steps.
+            step_dt = dt - eval_dt
+            if step_dt > 0:
+                print(f"train (steps only, validation pass subtracted): "
+                      f"{n / step_dt:,.0f} samples/s")
         try:
             os.remove(handler.save_path)
             os.remove(handler._resume_path())

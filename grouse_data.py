@@ -322,13 +322,25 @@ class RegionData:
             return path
 
         # Resolved file exists but is invalid - fall back to the most
-        # recent valid year among everything else on disk.
+        # recent valid year among everything else on disk. Loud, once
+        # per (feature, year): an empty placeholder vintage (e.g. a
+        # LANDFIRE GeoArea not yet published when it was fetched) is
+        # legitimate to keep on disk while waiting for the real data,
+        # but nobody should discover months later that "2025" was 2024.
         for candidate_year in sorted(years, reverse=True):
             if candidate_year == year:
                 continue
             candidate_path = self.path("raster", feature=feature,
                                        year=candidate_year)
             if self._is_valid_raster(candidate_path):
+                key = (feature, year)
+                if key not in self._year_gap_warned:
+                    self._year_gap_warned.add(key)
+                    print(f"   [warn] [{self.region}] {feature} {year} is "
+                          f"on disk but empty (fails content validation) "
+                          f"- using {candidate_year} instead. Re-run "
+                          f"download_rev.py once LANDFIRE publishes it; "
+                          f"the downloader now re-fetches empty files.")
                 return candidate_path
         raise MissingDataError(
             f"[{self.region}] every {feature} raster on disk ({years}) "

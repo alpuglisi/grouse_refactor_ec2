@@ -16,6 +16,23 @@ the diff.
 
 ---
 
+## Empty placeholder vintages: keep them, but say so and re-fetch them
+## (2026-09-20)
+
+The 2025 EVC clips on the box are all-nodata placeholders from before
+`download_rev.py` validated content - LANDFIRE had not published that
+GeoArea. They are deliberately kept on disk while the real data is
+being obtained, which was already safe (`raster_path` content-validates
+and falls back to the newest valid vintage) but silent, and
+`download_rev.py` skipped any existing file, so the placeholder would
+have blocked the real download forever. Now: `raster_path` warns once
+per (feature, year) when it substitutes a vintage for an empty file,
+and `plan_tasks` treats an existing file below `MIN_VALID_PIXEL_FRAC`
+as missing and re-fetches it. Verified with a synthetic empty 2025
+raster beside a valid 2024 one.
+
+---
+
 ## tcc/nlcd were on a different pixel grid from every other feature:
 ## rotated 11 px against the rest of every training patch (2026-09-20)
 

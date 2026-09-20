@@ -281,7 +281,19 @@ def plan_tasks():
                     continue
                 out = os.path.join(OUT_DIR, f"{region}_{year}_{feature}.tif")
                 if os.path.exists(out):
-                    continue
+                    # A file that exists but is (near-)empty is a
+                    # placeholder from a vintage LANDFIRE had not yet
+                    # published for this GeoArea when it was fetched -
+                    # the content check below only started rejecting
+                    # those after some were already on disk. Treat it
+                    # as missing so the next run re-fetches it, instead
+                    # of the empty file blocking the real data forever.
+                    frac = _raster_valid_fraction(out)
+                    if frac is None or frac >= MIN_VALID_PIXEL_FRAC:
+                        continue
+                    log(f"  [~] {region} {year} {feature}: existing file "
+                        f"is {frac * 100:.2f}% valid - treating as "
+                        f"missing and re-downloading.")
                 tasks.append((region, year, feature))
     return tasks
 

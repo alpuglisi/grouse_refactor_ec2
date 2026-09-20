@@ -338,9 +338,10 @@ class RegionData:
                     self._year_gap_warned.add(key)
                     print(f"   [warn] [{self.region}] {feature} {year} is "
                           f"on disk but empty (fails content validation) "
-                          f"- using {candidate_year} instead. Re-run "
-                          f"download_rev.py once LANDFIRE publishes it; "
-                          f"the downloader now re-fetches empty files.")
+                          f"- using {candidate_year} instead. Once "
+                          f"LANDFIRE publishes it, run download_rev.py "
+                          f"--refetch-empty (existing files are never "
+                          f"overwritten; the placeholder is backed up).")
                 return candidate_path
         raise MissingDataError(
             f"[{self.region}] every {feature} raster on disk ({years}) "

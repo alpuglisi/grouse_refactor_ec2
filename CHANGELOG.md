@@ -94,9 +94,11 @@ and falls back to the newest valid vintage) but silent, and
 `download_rev.py` skipped any existing file, so the placeholder would
 have blocked the real download forever. Now: `raster_path` warns once
 per (feature, year) when it substitutes a vintage for an empty file,
-and `plan_tasks` re-plans an existing file below `MIN_VALID_PIXEL_FRAC`
-(`--skip-existing` turns that off). Verified with a synthetic empty
-2025 raster beside a valid 2024 one.
+and `plan_tasks` can re-plan an existing file below
+`MIN_VALID_PIXEL_FRAC` - but only with `--refetch-empty`. **The default
+is to skip every existing file, placeholder or not** (asked for
+explicitly, after a first version that re-fetched by default). Verified
+with a synthetic empty 2025 raster beside a valid 2024 one.
 
 **`download_rev.py` never overwrites or deletes an existing file**
 (asked for explicitly: the placeholders are being kept while the real
@@ -108,7 +110,9 @@ into place; whatever was at that path first moves, unchanged, to
 `data/landfire/replaced/` (a subdirectory the discovery globs never
 see; an earlier backup of the same name gets a timestamp rather than
 being replaced). Attribute-table sidecars already on disk are left
-alone too. Verified end to end against a mocked LFPS: an empty re-fetch
+alone too. With the default (no `--refetch-empty`) the script never
+touches an existing path at all. Verified end to end against a mocked
+LFPS: an empty re-fetch
 leaves the placeholder byte-identical and no temp files; a valid one
 backs it up and installs the new file; a second valid one keeps both
 backups.

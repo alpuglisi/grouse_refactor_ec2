@@ -344,16 +344,18 @@ def download_one(region, year, feature):
 # =======================================================================
 # 4. TASK PLANNING + TWO-PHASE EXECUTION
 # =======================================================================
-def plan_tasks(refetch_empty=True):
+def plan_tasks(refetch_empty=False):
     """Everything that needs an actual network download. Topo features
     are planned for 2020 only; other years get filesystem copies of the
     2020 baseline in phase 2 (can't run concurrently with phase 1
     because the copies depend on the baseline existing).
 
-    refetch_empty: re-plan an existing file whose content is (near-)
-    empty - a placeholder from an unpublished vintage. A successful
-    re-fetch backs the placeholder up (see REPLACED_DIR) rather than
-    overwriting it; a failed one leaves it exactly as it was."""
+    refetch_empty (off by default): also re-plan an existing file whose
+    content is (near-)empty - a placeholder from an unpublished
+    vintage. Off, every existing file is skipped, placeholder or not. On
+    (--refetch-empty), a successful re-fetch backs the placeholder up
+    (see REPLACED_DIR) rather than overwriting it; a failed one leaves
+    it exactly as it was."""
     tasks = []
     listings = {}
     for region in BOXES_COORDINATES:
@@ -430,14 +432,18 @@ def main():
         description="Download LANDFIRE clips via LFPS. Never overwrites "
                     "or deletes an existing file: replaced files are "
                     f"moved to {REPLACED_DIR}.")
-    ap.add_argument("--skip-existing", action="store_true",
-                    help="Skip every existing file, even an empty "
-                         "placeholder. Default: re-fetch empty ones, "
-                         "keeping the placeholder unless a valid "
-                         "replacement arrives.")
+    ap.add_argument("--refetch-empty", action="store_true",
+                    help="Also re-download existing files that are "
+                         "(near-)empty placeholders from an unpublished "
+                         "vintage. Default: every existing file is "
+                         "skipped, placeholder or not. With this flag a "
+                         "placeholder is still never overwritten - a "
+                         f"valid replacement moves it to {REPLACED_DIR} "
+                         "first, and an empty or failed re-fetch leaves "
+                         "it untouched.")
     args = ap.parse_args()
     os.makedirs(OUT_DIR, exist_ok=True)
-    tasks = plan_tasks(refetch_empty=not args.skip_existing)
+    tasks = plan_tasks(refetch_empty=args.refetch_empty)
     skipped_known = sum(1 for r in BOXES_COORDINATES for y in YEARS
                         for f in FEATURES if (y, f) in KNOWN_UNAVAILABLE)
     log(f"Planned {len(tasks)} download job(s) "

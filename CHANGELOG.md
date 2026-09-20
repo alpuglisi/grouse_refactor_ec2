@@ -16,6 +16,69 @@ the diff.
 
 ---
 
+## Training-loop throughput: same numbers, fewer operations (2026-09-20)
+
+Constraint for this pass: wall-clock only - nothing the model sees,
+learns from, or does may change. Every change below was checked
+against a clean checkout of the previous commit on synthetic data (the
+fake-RegionData + patched `_read_patch` harness), by capturing outputs
+BEFORE editing and comparing AFTER: 113 dataset items across the
+augmented, deterministic, soft-label and SSL-pair paths bit-identical
+in values and dtypes, and all 17 outputs of `evaluate()` identical.
+No real data or GPU exists in the environment that made these, so the
+speedups are argued from profiles and kernel counts, not measured on
+the training box - `bench_pipeline.py` is the protocol for that.
+
+**1. Loader: no pandas in the per-item path** (`dataset.py`).
+Profiled on the cached path (the steady state after epoch 1): 238 us
+per item, of which `df.iloc[i]` was 39 us and an avoidable float32 copy
+of the int16 cache block another ~35 us. Per-point columns are now
+plain arrays built once; the label/weight/soft-label tensors are
+pre-built so an item returns a 0-d view; `_raw_stack` hands the cache's
+int16 block through and `_to_tensors` converts each half straight to
+its target dtype. After: 89 us per item on the augmented path (2.7x),
+50 us on the validation path. This matters exactly when the loader is
+the bottleneck, which train.py's own comments say it is; the
+`--jitter`, `expand_rotations`, D4 and RNG draw order are untouched.
+
+**2. Validation TTA in one forward pass** (`model_handler._pooled_logits`).
+The mirrored view was a second `model.logits` call per batch; it is now
+concatenated onto the batch and scored in the same call. Bit-identical
+(eval-mode BatchNorm uses running statistics, so nothing depends on
+batch composition - verified `torch.equal` on CPU), half the kernel
+launches for the whole validation pass, one forward of 2B instead of
+two of B. Memory per validation forward doubles, inside the documented
+eval batch sizes. Incidentally measured on this CPU: the synthetic
+validation pass went from 51 s to 35 s.
+
+**3. One less sync per validation batch** (`model_handler.evaluate`).
+The nlcd centre-code gather did `.cpu()` every batch - one forced
+device synchronization per batch, in a loop built on the
+accumulate-then-read-once pattern. Kept on device, gathered at the end.
+
+**4. `--compile` (opt-in)** (`train.py`, `model_handler.fit`). Compiles
+`model.logits` - the module's `forward()` is never what training calls,
+which is why predict.py's `--compile` was a no-op. Outputs match eager
+to floating-point rounding (1.5e-8 on CPU fp32), NOT bit-for-bit,
+because inductor fuses and reorders elementwise chains; hence a flag.
+With `--dynamic-dropout` every new dropout value recompiles (measured:
+`nn.Dropout.p` is a module attribute dynamo treats as a constant); the
+recompile cache limit is raised so it can never silently fall back to
+eager, and the cost is one recompile per epoch the value moved.
+Untested on a GPU; the fit() path ran compiled end to end on CPU with
+EMA and dynamic dropout on.
+
+**Not done, deliberately:** bf16 autocast (changes values), fusing the
+four `torch.randint` draws in `_augmented_view` (the draw order is a
+documented reproducibility contract), batching predict.py's eight D4
+views (out of this pass's scope: train loop only).
+
+**Protocol** (`bench_pipeline.py`): `loader` samples/s with the GPU
+idle, `eval` seconds for one validation pass, `train` samples/s over
+N real fit() steps; run once per revision, twice each, keep the second.
+
+---
+
 ## Validation now filtered by the same year-gap rule as training
 ## (2026-09-20)
 

@@ -82,6 +82,7 @@ assignments).
 | `check_exotic.py`, `check_raster.py`, `dupe_check.py` | One-off data-integrity checks. |
 | `scan_codes.py` | Per raster: code range on disk vs each categorical feature's `FEATURE_SPEC` vocab (what the clamp would destroy). |
 | `realign_rasters.py` | Per region: which rasters are off the template pixel grid, and (`--apply`) warps them onto it. |
+| `bench_pipeline.py` | Throughput of the loader, one validation pass and N real training steps on the real data - the before/after protocol for any speed change. |
 | `smoke_test_training.py` | Fast end-to-end training smoke test. |
 | `document_tree.sh` | Inventories the working directory — every file with size and date, plus a **feature × year raster coverage matrix per region**. Data files are gitignored and never reach a clone, so this is how the year-vintage situation becomes reviewable from the repo. |
 | `tune.py`, `tune_bins.py` | Hyperparameter / envelope-bin sweeps. |

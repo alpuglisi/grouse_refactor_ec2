@@ -847,6 +847,17 @@ def main():
                              "not recomputed per epoch. Incompatible with "
                              "--ensemble > 1 (ambiguous which model would "
                              "be the student).")
+    parser.add_argument("--compile", action="store_true",
+                        help="torch.compile the scoring path "
+                             "(model.logits - the module's forward() is "
+                             "never what training calls). Throughput "
+                             "only; outputs match eager to floating-"
+                             "point rounding, not bit-for-bit, which is "
+                             "why it is opt-in. The first training and "
+                             "first validation batch pay the compile. "
+                             "Works with --dynamic-dropout (see "
+                             "GrouseModelHandler._install_compiled_"
+                             "logits for the recompile handling).")
     parser.add_argument("--distill-alpha", type=float, default=0.5,
                         help="With --distill-from: weight on the true-"
                              "label loss in the blend against the "
@@ -1127,7 +1138,8 @@ def main():
                     dynamic_dropout_max=args.dynamic_dropout_max,
                     dynamic_dropout_step=args.dynamic_dropout_step,
                     distill_alpha=(args.distill_alpha if args.distill_from
-                                   else None))
+                                   else None),
+                    compile_model=args.compile)
         if tb_writer is not None:
             tb_writer.close()
         members.append((path, overrides.get('pool', args.pool)))

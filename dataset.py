@@ -62,6 +62,9 @@ class GrousePatchDataset(Dataset):
         self.spec = spec or FEATURE_SPEC
         self.cat_features = list(cat_features)
         self.cont_features = list(cont_features)
+        self._scales = np.array(
+            [[[float(self.spec[f].get("scale", 1.0))]]
+             for f in self.cont_features], dtype=np.float32)
         self.img_size = int(img_size)
         self.expand_rotations = bool(expand_rotations)
         self.augment = bool(augment)
@@ -94,6 +97,23 @@ class GrousePatchDataset(Dataset):
                              self.rd.raster_years(self.cont_features[0]))
         df['year'] = df['year'].fillna(df['year'].max()).astype(int)
         self.df = df
+        # Per-point columns as plain arrays. __getitem__ runs millions of
+        # times per training run and a pandas `df.iloc[i]` row lookup
+        # costs ~40 us of index/dtype machinery for five scalars
+        # (profiled: 16% of a cached item); indexing these arrays costs
+        # ~1 us. Same values, same dtypes as the DataFrame columns. The
+        # label/weight tensors are pre-built so an item returns a 0-d
+        # view instead of constructing a tensor from a Python float.
+        self._lon = df['longitude'].to_numpy(dtype=np.float64)
+        self._lat = df['latitude'].to_numpy(dtype=np.float64)
+        self._year = df['year'].to_numpy(dtype=np.int64)
+        self._label_t = torch.from_numpy(
+            df['label'].to_numpy(dtype=np.float32))
+        self._weight_t = torch.from_numpy(
+            df['weight'].to_numpy(dtype=np.float32))
+        self._soft_t = (torch.from_numpy(
+            df['soft_label'].to_numpy(dtype=np.float32))
+            if 'soft_label' in df.columns else None)
 
         # Resolve (feature, record-year) -> raster path once, up front.
         all_feats = self.cat_features + self.cont_features
@@ -319,9 +339,13 @@ class GrousePatchDataset(Dataset):
         return arr
 
     def _raw_stack(self, i, lon, lat, year):
-        """(n_feat, read_size, read_size) float32, nodata already 0."""
+        """(n_feat, read_size, read_size), nodata already 0. int16 straight
+        from the cache when there is one (the values are integral either
+        way - every raster is int16 - so _to_tensors converts each half
+        directly to its target dtype instead of paying for a float32
+        copy of the whole stack first); float32 from a live read."""
         if self.cache is not None:
-            return np.asarray(self.cache[i], dtype=np.float32)
+            return self.cache[i]
         feats = self.cat_features + self.cont_features
         return np.stack([
             np.nan_to_num(self._read_patch(self._path_for[(f, year)], lon, lat),
@@ -332,9 +356,8 @@ class GrousePatchDataset(Dataset):
             i, rot = idx // 4, idx % 4
         else:
             i, rot = idx, 0
-        row = self.df.iloc[i]
-        lon, lat, year = (float(row['longitude']), float(row['latitude']),
-                          int(row['year']))
+        lon, lat, year = (float(self._lon[i]), float(self._lat[i]),
+                          int(self._year[i]))
 
         stack = self._raw_stack(i, lon, lat, year)
 
@@ -352,11 +375,10 @@ class GrousePatchDataset(Dataset):
                 cat_x = torch.rot90(cat_x, k=rot, dims=(1, 2))
                 cont_x = torch.rot90(cont_x, k=rot, dims=(1, 2))
 
-        yl = torch.tensor(float(row['label']), dtype=torch.float32)
-        w = torch.tensor(float(row['weight']), dtype=torch.float32)
-        if 'soft_label' in self.df.columns:
-            sl = torch.tensor(float(row['soft_label']), dtype=torch.float32)
-            return cat_x, cont_x, yl, w, sl
+        yl = self._label_t[i]
+        w = self._weight_t[i]
+        if self._soft_t is not None:
+            return cat_x, cont_x, yl, w, self._soft_t[i]
         return cat_x, cont_x, yl, w
 
     def _to_tensors(self, s):
@@ -366,13 +388,16 @@ class GrousePatchDataset(Dataset):
         n = self.img_size
         n_cat = len(self.cat_features)
         cat_np, cont_np = s[:n_cat], s[n_cat:]
-        cat_x = (torch.from_numpy(np.ascontiguousarray(cat_np)).long()
+        # astype() makes the contiguous copy AND the dtype change in one
+        # pass (int16 -> int64 for codes, int16/float32 -> float32 for
+        # the continuous channels), identical values to the previous
+        # float32-then-.long() route because every stored value is an
+        # integer within int16 range.
+        cat_x = (torch.from_numpy(cat_np.astype(np.int64))
                  if n_cat else torch.zeros((0, n, n), dtype=torch.long))
         if len(self.cont_features):
-            scales = np.array([[[float(self.spec[f].get("scale", 1.0))]]
-                               for f in self.cont_features], dtype=np.float32)
             cont_x = torch.from_numpy(
-                np.ascontiguousarray(cont_np / scales)).float()
+                cont_np.astype(np.float32) / self._scales)
         else:
             cont_x = torch.zeros((0, n, n), dtype=torch.float32)
         return cat_x, cont_x
@@ -437,9 +462,8 @@ class SSLPairDataset(GrousePatchDataset):
                          jitter=jitter, label=0.0, **kw)
 
     def __getitem__(self, idx):
-        row = self.df.iloc[idx]
-        stack = self._raw_stack(idx, float(row['longitude']),
-                                float(row['latitude']), int(row['year']))
+        stack = self._raw_stack(idx, float(self._lon[idx]),
+                                float(self._lat[idx]), int(self._year[idx]))
         cat1, cont1 = self._augmented_view(stack)
         cat2, cont2 = self._augmented_view(stack)
         return cat1, cont1, cat2, cont2

@@ -59,7 +59,8 @@ sys.path.insert(0, _here)
 
 from grouse_data import GrouseData
 from models import (GrouseResNet, FEATURE_SPEC, split_features,
-                    config_to_model_kwargs)
+                    config_to_model_kwargs, spec_with_checkpoint_vocab,
+                    checkpoint_vocab_notes)
 from model_handler import GrouseModelHandler, roc_auc, average_precision
 from losses import loss_logit_bias
 from train import build_datasets, discover_features
@@ -97,7 +98,13 @@ def load_model(path, device, cli_pool, cli_center_skip, disk_features):
               f"loading fails or results look wrong, pass the flags the "
               f"model was trained with.")
     cat_f, cont_f = split_features(features)
-    model = GrouseResNet(cat_f, cont_f, pretrained=False,
+    # Vocab sizes from the checkpoint's own embedding tables (see
+    # predict.load_model / models.spec_with_checkpoint_vocab).
+    spec = spec_with_checkpoint_vocab(state)
+    for note in checkpoint_vocab_notes(spec, cat_f):
+        print(f"  [note] checkpoint {note} - rebuilt with the "
+              f"checkpoint's own table size.")
+    model = GrouseResNet(cat_f, cont_f, spec=spec, pretrained=False,
                          **kw).to(device)
     try:
         model.load_state_dict(state)

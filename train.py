@@ -335,7 +335,7 @@ def score_ensemble(members, features, val_ds, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     loader = DataLoader(val_ds, batch_size=256, num_workers=args.workers)
     per_member, ys = [], None
-    from models import config_to_model_kwargs
+    from models import config_to_model_kwargs, spec_with_checkpoint_vocab
     for path, pool in members:
         state, cfg = GrouseModelHandler.unwrap_checkpoint(
             torch.load(path, map_location=device, weights_only=True))
@@ -352,8 +352,9 @@ def score_ensemble(members, features, val_ds, args):
             early_attn_kv_stride=args.early_attn_kv_stride,
             dual_branch=args.dual_branch,
             dual_branch_channels=args.dual_branch_channels))
-        model = GrouseResNet(cat_f, cont_f, pretrained=False,
-                             **kw).to(device).eval()
+        model = GrouseResNet(cat_f, cont_f,
+                             spec=spec_with_checkpoint_vocab(state),
+                             pretrained=False, **kw).to(device).eval()
         model.load_state_dict(state)
         outs, labels = [], []
         with torch.no_grad():
@@ -858,7 +859,9 @@ def main():
     distill_models = None
     if args.distill_from:
         import torch as _torch2
-        from models import GrouseResNet, config_to_model_kwargs
+        from models import (GrouseResNet, config_to_model_kwargs,
+                            spec_with_checkpoint_vocab,
+                            checkpoint_vocab_notes)
         _device = _torch2.device("cuda" if _torch2.cuda.is_available()
                                  else "cpu")
         cat_f, cont_f = split_features(features)
@@ -867,9 +870,42 @@ def main():
             state, cfg = GrouseModelHandler.unwrap_checkpoint(
                 _torch2.load(ckpt_path, map_location=_device,
                             weights_only=True))
+            # A teacher is scored on THIS run's datasets, which are
+            # built from THIS run's feature list - so its own feature
+            # list (authoritative for a wrapped checkpoint, see
+            # ARCHITECTURE.md) must be the same list, in the same
+            # channel order. Anything else is either a shape mismatch
+            # (loud but cryptic) or, when the channel counts happen to
+            # agree, a teacher silently reading one feature's channel
+            # as another and emitting confident nonsense as the soft
+            # target. Refuse explicitly rather than let either happen;
+            # supporting mixed feature sets would need one dataset per
+            # distinct teacher list and is not worth it.
+            ckpt_features = (cfg or {}).get("features")
+            if ckpt_features is None:
+                print(f"   [warn] {ckpt_path} is a bare checkpoint with no "
+                      f"feature list - assuming it was trained on this "
+                      f"run's features {features}; a shape mismatch "
+                      f"below means it wasn't.")
+            elif split_features(ckpt_features) != (cat_f, cont_f):
+                # Compared in spec order, so an explicit --features list
+                # given in a different order still matches.
+                raise SystemExit(
+                    f"--distill-from {ckpt_path}: teacher was trained on "
+                    f"features {list(ckpt_features)} but this run uses "
+                    f"{list(features)}. A teacher is scored on this run's "
+                    f"patches, so the two lists must match exactly. "
+                    f"Missing on disk: "
+                    f"{sorted(set(ckpt_features) - set(features))}; "
+                    f"extra on disk: "
+                    f"{sorted(set(features) - set(ckpt_features))}. "
+                    f"Either restore the teacher's rasters (or pass "
+                    f"--features with its list) or retrain the teachers "
+                    f"on the current feature set.")
             # Rebuild from the checkpoint's OWN config (see score_ensemble)
             # - a teacher's architecture doesn't have to, and here mostly
-            # won't, match this run's --pool/etc.
+            # won't, match this run's --pool/etc. Its embedding vocab
+            # sizes likewise come from its own tables.
             kw = config_to_model_kwargs(cfg, defaults=dict(
                 pool=args.pool, center_skip=args.center_skip,
                 keep_early_resolution=args.keep_early_resolution,
@@ -878,9 +914,20 @@ def main():
                 early_attn_kv_stride=args.early_attn_kv_stride,
                 dual_branch=args.dual_branch,
                 dual_branch_channels=args.dual_branch_channels))
-            m = GrouseResNet(cat_f, cont_f, pretrained=False,
+            t_spec = spec_with_checkpoint_vocab(state)
+            for note in checkpoint_vocab_notes(t_spec, cat_f):
+                print(f"   [note] teacher {ckpt_path}: {note} - the "
+                      f"teacher scores with ITS clamp; the student "
+                      f"trains under the current spec.")
+            m = GrouseResNet(cat_f, cont_f, spec=t_spec, pretrained=False,
                              **kw).to(_device).eval()
-            m.load_state_dict(state)
+            try:
+                m.load_state_dict(state)
+            except RuntimeError as e:
+                raise SystemExit(
+                    f"--distill-from {ckpt_path}: checkpoint doesn't match "
+                    f"the model rebuilt from its config (features="
+                    f"{list(features)}, {kw}).\nOriginal error:\n{e}")
             distill_models.append(m)
         print(f"   --distill-from: {len(distill_models)} teacher(s) loaded "
               f"({', '.join(args.distill_from)}), alpha="

@@ -85,7 +85,8 @@ if not os.path.exists(os.path.join(_here, "grouse_data.py")):
 
 from grouse_data import GrouseData, NLCD_NAMES, NODATA_SENTINELS
 from models import (GrouseResNet, FEATURE_SPEC, split_features,
-                    config_to_model_kwargs, d4_tta_logits)
+                    config_to_model_kwargs, d4_tta_logits,
+                    spec_with_checkpoint_vocab, checkpoint_vocab_notes)
 from losses import loss_logit_bias
 from prepare_training_data import BOXES
 
@@ -131,7 +132,15 @@ def load_model(model_path, disk_features, device, cli_pool="attn",
               f"pass --pool/--center-skip matching the training run if "
               f"this is wrong.")
     cat_f, cont_f = split_features(features)
-    model = GrouseResNet(cat_f, cont_f, pretrained=False,
+    # Embedding vocab sizes come from the checkpoint's own tables, not
+    # today's FEATURE_SPEC - a checkpoint trained under the old evh/evc
+    # vocab of 300 must keep loading (and keep clamping exactly as it
+    # was trained to; see models.spec_with_checkpoint_vocab).
+    spec = spec_with_checkpoint_vocab(state)
+    for note in checkpoint_vocab_notes(spec, cat_f):
+        print(f"   [note] checkpoint {note} - rebuilt with the "
+              f"checkpoint's own table size.")
+    model = GrouseResNet(cat_f, cont_f, spec=spec, pretrained=False,
                          **kw).to(device)
     try:
         model.load_state_dict(state)

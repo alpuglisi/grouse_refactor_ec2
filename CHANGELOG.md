@@ -16,6 +16,107 @@ the diff.
 
 ---
 
+## models.py: evh/evc vocab 300 was clamping LANDFIRE's entire
+## herbaceous block onto one shrub code (2026-09-20)
+
+Found by static review, then confirmed against the official LANDFIRE
+Attribute Data Dictionaries for every vintage on disk (LF2022-LF2025).
+Since the LF 2016 Remap, EVC and EVH are laid out in three life-form
+blocks: EVC tree 110-199 / shrub 210-299 / herb 310-399 (one code per
+percent), EVH tree 101-199 / shrub 201-230 / herb 301-310 (decimetre
+steps). `FEATURE_SPEC` had `vocab: 300` for both, and
+`GrouseResNet.embed` clamps every code into `[0, vocab-1]` - so all
+90 EVC herb codes and all 10 EVH herb codes were being mapped to index
+299 before the embedding lookup. For EVC, 299 is a LIVE code, "Shrub
+Cover >= 99%": every herb-dominated pixel (openings, hayfields, wet
+meadows - the drumming and brood-foraging cover this species keys on)
+was handed the densest-shrub embedding, and herb cover percent was
+unlearnable. For EVH, 299 is undefined, so herb height collapsed to one
+dead index rather than aliasing. Nothing crashed, nothing warned; the
+codes survive intact in the rasters and the int16 patch cache, and the
+loss happened only at the clamp. The vocab appears to have been carried
+over from the original project's hardcoded embeddings, sized for the
+pre-Remap 10%-binned codes (101-129), and never revisited when LF2022
+vintages arrived.
+
+`sclass` (max 180), `evt` (documented domain 4401-9994, vocab 10000)
+and `fdist` (max 733, vocab 10000) are unaffected.
+
+Fixed: `evh`/`evc` vocab -> 512. The documented maximum is 399; 512
+costs nothing and leaves headroom. **This is a cold-start geometry
+change** - the embedding tables are in the state dict, so `--resume`
+and `--init-from` are invalid against every earlier checkpoint
+(`load_backbone` skips the two mismatched tables by name and transfers
+the rest, which is its documented behaviour; `--resume`'s config
+comparison now includes `vocab` so it names the change instead of
+failing on a tensor shape).
+
+**Existing checkpoints stay deployable.** `predict.py`, `calibrate.py`,
+`train.score_ensemble` and the `--distill-from` loader now rebuild each
+categorical feature's vocab from the checkpoint's own
+`embeddings.<f>.weight` rows (`models.spec_with_checkpoint_vocab`),
+not from today's `FEATURE_SPEC`. A pre-change checkpoint therefore
+loads with vocab 300 and keeps clamping at inference exactly as it did
+in training - the right behaviour for THAT model, whose weights only
+know the collapsed code. The fix for the collapse itself is a retrain.
+
+Added a loud guard so this class of bug can't recur silently:
+`fit()`'s init-time feed check now compares each categorical feature's
+maximum code in the spread sample against its vocab and warns by name
+with the affected pixel fraction. `scan_codes.py` does the same over
+the rasters on disk, per region and vintage, against FEATURE_SPEC.
+
+Confirmed on the training box before the change was committed: the
+downloaded `LF2024_EVC.csv`/`LF2025_EVC.csv` tables run to 399 and
+`LF2024_EVH.csv`/`LF2025_EVH.csv` to 310 (SClass to 180), and the
+ME/NH/VT rasters themselves carry EVC codes up to 385 and EVH codes
+303-310 in every 2023/2024 vintage. (The first-draft scan script in
+`research_request_vocab_and_distill.md` passed a 3-D `out_shape` to a
+single-band read and so sampled only the first decimated row - its
+code lists were right, its percentages were not; `scan_codes.py` reads
+the full decimated band.)
+
+Not done, deliberately: re-encoding EVC/EVH as (life-form class +
+ordinal scalar) instead of one embedding row per code. The codes are
+ordinal within a block and categorical across blocks, and a per-code
+table has to learn 90 near-identical vectors from data. That is a
+better representation and the same cold start, but it is a modelling
+change, not a bug fix, and is left as a decision for the next retrain.
+
+Verified offline with synthetic checkpoints (no real data or torch GPU
+here): a wrapped checkpoint written under vocab 300 loads through
+`spec_with_checkpoint_vocab` and scores; the same state fails against
+the bare new spec with the expected embedding-shape error; a
+post-change checkpoint round-trips; and `--distill-from`'s feature
+check rejects a mismatched teacher with the new message.
+
+---
+
+## train.py: `--distill-from` rebuilt teachers from the disk feature
+## list, not their own (2026-09-20)
+
+`predict.py` and `calibrate.py` treat a wrapped checkpoint's
+`config["features"]` as authoritative (ARCHITECTURE.md invariant). The
+`--distill-from` loader did not: it built every teacher from THIS run's
+disk-discovered feature list. A teacher trained on a different set
+either failed with a raw tensor-shape traceback or - when the channel
+counts happened to agree - loaded cleanly and read one feature's
+channel as another, emitting confident nonsense as the soft target with
+no error anywhere.
+
+Fixed by refusing: the teacher's feature list (compared in spec order,
+so an explicit `--features` given in another order still matches) must
+equal this run's, and the error names the missing and extra features
+and the two remedies (restore the teacher's rasters / `--features`, or
+retrain the teachers). Supporting mixed feature sets was rejected - a
+teacher is scored on the student's patches, so it would need one
+dataset per distinct teacher list. Bare teachers with no config warn
+and fall through to the shape check. Teachers also now rebuild with
+their own embedding vocab (see the entry above), so a pre-vocab-change
+member can still teach a post-change student.
+
+---
+
 ## train.py: `--distill-from` - collapse an ensemble into one deployable
 ## checkpoint via distillation, not weight-averaging (2026-09-20)
 

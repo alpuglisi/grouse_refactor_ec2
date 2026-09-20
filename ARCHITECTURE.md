@@ -131,7 +131,22 @@ carries its own feature list and geometry, and that list is
 authoritative on load. Bare (older) is a raw `state_dict` with no
 feature list, so loading it depends on what is on disk *now* — which
 breaks whenever the disk feature set changes. `config_to_model_kwargs`
-owns every geometry key and legacy fallback.
+owns every geometry key and legacy fallback — except one that lives in
+the weights themselves: each categorical embedding's row count (its
+`vocab`). Loaders take that from the checkpoint's own
+`embeddings.<f>.weight` via `models.spec_with_checkpoint_vocab`, never
+from today's `FEATURE_SPEC`, so a checkpoint keeps loading after the
+spec changes. Any new loader must do both.
+
+**A categorical `vocab` must cover the raster's whole code domain, or
+the top of it silently disappears.** `GrouseResNet.embed` clamps codes
+into `[0, vocab-1]`; a code at or above the vocab lands on the top index
+and nothing crashes. That is how the LANDFIRE herbaceous block vanished:
+EVC encodes herb cover as 310–399 and EVH herb height as 301–310 (three
+life-form blocks since LF 2016 Remap, identical LF2022–LF2025), and both
+features had `vocab: 300` until 2026-09-20. `fit()` now checks the spread
+sample against the vocab and warns by name; raising a vocab is a
+cold-start geometry change (the table is in the state dict).
 
 **`--select-min-delta` compares against the last SAVED checkpoint, not
 the running maximum.** This is deliberate: max-based selection creeps

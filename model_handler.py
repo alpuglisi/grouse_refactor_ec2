@@ -474,6 +474,16 @@ class GrouseModelHandler:
                            "dual_branch": self.model.dual_branch,
                            "dual_branch_channels":
                                self.model._dual_branch_channels,
+                           # Embedding-table rows per categorical
+                           # feature. Geometry, like the keys above,
+                           # but it also lives in the state dict itself
+                           # (embeddings.<f>.weight), which is what
+                           # loaders read (models.spec_with_checkpoint_
+                           # vocab); recorded here so --resume's
+                           # geometry comparison names a vocab change
+                           # instead of failing on a tensor shape.
+                           "vocab": {f: int(self.spec[f]["vocab"])
+                                     for f in self.cat_features},
                            # Not geometry, but consumers of the LOGITS
                            # need it: an asymmetric objective (an_full
                            # with lambda != 1, focal with alpha != 0.5)
@@ -596,6 +606,16 @@ class GrouseModelHandler:
               f"{f'; {len(mismatched)} shape-mismatched skipped' if mismatched else ''}"
               f"{f'; {len(absent)} checkpoint-only ignored' if absent else ''}. "
               f"Loaded parameters train in the backbone LR group.")
+        if mismatched:
+            # Name them: a mismatch is either a feature-set change (stem
+            # width) or an embedding vocab change (table rows) - both
+            # are documented cold-start geometry changes, and the
+            # tensor names say which.
+            shown = ", ".join(
+                f"{k} {tuple(state[k].shape)}->{tuple(msd[k].shape)}"
+                for k in mismatched[:6])
+            print(f"   [note] shape-mismatched (stay fresh): {shown}"
+                  f"{' ...' if len(mismatched) > 6 else ''}")
         if cfg and cfg.get("features"):
             here = set(self.cat_features) | set(self.cont_features)
             if set(cfg["features"]) != here:
@@ -750,6 +770,25 @@ class GrouseModelHandler:
                 "fill due to a raster CRS/bounds mismatch. (The dataset's "
                 "construction-time probe should also have caught this - "
                 "if you're seeing this, inspect the patch reads.)")
+        # VOCAB check: embed() clamps every categorical code into
+        # [0, vocab-1], so a code at or above the vocab is silently
+        # merged into the top index - nothing crashes, the feature just
+        # loses whatever those codes meant. That is exactly how the
+        # LANDFIRE herbaceous block (EVC 310-399, EVH 301-310) vanished
+        # under the old vocab of 300. Checked here on the same spread
+        # sample, loudly, so a code space outgrowing FEATURE_SPEC can't
+        # do it again unnoticed.
+        for k, name in enumerate(self.cat_features):
+            vocab = int(self.spec[name]["vocab"])
+            top = int(cat_x[:, k].max())
+            if top >= vocab:
+                n_over = int((cat_x[:, k] >= vocab).sum())
+                print(f"   [warn] {name}: codes up to {top} seen in the "
+                      f"sample but vocab is {vocab} - {n_over:,} pixels "
+                      f"({100.0 * n_over / cat_x[:, k].numel():.2f}%) "
+                      f"will be CLAMPED onto index {vocab - 1} and lose "
+                      f"their meaning. Raise FEATURE_SPEC['{name}']"
+                      f"['vocab'] (a cold-start geometry change).")
         self.model.train()
         with torch.no_grad():
             init_logits = self._pooled_logits(cat_x.to(self.device),

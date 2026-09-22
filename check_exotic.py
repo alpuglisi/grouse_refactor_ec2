@@ -30,7 +30,6 @@ import pandas as pd
 
 REGIONS_DEFAULT = ["ME", "NH", "VT"]
 TARGET_PHYS = ["Exotic Tree-Shrub", "Exotic Herbaceous"]
-ROUND_DECIMALS = 5   # ~1.1m - matches check_duplicate_coordinates.py
 
 
 def check_visit_concentration(df, label):

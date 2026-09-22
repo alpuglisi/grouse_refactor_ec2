@@ -750,8 +750,12 @@ class GrouseModelHandler:
             if metrics_csv:
                 self._log_metrics(metrics_csv, metrics)
 
+            # BUG-0012 (recurrence): this call site was missed in the
+            # original fix - same conditional-population-vs-unconditional-
+            # consumption defect as the other tta_auc usages above.
             if guard.update(metrics.get('strict_accuracy', float('-inf')),
-                            metrics['tta_auc'], metrics['ap']):
+                            metrics.get('tta_auc', float('-inf')),
+                            metrics['ap']):
                 streak_epochs = f"epochs {epoch - self._divergence_patience + 2}-{epoch + 1}"
                 if self.on_divergence == 'warn':
                     print(f"   [!] DIVERGENCE: strict accuracy rose while "

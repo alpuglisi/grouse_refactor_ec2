@@ -4,15 +4,26 @@ Flat quick-scan index. Full investigations live in `BUG-XXXX-slug.md` in
 this directory. See `CLAUDE.md` §2 for what a full investigation must
 contain.
 
-Entries were found during the 2026-09-22 repository-wide bug review of all
-33 root-level `.py` files. Trivial (single-function, no-CR-required) fixes
-were implemented immediately; everything else went through a CR under
-`docs/quality/change-requests/`, an independent review (which caught a
-real scope gap in CR-0002 — see BUG-0001), and implementation. Newest-first
-by discovery within that pass; ties broken by ID order.
+Entries BUG-0001..0013 were found during the 2026-09-22 repository-wide
+bug review of all 33 root-level `.py` files. Trivial (single-function,
+no-CR-required) fixes were implemented immediately; everything else went
+through a CR under `docs/quality/change-requests/`, an independent review
+(which caught a real scope gap in CR-0002 — see BUG-0001), and
+implementation. Entries BUG-0014..0018 were found during a same-day
+follow-up review pass across all 34 files (regions.py now included),
+specifically checking the prior fixes for regressions and re-running the
+PA-0012 duplicate-script sweep — it found one incomplete fix (BUG-0014,
+a missed BUG-0012 call site) and one un-swept duplicate-script instance
+(BUG-0015). Newest-first by discovery within each pass; ties broken by ID
+order.
 
 | ID | Date | Symptom | Root cause | Remediation | Status |
 |----|------|---------|------------|-------------|--------|
+| BUG-0018 | 2026-09-22 | `check_exotic.py` carries a dead, misleading `ROUND_DECIMALS` constant | Leftover from a superseded coordinate-rounding approach, never removed | Trivial fix applied directly — deleted the unused constant | CLOSED |
+| BUG-0017 | 2026-09-22 | `dataset.py`'s training patches may conflate nodata sentinels with a legitimate value of 0 (unconfirmed) | Same mechanism as BUG-0008, in the training-data path instead of inference masking — not yet verified against real attribute tables | None — deliberately deferred pending domain confirmation; would need a CR if confirmed (touches cache format) | OPEN, unconfirmed |
+| BUG-0016 | 2026-09-22 | `tune.py` and `tune_bins.py` silently overwrite each other's `bin_tuning_{region}.csv` output | Diverged (non-overlapping) duplicate scripts share one mutable output path with no marker for which produced it | Trivial fix applied directly — warning banner in `tune.py`; full resolution (reconcile scripts or disambiguate paths) needs a domain-owner call + CR | OPEN, stopgap in place |
+| BUG-0015 | 2026-09-22 | `download_more.py` can silently accept an empty (all-nodata) raster as a successful download | Empty-raster validity check fixed in `download_rev.py`, never backported to `download_more.py` (a 4th instance of the stale-duplicate-script mechanism, found by re-running PA-0012's sweep) | Backported directly — `_raster_valid_fraction`/`MIN_VALID_PIXEL_FRAC` ported verbatim | CLOSED |
+| BUG-0014 | 2026-09-22 | `fit()`'s divergence-guard call could still crash with `KeyError: 'tta_auc'` — BUG-0012 recurrence, one call site missed | Original BUG-0012 fix targeted only the call sites its investigation quoted, not a full sweep of every `tta_auc` consumer in the function | Trivial fix applied directly — `guard.update(...)` now uses `.get('tta_auc', float('-inf'))` | CLOSED |
 | BUG-0013 | 2026-09-22 | Broad `except Exception` in download submit/poll loops masks real bugs as transient network errors | Blanket exception handling copied across download scripts | Deferred (low priority, 20 call sites across 6 files) — narrow to specific exception types, log traceback | OPEN |
 | BUG-0012 | 2026-09-22 | `fit()` can crash with `KeyError: 'tta_auc'` for non-multiple-of-4 validation sets | `evaluate()` conditionally populates `tta_auc`; `fit()` consumes it unconditionally | Trivial fix applied directly — `fit()` now uses `.get('tta_auc', float('-inf'))` | CLOSED |
 | BUG-0011 | 2026-09-22 | `diagnose_training.py` crashes on real checkpoints instead of diagnosing them | Diagnostic script's handler defaults don't match `train.py`'s real defaults; exception handling too narrow | CR-0005 — mirrors train.py defaults, widened except | CLOSED |

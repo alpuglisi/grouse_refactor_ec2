@@ -7,6 +7,7 @@ import zipfile
 import threading
 import requests
 import urllib3
+import rasterio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -78,6 +79,34 @@ def log(msg):
 def bbox_str(region):
     min_lon, min_lat, max_lon, max_lat = BOXES_COORDINATES[region]
     return f"{min_lon} {min_lat} {max_lon} {max_lat}"
+
+
+# NEW-BUG (found in a follow-up review, same class as BUG-0002/0003/0004:
+# a fix landed in download_rev.py, never backported to this sibling copy).
+# A job can report "Succeeded" and produce a well-formed, correctly-
+# georeferenced GeoTIFF that is nonetheless entirely nodata - this
+# happens when LFPS accepts an AOI request for a region whose data for
+# that product/vintage isn't populated yet (e.g. LANDFIRE's LF2025
+# rollout is staggered by GeoArea; requesting an unreleased GeoArea's
+# extent "succeeds" and returns an empty clip, not an error). Job status
+# alone can't detect this - the content has to be checked after download.
+MIN_VALID_PIXEL_FRAC = 0.01   # below this fraction non-nodata, reject
+
+
+def _raster_valid_fraction(path):
+    """Fraction of non-nodata pixels in a raster's first band. Returns
+    None (skip the check) if the file can't be opened as a raster at all
+    - that's a different failure mode, already handled by the zip/tif
+    checks above."""
+    try:
+        with rasterio.open(path) as src:
+            data = src.read(1)
+            if src.nodata is None:
+                return 1.0   # no nodata value defined - can't judge, allow it
+            n_valid = int((data != src.nodata).sum())
+            return n_valid / data.size if data.size else 0.0
+    except Exception:
+        return None
 
 
 def make_session():
@@ -199,6 +228,23 @@ def download_one(region, year, feature):
                                                 os.path.basename(name))
                             with z.open(name) as zf, open(dest, "wb") as f:
                                 shutil.copyfileobj(zf, f)
+
+                    # Content validation: a "Succeeded" job can still
+                    # deliver a well-formed, correctly-georeferenced,
+                    # entirely-empty raster (see MIN_VALID_PIXEL_FRAC
+                    # comment above). Job status can't catch this -
+                    # check the actual pixel content before accepting.
+                    pct_valid = _raster_valid_fraction(out_filepath)
+                    if pct_valid is not None and pct_valid < MIN_VALID_PIXEL_FRAC:
+                        os.remove(out_filepath)
+                        return task, (
+                            f"job succeeded but raster is empty "
+                            f"({pct_valid * 100:.2f}% valid pixels) - "
+                            f"almost certainly means this product/vintage "
+                            f"isn't populated yet for this region (e.g. "
+                            f"LANDFIRE's staggered GeoArea rollout), not a "
+                            f"transfer error. Retrying won't help; check "
+                            f"LANDFIRE's release schedule.")
                 return task, "ok"
             except (requests.exceptions.RequestException,
                     zipfile.BadZipFile, EOFError, OSError) as e:

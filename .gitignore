@@ -7,3 +7,9 @@
 # 3. Explicitly allow essential configuration files in the root
 !/.gitignore
 !/README.md
+!/CLAUDE.md
+
+# 4. Allow the quality management system docs tree
+!/docs/
+!/docs/**/
+!/docs/**/*.md

@@ -1,15 +1,22 @@
-# BUG-0013: Broad `except Exception` blocks swallow all error types in download job submit/poll loops
+# BUG-0013: Broad `except Exception` blocks swallow all error types in download/polling loops
 
 ## 1. Description
 The LandFire/GBIF job submission and status-polling loops across the
 download scripts catch `Exception` broadly, print, and `continue`/`break`
 without logging tracebacks or distinguishing transient network failures
-from programming errors.
+from programming errors. **Updated by the PA-0011 sweep** (run in response
+to BUG-0019): the same mechanism also exists in `ebird.py`'s day-by-day
+polling loop, a 7th file not in the original catalogue.
 
 ## 2. Where encountered
 `download_landfire.py:114-118` and equivalent blocks in
 `download_landfire_2.py`, `download_landfire_3.py`, `download.py`,
-`download_more.py`/`download_rev.py` (status-poll loops).
+`download_more.py`/`download_rev.py` (status-poll loops). **Added by the
+PA-0011 sweep:** `ebird.py:107-108`, structurally identical — a day-by-day
+polling loop over a full year calling `session.get()`, with a broad
+`except Exception as e: print(f"...{e}")` wrapping the network call plus
+response/JSON/CSV-handling logic, silently continuing to the next date on
+any exception.
 
 ## 3. What it caused to fail
 A genuine programming error (e.g. an `AttributeError` from a malformed
@@ -55,13 +62,20 @@ None implemented yet — documentation-only pass. Low severity; recommended
 as a lower-priority cleanup: narrow to `requests.exceptions.RequestException`
 (or the library's specific transient-error types) where retryable, and
 log `traceback.format_exc()` before continuing when a broad catch is kept
-intentionally. Status: **OPEN**.
+intentionally. Status: **OPEN** (now covering 7 files, 21 call sites).
 
 ## 7. Recurrence review
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`: no prior bug specifically
 concerns exception-handling breadth (distinct from BUG-0002/0003/0004,
 which concern fixes not being backported, not exception scope). Result:
 **none found**.
+
+**PA-0011 sweep addendum:** the sweep also checked all other files for
+narrow-exception counterexamples and found two: `get_negatives.py:72` and
+`download_attribute_tables.py:115` already correctly use
+`requests.exceptions.RequestException` rather than a broad catch —
+evidence the narrower pattern was known and used elsewhere in the
+codebase, just not applied consistently to every retry/polling loop.
 
 ## 8. Preventive action
 **PA-0011** (see `PREVENTIVE_ACTIONS.md`): prefer narrow exception types

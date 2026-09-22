@@ -51,11 +51,16 @@ version, with nothing to prevent someone from running the stale, still-
 broken copy.
 
 ## 6. Corrective action
-None implemented yet — documentation-only pass. Recommended fix (for a
-future CR): either delete `download_landfire.py`/`_2`/`_3` if `download.py`
-fully supersedes them, or if any are still needed for a distinct purpose,
-port the endpoint fix into each and add a header comment marking them
-superseded/deprecated in favor of `download.py`. Status: **OPEN**.
+CR-0003 (approved after independent review): a line-level backport was
+rejected as unsafe (the old and new APIs are different protocols, and this
+environment has no live-API access to validate a rewrite against). Instead,
+all three files now print a deprecation message naming this bug and
+`download.py` as the fix, then `raise SystemExit(1)` before any request is
+made — verified by running each script and confirming exit code 1 and the
+message. This converts the failure mode from "silently loops through every
+combination failing" to "refuses to run at all, loudly." **Status:
+CLOSED** (as a deprecation, not a working fix — see Out of scope in
+CR-0003 for what a full working fix would require).
 
 ## 7. Recurrence review
 Searched `BUG_LOG.md`: BUG-0001 is the only prior entry, and its mechanism

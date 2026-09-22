@@ -14,13 +14,9 @@ import matplotlib.pyplot as plt
 DATA_DIR = "./"                  # Directory containing your sighting CSVs
 RASTER_DIR = "data/landfire"   # Output folder created by download.py
 
-# Bounding boxes MUST match BOXES_COORDINATES in download.py
-# (min_lon, min_lat, max_lon, max_lat)
-BOXES = {
-    "ME": (-71.158, 42.889, -66.852, 47.555),
-    "NH": (-72.626, 42.605, -70.600, 45.398),
-    "VT": (-73.510, 42.632, -71.422, 45.112),
-}
+# BUG-0001: was a manually-synced duplicate; now a single shared source of
+# truth (still matches BOXES_COORDINATES in download.py, by construction).
+from regions import BOXES
 
 REGIONS_TO_RUN = list(BOXES.keys())
 

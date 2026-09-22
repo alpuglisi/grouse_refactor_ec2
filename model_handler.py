@@ -363,6 +363,37 @@ class GrouseModelHandler:
             return obj["state_dict"], obj.get("config")
         return obj, None
 
+    @staticmethod
+    def _model_config(model, features):
+        return {"pool": model.pool_mode,
+                "center_skip": bool(model.center_skip),
+                "features": list(features),
+                "keep_early_resolution": bool(model.keep_early_resolution),
+                "early_attn": model.early_attn is not None,
+                "early_attn_kv_stride": model._early_attn_kv_stride}
+
+    @staticmethod
+    def check_checkpoint_config(model, features, cfg, source="checkpoint"):
+        """Raise if a checkpoint's stored config doesn't match the model
+        it's being loaded into. BUG-0010: config was saved but never
+        validated on load, allowing a checkpoint trained with one pooling
+        mode to silently load into a handler built with a different one -
+        mean/center/gauss pooling share identical parameter shapes, so
+        load_state_dict succeeds either way. cfg=None (legacy checkpoints
+        written before the config field existed) skips validation, matching
+        unwrap_checkpoint's documented backward-compatibility contract."""
+        if cfg is None:
+            return
+        actual = GrouseModelHandler._model_config(model, features)
+        mismatches = {k: (cfg[k], actual[k]) for k in actual
+                      if k in cfg and cfg[k] != actual[k]}
+        if mismatches:
+            raise ValueError(
+                f"{source}: checkpoint config does not match this model's "
+                f"construction - refusing to load a mismatched "
+                f"architecture (BUG-0010). Mismatched fields as "
+                f"(checkpoint, actual): {mismatches}.")
+
     # ---- training --------------------------------------------------------
     def _eval_batch_size(self, batch_size, requested=None):
         """Validation batch size: explicit request wins, else widen only
@@ -907,8 +938,11 @@ class GrouseModelHandler:
                    path or self.save_path)
 
     def load(self, path=None):
-        state, _cfg = self.unwrap_checkpoint(torch.load(
-            path or self.save_path, map_location=self.device,
-            weights_only=True))
+        load_path = path or self.save_path
+        state, cfg = self.unwrap_checkpoint(torch.load(
+            load_path, map_location=self.device, weights_only=True))
+        self.check_checkpoint_config(
+            self.model, list(self.cat_features) + list(self.cont_features),
+            cfg, source=load_path)
         self.model.load_state_dict(state)
         return self

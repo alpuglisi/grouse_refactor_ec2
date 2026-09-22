@@ -50,13 +50,18 @@ line numbers above.
 were written directly into source as the path of least resistance.
 
 ## 6. Corrective action
-None implemented yet — documentation-only pass, and this is a case where
-implementation should not happen silently: the credentials should be
-**rotated by their owner** (the GBIF password and eBird API key should be
-changed at the source, not just removed from the file) before or alongside
-any code fix, since removing them from a future commit does not remove them
-from git history already pushed. This is flagged to the user directly, not
-just logged. Status: **OPEN — recommend immediate credential rotation**.
+CR-0001 (approved after independent review): `sightings.py` and `ebird.py`
+now read `GBIF_USER`/`GBIF_PWD`/`GBIF_EMAIL`/`EBIRD_API_KEY` from the
+environment via `os.environ.get(...)`, with a clear error message and
+early exit/return when unset. Verified: both files parse, and grep
+confirms no reference to the removed literal values remains anywhere in
+the repo. **Status: code fix CLOSED — credential rotation still OPEN,
+must be done by the account owner** (the values already pushed to the
+remote in commit `29c194a` remain in git history regardless of this code
+fix; rotating the actual GBIF password and eBird API key at the source is
+outside what a code change can do, and a git-history rewrite was
+explicitly out of scope for CR-0001 pending the user's sign-off on that
+separate, higher-blast-radius action).
 
 ## 7. Recurrence review
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`: no prior bug concerns

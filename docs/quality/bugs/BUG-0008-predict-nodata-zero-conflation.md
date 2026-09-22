@@ -58,11 +58,17 @@ tell them apart, and the fallback guard (`nodata != 0`) silently fails
 exactly when a raster's own nodata value is `0`.
 
 ## 6. Corrective action
-None implemented yet — documentation-only pass. Recommended: carry an
-explicit boolean nodata mask per raster (computed from the raster's own
-`nodata` attribute at read time, before collapsing sentinels), and check
-that mask directly instead of re-deriving nodata from a post-hoc `== 0`
-comparison. Status: **OPEN**.
+CR-0004 (approved after independent review): `read_strip` now returns the
+reference band's raw (pre-sentinel-collapse) values; `predict_region`
+builds an explicit `invalid_mask` from those raw values against the
+raster's actual `nodata` and the sentinel list, replacing the old
+`ref_band[cy, cx] == 0 and ref_nodata != 0` check. Verified via a synthetic
+test in this environment: a legitimate `0` value is correctly preserved
+(not masked) while a sentinel is masked, and — the case that was
+previously broken — when the raster's own `nodata` is `0`, matching cells
+are now correctly masked. **Status: CLOSED** (end-to-end validation
+against a real raster/checkpoint remains an accepted test gap — neither is
+present in this environment; recommend a spot-check after this lands).
 
 ## 7. Recurrence review
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`: no prior bug concerns

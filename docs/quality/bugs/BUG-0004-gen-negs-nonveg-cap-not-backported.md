@@ -60,9 +60,14 @@ copy not receiving a backported fix), now confirmed as a repository-wide
 pattern rather than isolated to the LandFire download scripts.
 
 ## 6. Corrective action
-None implemented yet — documentation-only pass. Recommended: delete
-`gen_negs.py` if `generate_negatives.py` fully supersedes it, or backport
-the `NONVEG_MAX_FRAC` cap and mark it deprecated otherwise. Status: **OPEN**.
+CR-0003-B (approved after independent review): backported
+`generate_negatives.py`'s `NONVEG_MAX_FRAC = 0.30` cap and the full
+two-pool sampling block (`habitat_pool`/`nonveg_pool` split,
+`weighted_take` helper, shortfall top-up) into `gen_negs.py` verbatim
+(diffed against `generate_negatives.py`'s equivalent block — identical
+apart from an added comment), and added a superseded-by header comment.
+Verified: file parses and imports cleanly, `NONVEG_MAX_FRAC` resolves to
+`0.3`. **Status: CLOSED.**
 
 ## 7. Recurrence review
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`: **matches BUG-0002/

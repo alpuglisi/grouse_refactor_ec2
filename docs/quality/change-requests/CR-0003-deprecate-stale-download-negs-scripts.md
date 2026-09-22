@@ -38,9 +38,13 @@ against the wrong geography (BUG-0003). This directly resolves both bugs'
 "silent failure" impact without introducing new, unverifiable logic.
 
 `gen_negs.py` is different: its sampling cap fix (`NONVEG_MAX_FRAC`) is a
-same-paradigm, mechanically portable change (same pool/weight/sampling
-API, just adding a cap) — see CR-0003-B below for why it's backported
-directly rather than only deprecated.
+same-paradigm, mechanically portable change — both files already share the
+same `is_nonveg`/`weight`/`block_id`/`split` column structure over the same
+candidate-pool dataframe, so `generate_negatives.py`'s ~35-line two-pool
+sampling block (a `habitat_pool`/`nonveg_pool` split, a `weighted_take`
+helper, and a shortfall top-up) can be ported as-is, not just a one-line
+constant swap — see CR-0003-B below for why it's backported directly
+rather than only deprecated.
 
 ### CR-0003-A: `download_landfire.py`, `_2.py`, `_3.py` — deprecation banner
 Add, immediately inside `if __name__ == "__main__":` (before calling
@@ -110,12 +114,12 @@ against live APIs/data in this environment (see Test plan).
   environment (no `data/` tree present) — flagged as an accepted test gap.
 
 ## Deliverables
-- [ ] Add deprecation banner + `SystemExit(1)` to `download_landfire.py`.
-- [ ] Add deprecation banner + `SystemExit(1)` to `download_landfire_2.py`.
-- [ ] Add deprecation banner + `SystemExit(1)` to `download_landfire_3.py`.
-- [ ] Backport `NONVEG_MAX_FRAC` cap + pool-split sampling into `gen_negs.py`.
-- [ ] Add a superseded-by comment header to `gen_negs.py`.
-- [ ] Update `BUG-0002`, `BUG-0003`, `BUG-0004` corrective-action sections
+- [x] Add deprecation banner + `SystemExit(1)` to `download_landfire.py`.
+- [x] Add deprecation banner + `SystemExit(1)` to `download_landfire_2.py`.
+- [x] Add deprecation banner + `SystemExit(1)` to `download_landfire_3.py`.
+- [x] Backport `NONVEG_MAX_FRAC` cap + pool-split sampling into `gen_negs.py`.
+- [x] Add a superseded-by comment header to `gen_negs.py`.
+- [x] Update `BUG-0002`, `BUG-0003`, `BUG-0004` corrective-action sections
       and `BUG_LOG.md` statuses.
 
 ## Out of scope
@@ -130,5 +134,28 @@ against live APIs/data in this environment (see Test plan).
 - `audit.py`/`analyze_grouse.py`'s duplicate-file structural risk (noted
   in BUG-0001, not touched here).
 
-## Reviewer verdicts
-See independent review below (§ Review).
+## § Review
+
+**Reviewer (independent agent, re-derived from current source): APPROVE.**
+Confirmed via grep that `download_landfire.py`/`_2`/`_3` all use the old
+ArcGIS GPServer contract (`SUBMIT_URL`, `esriJobSucceeded`, `Output_File`)
+vs. `download.py`'s `lfps.usgs.gov/api/job`, supporting the
+deprecation-over-blind-rewrite decision; confirmed the `__main__` blocks
+match exactly where the banner is inserted; confirmed none of the 4 files
+is imported elsewhere. For CR-0003-B, confirmed `gen_negs.py`'s current
+uncapped sampling and `generate_negatives.py`'s `NONVEG_MAX_FRAC`
+pool-split share the same column structure, so the port is mechanically
+sound.
+
+One non-blocking wording note: this CR's "Why now" section originally
+described CR-0003-B's port as "same pool/weight/sampling API, just adding
+a cap," which undersold that the actual ported block is a ~35-line
+two-pool rewrite (`habitat_pool`/`nonveg_pool` split plus a `weighted_take`
+helper and shortfall top-up), not a one-line cap addition.
+
+**Disposition: accepted, corrected below.** The "Why now" wording is
+tightened to describe the port's actual size without changing the risk
+level (still low — mechanically sound, same data structures, no new
+external dependency).
+
+**Author sign-off:** approved for implementation as revised.

@@ -1,13 +1,15 @@
+import os
 import csv
 import time
 import requests
 from datetime import date, timedelta
 
 # ==========================================
-# HARDCODED GLOBAL VARIABLE FOR API KEY
+# API KEY
 # ==========================================
-# Insert your eBird API key here before running
-API_KEY = "69gtab3miaee"
+# BUG-0006: read from the environment instead of hardcoding a real key in
+# source. Set this before running: export EBIRD_API_KEY=...
+API_KEY = os.environ.get("EBIRD_API_KEY")
 SPECIES_CODE = "rufgro"
 
 # eBird region codes for the states requested
@@ -20,9 +22,11 @@ STATES = {
 START_YEAR = 2016
 
 def main():
-    if API_KEY == "YOUR_API_KEY_HERE":
-        print("WARNING: You are using the placeholder API key. Please insert your actual API key at the top before running.\n")
-        
+    if not API_KEY:
+        print("ERROR: set the EBIRD_API_KEY environment variable before "
+              "running.")
+        return
+
     end_year = date.today().year
     
     headers = {

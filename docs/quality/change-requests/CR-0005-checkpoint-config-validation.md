@@ -113,7 +113,7 @@ except (RuntimeError, ValueError) as e:
          f"flags, this diagnostic doesn't know that yet: {e}")
 ```
 (mirrors `train.py`'s actual `--pool`/`--center-skip` argparse defaults,
-confirmed at `train.py:255`/`:283`; still doesn't read the checkpoint's own
+confirmed at `train.py:255`/`:285`; still doesn't read the checkpoint's own
 stored config to auto-detect the true architecture — that would require
 reconstructing `GrouseModelHandler` from `cfg` before calling `load()`,
 which is out of scope here, see below.)
@@ -133,6 +133,11 @@ which is out of scope here, see below.)
   trained with `train.py`'s actual defaults instead of crashing; if a
   checkpoint was trained with non-default `--pool`/`--center-skip` flags,
   the new `except` clause reports that clearly instead of a raw traceback.
+- `smoke_test_training.py:132-134` also calls `.load()` on a
+  `GrouseModelHandler` — confirmed via independent review it saves and
+  loads with matching library defaults on both sides (no `pool`/
+  `center_skip` override), so `check_checkpoint_config` finds no mismatch
+  and this caller is unaffected by the new validation.
 - Legacy checkpoints saved before the `config` field existed (`cfg is
   None`) are unaffected — validation is skipped for them, matching
   `unwrap_checkpoint`'s existing documented behavior.
@@ -164,14 +169,14 @@ checkpoint's `config` (which the error message effectively surfaces).
   a real checkpoint after this lands to confirm section 3 completes.
 
 ## Deliverables
-- [ ] Add `_model_config`/`check_checkpoint_config` staticmethods to
+- [x] Add `_model_config`/`check_checkpoint_config` staticmethods to
       `GrouseModelHandler` in `model_handler.py`.
-- [ ] Update `GrouseModelHandler.load()` to call the new check.
-- [ ] Update `train.py`'s `score_ensemble()` to call the new check.
-- [ ] Update `diagnose_training.py`'s handler construction to mirror
+- [x] Update `GrouseModelHandler.load()` to call the new check.
+- [x] Update `train.py`'s `score_ensemble()` to call the new check.
+- [x] Update `diagnose_training.py`'s handler construction to mirror
       `train.py`'s real defaults and widen its `except` clause.
-- [ ] Run the synthetic mismatch/match check described in the test plan.
-- [ ] Update `BUG-0010-checkpoint-config-discarded.md` and
+- [x] Run the synthetic mismatch/match check described in the test plan.
+- [x] Update `BUG-0010-checkpoint-config-discarded.md` and
       `BUG-0011-diagnose-training-wrong-defaults.md` corrective actions and
       `BUG_LOG.md` statuses.
 
@@ -185,5 +190,30 @@ checkpoint's `config` (which the error message effectively surfaces).
 - Any other checkpoint/config field beyond the six already present in
   `_wrap_checkpoint`'s existing `config` dict.
 
-## Reviewer verdicts
-See independent review below (§ Review).
+## § Review
+
+**Reviewer (independent agent, re-derived from current source): APPROVE.**
+Confirmed `load()`/`score_ensemble()` currently discard `cfg` exactly as
+quoted; confirmed all six config fields exist as the exact attribute names
+the proposed `_model_config` references (`models.py:144,174,186-190,221`);
+confirmed `self.cat_features`/`self.cont_features` exist on
+`GrouseModelHandler`; confirmed `diagnose_training.py`'s current handler
+construction and `train.py`'s actual `--pool`/`--center-skip` defaults
+(`attn`/`True`) match the CR's proposed fix.
+
+Two non-blocking notes: (1) the CR cited `train.py:283` for the
+`--center-skip` default; the reviewer's independent read found it at
+`train.py:285` — a citation drift, not a functional issue. (2) the CR's
+"Impact on other parts of the system" section discussed `load()`/
+`score_ensemble()` in the abstract but didn't name a third caller the
+reviewer found via grep, `smoke_test_training.py:132-134`. The reviewer
+traced it and confirmed it's a same-defaults round-trip (save then load
+with no `pool`/`center_skip` override on either side) that `
+check_checkpoint_config` will find no mismatch for — not a defect in the
+fix, but a completeness gap in the write-up.
+
+**Disposition: accepted, corrected below.** Citation fixed to `:285`;
+`smoke_test_training.py` added to the impact analysis and confirmed
+unaffected (same-defaults round-trip, no mismatch raised).
+
+**Author sign-off:** approved for implementation as revised.

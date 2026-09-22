@@ -63,9 +63,13 @@ def main():
 (`ebird.py` gains an `import os`.)
 
 The `if __name__ == "__main__"` early-exit behavior for missing credentials
-is preserved (previously exit(1) triggered only on the literal placeholder
-string; now it triggers whenever the env var is unset/empty, which is a
-strict superset of the old check and closer to the evident intent).
+is preserved for `sightings.py` (previously `exit(1)` triggered only on the
+literal placeholder string; now it triggers whenever any of the three env
+vars is unset/empty, a strict superset of the old check). For `ebird.py`,
+this is a **genuine behavior improvement, not mere preservation**: the
+current `main()` only prints a warning on the placeholder value and falls
+through to run anyway (no `return`/`exit` at all) — the proposed `return`
+on a missing key is new, deliberate fail-fast behavior.
 
 ## Impact on other parts of the system
 - Only these two standalone, non-imported scripts are affected (confirmed:
@@ -99,14 +103,14 @@ user's explicit sign-off given its blast radius on any existing clones/PRs.
   request.
 
 ## Deliverables
-- [ ] `sightings.py`: replace literal credentials with `os.environ.get(...)`
+- [x] `sightings.py`: replace literal credentials with `os.environ.get(...)`
       + a clear missing-env-var error message.
-- [ ] `ebird.py`: replace literal API key with `os.environ.get(...)` + a
+- [x] `ebird.py`: replace literal API key with `os.environ.get(...)` + a
       clear missing-env-var error message; add `import os`.
-- [ ] Verify no other repo file references the removed literal values.
-- [ ] Update `BUG-0006-hardcoded-credentials.md` corrective action section
+- [x] Verify no other repo file references the removed literal values.
+- [x] Update `BUG-0006-hardcoded-credentials.md` corrective action section
       and `BUG_LOG.md` status.
-- [ ] Flag credential rotation to the user as a standing action item (not
+- [x] Flag credential rotation to the user as a standing action item (not
       a code deliverable — cannot be done from this session).
 
 ## Out of scope
@@ -117,5 +121,23 @@ user's explicit sign-off given its blast radius on any existing clones/PRs.
   (no other script in the repo currently needs one; revisit if that
   changes).
 
-## Reviewer verdicts
-See independent review below (§ Review).
+## § Review
+
+**Reviewer (independent agent, re-derived from current source): APPROVE.**
+Verified the current literals in both files match this CR's quotes
+exactly, confirmed via independent grep that neither `sightings.py` nor
+`ebird.py` is imported anywhere else in the repo (only these two scripts
+are affected), and confirmed the fix is mechanically correct.
+
+One non-blocking accuracy note: the CR's claim that the missing-env-var
+early exit "preserves" prior behavior as "a strict superset of the old
+check" is true for `sightings.py` (already `exit(1)`) but not for
+`ebird.py` — `ebird.py`'s current `main()` only prints a warning and falls
+through to run anyway (no `return`), so the proposed `return` is a
+genuine, deliberate behavior improvement, not mere preservation.
+
+**Disposition: accepted, corrected below.** The claim is narrowed to
+`sightings.py` only, and `ebird.py`'s change is now described accurately
+as a real behavior improvement rather than continuity.
+
+**Author sign-off:** approved for implementation as revised.

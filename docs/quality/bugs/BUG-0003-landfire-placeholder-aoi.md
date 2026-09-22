@@ -57,8 +57,10 @@ This bug and BUG-0002 are two independent defects that happen to share one
 root cause and were fixed together in the same rewrite.
 
 ## 6. Corrective action
-None implemented yet — documentation-only pass. Same remediation path as
-BUG-0002 (delete or deprecate-and-backport). Status: **OPEN**.
+CR-0003 (same fix as BUG-0002, applied together): the deprecation banner
+covers both defects in the same three files with one message naming both
+bugs. **Status: CLOSED** (as a deprecation — see BUG-0002 and CR-0003's
+Out of scope for what a full working fix would require).
 
 ## 7. Recurrence review
 Searched `BUG_LOG.md`: **matches BUG-0002** — same root cause (stale

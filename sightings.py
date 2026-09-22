@@ -7,10 +7,12 @@ import pandas as pd
 # ==========================================
 # GBIF CREDENTIALS & SETTINGS
 # ==========================================
-# Your registered GBIF account credentials
-GBIF_USER = "alpuglisi"
-GBIF_PWD = "Password1994!"
-GBIF_EMAIL = "albert.puglisi94@gmail.com"
+# BUG-0006: read from the environment instead of hardcoding real
+# credentials in source. Set these before running:
+#   export GBIF_USER=... GBIF_PWD=... GBIF_EMAIL=...
+GBIF_USER = os.environ.get("GBIF_USER")
+GBIF_PWD = os.environ.get("GBIF_PWD")
+GBIF_EMAIL = os.environ.get("GBIF_EMAIL")
 
 # The unique Dataset UUID for the "eBird Observation Dataset" on GBIF
 EBIRD_DATASET_KEY = "4fa7b334-ce0d-4e88-aaae-2e0c138d049e"
@@ -146,8 +148,12 @@ def process_and_split_data(zip_path):
     os.remove(csv_filename)
 
 if __name__ == "__main__":
-    if GBIF_USER == "your_gbif_username":
-        print("WARNING: Please insert your GBIF credentials at the top of the script before running.")
+    _missing = [n for n, v in (("GBIF_USER", GBIF_USER),
+                               ("GBIF_PWD", GBIF_PWD),
+                               ("GBIF_EMAIL", GBIF_EMAIL)) if not v]
+    if _missing:
+        print(f"ERROR: set the following environment variable(s) before "
+              f"running: {', '.join(_missing)}")
         exit(1)
         
     # Run the execution pipeline

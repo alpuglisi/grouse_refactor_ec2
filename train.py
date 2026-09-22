@@ -181,8 +181,10 @@ def score_ensemble(members, features, val_ds, args):
     for path, pool in members:
         model = GrouseResNet(cat_f, cont_f, pretrained=False, pool=pool,
                              center_skip=args.center_skip).to(device).eval()
-        state, _cfg = GrouseModelHandler.unwrap_checkpoint(
+        state, cfg = GrouseModelHandler.unwrap_checkpoint(
             torch.load(path, map_location=device, weights_only=True))
+        GrouseModelHandler.check_checkpoint_config(
+            model, cat_f + cont_f, cfg, source=path)
         model.load_state_dict(state)
         outs, labels = [], []
         with torch.no_grad():

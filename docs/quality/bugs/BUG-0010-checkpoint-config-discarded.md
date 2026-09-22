@@ -65,11 +65,17 @@ reconstruct from that stored config, so the ambiguity the field exists to
 resolve remains fully unresolved at load time.
 
 ## 6. Corrective action
-None implemented yet — documentation-only pass. Recommended: `load()`
-should either (a) assert the loaded checkpoint's `config` matches the
-handler's own construction args and raise loudly on mismatch, or (b) use
-the stored config to reconstruct the handler's architecture before calling
-`load_state_dict`. Status: **OPEN**.
+CR-0005 (approved after independent review): added
+`GrouseModelHandler.check_checkpoint_config` (option (a) from the original
+recommendation — assert-and-raise, not silent reconstruction), called from
+both `load()` and `train.py`'s `score_ensemble()`. `cfg is None` (legacy
+checkpoints) skips validation, preserving `unwrap_checkpoint`'s documented
+backward compatibility. Verified via a standalone reimplementation test in
+this environment (torch unavailable to install here): a mismatched pool
+config correctly raises `ValueError` naming the mismatched field, a
+matching config does not raise, and `cfg=None` does not raise. Reviewer
+additionally confirmed `smoke_test_training.py`'s `.load()` caller is
+unaffected (matching defaults on both sides). **Status: CLOSED.**
 
 ## 7. Recurrence review
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`: no prior bug concerns

@@ -1,13 +1,33 @@
 # BUG-0001: New Hampshire bounding-box constant has drifted between duplicated copies
 
+**Correction (during CR-0002 independent review):** the initial sweep for
+this bug missed a 7th copy, `prepare_training_data.py`, which is
+byte-for-byte identical to `clean.py` (md5-confirmed) and — unlike
+`audit.py`/`analyze_grouse.py`, which are unreferenced duplicates —  is
+actively imported (`from prepare_training_data import BOXES`) by both
+`gen_negs.py` and `generate_negatives.py` to compute spatial block IDs for
+negative sampling. This means the initial CR-0002 draft would have left
+`gen_negs.py`/`generate_negatives.py` reading the stale `-70.614` value
+while the other 6 files converged on `-70.600` — reintroducing the exact
+drift this bug describes under a different file. Corrected below and in
+CR-0002. This is exactly the kind of miss `PREVENTIVE_ACTIONS.md`'s
+PA-0012 sweep note anticipated ("a dedicated future sweep is recommended
+before treating the set as closed") — recorded here as evidence that
+note was warranted, not just caution.
+
 ## 1. Description
 The `NH` entry in the `BOXES`/`BOXES_COORDINATES` bounding-box constant is
-hardcoded independently in at least 6 files. Two inconsistent values exist:
-`-70.614` (in `clean.py`, `download.py`) vs. `-70.600` (in `audit.py`,
-`analyze_grouse.py`, `download_more.py`, `download_rev.py`).
+hardcoded independently in at least 7 files. Two inconsistent values exist:
+`-70.614` (in `clean.py`, `prepare_training_data.py`, `download.py`) vs.
+`-70.600` (in `audit.py`, `analyze_grouse.py`, `download_more.py`,
+`download_rev.py`).
 
 ## 2. Where encountered
 - `clean.py:48`
+- `prepare_training_data.py:48` (byte-for-byte identical to `clean.py`,
+  md5-confirmed — and, unlike the `audit.py`/`analyze_grouse.py` pair
+  below, actively imported by `gen_negs.py:60` and
+  `generate_negatives.py:60` for block-ID computation)
 - `audit.py:21`, `analyze_grouse.py:21` (these two files are byte-for-byte
   identical, md5-confirmed)
 - `download.py:23`
@@ -62,13 +82,20 @@ duplicated by copy-paste across independently-maintained files with no
 single source of truth, so edits to one copy don't propagate to siblings.
 
 ## 6. Corrective action
-None implemented yet — this review pass is documentation-only per the task
-that produced it. Fixing this requires a CR (see `CLAUDE.md` §1) to
-introduce a single shared module (e.g. `regions.py`) exporting `BOXES`,
-imported by every script that currently hardcodes it, plus a decision on
-which of `-70.614` / `-70.600` is the intended value (needs a domain-owner
-call, not an engineering guess — the two values differ by real geography).
-Status: **OPEN**.
+CR-0002 (approved after independent review, which caught the
+`prepare_training_data.py` omission — see correction note above):
+introduced `regions.py` as the single shared source of truth (`NH` max_lon
+`-70.600`, the majority value — explicitly flagged as an accepted-risk,
+unverified choice pending domain confirmation against real sighting data).
+All 7 files (`clean.py`, `prepare_training_data.py`, `audit.py`,
+`analyze_grouse.py`, `download.py`, `download_more.py`, `download_rev.py`)
+now import from it; `gen_negs.py`/`generate_negatives.py` transparently
+pick up the value through their existing `from prepare_training_data
+import BOXES`. Verified: all files parse, all resolve to the identical
+imported dict (confirmed by direct import test in this environment).
+**Status: CLOSED, with a standing follow-up** — the NH value itself still
+needs domain-owner confirmation against real sighting data; update
+`regions.py` (one place) if it's wrong.
 
 ## 7. Recurrence review
 Searched: no prior BUG entries existed before this review pass (`BUG_LOG.md`

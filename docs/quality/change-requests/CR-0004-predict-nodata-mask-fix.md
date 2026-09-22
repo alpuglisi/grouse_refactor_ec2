@@ -109,11 +109,11 @@ below), not an end-to-end run.
   coverage after this lands.
 
 ## Deliverables
-- [ ] Update `read_strip` to return `ref_raw` alongside `cat`, `cont`.
-- [ ] Update `predict_region` to build `invalid_mask` from `ref_raw` vs.
+- [x] Update `read_strip` to return `ref_raw` alongside `cat`, `cont`.
+- [x] Update `predict_region` to build `invalid_mask` from `ref_raw` vs.
       `ref_nodata`/`NODATA_SENTINELS`, replacing the old `== 0`/`!= 0` check.
-- [ ] Run the synthetic invalid-mask check described in the test plan.
-- [ ] Update `BUG-0008-predict-nodata-zero-conflation.md` corrective action
+- [x] Run the synthetic invalid-mask check described in the test plan.
+- [x] Update `BUG-0008-predict-nodata-zero-conflation.md` corrective action
       and `BUG_LOG.md` status.
 
 ## Out of scope
@@ -125,5 +125,20 @@ below), not an end-to-end run.
   trivial, single-function change (no CR required per `CLAUDE.md`'s
   triviality bar).
 
-## Reviewer verdicts
-See independent review below (§ Review).
+## § Review
+
+**Reviewer (independent agent, re-derived from current source): APPROVE.**
+Confirmed the exact current defect (`predict.py:242,255`) and confirmed
+`open_aligned_sources` genuinely sets `ref` to the same raster as the
+masking reference band, validating the root-cause claim. Checked the
+proposed fix in detail: `ref_raw` selection logic is equivalent to the
+original's truthiness test; shapes match for `invalid_mask[cy, cx]`
+indexing; the new mask is a strict superset of what the old check caught
+(no masking regression) while additionally fixing both BUG-0008 failure
+modes; `read_strip`/`predict_region`/`predict.py` each confirmed used or
+imported in exactly the expected places, no missed call sites. No concerns
+raised — fix is correct as specified.
+
+**Disposition:** no changes required.
+
+**Author sign-off:** approved for implementation as originally drafted.

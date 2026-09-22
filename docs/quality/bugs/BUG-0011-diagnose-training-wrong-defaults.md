@@ -69,12 +69,16 @@ is scoped only to the failure mode its author anticipated (missing file),
 not the one that actually occurs (architecture mismatch).
 
 ## 6. Corrective action
-None implemented yet — documentation-only pass. Recommended: once BUG-0010
-is fixed, have `diagnose_training.py` construct the handler from the
-checkpoint's own stored config; until then, at minimum mirror `train.py`'s
-actual defaults (`pool='attn', center_skip=True`) and widen the `except` to
-also catch and report `RuntimeError` from `load_state_dict` instead of
-letting it kill the script. Status: **OPEN**.
+CR-0005 (approved after independent review, alongside BUG-0010's fix):
+`diagnose_training.py`'s section-3 handler now constructs with
+`pool='attn', center_skip=True`, mirroring `train.py`'s actual defaults
+(confirmed at `train.py:255`/`:285`), and the `except` clause is widened to
+`(RuntimeError, ValueError)` alongside the existing `FileNotFoundError`, so
+a config mismatch (including the new BUG-0010 validation error) is
+reported clearly instead of crashing the script. Verified: file parses.
+Reconstructing from the checkpoint's own stored config (rather than a
+hardcoded mirror of `train.py`'s defaults) remains out of scope, as noted
+in CR-0005. **Status: CLOSED.**
 
 ## 7. Recurrence review
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`: **related to BUG-0010**

@@ -1,6 +1,13 @@
 """
 generate_negatives.py
 
+SUPERSEDED: this file (gen_negs.py) is an older, standalone duplicate of
+generate_negatives.py. Prefer generate_negatives.py for new runs. This
+copy's non-vegetated sampling cap (BUG-0004) has been backported so it no
+longer produces degraded negative sets, but future fixes to
+generate_negatives.py are not guaranteed to be mirrored here again - see
+docs/quality/bugs/BUG-0004-gen-negs-nonveg-cap-not-backported.md.
+
 Builds negative training + validation data from the GBIF other-species
 records (gbif_negatives_{ST}.csv), per the agreed design:
 
@@ -77,6 +84,15 @@ W_FLOOR = 0.1                   # ratio floor -> max habitat-based weight 10
 W_CAP = 10.0                    # ratio cap   -> min weight 0.1
 NEUTRAL_WEIGHT = 1.0            # Landscape-Rare / never-observed envelopes
 NONVEG_WEIGHT = 10.0            # water/urban/etc 'hard negative' candidates
+
+# BUG-0004: backported from generate_negatives.py. Cap on the NonVeg share
+# of each split's SAMPLED negatives. NonVeg candidates are useful as a
+# floor (a model that can't reject open water is broken) but they're
+# trivially separable - at high shares they let focal loss "solve" the
+# negative class in one epoch via the water/urban embeddings and never
+# learn to discriminate real habitat. The remainder of the quota is forced
+# to come from the weighted habitat-based pool.
+NONVEG_MAX_FRAC = 0.30
 
 CSV_KEEP = ["longitude", "latitude", "common_name", "obs_date", "year",
             "state", "gbif_id", "coord_uncertainty_m"]
@@ -247,16 +263,48 @@ def process_region(region, data, evt_xwalk, seed):
         if len(pool) == 0:
             print(f"  [!] No candidates in '{split}' blocks - 0/{n_target} sampled.")
             continue
-        if len(pool) <= n_target:
-            print(f"  [!] Only {len(pool):,} candidates available for "
-                 f"'{split}' (target {n_target:,}) - taking all of them.")
-            picked.append(pool)
-            continue
-        p = pool['weight'].values / pool['weight'].sum()
-        idx = rng.choice(pool.index.values, size=n_target, replace=False, p=p)
-        picked.append(pool.loc[idx])
-        print(f"  Sampled {n_target:,} '{split}' negatives from "
-             f"{len(pool):,} candidates (weighted).")
+        # BUG-0004: backported from generate_negatives.py. Two-pool
+        # sampling: NonVeg capped at NONVEG_MAX_FRAC of the target; the
+        # rest must come from habitat-based candidates so trivially-
+        # separable water/urban records can't dominate.
+        nonveg_pool = pool[pool['is_nonveg']]
+        habitat_pool = pool[~pool['is_nonveg']]
+        n_nonveg_t = min(int(round(n_target * NONVEG_MAX_FRAC)),
+                         len(nonveg_pool))
+        n_habitat_t = n_target - n_nonveg_t
+
+        def weighted_take(subpool, n):
+            if n <= 0 or len(subpool) == 0:
+                return subpool.iloc[0:0]
+            if len(subpool) <= n:
+                return subpool
+            p = subpool['weight'].values / subpool['weight'].sum()
+            idx = rng.choice(subpool.index.values, size=n, replace=False, p=p)
+            return subpool.loc[idx]
+
+        take_hab = weighted_take(habitat_pool, n_habitat_t)
+        shortfall = n_habitat_t - len(take_hab)
+        if shortfall > 0:
+            # Habitat pool undersupplied: top up from NonVeg beyond the
+            # cap rather than under-delivering, but say so loudly.
+            print(f"  [!] '{split}': habitat pool undersupplied "
+                 f"({len(take_hab):,}/{n_habitat_t:,}) - filling "
+                 f"{shortfall:,} extra from NonVeg beyond the "
+                 f"{NONVEG_MAX_FRAC:.0%} cap. Raise the download headroom "
+                 f"to fix properly.")
+            n_nonveg_t = min(n_nonveg_t + shortfall, len(nonveg_pool))
+        take_nv = weighted_take(nonveg_pool, n_nonveg_t)
+
+        got = pd.concat([take_hab, take_nv])
+        if len(got) < n_target:
+            print(f"  [!] '{split}': only {len(got):,}/{n_target:,} "
+                 f"available across both pools - taking all of them.")
+        else:
+            print(f"  Sampled {len(got):,} '{split}' negatives "
+                 f"({len(take_hab):,} habitat + {len(take_nv):,} NonVeg "
+                 f"[{100 * len(take_nv) / max(len(got), 1):.0f}%], "
+                 f"cap {NONVEG_MAX_FRAC:.0%}).")
+        picked.append(got)
     if not picked:
         return
     selected = pd.concat(picked).copy()

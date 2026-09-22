@@ -191,5 +191,14 @@ def download_landfire_data():
                         os.remove(zip_path)
 
 if __name__ == "__main__":
+    print(
+        "DEPRECATED: this script calls a retired LandFire API endpoint "
+        "(BUG-0002) and uses placeholder AOI coordinates that don't "
+        "overlap the project's ME/NH/VT sighting data (BUG-0003). Use "
+        "download.py instead, which has both fixes. See "
+        "docs/quality/bugs/BUG-0002-landfire-retired-endpoint.md and "
+        "BUG-0003-landfire-placeholder-aoi.md."
+    )
+    raise SystemExit(1)
     download_landfire_data()
     print("\nAll tasks completed!")

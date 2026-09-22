@@ -194,18 +194,24 @@ def _safe_windowed_read(src, window, fill_value=0):
 
 def read_strip(srcs, cat_f, cont_f, r0, rows, c0, cols):
     window = Window(c0, r0, cols, rows)
-    cat = np.stack([
-        _safe_windowed_read(srcs[f], window, fill_value=0)
-        for f in cat_f]).astype(np.int64)
-    cont = np.stack([
-        _safe_windowed_read(srcs[f], window, fill_value=0)
-        for f in cont_f]).astype(np.float32)
+    cat_raw = [_safe_windowed_read(srcs[f], window, fill_value=0)
+               for f in cat_f]
+    cont_raw = [_safe_windowed_read(srcs[f], window, fill_value=0)
+                for f in cont_f]
+    # BUG-0008: the reference band's RAW values (before sentinel collapse)
+    # are returned so predict_region can build an invalid-data mask from
+    # them directly, instead of overloading the post-collapse 0 to mean
+    # both "sentinel nodata" and "legitimate zero".
+    ref_raw = cat_raw[0] if cat_raw else cont_raw[0]
+
+    cat = np.stack(cat_raw).astype(np.int64)
+    cont = np.stack(cont_raw).astype(np.float32)
     for s in NODATA_SENTINELS:
         cat[cat == s] = 0
         cont[cont == s] = 0.0
     for i, f in enumerate(cont_f):
         cont[i] /= float(FEATURE_SPEC[f].get("scale", 1.0))
-    return cat, cont
+    return cat, cont, ref_raw
 
 
 def predict_region(model, device, srcs, ref, cat_f, cont_f,
@@ -236,10 +242,18 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                             height - y0)
             if rows_here < IMG_SIZE:
                 break
-            cat_np, cont_np = read_strip(srcs, cat_f, cont_f,
-                                         r_start + y0, rows_here,
-                                         c_start, width)
-            ref_band = cat_np[0] if cat_f else cont_np[0]
+            cat_np, cont_np, ref_raw = read_strip(srcs, cat_f, cont_f,
+                                                  r_start + y0, rows_here,
+                                                  c_start, width)
+            # BUG-0008: invalid mask built from RAW values against the
+            # reference raster's real nodata, so a legitimate value of 0
+            # is never masked and a raster whose true nodata IS 0 is still
+            # masked correctly (the old check compared the post-sentinel-
+            # collapse array to 0 and was gated by `ref_nodata != 0`,
+            # which defeated itself in exactly that case).
+            invalid_mask = (ref_raw == ref_nodata)
+            for s in NODATA_SENTINELS:
+                invalid_mask |= (ref_raw == s)
 
             ys = list(range(0, rows_here - IMG_SIZE + 1, stride))
             xs = list(range(0, width - IMG_SIZE + 1, stride))
@@ -252,8 +266,8 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                 keep, cat_b, cont_b = [], [], []
                 for (y, x) in chunk:
                     cy, cx = y + IMG_SIZE // 2, x + IMG_SIZE // 2
-                    if ref_band[cy, cx] == 0 and ref_nodata != 0:
-                        # center pixel had no data (filled to 0) - mask
+                    if invalid_mask[cy, cx]:
+                        # center pixel had no data - mask
                         continue
                     keep.append((y, x))
                     cat_b.append(cat_np[:, y:y + IMG_SIZE, x:x + IMG_SIZE])

@@ -297,11 +297,16 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
     print(f"   Scored {n_valid:,}/{heatmap.size:,} cells "
           f"({100 * n_valid / heatmap.size:.1f}% - rest masked as "
           f"nodata).")
+    # BUG-0009: Affine's constant term is the coordinate of pixel (0,0)'s
+    # CORNER, not its center. Patch centers were being assigned directly as
+    # the corner coordinate, shifting every output pixel by half an output
+    # pixel (0.5 * stride source pixels). Subtract that half-pixel here to
+    # convert center -> corner convention.
     new_trans = rasterio.Affine(
         ref.transform.a * stride, ref.transform.b,
-        ref.transform.c + (c_start + IMG_SIZE // 2) * ref.transform.a,
+        ref.transform.c + (c_start + IMG_SIZE // 2 - 0.5 * stride) * ref.transform.a,
         ref.transform.d, ref.transform.e * stride,
-        ref.transform.f + (r_start + IMG_SIZE // 2) * ref.transform.e)
+        ref.transform.f + (r_start + IMG_SIZE // 2 - 0.5 * stride) * ref.transform.e)
     return heatmap, new_trans
 
 

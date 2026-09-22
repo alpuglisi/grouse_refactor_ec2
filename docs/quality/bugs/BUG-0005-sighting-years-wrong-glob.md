@@ -48,11 +48,12 @@ the class's own `sightings(year)` method correctly uses, so the two drifted
 out of sync when the directory layout changed.
 
 ## 6. Corrective action
-None implemented yet — documentation-only pass. Recommended: rewrite
-`sighting_years()`'s glob to derive its search path from
-`PATH_TEMPLATES["sightings"]` (e.g. glob the templated directory with a
-`*` year wildcard) instead of a separately hardcoded fragment. Status:
-**OPEN**.
+Trivial fix (confined to `sighting_years()`, no signature/schema change —
+no CR required per `CLAUDE.md`'s triviality bar): `sighting_years()` now
+derives its glob pattern from `PATH_TEMPLATES["sightings"]` via
+`.format(state_lower=..., year="*")`, the same template `sightings(year)`
+already uses, instead of a separately hardcoded path fragment. See
+`grouse_data.py`'s `sighting_years()`. Status: **CLOSED**.
 
 ## 7. Recurrence review
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`: no prior bug involves

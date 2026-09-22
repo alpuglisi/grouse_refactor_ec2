@@ -154,9 +154,9 @@ def process_region(region, data, evt_xwalk, seed):
          f"uncertainty > {MAX_COORD_UNCERTAINTY_M} m (NaN uncertainty kept).")
 
     n1 = len(cand)
-    cand = cand.drop_duplicates(
-        subset=cand[['longitude', 'latitude']].round(5).columns.tolist()
-    )
+    # BUG-0007: the preceding drop_duplicates(subset=...round(5).columns...)
+    # call was a no-op (.columns discards the rounding, leaving raw-value
+    # dedup) and has been removed; this rounded-key dedup is the real logic.
     coords_key = cand[['longitude', 'latitude']].round(5)
     cand = cand.loc[~coords_key.duplicated()].copy()
     print(f"  Collapsed {n1 - len(cand):,} exact-duplicate coordinates "

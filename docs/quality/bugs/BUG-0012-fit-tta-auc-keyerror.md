@@ -57,12 +57,15 @@ instead of guarding on the same condition or using a safe accessor
 everywhere.
 
 ## 6. Corrective action
-None implemented yet — documentation-only pass. Recommended: use
-`metrics.get('tta_auc')` consistently in `fit()` (matching the existing
-status-line usage) with an explicit fallback/guard when `select_by=='auc'`
-and the key is absent (e.g. skip the AUC-based improvement check for that
-epoch, or raise a clear, actionable error rather than a bare `KeyError`).
-Status: **OPEN**.
+Trivial fix (confined to two lines in `fit()`, no signature/schema change
+— no CR required): both `metrics['tta_auc']` direct-index usages now use
+`metrics.get('tta_auc', float('-inf'))`, matching the existing status-line
+usage in the same function. When `tta_auc` is absent, `select_by == 'auc'`
+now treats that epoch as not-improved (`-inf` never exceeds `best_auc`)
+instead of crashing — a deliberate, conservative fallback rather than a
+raised error, since a missing TTA metric on an oddly-sized validation set
+is not itself an error condition worth halting training over. Status:
+**CLOSED**.
 
 ## 7. Recurrence review
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`: no prior bug concerns

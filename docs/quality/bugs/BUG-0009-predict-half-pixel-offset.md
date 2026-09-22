@@ -52,11 +52,12 @@ transform's required convention) with "coordinate of a pixel's center"
 constructing the output transform.
 
 ## 6. Corrective action
-None implemented yet — documentation-only pass. Recommended: subtract half
-an output pixel in each axis when converting the patch-center coordinate to
-the transform's corner term, i.e. `... + (c_start + IMG_SIZE // 2 - 0.5 *
-stride) * ref.transform.a` and the equivalent for the row axis. Status:
-**OPEN**.
+Trivial fix (confined to the `new_trans` construction in `predict_region`,
+no signature/schema change — no CR required): both the column and row
+corner terms now subtract `0.5 * stride` (in source-pixel units) before
+multiplying by the transform's per-axis scale, converting the patch-center
+coordinate to the corner convention Affine requires. See `predict.py`'s
+`predict_region()`. Status: **CLOSED**.
 
 ## 7. Recurrence review
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`: no prior bug concerns

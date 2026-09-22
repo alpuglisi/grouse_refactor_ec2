@@ -693,15 +693,20 @@ class GrouseModelHandler:
                       f"(hedged {metrics.get('hedged_pct', float('nan')):.1f}%) | "
                       f"train acc: {metrics['train_accuracy']:.1f}% | "
                       f"logit std: {metrics['logit_std']:.3f}")
+            # BUG-0012: evaluate() only populates 'tta_auc' when the val set
+            # size is an exact multiple of tta_group, so it must be read via
+            # .get() here (matching the status-line usage above), not
+            # indexed directly - direct indexing raised KeyError whenever
+            # that divisibility condition didn't hold.
             if self.select_by == 'auc':
-                improved = metrics['tta_auc'] > best_auc
+                improved = metrics.get('tta_auc', float('-inf')) > best_auc
             elif self.select_by == 'strict':
                 improved = metrics.get('strict_accuracy',
                                        float('-inf')) > best_strict
             else:
                 improved = metrics['val_loss'] < best_loss
             best_loss = min(best_loss, metrics['val_loss'])
-            best_auc = max(best_auc, metrics['tta_auc'])
+            best_auc = max(best_auc, metrics.get('tta_auc', float('-inf')))
             best_strict = max(best_strict,
                               metrics.get('strict_accuracy', float('-inf')))
             if improved:

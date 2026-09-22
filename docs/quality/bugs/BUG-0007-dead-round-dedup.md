@@ -59,9 +59,12 @@ dedup key, producing dead code that happens to be harmless only because a
 second, correct block immediately follows it.
 
 ## 6. Corrective action
-None implemented yet — documentation-only pass. Recommended: delete the
-first (no-op) `drop_duplicates` call in both files, since the following two
-lines already perform the correct rounded-key dedup. Status: **OPEN**.
+Trivial fix (confined to one block per file, no behavior change — the
+no-op call did nothing to begin with — no CR required): deleted the
+no-op `drop_duplicates(subset=...round(5).columns...)` call in both
+`generate_negatives.py` and `gen_negs.py`, leaving the correct rounded-key
+dedup (`coords_key = ...round(5)` / `cand.loc[~coords_key.duplicated()]`)
+as the only dedup logic. Status: **CLOSED**.
 
 ## 7. Recurrence review
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`: no prior bug concerns

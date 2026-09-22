@@ -325,11 +325,15 @@ class RegionData:
         return self._load_csv("sightings", year=year)
 
     def sighting_years(self):
+        # Derived from PATH_TEMPLATES["sightings"] (BUG-0005: this used to
+        # glob a hardcoded, unnamespaced pattern that drifted from the
+        # actual data/sightings/ location sightings() resolves to).
+        glob_rel = PATH_TEMPLATES["sightings"].format(
+            state_lower=self.region.lower(), year="*")
         pattern = re.compile(
-            rf"^{self.region.lower()}_sightings_(\d{{4}})\.csv$")
+            rf"^{re.escape(self.region.lower())}_sightings_(\d{{4}})\.csv$")
         found = []
-        for p in glob.glob(self.config.resolve(
-                f"{self.region.lower()}_sightings_*.csv")):
+        for p in glob.glob(self.config.resolve(glob_rel)):
             m = pattern.match(os.path.basename(p))
             if m:
                 found.append(int(m.group(1)))

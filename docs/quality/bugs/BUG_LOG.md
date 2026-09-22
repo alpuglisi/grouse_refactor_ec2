@@ -15,10 +15,17 @@ specifically checking the prior fixes for regressions and re-running the
 PA-0012 duplicate-script sweep — it found one incomplete fix (BUG-0014,
 a missed BUG-0012 call site) and one un-swept duplicate-script instance
 (BUG-0015). Newest-first by discovery within each pass; ties broken by ID
-order.
+order. Entries BUG-0019..0021 were found in a third pass, triggered by the
+user directly asking whether `CLAUDE.md` §3.5's mandatory sweep step was
+actually being followed — it wasn't, for most preventive actions (see
+BUG-0019). Running the five outstanding sweeps found two more real
+findings (BUG-0020, BUG-0021) and confirmed three PAs clean.
 
 | ID | Date | Symptom | Root cause | Remediation | Status |
 |----|------|---------|------------|-------------|--------|
+| BUG-0021 | 2026-09-22 | `predict.py`/`calibrate.py` reimplement checkpoint-config handling instead of using the shared `check_checkpoint_config` (PA-0009 sweep) | Two independent, both-correct mechanisms solve the same problem (BUG-0010's concern) without sharing code | None — verified not a live risk (both already reconstruct from the checkpoint's config); recommend a future CR to unify | OPEN, low priority |
+| BUG-0020 | 2026-09-22 | 13 files independently hardcode paths duplicating `PATH_TEMPLATES`, worst in `organize_project.py` (PA-0003 sweep) | `PATH_TEMPLATES` introduced as single source of truth, but no migration swept pre-existing/independent hardcodings onto it | None — deferred, scope too large for this pass; recommend a future CR (path-derivation helpers) | OPEN |
+| BUG-0019 | 2026-09-22 | Preventive-action sweeps (`CLAUDE.md` §3.5) were not consistently run when new PAs were added — 5 of 14 had zero documented sweep activity | The sweep step depends on the implementing session remembering to run and record it, with no structural checkpoint forcing that or making its absence visible | Ran the 5 outstanding sweeps (this pass); added a **Swept?** column to `PREVENTIVE_ACTIONS.md` (PA-0015) so an unswept rule is visible without grepping every bug doc | CLOSED |
 | BUG-0018 | 2026-09-22 | `check_exotic.py` carries a dead, misleading `ROUND_DECIMALS` constant | Leftover from a superseded coordinate-rounding approach, never removed | Trivial fix applied directly — deleted the unused constant | CLOSED |
 | BUG-0017 | 2026-09-22 | `dataset.py`'s training patches may conflate nodata sentinels with a legitimate value of 0 (unconfirmed) | Same mechanism as BUG-0008, in the training-data path instead of inference masking — not yet verified against real attribute tables | None — deliberately deferred pending domain confirmation; would need a CR if confirmed (touches cache format) | OPEN, unconfirmed |
 | BUG-0016 | 2026-09-22 | `tune.py` and `tune_bins.py` silently overwrite each other's `bin_tuning_{region}.csv` output | Diverged (non-overlapping) duplicate scripts share one mutable output path with no marker for which produced it | Trivial fix applied directly — warning banner in `tune.py`; full resolution (reconcile scripts or disambiguate paths) needs a domain-owner call + CR | OPEN, stopgap in place |

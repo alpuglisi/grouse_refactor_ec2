@@ -45,6 +45,16 @@ the state line a pixel falls.
   rectangle's grid (`tsd`).
 - The model has no location or region input.
 
+**Update:** a fix for the per-state road source was committed (CHANGELOG,
+"road_dist: roads from neighbouring states"). The most direct check of
+this hypothesis needs no retraining:
+1. Copy the current `NH_*_road_dist.tif` files aside.
+2. Run `python generate_road_distance.py --regions NH`.
+3. Re-run the same `predict.py` command with the **same old checkpoint**.
+
+If the Maine-side jump collapses, `road_dist` was the cause. If it
+persists, rule it out and continue below.
+
 If step 6 shows the Maine-side jump survives blanking `road_dist`, the
 cause lies outside what the code shows (the data values themselves).
 Continue with steps 3–5 comparing inputs on matched Maine/NH points.

@@ -16,6 +16,64 @@ the diff.
 
 ---
 
+## road_dist: roads from neighbouring states, NODATA outside US coverage (2026-09-29)
+
+**Symptom (user, Errol NH map):** everything on the Maine side of the
+state line scored significantly higher than New Hampshire land of
+essentially the same habitat.
+
+**Defect in `generate_road_distance.py`:** `load_paved_roads` fetched
+TIGER roads for the region's own state only (`STATE_FIPS[region]`,
+then each of that state's counties), but `build_distance_raster` ran the
+distance transform over the whole region grid. That grid is the LANDFIRE
+request rectangle, and NH's reaches −70.60, well into Maine. Every Maine
+pixel therefore held the distance to the nearest *New Hampshire* road,
+so a pixel beside Route 26 at Upton read as kilometres from any road.
+The same holds for every region along every neighbouring-state edge.
+
+**Status of the link to the symptom: not yet confirmed on real data.**
+The mechanism fits: positives sit 2–5× farther from roads than
+background points (see the road-hugging investigation), so falsely
+"remote" land scores as grouse-like. Nothing has yet been measured on
+the actual rasters. Confirmation needs no retraining: regenerate
+`road_dist` and re-predict the same box with the *old* checkpoint. The
+old model then sees correct Maine distances, so if the Maine-side jump
+collapses, this was the cause. `INVESTIGATION_PLAN_errol_map.md` has
+further checks.
+
+**Fix:**
+- Roads now come from every TIGER county, in any state, that intersects
+  the grid expanded by `--pad-km` (default 10 km); a national county
+  file is already downloaded for FIPS lookup.
+- The distance transform runs on the padded grid and is cropped back, so
+  roads just outside the grid edge also count.
+- Pixels outside every US county (Canada, ocean) are written as NODATA,
+  since TIGER has no roads there and a distance would be invented.
+  `missing_mask` models read them as missing.
+- Distances just south of the Canadian border remain upper bounds; the
+  run prints the uncovered fraction.
+
+**Verified** on a synthetic two-state grid:
+- a pixel beside the neighbour state's road reads about 30 m;
+- a grid-edge pixel picks up a road 300 m outside the grid (about
+  330 m; the old code gave about 2 km);
+- pixels outside all counties are NODATA;
+- a non-intersecting county is not loaded.
+
+Not run against real TIGER downloads here (no data in this environment).
+
+**Consequences:**
+- Every model trained on the old rasters learned from wrong distances
+  for points near state lines. Regenerate (`python
+  generate_road_distance.py`) and retrain with a fresh run. The patch
+  cache invalidates itself from the new mtimes.
+- `diagnose_road_bias.py` has the same class of defect: it loads
+  per-state PRISECROADS, so sighting points near a border get distances
+  that ignore the neighbour's roads. Not fixed here. Its 2–5× result
+  should be re-checked once it is.
+
+---
+
 ## Nodata validity channels, out-of-vocab codes as missing, dual branch on by default, Platt calibration (2026-09-29)
 
 Four fixes from an architecture review. **Cold start required** for the

@@ -54,15 +54,41 @@ models.road_dist_decode inverts it for anything that wants metres back.
 Written once per year already present for that region, since roads are
 static but the pipeline's year-matching expects a vintage per feature.
 
+WHICH ROADS: EVERY US COUNTY THE GRID TOUCHES, NOT JUST THE STATE'S
+-------------------------------------------------------------------
+A region's grid is the LANDFIRE request rectangle, which reaches well
+into the neighbouring states (NH's runs to -70.60, deep into Maine).
+The original version loaded only the region's own state's counties, so
+every pixel across a state line held the distance to the nearest road IN
+THE HOME STATE: a Maine pixel beside Route 26 read as kilometres from
+any road. Since training positives sit far from roads, that would turn
+neighbouring-state land into "remote, grouse-like" land, and give every
+training point near a border a wrong road distance.
+
+Now roads come from every TIGER county, in any state, whose polygon
+intersects the grid expanded by --pad-km (default 10 km). The distance
+transform also runs on that expanded grid, so a road just outside the
+region's edge still counts, then the result is cropped back to the
+region grid.
+
+Pixels outside every US county (Canada, open ocean) are written as
+NODATA: TIGER has no roads there, so any distance would be invented.
+missing_mask models see them as missing. Distances just SOUTH of the
+Canadian border are still upper bounds (Canadian roads are absent); the
+run prints how much of the grid lies outside US coverage.
+
 MEMORY: the distance transform runs on the whole region grid at once
 (it has to - a pixel's nearest road can be arbitrarily far), so peak
-usage is roughly 12 bytes per raster pixel. A large state can want
-several GB. Run one region at a time with --regions if that bites.
+usage is roughly 12 bytes per raster pixel, counted on the grid PLUS
+its --pad-km margin on every side. A large state can want several GB.
+Run one region at a time with --regions, or lower --pad-km, if that
+bites.
 
 Usage:
     python generate_road_distance.py
     python generate_road_distance.py --regions NH
     python generate_road_distance.py --mtfcc S1100 S1200   # highways only
+    python generate_road_distance.py --pad-km 20   # wider road margin
 """
 import os
 import glob
@@ -73,6 +99,7 @@ import numpy as np
 import rasterio
 import rasterio.features
 from scipy.ndimage import distance_transform_edt
+from rasterio.transform import Affine, array_bounds
 
 from grouse_data import GrouseData
 from models import ROAD_DIST_MAX_M, road_dist_encode
@@ -86,6 +113,11 @@ CACHE_DIR = "data/roads"
 # script, and the patch cache rebuilds itself from the new mtimes.
 TIGER_YEAR = 2025
 STATE_FIPS = {"ME": "23", "NH": "33", "VT": "50"}
+# Margin around the region grid for road loading and the distance
+# transform: a road this far outside the grid still sets the distance of
+# the pixels at its edge.
+PAD_KM_DEFAULT = 10.0
+ROAD_DIST_NODATA = -9999
 PAVED_MTFCC_DEFAULT = ["S1100", "S1200", "S1400", "S1630", "S1640"]
 
 
@@ -98,28 +130,35 @@ def _download(url, path):
     return path
 
 
-def county_fips(state_fp, tiger_year=TIGER_YEAR):
-    """County FIPS codes for a state, from TIGER's national county file
-    (one ~80MB download, cached, shared by all three regions)."""
+def load_counties(tiger_year=TIGER_YEAR):
+    """TIGER's national county polygons (one ~80MB download, cached,
+    shared by all regions)."""
     import geopandas as gpd
     path = os.path.join(CACHE_DIR, f"tl_{tiger_year}_us_county.zip")
     _download(f"https://www2.census.gov/geo/tiger/TIGER{tiger_year}/COUNTY/"
               f"tl_{tiger_year}_us_county.zip", path)
-    counties = gpd.read_file(path)
-    sel = counties[counties["STATEFP"] == state_fp]
-    return sorted(sel["COUNTYFP"].tolist())
+    return gpd.read_file(path)
 
 
-def load_paved_roads(region, mtfcc, target_crs, tiger_year=TIGER_YEAR):
-    """Every county's TIGER roads for this state, filtered to the paved
-    MTFCC classes and reprojected to the region raster's CRS."""
+def counties_for_grid(counties, grid_bounds, grid_crs):
+    """Every county, in ANY state, whose polygon intersects the grid's
+    bounding box (minx, miny, maxx, maxy in grid_crs). Returns the
+    matching rows reprojected to grid_crs."""
+    from shapely.geometry import box
+    import geopandas as gpd
+    footprint = gpd.GeoSeries([box(*grid_bounds)], crs=grid_crs)
+    footprint = footprint.to_crs(counties.crs).iloc[0]
+    sel = counties[counties.intersects(footprint)]
+    return sel.to_crs(grid_crs)
+
+
+def load_paved_roads(county_rows, mtfcc, target_crs, tiger_year=TIGER_YEAR):
+    """TIGER roads for the given counties (any states), filtered to the
+    paved MTFCC classes and reprojected to the region raster's CRS."""
     import geopandas as gpd
     import pandas as pd
-    state_fp = STATE_FIPS[region]
-    fips = county_fips(state_fp, tiger_year)
-    print(f"   {region}: {len(fips)} counties (TIGER {tiger_year})")
     frames = []
-    for cf in fips:
+    for state_fp, cf in zip(county_rows["STATEFP"], county_rows["COUNTYFP"]):
         name = f"tl_{tiger_year}_{state_fp}{cf}_roads.zip"
         path = os.path.join(CACHE_DIR, name)
         _download(f"https://www2.census.gov/geo/tiger/TIGER{tiger_year}/"
@@ -130,35 +169,64 @@ def load_paved_roads(region, mtfcc, target_crs, tiger_year=TIGER_YEAR):
     roads = pd.concat(frames, ignore_index=True)
     roads = gpd.GeoDataFrame(roads, geometry="geometry", crs=frames[0].crs)
     by_class = roads["MTFCC"].value_counts().to_dict()
-    print(f"   {region}: {len(roads):,} paved road segments kept "
-         f"({by_class})")
+    print(f"      {len(roads):,} paved road segments kept ({by_class})")
     return roads.to_crs(target_crs)
 
 
-def build_distance_raster(roads, template_path):
-    """Rasterize the road lines onto the template's exact grid, then
-    Euclidean-distance-transform the complement. all_touched=True so a
-    diagonal line marks every pixel it crosses instead of leaving gaps
-    a nearest-neighbour rasterization would punch through it."""
+def padded_grid(transform, height, width, pad_px):
+    """The grid expanded by pad_px pixels on every side: (transform,
+    height, width). The region grid is the window [pad_px:pad_px+height,
+    pad_px:pad_px+width] of it."""
+    t = transform * Affine.translation(-pad_px, -pad_px)
+    return t, height + 2 * pad_px, width + 2 * pad_px
+
+
+def build_distance_raster(roads, template_path, pad_px=0, coverage=None):
+    """Rasterize the road lines onto the template's grid EXPANDED by
+    pad_px pixels, Euclidean-distance-transform the complement, and crop
+    back to the template grid, so roads up to pad_px outside the grid
+    still count. all_touched=True so a diagonal line marks every pixel it
+    crosses instead of leaving gaps a nearest-neighbour rasterization
+    would punch through it.
+
+    coverage: polygons (in the template CRS) where road data exists
+    (the US counties). Pixels outside them come back as NaN in dist_m
+    and as ROAD_DIST_NODATA in the encoded raster.
+    Returns (encoded int16, dist_m float with NaN, transform, crs)."""
     with rasterio.open(template_path) as src:
         transform, crs = src.transform, src.crs
         height, width = src.height, src.width
+    p_transform, p_h, p_w = padded_grid(transform, height, width, pad_px)
     mask = rasterio.features.rasterize(
         ((geom, 1) for geom in roads.geometry if geom is not None),
-        out_shape=(height, width), transform=transform, fill=0,
+        out_shape=(p_h, p_w), transform=p_transform, fill=0,
         default_value=1, all_touched=True, dtype="uint8")
-    covered = 100.0 * mask.sum() / mask.size
-    print(f"      rasterized: {mask.sum():,} road pixels "
-         f"({covered:.3f}% of the grid)")
+    inner = mask[pad_px:pad_px + height, pad_px:pad_px + width]
+    covered = 100.0 * inner.sum() / inner.size
+    print(f"      rasterized: {inner.sum():,} road pixels inside the grid "
+         f"({covered:.3f}%), {mask.sum() - inner.sum():,} in the "
+         f"{pad_px}-px margin")
     if mask.sum() == 0:
         raise SystemExit("No road pixels landed on this grid - check the "
                          "CRS/extent match between roads and rasters.")
     res_y, res_x = abs(transform.e), abs(transform.a)
     dist_m = distance_transform_edt(mask == 0, sampling=(res_y, res_x))
-    return road_dist_encode(dist_m), dist_m, transform, crs
+    del mask
+    dist_m = dist_m[pad_px:pad_px + height, pad_px:pad_px + width]
+    encoded = road_dist_encode(dist_m)
+    if coverage is not None:
+        inside = rasterio.features.rasterize(
+            ((geom, 1) for geom in coverage if geom is not None),
+            out_shape=(height, width), transform=transform, fill=0,
+            default_value=1, all_touched=True, dtype="uint8").astype(bool)
+        dist_m = np.where(inside, dist_m, np.nan)
+        encoded = np.where(inside, encoded,
+                           ROAD_DIST_NODATA).astype(np.int16)
+    return encoded, dist_m, transform, crs
 
 
-def process_region(region, data, mtfcc, tiger_year=TIGER_YEAR):
+def process_region(region, data, mtfcc, tiger_year=TIGER_YEAR,
+                   pad_km=PAD_KM_DEFAULT):
     print(f"\n{'=' * 60}\n{region}\n{'=' * 60}")
     rd = data[region]
     template_feature = next(
@@ -182,18 +250,38 @@ def process_region(region, data, mtfcc, tiger_year=TIGER_YEAR):
 
     with rasterio.open(template) as src:
         target_crs = src.crs
-    roads = load_paved_roads(region, mtfcc, target_crs, tiger_year)
-    encoded, dist_m, transform, crs = build_distance_raster(roads, template)
+        pad_px = int(round(pad_km * 1000.0 / abs(src.transform.a)))
+        p_transform, p_h, p_w = padded_grid(src.transform, src.height,
+                                            src.width, pad_px)
+    w, s_, e, n = array_bounds(p_h, p_w, p_transform)
+    grid_bounds = (min(w, e), min(s_, n), max(w, e), max(s_, n))
+    county_rows = counties_for_grid(load_counties(tiger_year), grid_bounds,
+                                    target_crs)
+    by_state = county_rows.groupby("STATEFP").size().to_dict()
+    print(f"   roads from {len(county_rows)} counties across "
+         f"{len(by_state)} state(s) (STATEFP: {by_state}), grid + "
+         f"{pad_km:g} km margin")
+    roads = load_paved_roads(county_rows, mtfcc, target_crs, tiger_year)
+    encoded, dist_m, transform, crs = build_distance_raster(
+        roads, template, pad_px=pad_px, coverage=county_rows.geometry)
+    outside = float(np.isnan(dist_m).mean())
+    print(f"      {100 * outside:.1f}% of the grid lies outside US county "
+         f"coverage (Canada/ocean) -> NODATA")
+    if outside > 0:
+        print("      [note] distances near the Canadian border are upper "
+              "bounds: TIGER has no Canadian roads.")
     # Reported in METRES (the encoded raster is log-scaled - see
     # models.road_dist_encode). A median anywhere near ROAD_DIST_MAX_M
     # would mean the sanity bound is actually binding, which it should
     # not be at any sane --mtfcc choice.
-    pct = [float(np.percentile(dist_m, p)) for p in (50, 90, 99)]
-    print(f"      distance: min {dist_m.min():.0f}m | median {pct[0]:.0f}m "
+    valid = dist_m[np.isfinite(dist_m)]
+    pct = [float(np.percentile(valid, p)) for p in (50, 90, 99)]
+    print(f"      distance: min {valid.min():.0f}m | median {pct[0]:.0f}m "
          f"| p90 {pct[1]:.0f}m | p99 {pct[2]:.0f}m | max "
-         f"{dist_m.max():.0f}m")
-    print(f"      encoded (log1p) int16 range: {encoded.min()}-"
-         f"{encoded.max()}")
+         f"{valid.max():.0f}m")
+    enc_valid = encoded[encoded != ROAD_DIST_NODATA]
+    print(f"      encoded (log1p) int16 range: {enc_valid.min()}-"
+         f"{enc_valid.max()}")
     if pct[0] >= ROAD_DIST_MAX_M * 0.5:
         print(f"      [warn] median distance is more than half the "
              f"{ROAD_DIST_MAX_M}m sanity bound - this road set is very "
@@ -207,7 +295,8 @@ def process_region(region, data, mtfcc, tiger_year=TIGER_YEAR):
         with rasterio.open(out, "w", driver="GTiff",
                            height=encoded.shape[0], width=encoded.shape[1],
                            count=1, dtype="int16",
-                           crs=crs, transform=transform, nodata=-9999,
+                           crs=crs, transform=transform,
+                           nodata=ROAD_DIST_NODATA,
                            compress="deflate", predictor=2, tiled=True) as dst:
             dst.write(encoded, 1)
         print(f"      wrote {os.path.basename(out)} "
@@ -229,6 +318,11 @@ def main():
                          "%(default)s. Raise it when a newer shapefile "
                          "release is confirmed live; the URL pattern is "
                          "unchanged across vintages.")
+    ap.add_argument("--pad-km", type=float, default=PAD_KM_DEFAULT,
+                    help="Margin around each region grid for loading "
+                         "roads and running the distance transform, so "
+                         "roads just outside the grid still count. "
+                         "Default: %(default)s km.")
     args = ap.parse_args()
 
     try:
@@ -240,12 +334,13 @@ def main():
     print(f"Paved MTFCC classes: {args.mtfcc} | TIGER {args.tiger_year}")
     data = GrouseData()
     for region in args.regions:
-        process_region(region, data, args.mtfcc, args.tiger_year)
-    print("\nDone. Re-run train.py - 'road_dist' is now discoverable in "
-         "FEATURE_SPEC/RASTER_FEATURES and will be picked up "
-         "automatically. NOTE: this adds an input channel, which is a "
-         "GEOMETRY change - it needs a fresh training run, not --resume "
-         "or --init-from.")
+        process_region(region, data, args.mtfcc, args.tiger_year,
+                       args.pad_km)
+    print("\nDone. road_dist VALUES changed (roads from neighbouring "
+         "states, NODATA outside US coverage). The patch cache rebuilds "
+         "itself from the new mtimes, but every model trained on the old "
+         "rasters learned from wrong distances near state lines - "
+         "retrain with a fresh run (not --resume).")
 
 
 if __name__ == "__main__":

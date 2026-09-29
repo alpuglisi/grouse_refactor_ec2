@@ -197,6 +197,18 @@ identify the vintage, and the network would have a free year label. Same
 failure mode as a mixed-vintage `fdist` code space. `TSD_MAX_YEARS` is
 constant across every raster written.
 
+**`road_dist` takes its roads from every US county the grid touches, in
+any state.** A region's grid is the LANDFIRE request rectangle, which
+extends well into neighbouring states. `generate_road_distance.py`
+loads TIGER roads for every county intersecting the grid plus a
+`--pad-km` margin, and runs the distance transform on that padded grid.
+Pixels outside all US counties (Canada, ocean) are NODATA, because
+TIGER has no roads there. Before 2026-09-29 only the home state's roads
+were loaded, so across a state line the feature measured distance to the
+nearest *home-state* road. Any new distance-type feature built from
+per-state source data must do the same: source from everything
+intersecting the grid, and mark uncovered pixels missing.
+
 **`tsd` is recomputed per vintage; `road_dist` is copied.** Roads are
 static, so `road_dist` writes byte-identical files to every year. Time
 since disturbance is not: the clock runs. Each vintage year Y is computed

@@ -138,6 +138,18 @@ instead of a fresh investigation.
 Status: **OPEN**. The process corrective action is in place; the map
 defect the user reported is unidentified.
 
+**Update (2026-09-29):** the user then gave the symptom: "everything on
+the maine side of the state border is ranked significantly higher than
+the new hampshire side despite being essentially the same habitat."
+
+With the symptom established, a code trace of all 15 inputs found
+`road_dist` to be the only input built per state. That is logged, with
+its fix, as **BUG-0023**. It was the mechanism first asserted in reply 1
+and is still **unconfirmed on real data**. That doesn't change this
+bug's finding: the defect here is that it was stated as the cause, with
+a fix proposed, before the symptom was known or any check could have
+failed it.
+
 ## 7. Recurrence review
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md` for (a) the same
 failure and (b) a different failure with the same root cause (a

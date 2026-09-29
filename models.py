@@ -20,9 +20,137 @@ Everything architectural is preserved from the original:
 """
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torchvision import models
 
 from blocks import CBAM
+
+# Relative-position geometry for EarlyAttentionBlock's 'rel' mode.
+# ROPE_BASE: frequency base for the 2D rotary embedding; 100 (not the
+#   language-model 10000) because grid coordinates only span ~0-64, and
+#   the resulting wavelengths (~6 to ~200 cells) cover that range with
+#   real resolution instead of being nearly constant across it.
+# REL_MAX: the relative-bias table covers offsets in [-REL_MAX, REL_MAX]
+#   per axis - exactly the 32x32 keep-early-resolution grid. Offsets
+#   beyond it (only possible with img_size > 64) clamp to the table
+#   edge, i.e. the bias saturates at long range instead of failing.
+ROPE_BASE = 100.0
+REL_MAX = 31
+
+
+def _apply_rope(x, cos, sin):
+    """Rotate per-head token vectors by their position angles.
+    x: (B, heads, L, head_dim); cos/sin: (L, head_dim/2)."""
+    cos = cos.to(x.dtype)[None, None]
+    sin = sin.to(x.dtype)[None, None]
+    x1, x2 = x[..., 0::2], x[..., 1::2]
+    return torch.stack((x1 * cos - x2 * sin,
+                        x1 * sin + x2 * cos), dim=-1).flatten(-2)
+
+
+class RelativeMultiheadAttention(nn.Module):
+    """Multi-head attention with nn.MultiheadAttention's EXACT parameter
+    layout (packed in_proj_weight/in_proj_bias + out_proj), so
+    checkpoints trained with the stock module load into this one
+    unchanged - verified numerically equivalent when rope/bias are off.
+    On top of the stock math it accepts two relative-position inputs:
+
+      rope_q/rope_k : (cos, sin) tables that rotate each token's Q/K
+        vector by an angle proportional to its (row, col). The QK dot
+        product then depends on the two tokens' CONTENT and their
+        RELATIVE offset jointly - "what is 2 cells north-east of what" -
+        and is invariant to where the pair sits in the patch.
+      bias : (heads, Lq, Lk) additive attention-logit bias looked up
+        from a learned (drow, dcol) table - a content-independent
+        distance/direction prior.
+
+    Attention runs through scaled_dot_product_attention; with a bias
+    the flash kernel is ineligible but the memory-efficient backend
+    still avoids materializing the (B, heads, L, L) matrix."""
+
+    def __init__(self, embed_dim, num_heads, dropout=0.0):
+        super().__init__()
+        if embed_dim % num_heads:
+            raise ValueError(f"embed_dim {embed_dim} not divisible by "
+                             f"num_heads {num_heads}")
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.dropout = float(dropout)
+        self.in_proj_weight = nn.Parameter(torch.empty(3 * embed_dim,
+                                                       embed_dim))
+        self.in_proj_bias = nn.Parameter(torch.zeros(3 * embed_dim))
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
+        nn.init.xavier_uniform_(self.in_proj_weight)
+
+    def forward(self, query, key, value, rope_q=None, rope_k=None,
+                bias=None):
+        b, lq, c = query.shape
+        lk = key.shape[1]
+        w_q, w_k, w_v = self.in_proj_weight.chunk(3)
+        b_q, b_k, b_v = self.in_proj_bias.chunk(3)
+        q = F.linear(query, w_q, b_q).view(
+            b, lq, self.num_heads, self.head_dim).transpose(1, 2)
+        k = F.linear(key, w_k, b_k).view(
+            b, lk, self.num_heads, self.head_dim).transpose(1, 2)
+        v = F.linear(value, w_v, b_v).view(
+            b, lk, self.num_heads, self.head_dim).transpose(1, 2)
+        if rope_q is not None:
+            q = _apply_rope(q, *rope_q)
+            k = _apply_rope(k, *rope_k)
+        mask = None if bias is None else bias.unsqueeze(0).to(q.dtype)
+        out = F.scaled_dot_product_attention(
+            q, k, v, attn_mask=mask,
+            dropout_p=self.dropout if self.training else 0.0)
+        return self.out_proj(out.transpose(1, 2).reshape(b, lq, c))
+
+    @torch.no_grad()
+    def attention_weights(self, query, key, rope_q=None, rope_k=None,
+                          bias=None):
+        """Diagnostic-only: the (B, heads, Lq, Lk) softmax attention
+        weights this block would use, via an explicit softmax(QK^T)
+        instead of the fused SDPA kernel forward() uses (which never
+        materializes them). Not called anywhere on the training path -
+        see EarlyAttentionBlock.attention_weights / model_handler's
+        --tb-attention."""
+        b, lq, _ = query.shape
+        lk = key.shape[1]
+        w_q, w_k = self.in_proj_weight.chunk(3)[:2]
+        b_q, b_k = self.in_proj_bias.chunk(3)[:2]
+        q = F.linear(query, w_q, b_q).view(
+            b, lq, self.num_heads, self.head_dim).transpose(1, 2)
+        k = F.linear(key, w_k, b_k).view(
+            b, lk, self.num_heads, self.head_dim).transpose(1, 2)
+        if rope_q is not None:
+            q = _apply_rope(q, *rope_q)
+            k = _apply_rope(k, *rope_k)
+        scores = torch.matmul(q, k.transpose(-2, -1)) / (
+            self.head_dim ** 0.5)
+        if bias is not None:
+            scores = scores + bias.unsqueeze(0).to(scores.dtype)
+        return torch.softmax(scores, dim=-1)
+
+
+def sincos_position_encoding(h, w, channels, stride=1, device=None):
+    """(1, h*w, channels) fixed 2D sin-cos position encoding.
+
+    Coordinates are expressed in FULL-RESOLUTION pixel units: token
+    (i, j) of a grid produced at `stride` sits at pixel center
+    ((i + 0.5) * stride, (j + 0.5) * stride). A full-res query grid and
+    a kv_stride-downsampled key grid therefore share one coordinate
+    frame, so query-key position offsets stay geometrically meaningful
+    across the two resolutions."""
+    d4 = channels // 4
+    omega = 1.0 / (10000.0 ** (
+        torch.arange(d4, dtype=torch.float32, device=device) / d4))
+    ys = ((torch.arange(h, dtype=torch.float32, device=device) + 0.5)
+          * stride)[:, None] * omega
+    xs = ((torch.arange(w, dtype=torch.float32, device=device) + 0.5)
+          * stride)[:, None] * omega
+    pe_y = torch.cat([ys.sin(), ys.cos()], dim=1)          # (h, C/2)
+    pe_x = torch.cat([xs.sin(), xs.cos()], dim=1)          # (w, C/2)
+    pe = torch.cat([pe_y[:, None, :].expand(h, w, 2 * d4),
+                    pe_x[None, :, :].expand(h, w, 2 * d4)], dim=2)
+    return pe.reshape(1, h * w, channels)
 
 
 class EarlyAttentionBlock(nn.Module):
@@ -49,14 +177,77 @@ class EarlyAttentionBlock(nn.Module):
       (queries stay full-resolution) - every fine pixel still attends
       OUT to the whole map, just against a coarser summary of it,
       trading some fidelity for roughly kv_stride^2 less attention
-      compute."""
+      compute.
 
-    def __init__(self, channels, num_heads=4, kv_stride=1):
+    Three properties this block must hold to be trainable inside a
+    pretrained backbone on ~12.7k noisy points (each was violated by an
+    earlier version, which diverged a few epochs after the focal-loss
+    switch):
+
+    POSITION (pos_mode): attention is a set operation - without
+      position information the block is exactly permutation-equivariant
+      in its spatial tokens (verified), i.e. blind to arrangement, and
+      the only thing it can compute is a global content summary of the
+      patch. That summary acts as a per-patch fingerprint - a
+      memorization channel, the opposite of the spatial reasoning the
+      block exists for. Modes:
+      'rel' (default): RELATIVE geometry, two mechanisms.
+        (1) 2D rotary embedding (RoPE) on Q and K: every attention
+            score becomes a joint function of the two tokens' CONTENT
+            and their RELATIVE (drow, dcol) offset. This is the direct
+            encoding of the habitat hypothesis the block exists for -
+            suitability driven by how each pixel's feature stack sits
+            relative to every other stack (regenerating aspen/birch
+            NEXT TO conifer cover NEXT TO an opening), a relationship
+            that must score identically wherever the arrangement falls
+            inside the 1.9km patch. Absolute encodings represent it
+            only indirectly and must relearn it per location; RoPE
+            makes it translation-invariant by construction.
+        (2) A learned per-head bias table over (drow, dcol), added to
+            the attention logits: the content-independent prior
+            (adjacency vs distance, N-S vs E-W anisotropy), learnable
+            even before content features mature. Zero-init.
+      'abs': fixed 2D sin-cos added to normed Q/K (the previous fix -
+        position-aware but location-specific).
+      'none': the original position-blind block, for old checkpoints.
+    IDENTITY AT INIT: attn.out_proj and the MLP's output Linear are
+      zero-initialized, so the block starts as an exact identity
+      instead of injecting ~30% relative noise (measured) into the
+      pretrained stream that layer2 was trained to expect. The block
+      then fades in only as fast as its gradients justify.
+    REGULARIZATION (attn_dropout, drop_path): the trainer's Dropout2d /
+      embed-dropout knobs never touch this block, so it was the one
+      unregularized module in the network. Attention-weight dropout
+      plus per-sample drop-path on both residual branches close that
+      hole."""
+
+    def __init__(self, channels, num_heads=4, kv_stride=1,
+                 attn_dropout=0.1, drop_path=0.1, pos_mode='rel'):
         super().__init__()
+        if channels % 4 != 0:
+            raise ValueError(f"channels must be divisible by 4 for the "
+                             f"2D sin-cos position encoding, got {channels}")
+        if pos_mode not in ('rel', 'abs', 'none'):
+            raise ValueError(f"pos_mode must be 'rel'/'abs'/'none', "
+                             f"got {pos_mode!r}")
         self.kv_stride = int(kv_stride)
+        self.pos_mode = pos_mode
+        self.drop_path_p = float(drop_path)
         self.norm1 = nn.LayerNorm(channels)
-        self.attn = nn.MultiheadAttention(channels, num_heads,
-                                          batch_first=True)
+        self.attn = RelativeMultiheadAttention(channels, num_heads,
+                                               dropout=attn_dropout)
+        if pos_mode == 'rel':
+            if self.attn.head_dim % 4:
+                raise ValueError(f"head_dim {self.attn.head_dim} must be "
+                                 f"divisible by 4 for 2D RoPE (half the "
+                                 f"rotation pairs per spatial axis)")
+            # (heads, drow, dcol) attention-logit bias, indexed by
+            # relative offset + REL_MAX. Zero-init: neutral until
+            # training discovers a spatial prior. Created ONLY in 'rel'
+            # mode so 'abs'/'none' state dicts stay byte-identical to
+            # checkpoints from before this mode existed.
+            self.rel_bias = nn.Parameter(
+                torch.zeros(num_heads, 2 * REL_MAX + 1, 2 * REL_MAX + 1))
         if self.kv_stride > 1:
             self.kv_proj = nn.Conv2d(channels, channels,
                                      kernel_size=self.kv_stride,
@@ -65,21 +256,254 @@ class EarlyAttentionBlock(nn.Module):
         self.mlp = nn.Sequential(
             nn.Linear(channels, channels * 4), nn.GELU(),
             nn.Linear(channels * 4, channels))
+        # Identity at init (see docstring): both residual branches
+        # contribute exactly zero until training moves these weights.
+        nn.init.zeros_(self.attn.out_proj.weight)
+        nn.init.zeros_(self.attn.out_proj.bias)
+        nn.init.zeros_(self.mlp[2].weight)
+        nn.init.zeros_(self.mlp[2].bias)
+        # Position tables are deterministic functions of the grid
+        # geometry - cached per (shape, device), never saved. (The
+        # rel_bias PARAMETER is learned; only its integer index grid is
+        # cached here.)
+        self._pe_cache = {}
 
-    def forward(self, x):
+    def _pe(self, h, w, stride, device):
+        key = ('abs', h, w, stride, device)
+        if key not in self._pe_cache:
+            self._pe_cache[key] = sincos_position_encoding(
+                h, w, self.norm1.normalized_shape[0], stride, device)
+        return self._pe_cache[key]
+
+    def _rope(self, h, w, stride, device):
+        """(cos, sin) rotation tables, (h*w, head_dim/2). Half the
+        rotation pairs turn with the row coordinate, half with the
+        column, so the QK product sees both axes of the offset.
+        Coordinates are in full-resolution cell units ((i+0.5)*stride
+        centers), so a strided KV grid shares the query grid's frame."""
+        key = ('rope', h, w, stride, device)
+        if key not in self._pe_cache:
+            n = self.attn.head_dim // 4        # frequencies per axis
+            freqs = ROPE_BASE ** (-torch.arange(
+                n, dtype=torch.float32, device=device) / n)
+            rows = (torch.arange(h, dtype=torch.float32, device=device)
+                    + 0.5) * stride
+            cols = (torch.arange(w, dtype=torch.float32, device=device)
+                    + 0.5) * stride
+            ar = rows[:, None] * freqs         # (h, n)
+            ac = cols[:, None] * freqs         # (w, n)
+            ang = torch.cat([ar[:, None, :].expand(h, w, n),
+                             ac[None, :, :].expand(h, w, n)],
+                            dim=2).reshape(h * w, 2 * n)
+            self._pe_cache[key] = (ang.cos(), ang.sin())
+        return self._pe_cache[key]
+
+    def _bias_index(self, h, w, kh, kw, stride, device):
+        """(Lq, Lk) int64 lookup into the flattened rel_bias table:
+        entry [q, k] = (drow + REL_MAX) * span + (dcol + REL_MAX), with
+        offsets measured in full-resolution cell units (rounded when a
+        strided KV grid makes them fractional) and clamped to the
+        table's range."""
+        key = ('bias', h, w, kh, kw, stride, device)
+        if key not in self._pe_cache:
+            span = 2 * REL_MAX + 1
+            qr = torch.arange(h, dtype=torch.float32, device=device) + 0.5
+            qc = torch.arange(w, dtype=torch.float32, device=device) + 0.5
+            kr = (torch.arange(kh, dtype=torch.float32, device=device)
+                  + 0.5) * stride
+            kc = (torch.arange(kw, dtype=torch.float32, device=device)
+                  + 0.5) * stride
+            dr = torch.round(qr[:, None] - kr[None, :]).long().clamp(
+                -REL_MAX, REL_MAX) + REL_MAX          # (h, kh)
+            dc = torch.round(qc[:, None] - kc[None, :]).long().clamp(
+                -REL_MAX, REL_MAX) + REL_MAX          # (w, kw)
+            idx = (dr[:, None, :, None] * span
+                   + dc[None, :, None, :])            # (h, w, kh, kw)
+            self._pe_cache[key] = idx.reshape(h * w, kh * kw)
+        return self._pe_cache[key]
+
+    def _drop_path(self, t):
+        """Per-sample stochastic depth on a residual branch."""
+        if self.drop_path_p <= 0.0 or not self.training:
+            return t
+        keep = 1.0 - self.drop_path_p
+        mask = t.new_empty(t.shape[0], 1, 1).bernoulli_(keep)
+        return t * (mask / keep)
+
+    def _qk_inputs(self, x):
+        """Shared by forward() and the diagnostic attention_weights():
+        the token sequences and position tensors (rope_q, rope_k,
+        bias) that go INTO attention, exactly as forward() builds
+        them. Factored out so the diagnostic path can never drift from
+        what training actually computes."""
         b, c, h, w = x.shape
         q_tokens = x.flatten(2).transpose(1, 2)           # (B, HW, C)
         q_normed = self.norm1(q_tokens)
         if self.kv_stride > 1:
             kv_map = self.kv_proj(x)                       # downsample
-            kv_tokens = kv_map.flatten(2).transpose(1, 2)
-            kv_normed = self.norm1(kv_tokens)
+            kh, kw = kv_map.shape[2], kv_map.shape[3]
+            kv_normed = self.norm1(kv_map.flatten(2).transpose(1, 2))
         else:
+            kh, kw = h, w
             kv_normed = q_normed
-        attn_out, _ = self.attn(q_normed, kv_normed, kv_normed)
-        x_tokens = q_tokens + attn_out
-        x_tokens = x_tokens + self.mlp(self.norm2(x_tokens))
+        q_in, k_in = q_normed, kv_normed
+        rope_q = rope_k = bias = None
+        if self.pos_mode == 'rel':
+            # Position enters through the attention MATH (Q/K rotation
+            # + logit bias), never the token contents, so the residual
+            # stream stays pure content and the geometry is relative by
+            # construction.
+            rope_q = self._rope(h, w, 1, x.device)
+            rope_k = (rope_q if self.kv_stride == 1
+                      else self._rope(kh, kw, self.kv_stride, x.device))
+            bias = self.rel_bias.flatten(1)[
+                :, self._bias_index(h, w, kh, kw, self.kv_stride,
+                                    x.device)]
+        elif self.pos_mode == 'abs':
+            # Queries and keys carry position; values stay content-only
+            # so no position vector enters the residual stream.
+            q_in = q_normed + self._pe(h, w, 1, x.device).to(q_normed.dtype)
+            k_in = (q_in if self.kv_stride == 1 else
+                    kv_normed + self._pe(kh, kw, self.kv_stride,
+                                         x.device).to(kv_normed.dtype))
+        return q_tokens, q_in, k_in, kv_normed, rope_q, rope_k, bias, \
+            (h, w, kh, kw)
+
+    def forward(self, x):
+        b, c, h, w = x.shape
+        q_tokens, q_in, k_in, kv_normed, rope_q, rope_k, bias, _ = \
+            self._qk_inputs(x)
+        attn_out = self.attn(q_in, k_in, kv_normed,
+                             rope_q=rope_q, rope_k=rope_k, bias=bias)
+        x_tokens = q_tokens + self._drop_path(attn_out)
+        x_tokens = x_tokens + self._drop_path(self.mlp(self.norm2(x_tokens)))
         return x_tokens.transpose(1, 2).reshape(b, c, h, w)
+
+    @torch.no_grad()
+    def attention_weights(self, x):
+        """Diagnostic-only: the (B, heads, Lq, Lk) softmax attention
+        weights this block's forward() pass actually uses internally,
+        plus the (h, w, kh, kw) grid shape to reshape them. Built from
+        the exact same inputs forward() computes (_qk_inputs), just
+        routed through an explicit softmax instead of the fused SDPA
+        kernel that never materializes them. Never called during
+        training - see model_handler's --tb-attention."""
+        _, q_in, k_in, _, rope_q, rope_k, bias, shape = \
+            self._qk_inputs(x)
+        return self.attn.attention_weights(
+            q_in, k_in, rope_q=rope_q, rope_k=rope_k, bias=bias), shape
+
+def _conv_bn_relu(cin, cout, dilation=1, stride=1):
+    return nn.Sequential(
+        nn.Conv2d(cin, cout, 3, stride=stride, padding=dilation,
+                  dilation=dilation, bias=False),
+        nn.BatchNorm2d(cout), nn.ReLU(inplace=True))
+
+
+class DualSpatialBranch(nn.Module):
+    """"Branch B" of the dual-branch head: a resolution-preserving,
+    multi-scale feature extractor over the full-resolution embedded
+    input, running in parallel with the ResNet trunk ("Branch A").
+
+    The trunk's stem halves the input immediately and pooling collapses
+    it further, so by the time its features are scored, exactly WHERE a
+    hard edge or conifer/deciduous transition sat has been smeared into
+    coarse cells. This branch never pays that cost: it stays at (or
+    returns to) the input's native 64x64 grid while growing its
+    receptive field through DILATION instead of downsampling - wide
+    context AND precise edge position, rather than trading one for the
+    other. The classifier then sees "general habitat character"
+    (Branch A) and "precise local arrangement" (Branch B) as separate
+    signals.
+
+    mode='unet' (default): shallow U-Net-lite - two-conv encoder at
+      full res, one stride-2 descent, a DILATED bottleneck (d=2,4) in
+      place of deeper pooling, bilinear return, skip-concat, fuse. The
+      hybrid keeps some cheap context-building downsampling but only
+      one level of it - the sweet spot for a 64px patch with no
+      resolution to spare.
+    mode='dilated': no downsampling at all - a projection then a
+      residual stack of 3x3 convs at dilation 1,2,4,8 (ASPP-style;
+      receptive field ~31px at native resolution).
+
+    The map is collapsed to a feature VECTOR with the same pooling
+    mechanism family the trunk uses (attn: learned softmax scores;
+    gauss/center/mean: the same fixed spatial weightings), applied to
+    feature channels instead of a logit map."""
+
+    def __init__(self, in_channels, channels=64, mode='unet',
+                 pool='attn'):
+        super().__init__()
+        if mode not in ('unet', 'dilated'):
+            raise ValueError(f"mode must be 'unet'/'dilated', got {mode!r}")
+        self.mode = mode
+        self.pool = pool
+        c = int(channels)
+        if mode == 'dilated':
+            self.proj = _conv_bn_relu(in_channels, c)
+            self.stack = nn.ModuleList(
+                [_conv_bn_relu(c, c, dilation=d) for d in (1, 2, 4, 8)])
+        else:
+            self.enc = nn.Sequential(_conv_bn_relu(in_channels, c),
+                                     _conv_bn_relu(c, c))
+            self.down = _conv_bn_relu(c, 2 * c, stride=2)
+            self.bott = nn.Sequential(_conv_bn_relu(2 * c, 2 * c, dilation=2),
+                                      _conv_bn_relu(2 * c, 2 * c, dilation=4))
+            self.fuse = _conv_bn_relu(3 * c, c)
+        self.score = nn.Conv2d(c, 1, 1)      # attn-pool score map
+        self._gauss_cache = {}
+
+    def feature_map(self, x):
+        if self.mode == 'dilated':
+            h = self.proj(x)
+            for blk in self.stack:
+                h = h + blk(h)               # residual dilated stack
+            return h
+        e = self.enc(x)
+        b = self.bott(self.down(e))
+        u = F.interpolate(b, size=e.shape[2:], mode='bilinear',
+                          align_corners=False)
+        return self.fuse(torch.cat([u, e], dim=1))
+
+    @torch.no_grad()
+    def pooling_map(self, x):
+        """Diagnostic-only: this branch's own pooling-weight map for
+        input x - the Branch-B analog of the trunk's attn-pool score
+        map, exposed as a public method purely for visualization
+        (model_handler's --tb-images). (B,1,H,W) for pool='attn'
+        (content-dependent); (1,1,H,W) for 'mean'/'center'/'gauss' (one
+        fixed map shared by every sample, since those pool modes don't
+        depend on content - the caller broadcasts it). Never called
+        during training."""
+        fmap = self.feature_map(x)
+        _, _, h, w = fmap.shape
+        return self._weights(fmap).reshape(-1, 1, h, w)
+
+    def _weights(self, fmap):
+        b, c, h, w = fmap.shape
+        if self.pool == 'attn':
+            return torch.softmax(
+                self.score(fmap).reshape(b, 1, h * w), dim=2)
+        if self.pool == 'center':
+            # normalized-mask form of pool_logits' 2x2 center-window
+            # mean - same cells, same uniform weights
+            m = torch.zeros(1, 1, h, w, device=fmap.device)
+            m[:, :, (h - 1) // 2:h // 2 + 1, (w - 1) // 2:w // 2 + 1] = 1
+            return (m / m.sum()).reshape(1, 1, h * w).to(fmap.dtype)
+        if self.pool == 'gauss':
+            key = (h, w, fmap.device)
+            if key not in self._gauss_cache:
+                self._gauss_cache[key] = gauss_weight_map(
+                    h, w, fmap.device).reshape(1, 1, h * w)
+            return self._gauss_cache[key].to(fmap.dtype)
+        return fmap.new_full((1, 1, h * w), 1.0 / (h * w))   # mean
+
+    def forward(self, x):
+        fmap = self.feature_map(x)
+        b, c, h, w = fmap.shape
+        return (fmap.reshape(b, c, h * w)
+                * self._weights(fmap)).sum(dim=2)            # (B, c)
+
 
 # ==========================================
 # FEATURE SPEC - single source of truth for model input geometry.
@@ -90,9 +514,25 @@ class EarlyAttentionBlock(nn.Module):
 # construction are instantiated.
 # ==========================================
 FEATURE_SPEC = {
+    # EVT: LANDFIRE's documented domain is 4401-9994 (LF2022-LF2025 ADDs).
     "evt":    {"kind": "categorical", "vocab": 10000, "dim": 32},
-    "evh":    {"kind": "categorical", "vocab": 300,   "dim": 16},
-    "evc":    {"kind": "categorical", "vocab": 300,   "dim": 16},
+    # EVH / EVC: since LF 2016 Remap, both are laid out in three life-form
+    # blocks and the HERBACEOUS block sits above 300:
+    #   EVC  tree 110-199 (1% steps)  shrub 210-299  herb 310-399
+    #   EVH  tree 101-199 (1 m steps) shrub 201-230  herb 301-310 (0.1 m)
+    # (LF2022-LF2025 Attribute Data Dictionaries; identical across those
+    # vintages.) The vocab was 300 until 2026-09-20, so embed()'s clamp
+    # sent every herb code to index 299 - for EVC a LIVE code ("Shrub
+    # Cover >= 99%"), so herb-dominated pixels were being handed the
+    # densest-shrub embedding, and herb cover/height were unlearnable.
+    # 512 covers the documented maximum (399) with headroom; the table
+    # cost is vocab x dim floats, i.e. nothing. Changing this is a
+    # GEOMETRY change (embedding rows are in the state dict): see
+    # spec_with_checkpoint_vocab for how loaders keep old checkpoints
+    # usable, and ARCHITECTURE.md's invariant.
+    "evh":    {"kind": "categorical", "vocab": 512,   "dim": 16},
+    "evc":    {"kind": "categorical", "vocab": 512,   "dim": 16},
+    # SClass: 1-7 plus 111/112/120/132/180 land-cover fills; max 180.
     "sclass": {"kind": "categorical", "vocab": 300,   "dim": 16},
     # FDist codes run into the low thousands (year/type/severity
     # composites); vocab sized generously - embedding memory is trivial.
@@ -103,7 +543,342 @@ FEATURE_SPEC = {
     # scale brings both to roughly unit range.
     "ch":     {"kind": "continuous", "scale": 100.0},
     "cc":     {"kind": "continuous", "scale": 100.0},
+    # Earth Engine products (download_tcc_nlcd.py). TCC = USFS Tree
+    # Canopy Cover percent (0-100, Landsat-modeled, annual 1985-2023) -
+    # CONTINUOUS, same unit scaling as CC (which it complements: CC is
+    # LANDFIRE's mapped canopy, TCC an independent annual model, and
+    # their disagreement is itself signal). NLCD = Annual NLCD land-
+    # cover class - CATEGORICAL Anderson Level II codes (11 water ...
+    # 95 emergent wetland; vocab covers the 8-bit code space, nodata
+    # 250 is remapped to -9999 at download so it clamps to padding).
+    "tcc":    {"kind": "continuous", "scale": 100.0},
+    "nlcd":   {"kind": "categorical", "vocab": 256, "dim": 16},
+    # Distance to the nearest paved road, LOG-ENCODED, from TIGER/Line
+    # vectors rasterized onto each region's own grid
+    # (generate_road_distance.py). See road_dist_encode below for the
+    # stored units; scale 10000 puts them in a ~0-1.1 unit range,
+    # matching the other continuous features.
+    #
+    # Why it exists: NLCD's 30m cells cannot resolve a two-lane road
+    # from the wetland it cuts through (verified with inspect_point.py -
+    # a point ON Route 16 pavement reads nlcd=90 WOODY WETLANDS and
+    # scores 0.68, while a wider stretch reads nlcd=22 Developed Low and
+    # scores 0.09). Distance-to-road is the one input that says "there
+    # is a road here" at a resolution the land-cover rasters cannot.
+    "road_dist": {"kind": "continuous", "scale": 10000.0},
+    # Years since the most recent stand-replacing or partial disturbance,
+    # LOG-ENCODED, from the LANDFIRE Annual Disturbance stack
+    # (generate_time_since_disturbance.py). See tsd_encode below.
+    #
+    # Why it exists alongside fdist, which also encodes disturbance:
+    # fdist is a CATEGORICAL embedding lookup, so the network has no way
+    # to learn that the code meaning "3 years" sits nearer to the one
+    # meaning "5 years" than to the one meaning "20 years" - embedding
+    # indices carry no order. tsd supplies that ordered magnitude, and
+    # it does so from 25 annual vintages (1999-2023) rather than fdist's
+    # four, at annual resolution rather than binned.
+    "tsd": {"kind": "continuous", "scale": 4000.0},
+    # USFS TreeMap stand-structure attributes (generate_treemap_features.py).
+    # These are the axes LANDFIRE carries NOTHING for: the stack measures
+    # cover three ways (evc/cc/tcc) and height two ways (evh/ch), but a
+    # stand reading 60% cover at 50ft could be 80 big stems per acre or
+    # 2,000 saplings - identical in every other feature, and opposite
+    # habitats for an early-successional obligate.
+    #
+    # balive/qmd/carbon_dwn are stored as FIXED-POINT integers (see
+    # TREEMAP_FIXED); tpa_live is log-encoded because its distribution is
+    # heavily skewed - the difference between 200 and 2,000 stems/acre is
+    # the difference between mature forest and grouse cover, while 15,000
+    # vs 17,000 is noise.
+    "balive":     {"kind": "continuous", "scale": 1000.0},
+    "tpa_live":   {"kind": "continuous", "scale": 10000.0},
+    "qmd":        {"kind": "continuous", "scale": 1000.0},
+    "carbon_dwn": {"kind": "continuous", "scale": 500.0},
 }
+
+# ---- road_dist encoding ------------------------------------------------
+# Stored as round(log1p(metres) * ROAD_DIST_LOG_SCALE) in int16, NOT as
+# raw metres. Two reasons, both learned the hard way:
+#
+#  1. SATURATION. A linear cap has to be set somewhere, and wherever it
+#     goes it erases everything beyond it. At --mtfcc S1100 S1200
+#     (highways only) Maine's MEDIAN distance-to-road exceeded a 5km cap
+#     - more than half the state pinned to one constant - while
+#     diagnose_road_bias.py measured training positives sitting at a
+#     median 2,951-4,875m from exactly those roads. The cap was deleting
+#     the signal in the range the data actually occupies.
+#  2. DYNAMIC RANGE. Raising the cap instead (30km+, to cover remote
+#     Maine) would squeeze 0-500m - the near field, which is the whole
+#     reason this feature exists - into a few percent of the range. log1p
+#     spends resolution where it matters: 0m/100m/500m/1km land at
+#     0.00/0.46/0.62/0.69 after scaling, while 5km-50km all compress
+#     into the 0.85-1.08 tail.
+#
+# ROAD_DIST_MAX_M is now only a sanity bound, not a signal-carrying
+# threshold - log1p(50000)*1000 = 10820, comfortably inside int16 (and
+# inside dataset.py's int16 patch cache).
+ROAD_DIST_MAX_M = 50000
+ROAD_DIST_LOG_SCALE = 1000.0
+
+
+def road_dist_encode(metres):
+    """Metres -> stored int16 units. Array-safe."""
+    import numpy as _np
+    m = _np.clip(_np.asarray(metres, dtype=_np.float64), 0, ROAD_DIST_MAX_M)
+    return _np.rint(_np.log1p(m) * ROAD_DIST_LOG_SCALE).astype(_np.int16)
+
+
+def road_dist_decode(stored):
+    """Stored int16 units -> metres. The inverse of road_dist_encode, for
+    diagnostics that want to report a human-readable distance."""
+    import numpy as _np
+    return _np.expm1(_np.asarray(stored, dtype=_np.float64)
+                     / ROAD_DIST_LOG_SCALE)
+
+
+# =======================================================================
+# Time since disturbance (tsd)
+# =======================================================================
+# Log-encoded for the same reason road_dist is: a grouse's use of a stand
+# changes enormously between 2 and 8 years post-cut and not at all
+# between 40 and 46, so linear years would spend most of the input range
+# resolving distinctions the species does not make.
+#
+# TSD_MAX_YEARS is a FIXED cap, deliberately not "years since the start
+# of the disturbance record". An undisturbed pixel must encode to the
+# same value in every vintage - if the cap grew with the vintage year
+# (24 in the 2022 raster, 27 in the 2025 one) then the single most
+# common value in the feature would itself identify the vintage, and a
+# network this size will happily learn the year instead of the habitat.
+TSD_MAX_YEARS = 30
+TSD_LOG_SCALE = 1000.0
+
+
+def tsd_encode(years):
+    """Years since last disturbance -> stored int16 units. Array-safe."""
+    import numpy as _np
+    y = _np.clip(_np.asarray(years, dtype=_np.float64), 0, TSD_MAX_YEARS)
+    return _np.rint(_np.log1p(y) * TSD_LOG_SCALE).astype(_np.int16)
+
+
+def tsd_decode(stored):
+    """Stored int16 units -> years. Inverse of tsd_encode."""
+    import numpy as _np
+    return _np.expm1(_np.asarray(stored, dtype=_np.float64) / TSD_LOG_SCALE)
+
+
+# =======================================================================
+# TreeMap stand structure (balive / tpa_live / qmd / carbon_dwn)
+# =======================================================================
+# The patch cache (dataset.py) stores int16, so every continuous feature
+# has to survive integer truncation BEFORE the FEATURE_SPEC scale is
+# applied. `mult` is that fixed-point multiplier; `cap` bounds the value
+# so the product stays inside int16 and so a single absurd pixel cannot
+# stretch the whole channel's range.
+#
+# Non-forest is stored as 0, NOT as a nodata sentinel. TreeMap is NoData
+# off forest, but "no trees" is a real measurement for three of these
+# four - a hayfield genuinely has zero basal area, zero stems and zero
+# down wood. qmd=0 is the one fudge (an undefined mean diameter rather
+# than a true zero), and it stays self-consistent: qmd=0 AND tpa_live=0
+# is exactly the non-forest signature, so the joint pattern carries the
+# forest/non-forest distinction without spending a mask channel on it.
+TREEMAP_FIXED = {
+    "balive":     {"mult": 10.0,  "cap": 400.0, "unit": "ft2/acre"},
+    "qmd":        {"mult": 100.0, "cap": 40.0,  "unit": "inches"},
+    "carbon_dwn": {"mult": 100.0, "cap": 20.0,  "unit": "tons/acre"},
+}
+TPA_LIVE_MAX = 30000.0
+TPA_LIVE_LOG_SCALE = 1000.0
+
+# QMD is exactly reconstructible from the other two, and this project
+# derives it rather than downloading it. 0.005454 = pi/(4*144), the
+# constant converting a diameter in inches to basal area in square feet;
+# QMD is the RMS diameter, so BALIVE = 0.005454 * TPA * QMD^2.
+#
+# Deriving it is not just convenient. TreeMap publishes QMD only for the
+# 2020/2022/2023 vintages - 2016 ships QMD_RMRS instead, under a
+# different definition - so a downloaded QMD would either open a
+# definitional seam across vintages or drop the 2016 vintage entirely.
+# One formula applied to all four vintages has neither problem.
+QMD_BA_CONSTANT = 0.005454
+
+
+def qmd_from_balive_tpa(balive, tpa_live):
+    """Quadratic mean diameter (inches) from basal area (ft2/acre) and
+    stems/acre. Returns 0 where there are no stems (see the non-forest
+    note above) rather than dividing by zero."""
+    import numpy as _np
+    ba = _np.asarray(balive, dtype=_np.float64)
+    tpa = _np.asarray(tpa_live, dtype=_np.float64)
+    out = _np.zeros(_np.broadcast(ba, tpa).shape, dtype=_np.float64)
+    ok = tpa > 0
+    _np.divide(ba, QMD_BA_CONSTANT * tpa, out=out, where=ok)
+    return _np.sqrt(out, out=out)
+
+
+def tpa_live_encode(stems_per_acre):
+    """Stems/acre -> stored int16 units (log). Array-safe."""
+    import numpy as _np
+    t = _np.clip(_np.asarray(stems_per_acre, dtype=_np.float64),
+                 0, TPA_LIVE_MAX)
+    return _np.rint(_np.log1p(t) * TPA_LIVE_LOG_SCALE).astype(_np.int16)
+
+
+def tpa_live_decode(stored):
+    """Stored int16 units -> stems/acre. Inverse of tpa_live_encode."""
+    import numpy as _np
+    return _np.expm1(_np.asarray(stored, dtype=_np.float64)
+                     / TPA_LIVE_LOG_SCALE)
+
+
+def treemap_encode(feature, values):
+    """Native TreeMap units -> stored int16, for the fixed-point three.
+    tpa_live has its own log pair above."""
+    import numpy as _np
+    spec = TREEMAP_FIXED[feature]
+    v = _np.clip(_np.asarray(values, dtype=_np.float64), 0, spec["cap"])
+    return _np.rint(v * spec["mult"]).astype(_np.int16)
+
+
+def treemap_decode(feature, stored):
+    """Stored int16 -> native TreeMap units, for anything reporting a
+    number to a human."""
+    import numpy as _np
+    return (_np.asarray(stored, dtype=_np.float64)
+            / TREEMAP_FIXED[feature]["mult"])
+
+
+@torch.no_grad()
+def d4_tta_logits(model, cat_x, cont_x, flip_tta=True, autocast=None):
+    """Pooled logit over the D4 symmetry group: 4 rotations, each
+    optionally averaged with its mirror, averaged BEFORE the sigmoid.
+
+    THE single inference-side definition of how this model is scored.
+    It was written out three times (predict_region,
+    _tb_capture_windows, inspect_point) and the failure mode if they
+    drift apart is silent: each path stays internally consistent while
+    the deployed map and the diagnostics that are supposed to explain
+    it stop agreeing. Averaging before the sigmoid is load-bearing -
+    it is what matches model_handler's validation path.
+
+    Scores through model.logits() rather than forward(): forward()
+    returns the raw spatial map and would silently bypass both the
+    trained pooling (attn/gauss/center/mean) and the center-skip head.
+
+    Callers apply their own temperature / prior shift / sigmoid to the
+    returned logit; this returns the part they all share. `autocast`
+    takes a context manager (predict_region passes its CUDA AMP one);
+    None means no autocast, matching the CPU/diagnostic paths.
+
+    The training side is NOT this function: there the 4 rotations come
+    from the dataset (expand_rotations=True) and only the mirror is
+    added in code, by GrouseModelHandler._pooled_logits. Same D4 group,
+    assembled differently because the data pipeline already did half
+    the work."""
+    import contextlib
+    ctx = autocast if autocast is not None else contextlib.nullcontext()
+    views = []
+    for k in range(4):
+        rc = torch.rot90(cat_x, k, dims=(2, 3))
+        rn = torch.rot90(cont_x, k, dims=(2, 3))
+        with ctx:
+            lg = model.logits(rc, rn).float()
+            if flip_tta:
+                lg = 0.5 * (lg + model.logits(
+                    rc.flip(-1), rn.flip(-1)).float())
+        views.append(lg.flatten())
+    return torch.stack(views).mean(dim=0)
+
+
+def config_to_model_kwargs(cfg, defaults=None):
+    """Decode a wrapped-checkpoint 'config' dict into GrouseResNet
+    constructor kwargs - the ONE place the legacy key chains live, so
+    every loader (predict.py, calibrate.py, train.score_ensemble)
+    rebuilds identical geometry and a new config key is added here
+    once instead of copy-pasted three times.
+
+    Legacy chain: early_attn_pos_mode missing -> interim checkpoints
+    stored early_attn_pos_enc (bool -> 'abs'); ones from before either
+    fix stored neither -> the 'none' default (position-blind, matching
+    how they trained).
+
+    defaults: per-call fallbacks for keys ABSENT from cfg (e.g. CLI
+    flags for bare checkpoints); unnamed keys fall back to the safe
+    architecture defaults below. 'features' is deliberately not
+    handled here - each loader owns its disk-vs-checkpoint feature
+    decision."""
+    base = dict(pool='attn', center_skip=True,
+                keep_early_resolution=False, early_attn=False,
+                early_attn_heads=4, early_attn_kv_stride=1,
+                early_attn_pos_mode='none',
+                dual_branch='off', dual_branch_channels=64)
+    if defaults:
+        base.update(defaults)
+    cfg = cfg or {}
+    kw = {k: cfg.get(k, v) for k, v in base.items()
+          if k != 'early_attn_pos_mode'}
+    pos_mode = cfg.get('early_attn_pos_mode')
+    if pos_mode is None:
+        pos_mode = ('abs' if cfg.get('early_attn_pos_enc')
+                    else base['early_attn_pos_mode'])
+    kw['early_attn_pos_mode'] = pos_mode
+    return kw
+
+
+def spec_with_checkpoint_vocab(state, spec=None):
+    """A copy of `spec` whose categorical vocab sizes are taken from the
+    checkpoint's OWN embedding tables (embeddings.<f>.weight rows), so a
+    model rebuilt from it loads regardless of what FEATURE_SPEC says
+    today. Features without a table in `state` keep the spec value.
+
+    The companion to config_to_model_kwargs for the one geometry
+    parameter that lives in the state dict rather than the config: an
+    embedding's row count. The evh/evc vocab was raised from 300 to 512
+    on 2026-09-20 (the herbaceous code block sits above 300 - see
+    FEATURE_SPEC); without this, every checkpoint trained before that
+    would stop loading in predict.py / calibrate.py, and every
+    checkpoint trained after it would stop loading anywhere the spec
+    was later changed again. Reading the rows from the tensor makes
+    both the wrapped and the bare checkpoint formats self-describing.
+
+    Note the trade-off this preserves: a pre-change checkpoint rebuilt
+    with vocab 300 still clamps herb codes to 299 at inference, exactly
+    as it did in training. That is the correct behaviour for THAT
+    model (its weights only know the collapsed code); the fix for the
+    collapse itself is a retrain under the new spec."""
+    spec = spec or FEATURE_SPEC
+    out = {}
+    for f, s in spec.items():
+        s = dict(s)
+        if s["kind"] == "categorical":
+            w = state.get(f"embeddings.{f}.weight")
+            if w is not None:
+                s["vocab"] = int(w.shape[0])
+        out[f] = s
+    return out
+
+
+def checkpoint_vocab_notes(spec, cat_features, base=None):
+    """Human-readable list of the categorical features whose vocab in
+    `spec` differs from `base` (default FEATURE_SPEC), for loaders to
+    print - empty when nothing differs."""
+    base = base or FEATURE_SPEC
+    return [f"{f}: vocab {spec[f]['vocab']} (current spec "
+            f"{base[f]['vocab']})" for f in cat_features
+            if f in base and spec[f]["vocab"] != base[f]["vocab"]]
+
+
+def gauss_weight_map(h, w, device=None):
+    """Normalized center-weighted gaussian (sigma = max(h, w)/4) -
+    the single definition of 'gauss' pooling weights, shared by
+    GrouseResNet.pool_logits and DualSpatialBranch so the trunk's and
+    Branch B's 'gauss' always mean the same thing."""
+    yy = torch.arange(h, dtype=torch.float32, device=device) - (h - 1) / 2.0
+    xx = torch.arange(w, dtype=torch.float32, device=device) - (w - 1) / 2.0
+    g = torch.exp(-(yy[:, None] ** 2 + xx[None, :] ** 2)
+                  / (2 * (max(h, w) / 4.0) ** 2))
+    return g / g.sum()
 
 
 def split_features(feature_names, spec=None):
@@ -125,7 +900,10 @@ class GrouseResNet(nn.Module):
                  pretrained=True, pool='mean', dropout=0.0,
                  embed_dropout=0.0, center_skip=False,
                  keep_early_resolution=False, early_attn=False,
-                 early_attn_heads=4, early_attn_kv_stride=1):
+                 early_attn_heads=4, early_attn_kv_stride=1,
+                 early_attn_dropout=0.1, early_attn_droppath=0.1,
+                 early_attn_pos_mode='rel',
+                 dual_branch='off', dual_branch_channels=64):
         """cat_features / cont_features: ordered feature-name lists (from
         split_features). Geometry is derived from them + the spec.
 
@@ -185,9 +963,13 @@ class GrouseResNet(nn.Module):
         self.cbam1 = CBAM(64)
         self.early_attn = (
             EarlyAttentionBlock(64, num_heads=early_attn_heads,
-                               kv_stride=early_attn_kv_stride)
+                               kv_stride=early_attn_kv_stride,
+                               attn_dropout=early_attn_dropout,
+                               drop_path=early_attn_droppath,
+                               pos_mode=early_attn_pos_mode)
             if early_attn else None)
         self._early_attn_kv_stride = int(early_attn_kv_stride)
+        self._early_attn_heads = int(early_attn_heads)
         if early_attn and not self.keep_early_resolution:
             print("   [note] early_attn=True without "
                  "keep_early_resolution=True: attention runs on the "
@@ -201,7 +983,8 @@ class GrouseResNet(nn.Module):
         self.layer4 = resnet.layer4
         self.cbam4 = CBAM(512)
 
-        self.avgpool = resnet.avgpool   # kept for parity; unused in forward
+        self.avgpool = resnet.avgpool   # unused in forward; features()
+                                        # pools with it for SSL pretraining
         # Dropout on the 512-d feature map before the head. ~12.7k
         # training points against ~12M parameters overfits hard, and this
         # is the cheapest place to fight it that costs no features.
@@ -223,6 +1006,30 @@ class GrouseResNet(nn.Module):
             self.center_head = nn.Sequential(
                 nn.Linear(total_in_channels, 128), nn.ReLU(),
                 nn.Dropout(dropout), nn.Linear(128, 1))
+        # Dual-branch "Branch B" (see DualSpatialBranch): a resolution-
+        # preserving multi-scale extractor over the full-res embedded
+        # input, pooled to a feature vector and scored by its own head.
+        # The head's output layer is ZERO-INITIALIZED, so the fused
+        # logit equals the plain Branch-A logit at init and Branch B
+        # fades in only as its gradients justify - additive fusion,
+        # which is the concatenate-then-linear head of the design
+        # decomposed per branch (and the same wide-&-deep pattern
+        # center_skip already proves out).
+        if dual_branch not in ('off', 'unet', 'dilated'):
+            raise ValueError(f"dual_branch must be 'off'/'unet'/"
+                             f"'dilated', got {dual_branch!r}")
+        self.dual_branch = dual_branch
+        self._dual_branch_channels = int(dual_branch_channels)
+        if dual_branch != 'off':
+            self.spatial_branch = DualSpatialBranch(
+                total_in_channels, channels=dual_branch_channels,
+                mode=dual_branch, pool=pool)
+            c = int(dual_branch_channels)
+            self.spatial_head = nn.Sequential(
+                nn.Linear(c, c), nn.ReLU(),
+                nn.Dropout(dropout), nn.Linear(c, 1))
+            nn.init.zeros_(self.spatial_head[-1].weight)
+            nn.init.zeros_(self.spatial_head[-1].bias)
 
     def embed(self, cat_x, cont_x):
         """Stack every feature into the (B, C, H, W) input tensor: one
@@ -251,7 +1058,12 @@ class GrouseResNet(nn.Module):
         pools it, as in the original."""
         return self.trunk(self.embed(cat_x, cont_x))
 
-    def trunk(self, x):
+    def backbone(self, x):
+        """Stem through cbam4: the 512-channel spatial feature map.
+        Shared by the supervised head (trunk -> conv_out) and by
+        self-supervised pretraining (features -> pooled vector), so
+        weights pretrained through one path load directly into the
+        other."""
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -267,16 +1079,48 @@ class GrouseResNet(nn.Module):
         x = self.cbam3(x)
         x = self.layer4(x)
         x = self.cbam4(x)
+        return x
 
-        return self.conv_out(self.drop(x))
+    def trunk(self, x):
+        return self.conv_out(self.drop(self.backbone(x)))
+
+    @torch.no_grad()
+    def attention_diagnostics(self, cat_x, cont_x):
+        """Diagnostic-only: early_attn's actual softmax attention
+        weights for this input (None if early_attn is inactive). Mirrors
+        backbone()'s stem-through-cbam1 prefix (the input early_attn
+        consumes) rather than adding a return value to backbone()'s hot
+        path - keep the two in sync if that prefix ever changes. See
+        model_handler's --tb-attention."""
+        if self.early_attn is None:
+            return None
+        x = self.embed(cat_x, cont_x)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+        x = self.layer1(x)
+        x = self.cbam1(x)
+        return self.early_attn.attention_weights(x)
+
+    def features(self, cat_x, cont_x):
+        """(B, 512) globally pooled backbone features - the encoder
+        output used by SimSiam self-supervised pretraining
+        (pretrain.py). No head, no dropout: the pretext task should
+        see the representation, not the classifier."""
+        return self.avgpool(
+            self.backbone(self.embed(cat_x, cont_x))).flatten(1)
 
     def logits(self, cat_x, cont_x):
         """The single scalar logit per sample that training optimizes:
-        pooled trunk output, plus the center-pixel skip when enabled."""
+        pooled trunk output (Branch A), plus the center-pixel skip and
+        the dual-branch spatial head (Branch B) when enabled."""
         x = self.embed(cat_x, cont_x)
         out = self.pool_logits(self.trunk(x))
         if self.center_skip:
             out = out + self.center_head(self._center_vector(cat_x, cont_x, x))
+        if self.dual_branch != 'off':
+            out = out + self.spatial_head(self.spatial_branch(x))
         return out
 
     def _center_vector(self, cat_x, cont_x, x):
@@ -319,13 +1163,9 @@ class GrouseResNet(nn.Module):
             return out_map[:, :, r0:r1, c0:c1].mean(dim=(2, 3))
         if self.pool_mode == 'gauss':
             if getattr(self, '_gauss_hw', None) != (h, w):
-                yy = torch.arange(h, dtype=torch.float32) - (h - 1) / 2.0
-                xx = torch.arange(w, dtype=torch.float32) - (w - 1) / 2.0
-                sigma = max(h, w) / 4.0
-                g = torch.exp(-(yy[:, None] ** 2 + xx[None, :] ** 2)
-                              / (2 * sigma ** 2))
-                self.register_buffer('_gauss_w', (g / g.sum()).to(
-                    out_map.device), persistent=False)
+                self.register_buffer(
+                    '_gauss_w', gauss_weight_map(h, w, out_map.device),
+                    persistent=False)
                 self._gauss_hw = (h, w)
             w_ = self._gauss_w.to(out_map.dtype)
             return (out_map * w_).sum(dim=(2, 3))

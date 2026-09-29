@@ -39,6 +39,8 @@ Usage:
 import argparse
 import sys
 import os
+import json
+import datetime as dt
 
 # grouse_data.py may sit next to this script (flat layout) or one
 # directory up (the original ml/ subfolder layout). Search for it rather
@@ -115,32 +117,201 @@ def discover_features(data, regions):
     return usable
 
 
+def sample_background_points(rd, features, n, seed=0):
+    """n uniformly random locations inside the region's reference
+    raster, filtered to valid data at the center pixel - the random
+    "assumed negative" background locations of Cole et al.'s L_AN-full.
+    Deliberately NOT buffered away from known presences: assuming
+    negatives everywhere (and accepting the resulting label noise) is
+    the loss's design; its positive up-weighting is what absorbs the
+    false negatives this creates."""
+    import numpy as np
+    import pandas as pd
+    import rasterio
+    from pyproj import Transformer
+    from dataset import NODATA_SENTINELS
+
+    feat = features[0]                     # spec order: categorical first
+    path = rd.latest_raster_path(feat)
+    year = max(rd.raster_years(feat))
+    rng = np.random.default_rng(seed)
+    lons, lats = [], []
+    with rasterio.open(path) as src:
+        to_lonlat = Transformer.from_crs(src.crs, "EPSG:4326",
+                                         always_xy=True)
+        nodata = src.nodata if src.nodata is not None else -9999
+        bad = set(NODATA_SENTINELS) | {nodata, 0}
+        attempts = 0
+        while len(lons) < n and attempts < 40:
+            attempts += 1
+            m = max(64, 2 * (n - len(lons)))
+            rows = rng.integers(0, src.height, m)
+            cols = rng.integers(0, src.width, m)
+            xs, ys = rasterio.transform.xy(src.transform, rows, cols)
+            vals = np.array([v[0] for v in
+                             src.sample(zip(xs, ys))], dtype=np.float64)
+            ok = ~np.isin(vals, list(bad)) & np.isfinite(vals)
+            if ok.any():
+                glon, glat = to_lonlat.transform(
+                    np.asarray(xs)[ok], np.asarray(ys)[ok])
+                lons.extend(np.atleast_1d(glon)[:n - len(lons)])
+                lats.extend(np.atleast_1d(glat)[:n - len(lats)])
+        if len(lons) < n:
+            raise SystemExit(
+                f"Background sampling found only {len(lons)}/{n} valid "
+                f"locations in {path} after {attempts} rounds - the "
+                f"raster may be mostly nodata.")
+    return pd.DataFrame({"longitude": lons, "latitude": lats,
+                         "year": int(year), "label": 0.0, "weight": 1.0})
+
+
+def filter_by_year_gap(df, rd, features, tolerance, what, region):
+    """Drop records (training and validation alike) whose sighting year
+    has no raster within +/-tolerance years for one or more features -
+    environmental data that far from the sighting date describes a
+    different landscape, so the record is not evidence about its own
+    label. Records with no year are kept (the dataset assigns them the
+    latest vintage, i.e. they claim current conditions). tolerance < 0
+    disables."""
+    if (tolerance < 0 or 'year' not in df.columns
+            or df['year'].isna().all()):
+        return df
+    yrs = {f: rd.raster_years(f) for f in features}
+    yrs = {f: ys for f, ys in yrs.items() if ys}
+
+    def ok(year):
+        year = int(year)
+        return all(min(abs(y - year) for y in ys) <= tolerance
+                   for ys in yrs.values())
+
+    verdict = {int(y): ok(y) for y in df['year'].dropna().unique()}
+    keep = df['year'].map(lambda y: verdict.get(int(y), True)
+                          if not (y != y) else True)   # NaN-safe
+    dropped = int((~keep).sum())
+    if dropped:
+        bad = sorted(y for y, v in verdict.items() if not v)
+        print(f"   {region}: EXCLUDED {dropped:,} {what} records - "
+              f"sighting years {bad} have no raster within "
+              f"+/-{tolerance} years for at least one feature "
+              f"({len(df) - dropped:,} kept).")
+    return df[keep].reset_index(drop=True)
+
+
+def _score_teacher_probs(models, df, label, rd, cat_f, cont_f, img_size,
+                         cache_dir, flip_tta=True, batch_size=256):
+    """--distill-from: per-point averaged probability from a set of
+    already-loaded, eval-mode teacher models, over df's points (fixed
+    4-rotation TTA, deterministic - a soft training target has to be a
+    stable number, not a moving one under --augment's random D4/jitter).
+
+    Each model's rotations (+ mirror, if flip_tta) are TTA-averaged in
+    ITS OWN logit scale first (matching score_ensemble's per-member TTA),
+    then sigmoid'd to a probability, and probabilities are averaged
+    across models. That differs from score_ensemble's z-scored-logit
+    average - z-scoring is built for ranking metrics (AUC/AP don't care
+    about scale) and doesn't produce a valid [0, 1] target, which the
+    distillation BCE needs."""
+    import numpy as np
+    import torch
+    from torch.utils.data import DataLoader
+    device = next(models[0].parameters()).device
+    ds = GrousePatchDataset(df, rd, cat_f, cont_f, img_size=img_size,
+                            expand_rotations=True, label=label,
+                            augment=False, cache_dir=cache_dir)
+    loader = DataLoader(ds, batch_size=batch_size)
+    per_model = []
+    with torch.no_grad():
+        for model in models:
+            outs = []
+            for cat_x, cont_x, _y, _w in loader:
+                cat_x, cont_x = cat_x.to(device), cont_x.to(device)
+                o = model.logits(cat_x, cont_x).float()
+                if flip_tta:
+                    o = 0.5 * (o + model.logits(cat_x.flip(-1),
+                                                cont_x.flip(-1)).float())
+                outs.append(o.squeeze(1).cpu())
+            lo = torch.cat(outs).numpy().reshape(-1, 4).mean(axis=1)
+            per_model.append(1.0 / (1.0 + np.exp(-lo)))
+    return np.mean(per_model, axis=0)
+
+
 def build_datasets(data, regions, features, img_size, cache_dir=None,
-                   jitter=0, augment=False):
+                   jitter=0, augment=False, background_per_pos=0.0,
+                   seed=0, train_year_gap=2, distill_models=None,
+                   flip_tta=True):
     import numpy as np
     cat_f, cont_f = split_features(features)
     train_parts, val_parts, train_labels = [], [], []
     aug = dict(cache_dir=cache_dir, jitter=jitter, augment=augment)
-    for region in regions:
+
+    def soft_labels_for(df, label, rd):
+        if distill_models is None:
+            return None
+        return _score_teacher_probs(distill_models, df, label, rd, cat_f,
+                                    cont_f, img_size, cache_dir,
+                                    flip_tta=flip_tta)
+    for region_i, region in enumerate(regions):
         rd = data[region]
+        # Year-gap exclusion applies to training AND validation with the
+        # same tolerance: a validation point scored against a raster
+        # more than `train_year_gap` years from its sighting is not
+        # evidence about that landscape either, and predict.py's
+        # latest-vintage rule already means deployment never sees such
+        # a gap. (Validation was previously left unfiltered to keep
+        # metrics comparable across the policy's introduction; that
+        # comparability has been spent, and a val set holding records
+        # the training set would refuse measured the wrong thing.)
+        pos_df = filter_by_year_gap(rd.positives("train"), rd, features,
+                                    train_year_gap, "train positive",
+                                    region)
+        neg_df = filter_by_year_gap(rd.negatives("train"), rd, features,
+                                    train_year_gap, "train negative",
+                                    region)
+        val_pos_df = filter_by_year_gap(rd.positives("val"), rd, features,
+                                        train_year_gap, "val positive",
+                                        region)
+        val_neg_df = filter_by_year_gap(rd.negatives("val"), rd, features,
+                                        train_year_gap, "val negative",
+                                        region)
         # Rotation expansion applied to BOTH classes (symmetric 4x ->
         # 1:1 effective balance; see earlier collapse diagnosis).
-        p_tr = GrousePatchDataset(rd.positives("train"), rd, cat_f, cont_f,
+        p_tr = GrousePatchDataset(pos_df, rd, cat_f, cont_f,
                                   img_size=img_size, expand_rotations=True,
-                                  label=1.0, **aug)
-        n_tr = GrousePatchDataset(rd.negatives("train"), rd, cat_f, cont_f,
+                                  label=1.0,
+                                  soft_labels=soft_labels_for(pos_df, 1.0, rd),
+                                  **aug)
+        n_tr = GrousePatchDataset(neg_df, rd, cat_f, cont_f,
                                   img_size=img_size, expand_rotations=True,
-                                  label=0.0, **aug)
+                                  label=0.0,
+                                  soft_labels=soft_labels_for(neg_df, 0.0, rd),
+                                  **aug)
         train_parts += [p_tr, n_tr]
         train_labels += [p_tr.labels, n_tr.labels]
+        if background_per_pos > 0:
+            n_bg = int(round(background_per_pos * len(pos_df)))
+            if n_bg > 0:
+                # seed + region index: each region draws its own RNG
+                # stream (same convention as pretrain.py) instead of
+                # every region replaying identical row/col sequences.
+                bg_df = sample_background_points(rd, features, n_bg,
+                                                 seed=seed + region_i)
+                bg_tr = GrousePatchDataset(
+                    bg_df, rd, cat_f, cont_f, img_size=img_size,
+                    expand_rotations=True, label=0.0,
+                    soft_labels=soft_labels_for(bg_df, 0.0, rd), **aug)
+                train_parts.append(bg_tr)
+                train_labels.append(bg_tr.labels)
+                print(f"   {region}: +{n_bg:,} random background "
+                      f"assumed-negatives (x{background_per_pos:g} per "
+                      f"positive; train only - validation unchanged).")
         # Validation is never augmented: the 4 fixed rotations are kept so
         # val scores stay comparable across runs (and so the evaluator can
         # average them per point as test-time augmentation).
         val_parts.append(GrousePatchDataset(
-            rd.positives("val"), rd, cat_f, cont_f, img_size=img_size,
+            val_pos_df, rd, cat_f, cont_f, img_size=img_size,
             expand_rotations=True, label=1.0, cache_dir=cache_dir))
         val_parts.append(GrousePatchDataset(
-            rd.negatives("val"), rd, cat_f, cont_f, img_size=img_size,
+            val_neg_df, rd, cat_f, cont_f, img_size=img_size,
             expand_rotations=True, label=0.0, cache_dir=cache_dir))
     return (ConcatDataset(train_parts), ConcatDataset(val_parts),
             np.concatenate(train_labels))
@@ -178,13 +349,26 @@ def score_ensemble(members, features, val_ds, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     loader = DataLoader(val_ds, batch_size=256, num_workers=args.workers)
     per_member, ys = [], None
+    from models import config_to_model_kwargs, spec_with_checkpoint_vocab
     for path, pool in members:
-        model = GrouseResNet(cat_f, cont_f, pretrained=False, pool=pool,
-                             center_skip=args.center_skip).to(device).eval()
         state, cfg = GrouseModelHandler.unwrap_checkpoint(
             torch.load(path, map_location=device, weights_only=True))
-        GrouseModelHandler.check_checkpoint_config(
-            model, cat_f + cont_f, cfg, source=path)
+        # Rebuild each member from its own stored config - members can
+        # carry geometry beyond pooling, and a guessed constructor
+        # either fails to load or silently runs the wrong architecture.
+        # config_to_model_kwargs owns the legacy key chains; CLI args
+        # are only the fallback for bare-state_dict checkpoints.
+        kw = config_to_model_kwargs(cfg, defaults=dict(
+            pool=pool, center_skip=args.center_skip,
+            keep_early_resolution=args.keep_early_resolution,
+            early_attn=args.early_attn,
+            early_attn_heads=args.early_attn_heads,
+            early_attn_kv_stride=args.early_attn_kv_stride,
+            dual_branch=args.dual_branch,
+            dual_branch_channels=args.dual_branch_channels))
+        model = GrouseResNet(cat_f, cont_f,
+                             spec=spec_with_checkpoint_vocab(state),
+                             pretrained=False, **kw).to(device).eval()
         model.load_state_dict(state)
         outs, labels = [], []
         with torch.no_grad():
@@ -240,13 +424,59 @@ def main():
                              "stratification (plain shuffling).")
     parser.add_argument("--no-pretrained", action="store_true",
                         help="Skip ImageNet weights (offline/test runs).")
+    parser.add_argument("--init-from", default=None,
+                        help="Path to a self-supervised backbone "
+                             "checkpoint from pretrain.py. Matching "
+                             "tensors (stem, embeddings, ResNet stages, "
+                             "CBAM, early-attn) are loaded and train in "
+                             "the reduced-LR backbone group; head layers "
+                             "stay fresh. Overwrites ImageNet weights "
+                             "where they overlap, so pair with "
+                             "--no-pretrained to skip the pointless "
+                             "download. Geometry flags must match the "
+                             "pretraining run for full transfer.")
     parser.add_argument("--save-path", default="grouse_single_best.pth")
+    parser.add_argument("--resume", default=None,
+                        help="Continue an interrupted run from "
+                             "<checkpoint>.resume (written automatically, "
+                             "every epoch, alongside any --save-path "
+                             "checkpoint - NOT the same file as the "
+                             "checkpoint itself, which stays the lean "
+                             "predict.py/calibrate.py-loadable weights "
+                             "file). Restores optimizer momentum and "
+                             "scheduler position too, not just weights - "
+                             "without those a 'resume' would restart "
+                             "Adam's moment estimates from zero and, "
+                             "under --sched warm_restarts, silently "
+                             "reheat the LR at the wrong point in the "
+                             "cycle. Pass the SAME hyperparameters "
+                             "(--epochs, --sched, --lr, --loss, ...) as "
+                             "the original run - only model geometry is "
+                             "verified automatically. --epochs is the "
+                             "TOTAL target, not additional epochs: "
+                             "--resume ... --epochs 150 on a run that "
+                             "crashed at epoch 85 continues to 150, not "
+                             "150 more. Incompatible with --ensemble > 1 "
+                             "(resumes only the first member).")
     parser.add_argument("--cache-dir", default="data/cache",
                         help="Materialize patches once into a memmapped "
                              "array here. '' disables.")
     parser.add_argument("--jitter", type=int, default=0,
                         help="Random center offset in pixels for training "
                              "augmentation (0 = off).")
+    parser.add_argument("--max-year-gap", "--max-train-year-gap",
+                        dest="max_train_year_gap", type=int, default=2,
+                        help="Training AND validation records are "
+                             "EXCLUDED when their sighting year has no "
+                             "raster within this many years for one or "
+                             "more features - environmental data that "
+                             "stale describes a different landscape than "
+                             "the sighting saw. Same rule for both sets, "
+                             "and predict.py's latest-vintage rule means "
+                             "deployment never sees a larger gap either. "
+                             "(--max-train-year-gap is the old name, kept "
+                             "as an alias.) -1 disables and restores "
+                             "nearest-year-whatever-the-gap.")
     parser.add_argument("--augment", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="Random D4 orientation (+ jitter, if set) per "
@@ -254,6 +484,70 @@ def main():
                              "rotation. --no-augment for the old behavior.")
     parser.add_argument("--metrics-csv", default=None,
                         help="Append per-epoch metrics to this CSV.")
+    parser.add_argument("--tensorboard", action="store_true",
+                        help="Log per-epoch loss/AUC/AP/rank curves, "
+                             "per-group learning rates, the val logit "
+                             "distribution, and checkpoint/divergence "
+                             "events to TensorBoard, under "
+                             "--tensorboard-dir/<timestamp>_<run name>. "
+                             "View with: tensorboard --logdir "
+                             "<--tensorboard-dir>. Requires the "
+                             "tensorboard package (pip install "
+                             "tensorboard).")
+    parser.add_argument("--tensorboard-dir", default="runs",
+                        help="Base directory for --tensorboard logs; "
+                             "each run gets its own timestamped "
+                             "subdirectory underneath it.")
+    parser.add_argument("--tb-log-every", type=int, default=50,
+                        help="Step interval for gradient norm/histogram "
+                             "logging (per LR group: backbone/"
+                             "early_attn/fresh), under --tensorboard. "
+                             "This is the one place instrumentation "
+                             "re-introduces a GPU sync into the "
+                             "training loop, so it's an interval, not "
+                             "every step; 0 disables step-level "
+                             "gradient logging (epoch-level metrics "
+                             "still log).")
+    parser.add_argument("--tb-images",
+                        action=argparse.BooleanOptionalAction, default=True,
+                        help="Under --tensorboard: log a fixed batch of "
+                             "validation patches (per continuous "
+                             "feature), the model's spatial logit map, "
+                             "and (pool=attn) its attention-pool score "
+                             "map, once per epoch. The same patches are "
+                             "reused every epoch so you can watch them "
+                             "evolve.")
+    parser.add_argument("--tb-attention",
+                        action=argparse.BooleanOptionalAction, default=True,
+                        help="Under --tensorboard, with --early-attn: "
+                             "also log the early-attention block's "
+                             "actual softmax attention weights (center "
+                             "token's distribution across the patch) "
+                             "for the same fixed batch. No-op without "
+                             "--early-attn.")
+    parser.add_argument("--tb-embeddings",
+                        action=argparse.BooleanOptionalAction, default=True,
+                        help="Under --tensorboard: log each categorical "
+                             "feature's embedding table (e.g. nlcd) to "
+                             "the TensorBoard embedding projector, from "
+                             "the SAVED checkpoint's weights at the end "
+                             "of training plus periodic snapshots (see "
+                             "--tb-embeddings-every) from the live "
+                             "training weights - each snapshot lands "
+                             "under the same tag at its own step, so "
+                             "the projector's slider lets you watch a "
+                             "class's representation move over "
+                             "training instead of only seeing the "
+                             "final state.")
+    parser.add_argument("--tb-embeddings-every", type=int, default=10,
+                        help="Epoch interval for the periodic embedding "
+                             "snapshots above. 0 disables periodic "
+                             "snapshots (the end-of-training one from "
+                             "the saved checkpoint still logs if "
+                             "--tb-embeddings is on). Each snapshot "
+                             "writes real projector data files, so "
+                             "very frequent snapshots on a long run "
+                             "cost real disk space.")
     parser.add_argument("--pool", default="attn",
                         choices=["mean", "center", "gauss", "attn"],
                         help="How the spatial logit map collapses to one "
@@ -277,6 +571,39 @@ def main():
                              "Pair with --keep-early-resolution for full "
                              "pixel-level attention.")
     parser.add_argument("--early-attn-heads", type=int, default=4)
+    parser.add_argument("--early-attn-dropout", type=float, default=0.1,
+                        help="Dropout on the early-attn block's attention "
+                             "weights. The block sits outside the reach "
+                             "of --dropout/--embed-dropout, so this is "
+                             "its only activation-level regularizer.")
+    parser.add_argument("--early-attn-droppath", type=float, default=0.1,
+                        help="Per-sample stochastic depth on the early-"
+                             "attn block's two residual branches.")
+    parser.add_argument("--early-attn-lr-factor", type=float, default=0.1,
+                        help="LR multiplier for the early-attn block's "
+                             "parameters (relative to --lr). At 1.0 the "
+                             "block was the fastest-learning module in "
+                             "the network and memorized hard examples "
+                             "once focal loss switched on; 0.1 paces it "
+                             "to the pretrained trunk.")
+    parser.add_argument("--early-attn-pos", default="rel",
+                        choices=["rel", "abs", "none"],
+                        help="How the early-attn block sees position. "
+                             "'rel' (default): 2D rotary embeddings on "
+                             "Q/K plus a learned relative-offset bias - "
+                             "every attention score is a joint function "
+                             "of two pixels' feature stacks AND their "
+                             "relative (drow, dcol) offset, identical "
+                             "wherever the pair sits in the patch. This "
+                             "directly encodes juxtaposition-driven "
+                             "habitat structure (regenerating cover NEXT "
+                             "TO conifer NEXT TO an opening). 'abs': "
+                             "fixed 2D sin-cos added to Q/K (position-"
+                             "aware but location-specific - relationships "
+                             "must be relearned per location). 'none': "
+                             "position-blind attention (the original "
+                             "block; only a global content fingerprint - "
+                             "a memorization channel).")
     parser.add_argument("--early-attn-kv-stride", type=int, default=1,
                         help="1 = full self-attention (every token "
                              "attends to every other - expensive: "
@@ -284,6 +611,25 @@ def main():
                              "this factor via a strided conv first "
                              "(queries stay full-res) - roughly "
                              "kv_stride^2 cheaper, small fidelity cost.")
+    parser.add_argument("--dual-branch", default="off",
+                        choices=["off", "unet", "dilated"],
+                        help="Add a second, resolution-preserving "
+                             "multi-scale branch ('Branch B') alongside "
+                             "the ResNet trunk, fused into the final "
+                             "logit through a zero-init head. The trunk "
+                             "downsamples away exactly WHERE an edge or "
+                             "conifer/deciduous transition sits; Branch "
+                             "B keeps the native 64x64 grid and grows "
+                             "its receptive field by dilation instead. "
+                             "'unet' = shallow U-Net-lite with a "
+                             "dilated bottleneck (recommended); "
+                             "'dilated' = pure ASPP-style stack, no "
+                             "downsampling at all. Ablate against "
+                             "'off' - if the trunk (esp. with "
+                             "--keep-early-resolution/--early-attn) "
+                             "already captures it, B adds cost without "
+                             "signal.")
+    parser.add_argument("--dual-branch-channels", type=int, default=64)
     parser.add_argument("--center-skip",
                         action=argparse.BooleanOptionalAction, default=True,
                         help="Feed the center pixel's feature vector "
@@ -291,6 +637,28 @@ def main():
                              "convolutional output.")
     parser.add_argument("--dropout", type=float, default=0.2)
     parser.add_argument("--embed-dropout", type=float, default=0.0)
+    parser.add_argument("--dynamic-dropout",
+                        action=argparse.BooleanOptionalAction, default=False,
+                        help="Adjust --dropout/--embed-dropout REACTIVELY "
+                             "each epoch off the val-minus-train loss gap, "
+                             "instead of holding them fixed: the gap "
+                             "WIDENING (overfitting worsening) nudges both "
+                             "up toward --dynamic-dropout-max, NARROWING "
+                             "nudges them back down toward --dynamic-"
+                             "dropout-min, moved together in the ratio "
+                             "they started in. Starts at --dropout/--embed-"
+                             "dropout (epoch 1 behaves exactly as without "
+                             "the flag). Requires --dropout > 0.")
+    parser.add_argument("--dynamic-dropout-min", type=float, default=None,
+                        help="Floor for --dynamic-dropout. Default: 0.3x "
+                             "--dropout.")
+    parser.add_argument("--dynamic-dropout-max", type=float, default=None,
+                        help="Ceiling for --dynamic-dropout. Default: "
+                             "1.6x --dropout, capped at 0.6.")
+    parser.add_argument("--dynamic-dropout-step", type=float, default=0.01,
+                        help="Per-epoch nudge (probability units) applied "
+                             "to --dropout when --dynamic-dropout is on; "
+                             "--embed-dropout moves proportionally.")
     parser.add_argument("--label-smoothing", type=float, default=0.05)
     parser.add_argument("--ema", type=float, default=0.999,
                         help="Weight-EMA decay (e.g. 0.999); 0 = off.")
@@ -313,18 +681,109 @@ def main():
                              f"{REFERENCE_BATCH_SIZE} all three are "
                              "identical.")
     parser.add_argument("--weight-decay", type=float, default=1e-4)
+    parser.add_argument("--loss", default="focal",
+                        choices=["focal", "an_full"],
+                        help="Training objective. 'focal' (default): the "
+                             "existing BCE-warmup -> FocalLoss recipe. "
+                             "'an_full': Cole et al.'s L_AN-full (full "
+                             "assume-negative) - lambda-weighted BCE "
+                             "where every negative (curated AND random "
+                             "background, see --an-background) is "
+                             "assumed to be a true negative and the "
+                             "positive up-weight absorbs the resulting "
+                             "false-negative noise. No focal phase; "
+                             "--warmup-epochs/--focal-gamma are ignored.")
+    parser.add_argument("--an-pos-weight", "--an-lambda", type=float,
+                        default=None,
+                        help="lambda for --loss an_full: multiplier on "
+                             "the positive loss terms (--an-lambda is "
+                             "an alias). Default (auto): 1.0 under "
+                             "stratified batching (batches are already "
+                             "class-balanced, so no compensation is "
+                             "needed); the dataset's neg:pos ratio when "
+                             "stratification is disabled "
+                             "(--batch-pos-frac -1), matching Cole et "
+                             "al.'s role for lambda of offsetting the "
+                             "assumed-negative flood. Takes precedence "
+                             "over --pos-neg-ratio.")
+    parser.add_argument("--pos-neg-ratio", type=float, default=None,
+                        help="Positive:negative weighting ratio of the "
+                             "LOSS, whichever loss is active. R > 1 "
+                             "weights each positive sample R times a "
+                             "negative (recall-leaning: false negatives "
+                             "cost more); R < 1 the reverse (precision-"
+                             "leaning). focal: sets alpha = R/(1+R) "
+                             "(default alpha 0.5 == ratio 1:1 - the "
+                             "balanced-data recalibration; the original "
+                             "0.25 was ratio 1:3). an_full: sets "
+                             "lambda = R unless --an-pos-weight/"
+                             "--an-lambda is given explicitly. Note "
+                             "this weights the LOSS only - batch "
+                             "composition is --batch-pos-frac.")
+    parser.add_argument("--an-background", type=float, default=0.0,
+                        help="Random background assumed-negatives added "
+                             "to TRAINING, as a multiple of each "
+                             "region's positive count (Cole et al. use "
+                             "1 random location per data location -> "
+                             "1.0). Sampled uniformly over the region's "
+                             "raster, valid-data filtered, NOT buffered "
+                             "away from presences (assumed negative is "
+                             "the point). Validation is untouched so "
+                             "metrics stay comparable. 0 = off. Usable "
+                             "with either --loss, but designed for "
+                             "an_full.")
     parser.add_argument("--focal-gamma", type=float, default=2.0)
     parser.add_argument("--backbone-lr-factor", type=float, default=0.1)
+    parser.add_argument("--grad-clip", type=float, default=1.0,
+                        help="Max GLOBAL L2 norm across every trainable "
+                             "parameter's gradient, combined into one "
+                             "value (torch.nn.utils.clip_grad_norm_, not "
+                             "per-layer) - exceeding it rescales every "
+                             "gradient by the same factor, preserving "
+                             "direction, only shrinking magnitude. Was "
+                             "hardcoded here; exposed after observing "
+                             "the true (pre-clip) norm sitting at 2-6.5 "
+                             "on most steps against the old fixed 1.0 - "
+                             "clipping was engaging almost every step, "
+                             "not as the rare safety valve it's meant "
+                             "to be, making it (not --lr) the thing "
+                             "actually setting step size most of the "
+                             "time. See Grad/total_norm_preclip in "
+                             "--tensorboard to check where yours sits "
+                             "before deciding whether to raise this.")
     parser.add_argument("--sched", default="cosine",
                         choices=["warm_restarts", "cosine"])
     parser.add_argument("--warmup-epochs", type=int, default=3,
                         help="Epochs of alpha-weighted BCE (gamma=0) "
                              "before switching to FocalLoss.")
-    parser.add_argument("--select-by", default="auc",
-                        choices=["loss", "auc", "strict"],
+    parser.add_argument("--select-by", default="rank",
+                        choices=["loss", "auc", "rank", "strict"],
                         help="Metric the best checkpoint is chosen on. "
-                             "'strict' = the confidence-demanding accuracy "
-                             "defined by --pos-threshold/--neg-threshold.")
+                             "'rank' (default) = mean of per-point TTA AUC "
+                             "and TTA AP - the two ranking metrics that "
+                             "matter for deployment, which disagree "
+                             "exactly when late-training memorization "
+                             "inflates one at the other's expense "
+                             "(measured: selecting on AUC alone kept "
+                             "saving through epochs 12-30 for +0.002 AUC "
+                             "- a third of that AUC's ~0.006 standard "
+                             "error on this val set - while AP fell and "
+                             "val loss rose 38%%). 'auc' = TTA AUC alone "
+                             "(the old default). 'strict' = the "
+                             "confidence-demanding accuracy defined by "
+                             "--pos-threshold/--neg-threshold.")
+    parser.add_argument("--select-min-delta", type=float, default=1e-3,
+                        help="A new checkpoint must beat the LAST SAVED "
+                             "one's selection score by at least this "
+                             "margin. Filters noise-level 'improvements' "
+                             "(max-based selection otherwise creeps "
+                             "upward on measurement noise and replaces a "
+                             "genuinely better earlier model); cumulative "
+                             "real gains still save because comparison is "
+                             "against the saved reference, not the "
+                             "running max. 0 disables. Applies to every "
+                             "--select-by mode ('loss' compares on "
+                             "-val_loss, same magnitude).")
     parser.add_argument("--pos-threshold", type=float, default=0.75,
                         help="STRICT accuracy: a positive val point only "
                              "counts as correct when the model's "
@@ -372,7 +831,45 @@ def main():
                              "- disagreement between differently-shaped "
                              "models is what makes the average beat its "
                              "members. Saved as <save-path>.member<i>.")
+    parser.add_argument("--distill-from", nargs="+", default=None,
+                        metavar="CKPT",
+                        help="Train ONE model (this run's normal --pool/"
+                             "--dropout/etc. recipe, geometry independent "
+                             "of the sources) against a blend of the true "
+                             "labels and these checkpoints' averaged "
+                             "probability - e.g. every "
+                             "<save-path>.member<i> from a finished "
+                             "--ensemble run, distilled into a single "
+                             "deployable file predict.py can load as-is. "
+                             "The teacher probability is computed ONCE per "
+                             "training point up front (fixed 4-rotation "
+                             "TTA, sigmoid'd per source then averaged), "
+                             "not recomputed per epoch. Incompatible with "
+                             "--ensemble > 1 (ambiguous which model would "
+                             "be the student).")
+    parser.add_argument("--compile", action="store_true",
+                        help="torch.compile the scoring path "
+                             "(model.logits - the module's forward() is "
+                             "never what training calls). Throughput "
+                             "only; outputs match eager to floating-"
+                             "point rounding, not bit-for-bit, which is "
+                             "why it is opt-in. The first training and "
+                             "first validation batch pay the compile. "
+                             "Works with --dynamic-dropout (see "
+                             "GrouseModelHandler._install_compiled_"
+                             "logits for the recompile handling).")
+    parser.add_argument("--distill-alpha", type=float, default=0.5,
+                        help="With --distill-from: weight on the true-"
+                             "label loss in the blend against the "
+                             "teachers' soft BCE (1 - this). 1.0 = "
+                             "teachers ignored, 0.0 = true labels ignored.")
     args = parser.parse_args()
+
+    if args.distill_from and args.ensemble > 1:
+        raise SystemExit(
+            "--distill-from trains a single student model - incompatible "
+            "with --ensemble > 1 (ambiguous which of N members would be "
+            "distilled). Use --ensemble 1 (the default).")
 
     import numpy as _np
     import torch as _torch
@@ -388,10 +885,90 @@ def main():
     print(f"Model features ({'explicit' if args.features else 'discovered'}): "
           f"{features}")
 
+    distill_models = None
+    if args.distill_from:
+        import torch as _torch2
+        from models import (GrouseResNet, config_to_model_kwargs,
+                            spec_with_checkpoint_vocab,
+                            checkpoint_vocab_notes)
+        _device = _torch2.device("cuda" if _torch2.cuda.is_available()
+                                 else "cpu")
+        cat_f, cont_f = split_features(features)
+        distill_models = []
+        for ckpt_path in args.distill_from:
+            state, cfg = GrouseModelHandler.unwrap_checkpoint(
+                _torch2.load(ckpt_path, map_location=_device,
+                            weights_only=True))
+            # A teacher is scored on THIS run's datasets, which are
+            # built from THIS run's feature list - so its own feature
+            # list (authoritative for a wrapped checkpoint, see
+            # ARCHITECTURE.md) must be the same list, in the same
+            # channel order. Anything else is either a shape mismatch
+            # (loud but cryptic) or, when the channel counts happen to
+            # agree, a teacher silently reading one feature's channel
+            # as another and emitting confident nonsense as the soft
+            # target. Refuse explicitly rather than let either happen;
+            # supporting mixed feature sets would need one dataset per
+            # distinct teacher list and is not worth it.
+            ckpt_features = (cfg or {}).get("features")
+            if ckpt_features is None:
+                print(f"   [warn] {ckpt_path} is a bare checkpoint with no "
+                      f"feature list - assuming it was trained on this "
+                      f"run's features {features}; a shape mismatch "
+                      f"below means it wasn't.")
+            elif split_features(ckpt_features) != (cat_f, cont_f):
+                # Compared in spec order, so an explicit --features list
+                # given in a different order still matches.
+                raise SystemExit(
+                    f"--distill-from {ckpt_path}: teacher was trained on "
+                    f"features {list(ckpt_features)} but this run uses "
+                    f"{list(features)}. A teacher is scored on this run's "
+                    f"patches, so the two lists must match exactly. "
+                    f"Missing on disk: "
+                    f"{sorted(set(ckpt_features) - set(features))}; "
+                    f"extra on disk: "
+                    f"{sorted(set(features) - set(ckpt_features))}. "
+                    f"Either restore the teacher's rasters (or pass "
+                    f"--features with its list) or retrain the teachers "
+                    f"on the current feature set.")
+            # Rebuild from the checkpoint's OWN config (see score_ensemble)
+            # - a teacher's architecture doesn't have to, and here mostly
+            # won't, match this run's --pool/etc. Its embedding vocab
+            # sizes likewise come from its own tables.
+            kw = config_to_model_kwargs(cfg, defaults=dict(
+                pool=args.pool, center_skip=args.center_skip,
+                keep_early_resolution=args.keep_early_resolution,
+                early_attn=args.early_attn,
+                early_attn_heads=args.early_attn_heads,
+                early_attn_kv_stride=args.early_attn_kv_stride,
+                dual_branch=args.dual_branch,
+                dual_branch_channels=args.dual_branch_channels))
+            t_spec = spec_with_checkpoint_vocab(state)
+            for note in checkpoint_vocab_notes(t_spec, cat_f):
+                print(f"   [note] teacher {ckpt_path}: {note} - the "
+                      f"teacher scores with ITS clamp; the student "
+                      f"trains under the current spec.")
+            m = GrouseResNet(cat_f, cont_f, spec=t_spec, pretrained=False,
+                             **kw).to(_device).eval()
+            try:
+                m.load_state_dict(state)
+            except RuntimeError as e:
+                raise SystemExit(
+                    f"--distill-from {ckpt_path}: checkpoint doesn't match "
+                    f"the model rebuilt from its config (features="
+                    f"{list(features)}, {kw}).\nOriginal error:\n{e}")
+            distill_models.append(m)
+        print(f"   --distill-from: {len(distill_models)} teacher(s) loaded "
+              f"({', '.join(args.distill_from)}), alpha="
+              f"{args.distill_alpha:g} true-label weight. Scoring every "
+              f"training point once before training starts...")
+
     train_ds, val_ds, train_labels = build_datasets(
         data, args.regions, features, args.img_size,
         cache_dir=args.cache_dir or None, jitter=args.jitter,
-        augment=args.augment)
+        augment=args.augment, background_per_pos=args.an_background,
+        seed=args.seed, train_year_gap=args.max_train_year_gap,
+        distill_models=distill_models, flip_tta=args.flip_tta)
     print(f"Train samples: {len(train_ds):,} | Val samples: {len(val_ds):,}")
 
     disable = (args.batch_pos_frac is not None
@@ -405,6 +982,43 @@ def main():
         frac_arg = args.batch_pos_frac[0]
     else:
         frac_arg = tuple(args.batch_pos_frac)
+
+    # lambda for L_AN-full. Under the default STRATIFIED batching the
+    # sampler feeds every batch pair at net 50/50 regardless of dataset
+    # composition (minority indices recycle), so the assumed-negative
+    # flood Cole et al. offset with lambda never reaches the loss -
+    # auto lambda is 1.0. Only with stratification disabled does the
+    # raw dataset imbalance hit each batch, and lambda = neg:pos
+    # restores the balance.
+    if args.pos_neg_ratio is not None and args.pos_neg_ratio <= 0:
+        raise SystemExit(f"--pos-neg-ratio must be > 0, got "
+                         f"{args.pos_neg_ratio}")
+    # focal's alpha weights positives by alpha and negatives by
+    # (1-alpha), so a pos:neg ratio R maps to alpha = R/(1+R).
+    focal_alpha = 0.5
+    if args.pos_neg_ratio is not None:
+        focal_alpha = args.pos_neg_ratio / (1.0 + args.pos_neg_ratio)
+        if args.loss == 'focal':
+            print(f"Loss pos:neg weighting {args.pos_neg_ratio:g}:1 -> "
+                  f"focal alpha = {focal_alpha:.3f} (applies to the "
+                  f"BCE warmup too).")
+    an_pos_weight = 1.0
+    if args.loss == 'an_full':
+        if args.an_pos_weight is not None:
+            an_pos_weight = float(args.an_pos_weight)
+            why = "explicit --an-pos-weight/--an-lambda"
+        elif args.pos_neg_ratio is not None:
+            an_pos_weight = float(args.pos_neg_ratio)
+            why = "--pos-neg-ratio (lambda IS an_full's pos:neg ratio)"
+        elif disable:
+            n_pos = int((train_labels == 1).sum())
+            n_neg = int((train_labels == 0).sum())
+            an_pos_weight = n_neg / max(n_pos, 1)
+            why = f"auto = neg:pos {n_neg:,}:{n_pos:,} (plain shuffling)"
+        else:
+            why = "auto = 1.0 (stratified batches are already balanced)"
+        print(f"L_AN-full lambda (positive weight): {an_pos_weight:g} "
+              f"[{why}]")
 
     # Scale the LR to the batch size. A batch of N averages N samples
     # into one gradient and one step, so at N=128 the run takes a
@@ -435,6 +1049,24 @@ def main():
                   f"{overrides} ===")
         else:
             path = args.save_path
+        tb_writer = None
+        if args.tensorboard:
+            try:
+                from torch.utils.tensorboard import SummaryWriter
+            except ImportError:
+                raise SystemExit(
+                    "--tensorboard requires the tensorboard package: "
+                    "pip install tensorboard")
+            run_name = (f"{dt.datetime.now():%Y%m%d_%H%M%S}_"
+                       f"{os.path.splitext(os.path.basename(path))[0]}")
+            tb_logdir = os.path.join(args.tensorboard_dir, run_name)
+            tb_writer = SummaryWriter(tb_logdir)
+            tb_writer.add_text("run/command", " ".join(sys.argv), 0)
+            tb_writer.add_text("run/args",
+                               f"```\n{json.dumps(vars(args), indent=2, default=str)}\n```",
+                               0)
+            print(f"   TensorBoard logging to {tb_logdir} (view with: "
+                  f"tensorboard --logdir {args.tensorboard_dir})")
         handler = GrouseModelHandler(
             features,
             pretrained=not args.no_pretrained,
@@ -448,15 +1080,25 @@ def main():
             early_attn=args.early_attn,
             early_attn_heads=args.early_attn_heads,
             early_attn_kv_stride=args.early_attn_kv_stride,
+            early_attn_dropout=args.early_attn_dropout,
+            early_attn_droppath=args.early_attn_droppath,
+            early_attn_pos_mode=args.early_attn_pos,
+            early_attn_lr_factor=args.early_attn_lr_factor,
+            dual_branch=args.dual_branch,
+            dual_branch_channels=args.dual_branch_channels,
             label_smoothing=overrides.get('label_smoothing',
                                           args.label_smoothing),
             ema_decay=args.ema, lr=lr,
             weight_decay=overrides.get('weight_decay', args.weight_decay),
+            loss=args.loss, an_pos_weight=an_pos_weight,
+            focal_alpha=focal_alpha,
             focal_gamma=args.focal_gamma,
             backbone_lr_factor=args.backbone_lr_factor,
+            grad_clip=args.grad_clip,
             sched=args.sched,
             warmup_epochs=args.warmup_epochs,
             select_by=args.select_by,
+            select_min_delta=args.select_min_delta,
             pos_threshold=args.pos_threshold,
             neg_threshold=args.neg_threshold,
             strict_objective=args.strict_objective,
@@ -464,13 +1106,42 @@ def main():
             on_divergence=args.on_divergence,
             divergence_dampen_factor=args.divergence_dampen_factor,
             flip_tta=args.flip_tta)
+        if args.init_from:
+            if args.resume and i == 0:
+                print("   [note] --resume restores full weights from "
+                      "where it left off, overriding whatever "
+                      "--init-from would have loaded.")
+            else:
+                handler.load_backbone(args.init_from)
+        resume_from = None
+        if args.resume:
+            if i == 0:
+                resume_from = args.resume + ".resume"
+            elif i == 1:
+                print("   [note] --resume only resumes the first "
+                      "ensemble member; later members start fresh.")
         handler.fit(train_ds, val_ds, epochs=args.epochs,
                     batch_size=args.batch_size,
                     eval_batch_size=args.eval_batch_size,
                     workers=args.workers,
                     train_labels=None if disable else train_labels,
                     batch_pos_frac=frac_arg,
-                    metrics_csv=args.metrics_csv)
+                    metrics_csv=args.metrics_csv,
+                    tb_writer=tb_writer, tb_log_every=args.tb_log_every,
+                    tb_images=args.tb_images,
+                    tb_attention=args.tb_attention,
+                    tb_embeddings=args.tb_embeddings,
+                    tb_embeddings_every=args.tb_embeddings_every,
+                    resume_from=resume_from,
+                    dynamic_dropout=args.dynamic_dropout,
+                    dynamic_dropout_min=args.dynamic_dropout_min,
+                    dynamic_dropout_max=args.dynamic_dropout_max,
+                    dynamic_dropout_step=args.dynamic_dropout_step,
+                    distill_alpha=(args.distill_alpha if args.distill_from
+                                   else None),
+                    compile_model=args.compile)
+        if tb_writer is not None:
+            tb_writer.close()
         members.append((path, overrides.get('pool', args.pool)))
 
     if len(members) > 1:

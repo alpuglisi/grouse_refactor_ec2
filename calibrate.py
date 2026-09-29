@@ -58,8 +58,11 @@ _here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _here)
 
 from grouse_data import GrouseData
-from models import GrouseResNet, FEATURE_SPEC, split_features
+from models import (GrouseResNet, FEATURE_SPEC, split_features,
+                    config_to_model_kwargs, spec_with_checkpoint_vocab,
+                    checkpoint_vocab_notes)
 from model_handler import GrouseModelHandler, roc_auc, average_precision
+from losses import loss_logit_bias
 from train import build_datasets, discover_features
 
 OUT_DIR = "data/calibration"
@@ -75,38 +78,43 @@ def load_model(path, device, cli_pool, cli_center_skip, disk_features):
     if first.startswith("_orig_mod."):
         state = {k[len("_orig_mod."):]: v for k, v in state.items()}
     if cfg is not None:
-        pool = cfg.get("pool", cli_pool)
-        center_skip = cfg.get("center_skip", cli_center_skip)
         features = cfg.get("features", disk_features)
-        keep_early_res = cfg.get("keep_early_resolution", False)
-        early_attn = cfg.get("early_attn", False)
-        early_attn_kv_stride = cfg.get("early_attn_kv_stride", 1)
-        print(f"Checkpoint config: pool={pool}, center_skip={center_skip}, "
-              f"features={features}")
+    else:
+        features = disk_features
+    # config_to_model_kwargs owns every geometry key and legacy chain
+    # in one place; CLI flags are only the bare-checkpoint fallback.
+    kw = config_to_model_kwargs(cfg, defaults=dict(
+        pool=cli_pool, center_skip=cli_center_skip))
+    if cfg is not None:
+        print(f"Checkpoint config: pool={kw['pool']}, "
+              f"center_skip={kw['center_skip']}, features={features}")
         if set(features) != set(disk_features):
             print(f"  [note] checkpoint features differ from disk "
                   f"({disk_features}) - using the CHECKPOINT's list, since "
                   f"that's the geometry the weights encode.")
     else:
-        pool, center_skip, features = cli_pool, cli_center_skip, disk_features
-        print(f"Bare (pre-config) checkpoint: assuming pool={pool}, "
-              f"center_skip={center_skip} from CLI flags - if loading "
-              f"fails or results look wrong, pass the flags the model "
-              f"was trained with.")
+        print(f"Bare (pre-config) checkpoint: assuming pool={kw['pool']}, "
+              f"center_skip={kw['center_skip']} from CLI flags - if "
+              f"loading fails or results look wrong, pass the flags the "
+              f"model was trained with.")
     cat_f, cont_f = split_features(features)
-    model = GrouseResNet(
-        cat_f, cont_f, pretrained=False, pool=pool, center_skip=center_skip,
-        keep_early_resolution=keep_early_res, early_attn=early_attn,
-        early_attn_kv_stride=early_attn_kv_stride).to(device)
+    # Vocab sizes from the checkpoint's own embedding tables (see
+    # predict.load_model / models.spec_with_checkpoint_vocab).
+    spec = spec_with_checkpoint_vocab(state)
+    for note in checkpoint_vocab_notes(spec, cat_f):
+        print(f"  [note] checkpoint {note} - rebuilt with the "
+              f"checkpoint's own table size.")
+    model = GrouseResNet(cat_f, cont_f, spec=spec, pretrained=False,
+                         **kw).to(device)
     try:
         model.load_state_dict(state)
     except RuntimeError as e:
         raise SystemExit(
             f"Checkpoint doesn't match the model geometry "
-            f"(pool={pool}, center_skip={center_skip}, "
+            f"(pool={kw['pool']}, center_skip={kw['center_skip']}, "
             f"features={features}).\nOriginal error:\n{e}")
     model.eval()
-    return model, features
+    return model, features, cfg
 
 
 # ==========================================
@@ -268,8 +276,21 @@ def main():
     print(f"Device: {device}")
     data = GrouseData()
     disk_features = discover_features(data, args.regions)
-    model, features = load_model(args.model, device, args.pool,
-                                 args.center_skip, disk_features)
+    model, features, ckpt_cfg = load_model(args.model, device, args.pool,
+                                           args.center_skip, disk_features)
+    bias = loss_logit_bias(ckpt_cfg)
+    if bias is not None:
+        reason, off = bias
+        print(f"\n[note] this checkpoint was trained with {reason}: the "
+              f"objective's asymmetric weighting builds a constant logit "
+              f"offset (~{off:+.2f}) into the model BY DESIGN. A "
+              f"temperature is a pure scale and cannot remove an offset, "
+              f"so expect residual one-sided gaps in the AFTER table "
+              f"below; the fitted T will be a compromise between fixing "
+              f"confidence scale and shrinking the offset. predict.py "
+              f"--prior applies exactly the offset correction this "
+              f"cannot, and --style quantile is immune to offsets "
+              f"entirely.")
 
     _, val_ds, _ = build_datasets(data, args.regions, features,
                                   args.img_size,
@@ -334,6 +355,13 @@ def main():
         "features": features,
         "flip_tta": bool(args.flip_tta),
         "n_points": int(len(logits)),
+        # The objective the checkpoint was trained with (None for
+        # pre-metadata checkpoints): a temperature is only a complete
+        # calibration for symmetric losses, and predict.py uses this
+        # plus the checkpoint's own config to warn about mismatches.
+        "loss": (ckpt_cfg or {}).get("loss"),
+        "an_pos_weight": (ckpt_cfg or {}).get("an_pos_weight"),
+        "focal_alpha": (ckpt_cfg or {}).get("focal_alpha"),
         "ece_before": ece_b, "ece_after": ece_a,
         "mce_before": mce_b, "mce_after": mce_a,
         "brier_before": brier(probs, y), "brier_after": brier(probs_c, y),
@@ -356,6 +384,12 @@ def main():
     print(f"\nSaved: {json_path}\n       {csv_path}\n       {png_path}")
     print("predict.py picks up the temperature automatically from "
           "calibration.json.")
+    print("NOTE: temperature calibrates probabilities to the ~50/50 "
+          "presence/pseudo-absence validation design; it is symmetric "
+          "about p=0.5 and can never move a score across it. If a "
+          "predicted map lights up wall-to-wall, that is prior "
+          "mismatch, not a bad temperature - use predict.py --prior "
+          "<expected suitable fraction> or --style quantile.")
 
 
 if __name__ == "__main__":

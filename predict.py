@@ -23,12 +23,29 @@ refactored from the previous project's version for the current pipeline:
 
 KMZ generation (present in the original, kept and fixed): the output
 GeoTIFF is reprojected to lat/lon, colorized, and packaged as a Google
-Earth GroundOverlay. Two explicit styles:
+Earth GroundOverlay. Three explicit styles:
   --style absolute  (default) color = the model's actual probability;
                     comparable across regions and model versions
+  --style quantile  color = the cell's rank within THIS map (0..1);
+                    --alpha-below then hides everything below that
+                    quantile ("0.8 = show the top 20% of the box").
+                    The right product when the deployed use is ranking
+                    candidate habitat inside an area of interest.
   --style stretched 2-98 percentile stretch + gamma, like the original
                     (which claimed "no normalization" while doing this);
                     maximizes local contrast, NOT comparable across maps
+
+PROBABILITY SEMANTICS / why a whole-forest box can light up: the model
+is trained and calibrated on a ~50/50 presence/pseudo-absence design
+(see calibrate.py "HONEST LIMITS"), so p=0.5 means "even odds AGAINST A
+SAMPLED PSEUDO-ABSENCE", not "50% of such cells hold grouse". Over a
+real landscape whose suitable fraction is far below 50%, those
+probabilities read inflated - and temperature scaling cannot shift
+them, because sigmoid(logit/T) is symmetric about p=0.5: no T moves a
+score across 0.5. Fixes: --prior <f> re-anchors the calibrated logits
+to an expected deployment prevalence f (the standard
+logit(f)-logit(0.5) prior correction), or --style quantile sidesteps
+absolute probabilities entirely.
 
 Usage:
     python predict.py --region ME
@@ -38,10 +55,12 @@ Usage:
 """
 import os
 import sys
+import json
 import math
 import zipfile
 import argparse
 import tempfile
+import datetime as dt
 
 import numpy as np
 import torch
@@ -64,12 +83,14 @@ if not os.path.exists(os.path.join(_here, "grouse_data.py")):
     if os.path.exists(os.path.join(_parent, "grouse_data.py")):
         sys.path.insert(0, _parent)
 
-from grouse_data import GrouseData
-from models import GrouseResNet, FEATURE_SPEC, split_features
+from grouse_data import GrouseData, NLCD_NAMES, NODATA_SENTINELS
+from models import (GrouseResNet, FEATURE_SPEC, split_features,
+                    config_to_model_kwargs, d4_tta_logits,
+                    spec_with_checkpoint_vocab, checkpoint_vocab_notes)
+from losses import loss_logit_bias
 from prepare_training_data import BOXES
 
 IMG_SIZE = 64
-NODATA_SENTINELS = (-9999, -32768, 32767, -1111)
 STRIP_TARGET_ROWS = 2048        # rows of raster processed per tile
 OUT_DIR = "data/predictions"
 
@@ -92,38 +113,44 @@ def load_model(model_path, disk_features, device, cli_pool="attn",
     if first_key.startswith("_orig_mod."):
         print("   Detected torch.compile checkpoint - stripping prefix.")
         state = {k[len("_orig_mod."):]: v for k, v in state.items()}
+    # config_to_model_kwargs owns every geometry key and legacy chain
+    # (pos-enc bools, dual-branch defaults, ...) in one place - the CLI
+    # pool/center-skip flags act only as fallbacks for bare checkpoints.
+    kw = config_to_model_kwargs(cfg, defaults=dict(
+        pool=cli_pool, center_skip=cli_center_skip))
     if cfg is not None:
-        pool = cfg.get("pool", cli_pool)
-        center_skip = cfg.get("center_skip", cli_center_skip)
         features = cfg.get("features", disk_features)
-        keep_early_res = cfg.get("keep_early_resolution", False)
-        early_attn = cfg.get("early_attn", False)
-        early_attn_kv_stride = cfg.get("early_attn_kv_stride", 1)
-        print(f"   Checkpoint config: pool={pool}, "
-              f"center_skip={center_skip}")
+        print(f"   Checkpoint config: pool={kw['pool']}, "
+              f"center_skip={kw['center_skip']}")
         if set(features) != set(disk_features):
             print(f"   [note] checkpoint features {features} differ from "
                   f"disk {disk_features} - using the checkpoint's list.")
     else:
-        pool, center_skip, features = (cli_pool, cli_center_skip,
-                                       disk_features)
-        print(f"   Bare (pre-config) checkpoint: assuming pool={pool}, "
-              f"center_skip={center_skip} - pass --pool/--center-skip "
-              f"matching the training run if this is wrong.")
+        features = disk_features
+        print(f"   Bare (pre-config) checkpoint: assuming "
+              f"pool={kw['pool']}, center_skip={kw['center_skip']} - "
+              f"pass --pool/--center-skip matching the training run if "
+              f"this is wrong.")
     cat_f, cont_f = split_features(features)
-    model = GrouseResNet(
-        cat_f, cont_f, pretrained=False, pool=pool, center_skip=center_skip,
-        keep_early_resolution=keep_early_res, early_attn=early_attn,
-        early_attn_kv_stride=early_attn_kv_stride).to(device)
+    # Embedding vocab sizes come from the checkpoint's own tables, not
+    # today's FEATURE_SPEC - a checkpoint trained under the old evh/evc
+    # vocab of 300 must keep loading (and keep clamping exactly as it
+    # was trained to; see models.spec_with_checkpoint_vocab).
+    spec = spec_with_checkpoint_vocab(state)
+    for note in checkpoint_vocab_notes(spec, cat_f):
+        print(f"   [note] checkpoint {note} - rebuilt with the "
+              f"checkpoint's own table size.")
+    model = GrouseResNet(cat_f, cont_f, spec=spec, pretrained=False,
+                         **kw).to(device)
     try:
         model.load_state_dict(state)
     except RuntimeError as e:
         raise SystemExit(
             f"Checkpoint doesn't match the model geometry "
-            f"(pool={pool}, center_skip={center_skip}, "
+            f"(pool={kw['pool']}, center_skip={kw['center_skip']}, "
             f"features={features}).\nOriginal error:\n{e}")
     model.eval()
-    return model, cat_f, cont_f, features
+    return model, cat_f, cont_f, features, cfg
 
 
 # ==========================================
@@ -192,36 +219,96 @@ def _safe_windowed_read(src, window, fill_value=0):
     return out
 
 
-def read_strip(srcs, cat_f, cont_f, r0, rows, c0, cols):
-    window = Window(c0, r0, cols, rows)
-    cat_raw = [_safe_windowed_read(srcs[f], window, fill_value=0)
-               for f in cat_f]
-    cont_raw = [_safe_windowed_read(srcs[f], window, fill_value=0)
-                for f in cont_f]
-    # BUG-0008: the reference band's RAW values (before sentinel collapse)
-    # are returned so predict_region can build an invalid-data mask from
-    # them directly, instead of overloading the post-collapse 0 to mean
-    # both "sentinel nodata" and "legitimate zero".
-    ref_raw = cat_raw[0] if cat_raw else cont_raw[0]
+def read_window_stack(srcs, cat_f, cont_f, window):
+    """One raster window -> the (cat int64, cont float32) stacks the
+    model consumes: sentinels zeroed, continuous channels divided by
+    their FEATURE_SPEC scale.
 
-    cat = np.stack(cat_raw).astype(np.int64)
-    cont = np.stack(cont_raw).astype(np.float32)
+    THE single inference-side definition of "raw pixels -> model
+    input". It was written out three times (read_strip,
+    _tb_capture_windows, inspect_point) and a divergence between them
+    would not crash - it would silently feed differently-scaled inputs
+    at different points in the same pipeline.
+
+    Note this is deliberately NOT shared with dataset.py's training
+    path, which routes sentinels through NaN first so it can run its
+    100%-nodata geolocation probe (impossible once 0 is in the array,
+    since 0 is also a legitimate value). The two converge on the same
+    numbers - dataset.py nan_to_num's to 0 - by different routes, for
+    a reason."""
+    cat = np.stack([_safe_windowed_read(srcs[f], window)
+                   for f in cat_f]).astype(np.int64)
+    cont = np.stack([_safe_windowed_read(srcs[f], window)
+                    for f in cont_f]).astype(np.float32)
     for s in NODATA_SENTINELS:
         cat[cat == s] = 0
         cont[cont == s] = 0.0
     for i, f in enumerate(cont_f):
         cont[i] /= float(FEATURE_SPEC[f].get("scale", 1.0))
+    return cat, cont
+
+
+def read_strip(srcs, cat_f, cont_f, r0, rows, c0, cols):
+    window = Window(c0, r0, cols, rows)
+    cat, cont = read_window_stack(srcs, cat_f, cont_f, window)
+    # BUG-0008: the reference band's RAW values (before sentinel collapse)
+    # are returned so predict_region can build an invalid-data mask from
+    # them directly, instead of overloading the post-collapse 0 to mean
+    # both "sentinel nodata" and "legitimate zero".
+    ref_f = cat_f[0] if cat_f else cont_f[0]
+    ref_raw = _safe_windowed_read(srcs[ref_f], window)
     return cat, cont, ref_raw
 
 
 def predict_region(model, device, srcs, ref, cat_f, cont_f,
                    window_bounds, stride, batch_size, use_compile,
-                   flip_tta=True, temperature=1.0):
+                   flip_tta=True, temperature=1.0, logit_shift=0.0,
+                   capture_features=None, edge_features=None):
+    """capture_features: iterable of feature names (from cat_f and/or
+    cont_f) to also capture per scored cell - the center-pixel value at
+    each cell, read from the SAME tensors already loaded for scoring (no
+    extra raster I/O). Returns feature_maps: {name: 2D array, same shape
+    as heatmap} - int32 (-1 = not scored) for a categorical feature,
+    float32 (NaN = not scored) for a continuous one (already the
+    model-input SCALED value - see read_strip). Empty dict if
+    capture_features is None/empty. Powers --tensorboard's per-feature
+    score-correlation breakdown over the predicted region: which
+    categorical classes and which continuous-feature ranges the model's
+    score actually tracks in this specific deployment area, not just
+    what the training data looked like.
+
+    edge_features: iterable of feature names to ALSO capture a per-cell
+    EDGE/CONTRAST magnitude for, computed over that same cell's WHOLE
+    64x64 window (not just its center pixel) from the exact tensors
+    already stacked for scoring - a hard-edge hypothesis (e.g. "the
+    model is keying on the canopy/field contrast a road cuts, not on
+    what's on either side of it") shows up here, not in
+    capture_features's plain center-pixel values. Continuous feature:
+    mean absolute finite-difference gradient. Categorical feature: rate
+    of class change between adjacent pixels. Returns edge_maps in the
+    same {name: 2D float32 array} shape as feature_maps, always
+    continuous regardless of the source feature's own kind, since an
+    edge magnitude is a continuous quantity either way."""
     r_start, r_end, c_start, c_end = window_bounds
     height, width = r_end - r_start, c_end - c_start
     out_h = (height - IMG_SIZE) // stride + 1
     out_w = (width - IMG_SIZE) // stride + 1
     heatmap = np.full((out_h, out_w), np.nan, dtype=np.float32)
+    capture_features = list(capture_features or [])
+    cat_capture = {f: cat_f.index(f) for f in capture_features if f in cat_f}
+    cont_capture = {f: cont_f.index(f) for f in capture_features
+                    if f in cont_f}
+    feature_maps = {f: np.full((out_h, out_w), -1, dtype=np.int32)
+                    for f in cat_capture}
+    feature_maps.update({f: np.full((out_h, out_w), np.nan, dtype=np.float32)
+                         for f in cont_capture})
+    edge_features = list(edge_features or [])
+    edge_cat_capture = {f: cat_f.index(f) for f in edge_features
+                        if f in cat_f}
+    edge_cont_capture = {f: cont_f.index(f) for f in edge_features
+                         if f in cont_f}
+    edge_maps = {f: np.full((out_h, out_w), np.nan, dtype=np.float32)
+                for f in list(edge_cat_capture) + list(edge_cont_capture)}
 
     # Reference-layer nodata mask for honest masking of no-coverage cells.
     ref_nodata = ref.nodata if ref.nodata is not None else -9999
@@ -279,33 +366,58 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                 t_cont = torch.from_numpy(np.stack(cont_b)).to(
                     device, non_blocking=True)
 
-                # TTA over the D4 group, scored through model.logits()
-                # so the trained pooling (attn/gauss/center/mean) and the
-                # center-skip head actually apply - forward() alone
-                # returns the raw spatial map and would silently ignore
-                # both. Logits are averaged across views BEFORE sigmoid,
-                # matching model_handler's evaluation exactly, then
-                # divided by the calibration temperature (T=1.0 when no
-                # calibration is loaded).
-                tta_logits = []
-                for k in range(4):
-                    rc = torch.rot90(t_cat, k, dims=(2, 3))
-                    rn = torch.rot90(t_cont, k, dims=(2, 3))
-                    with autocast:
-                        lg = model.logits(rc, rn).float()
-                        if flip_tta:
-                            lg = 0.5 * (lg + model.logits(
-                                rc.flip(-1), rn.flip(-1)).float())
-                    tta_logits.append(lg.flatten())
-                pooled_logit = torch.stack(tta_logits).mean(dim=0)
-                probs = torch.sigmoid(
-                    pooled_logit / temperature).float().cpu().numpy()
+                # Edge/contrast magnitude per sample, on the canonical
+                # (untransformed) orientation only - one pass, not per
+                # TTA view, since this characterizes the WINDOW's own
+                # content, not a scoring quantity. Categorical: rate of
+                # class change between adjacent pixels (unrelated
+                # values still count as "different", which is exactly
+                # what a categorical edge is). Continuous: mean absolute
+                # finite-difference gradient.
+                edge_cat_vals, edge_cont_vals = {}, {}
+                for f, idx in edge_cat_capture.items():
+                    ch = t_cat[:, idx]
+                    neq_x = (ch[:, :, 1:] != ch[:, :, :-1]).float().mean(
+                        dim=(1, 2))
+                    neq_y = (ch[:, 1:, :] != ch[:, :-1, :]).float().mean(
+                        dim=(1, 2))
+                    edge_cat_vals[f] = (0.5 * (neq_x + neq_y)).cpu().numpy()
+                for f, idx in edge_cont_capture.items():
+                    ch = t_cont[:, idx]
+                    dx = (ch[:, :, 1:] - ch[:, :, :-1]).abs().mean(dim=(1, 2))
+                    dy = (ch[:, 1:, :] - ch[:, :-1, :]).abs().mean(dim=(1, 2))
+                    edge_cont_vals[f] = (0.5 * (dx + dy)).cpu().numpy()
 
-                for p, (y, x) in zip(probs, keep):
+                # D4 TTA through the shared scorer (models.d4_tta_logits
+                # - the single definition, also used by
+                # _tb_capture_windows and inspect_point.py).
+                pooled_logit = d4_tta_logits(model, t_cat, t_cont,
+                                             flip_tta=flip_tta,
+                                             autocast=autocast)
+                # Temperature first (calibrates the val-design scale),
+                # then the prior shift (converts calibrated logits from
+                # the 50/50 training prior to the deployment prior).
+                probs = torch.sigmoid(
+                    pooled_logit / temperature
+                    + logit_shift).float().cpu().numpy()
+
+                for i, (p, (y, x)) in enumerate(zip(probs, keep)):
                     gy = (y0 + y) // stride
                     gx = x // stride
                     if gy < out_h and gx < out_w:
                         heatmap[gy, gx] = p
+                        if cat_capture or cont_capture:
+                            cy, cx = y + IMG_SIZE // 2, x + IMG_SIZE // 2
+                            for f, idx in cat_capture.items():
+                                feature_maps[f][gy, gx] = int(
+                                    cat_np[idx, cy, cx])
+                            for f, idx in cont_capture.items():
+                                feature_maps[f][gy, gx] = float(
+                                    cont_np[idx, cy, cx])
+                        for f, vals in edge_cat_vals.items():
+                            edge_maps[f][gy, gx] = float(vals[i])
+                        for f, vals in edge_cont_vals.items():
+                            edge_maps[f][gy, gx] = float(vals[i])
 
     n_valid = int(np.isfinite(heatmap).sum())
     print(f"   Scored {n_valid:,}/{heatmap.size:,} cells "
@@ -321,7 +433,273 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
         ref.transform.c + (c_start + IMG_SIZE // 2 - 0.5 * stride) * ref.transform.a,
         ref.transform.d, ref.transform.e * stride,
         ref.transform.f + (r_start + IMG_SIZE // 2 - 0.5 * stride) * ref.transform.e)
-    return heatmap, new_trans
+    return heatmap, new_trans, feature_maps, edge_maps
+
+
+# ==========================================
+# TensorBoard instrumentation
+# ==========================================
+def _tb_suitability_image(heatmap, cmap_name="jet", max_dim=1024):
+    """The heatmap itself, colorized (nodata fully transparent) and
+    downsampled to a sane TensorBoard image size - the region-scan
+    analog of train.py's Patches/logit_map, at the scale that's
+    actually the point of running predict.py at all."""
+    valid = np.isfinite(heatmap)
+    shown = np.nan_to_num(heatmap, nan=0.0)
+    rgba = (plt.get_cmap(cmap_name)(np.clip(shown, 0, 1)) * 255
+           ).astype(np.uint8)
+    rgba[..., 3] = np.where(valid, 255, 0).astype(np.uint8)
+    img = Image.fromarray(rgba, "RGBA")
+    if max(img.size) > max_dim:
+        ratio = max_dim / max(img.size)
+        img = img.resize((max(1, int(img.width * ratio)),
+                          max(1, int(img.height * ratio))),
+                         Image.NEAREST)
+    arr = np.asarray(img).astype(np.float32) / 255.0
+    return torch.from_numpy(arr).permute(2, 0, 1)          # (4, H, W)
+
+
+def _tb_log_categorical_breakdown(tb_writer, heatmap, code_map, feature,
+                                  min_count=50, max_classes=15, names=None):
+    """Per-class breakdown over the PREDICTED region for ONE categorical
+    feature - the live, real-deployment counterpart to model_handler's
+    per-class val breakdown and diagnose_wetland.py's area-composition
+    analysis. Generalizes what used to be nlcd-only to every categorical
+    feature the model actually uses (evt/evh/evc/sclass/fdist/nlcd),
+    tagged under Class/<feature>/... so a "sticks to roads" pattern can
+    be tested against EVERY feature, not just land cover - a strong
+    fdist (disturbance) or sclass (succession stage) correlation would
+    mean something very different than an nlcd one:
+    - mean_score: does any class score anomalously high across this
+      actual mapped area? No ground truth at inference, so no AUC -
+      mean score is what's available.
+    - score_hist: the SHAPE of each class's score distribution, not
+      just its mean - a thin high tail over an otherwise ordinary bulk
+      looks very different from uniformly elevated, and the mean alone
+      can't tell those apart.
+    - area_share: each class's share of the scored map area - a high
+      mean score over a handful of pixels is a very different finding
+      from the same mean over a large contiguous class.
+    - lit_area_share: diagnose_wetland.py Part D's "landscape area
+      share x mean score", normalized to sum to 1 across classes - each
+      class's actual contribution to the map's total predicted
+      suitability, the map-level answer to "does this class scoring
+      high actually move the map, or is it a sliver."
+    max_classes caps the tile count to the most areally significant
+    classes (by area_share) - a high-cardinality feature like evt/sclass
+    can have far more distinct codes on disk than are worth a tile each;
+    the ones that don't even cover enough ground to matter for
+    lit_area_share aren't worth the clutter."""
+    valid = np.isfinite(heatmap) & (code_map >= 0)
+    if not valid.any():
+        return
+    codes, scores = code_map[valid], heatmap[valid]
+    total = float(valid.sum())
+    rows = []
+    for code in sorted(set(codes.tolist())):
+        m = codes == code
+        if m.sum() < min_count:
+            continue
+        label = (names.get(int(code), f"class_{code}") if names
+                 else str(int(code))).replace(' ', '_').replace('/', '-')
+        rows.append((label, float(m.sum()) / total,
+                    float(scores[m].mean()), scores[m]))
+    rows.sort(key=lambda r: -r[1])
+    rows = rows[:max_classes]
+    norm = sum(a * sc for _, a, sc, _ in rows) or 1.0
+    for label, area_share, mean_score, class_scores in rows:
+        tb_writer.add_scalar(f"Class/{feature}/mean_score/{label}",
+                             mean_score, 0)
+        tb_writer.add_histogram(f"Class/{feature}/score_hist/{label}",
+                                class_scores, 0)
+        tb_writer.add_scalar(f"Class/{feature}/area_share/{label}",
+                             area_share, 0)
+        tb_writer.add_scalar(f"Class/{feature}/lit_area_share/{label}",
+                             (area_share * mean_score) / norm, 0)
+
+
+def _tb_log_continuous_correlation(tb_writer, heatmap, value_map, feature,
+                                   n_bins=20, tag_prefix="Correlation"):
+    """Does the score actually track a CONTINUOUS quantity - a raw
+    feature value (canopy height/cover, tree-canopy-cover%) or, via
+    edge_maps/tag_prefix='Edge', a per-cell EDGE/CONTRAST magnitude
+    instead - not just land-cover class? Logs a Pearson r scalar plus a
+    binned mean-score-vs-value plot (quantile bins, so a skewed
+    quantity like canopy cover or an edge-density fraction doesn't dump
+    most cells into one or two equal-width bins) - the map-level analog
+    of asking "if I sort every scored cell by this quantity, does the
+    mean score trend with it." A strong trend under the default
+    'Correlation' prefix means the pattern is a height/structure/value
+    effect; a strong one under 'Edge' means it's a hard-boundary/
+    contrast effect instead - e.g. a road's canopy/field edge, not
+    what's actually on either side of it."""
+    valid = np.isfinite(heatmap) & np.isfinite(value_map)
+    if valid.sum() < n_bins * 5:
+        return
+    scores, values = heatmap[valid], value_map[valid]
+    if np.ptp(values) == 0:
+        return
+    r = float(np.corrcoef(values, scores)[0, 1])
+    tb_writer.add_scalar(f"{tag_prefix}/pearson_r/{feature}", r, 0)
+
+    edges = np.unique(np.quantile(values, np.linspace(0, 1, n_bins + 1)))
+    if len(edges) < 3:
+        return
+    bin_idx = np.clip(np.digitize(values, edges[1:-1]), 0, len(edges) - 2)
+    bin_centers, bin_means, bin_counts = [], [], []
+    for b in range(len(edges) - 1):
+        m = bin_idx == b
+        if not m.any():
+            continue
+        bin_centers.append(float(values[m].mean()))
+        bin_means.append(float(scores[m].mean()))
+        bin_counts.append(int(m.sum()))
+
+    fig, ax1 = plt.subplots(figsize=(6, 4), dpi=110)
+    ax1.plot(bin_centers, bin_means, 'o-', color='tab:blue')
+    ax1.set_xlabel(feature)
+    ax1.set_ylabel('mean predicted score', color='tab:blue')
+    ax1.tick_params(axis='y', labelcolor='tab:blue')
+    ax2 = ax1.twinx()
+    ax2.bar(bin_centers, bin_counts,
+           width=(max(bin_centers) - min(bin_centers) or 1) / n_bins * 0.8,
+           alpha=0.15, color='gray')
+    ax2.set_ylabel('cell count', color='gray')
+    ax1.set_title(f"score vs {feature} (r={r:+.3f}, n={valid.sum():,})")
+    fig.tight_layout()
+    fig.canvas.draw()
+    w, h = fig.canvas.get_width_height()
+    arr = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8).reshape(
+        h, w, 4)
+    plt.close(fig)
+    tb_writer.add_image(f"{tag_prefix}/plot/{feature}",
+                        torch.from_numpy(arr.copy()).permute(2, 0, 1), 0)
+
+
+def _tb_capture_windows(model, device, srcs, cat_f, cont_f, heatmap,
+                        window_bounds, stride, top_n, temperature,
+                        logit_shift, flip_tta):
+    """Re-reads the actual top-N and bottom-N scoring windows' input
+    patches - cheap (top_n*2 windows total, not a rescan of the region)
+    - so --tensorboard can show what the model literally saw at its
+    most and least confident locations. srcs must still be open (call
+    this before the caller's finally closes them). None if nothing
+    scored."""
+    r_start, r_end, c_start, c_end = window_bounds
+    finite = np.isfinite(heatmap)
+    if not finite.any():
+        return None
+    flat_idx = np.flatnonzero(finite)
+    vals = heatmap.flat[flat_idx]
+    order = np.argsort(vals)
+    n = min(top_n, len(order))
+
+    def gather(idxs):
+        cat_list, cont_list = [], []
+        for flat in idxs:
+            gy, gx = np.unravel_index(flat, heatmap.shape)
+            window = Window(c_start + int(gx) * stride,
+                            r_start + int(gy) * stride, IMG_SIZE, IMG_SIZE)
+            cat, cont = read_window_stack(srcs, cat_f, cont_f, window)
+            cat_list.append(cat)
+            cont_list.append(cont)
+        t_cat = torch.from_numpy(np.stack(cat_list)).to(device)
+        t_cont = torch.from_numpy(np.stack(cont_list)).to(device)
+        with torch.no_grad():
+            score = torch.sigmoid(
+                d4_tta_logits(model, t_cat, t_cont, flip_tta=flip_tta)
+                / temperature + logit_shift)
+        return t_cat, t_cont, score.cpu().numpy()
+
+    return {"top": gather(flat_idx[order[-n:][::-1]]),
+           "bottom": gather(flat_idx[order[:n]])}
+
+
+def _tb_log_windows(tb_writer, tag_prefix, model, cat_f, cont_f, window):
+    """Logs one gather() result from _tb_capture_windows: each
+    continuous feature's patch, the 'nlcd' category map (if present),
+    the model's own pre-pool spatial logit map, and - if early_attn is
+    active - its center-query attention (head-averaged, an off-center
+    query grid, and per-head at the center), one tile per window, plus
+    the windows' actual scores as text. Mirrors model_handler's
+    _tb_log_epoch_extras patch/attention visualization, rebuilt here
+    since predict.py scores bare windows directly rather than through
+    a GrouseModelHandler/DataLoader."""
+    import torchvision
+    from model_handler import GrouseModelHandler
+    t_cat, t_cont, scores = window
+    n = t_cat.shape[0]
+
+    def norm01(m):
+        lo = m.amin(dim=(2, 3), keepdim=True)
+        hi = m.amax(dim=(2, 3), keepdim=True)
+        return ((m - lo) / (hi - lo).clamp_min(1e-6)).float().cpu()
+
+    def clip01(m):
+        """For raw INPUT feature channels only, not model outputs: see
+        model_handler.py's _tb_log_epoch_extras.clip01 - the same bug,
+        mirrored here since this function reimplements that
+        visualization for bare windows. t_cont arrives already divided
+        by FEATURE_SPEC scale (read_window_stack), so it's fixed and
+        comparable across windows; norm01's per-sample min/max stretch
+        was throwing that away."""
+        return m.clamp(0, 1).float().cpu()
+
+    with torch.no_grad():
+        for ci, fname in enumerate(cont_f):
+            grid = torchvision.utils.make_grid(
+                clip01(t_cont[:, ci:ci + 1]), nrow=n)
+            tb_writer.add_image(f"{tag_prefix}/{fname}", grid, 0)
+        if "nlcd" in cat_f:
+            ni = cat_f.index("nlcd")
+            grid = torchvision.utils.make_grid(
+                GrouseModelHandler._class_map_rgb(t_cat[:, ni:ni + 1]),
+                nrow=n)
+            tb_writer.add_image(f"{tag_prefix}/nlcd", grid, 0)
+        spatial = model.trunk(model.embed(t_cat, t_cont))
+        tb_writer.add_image(
+            f"{tag_prefix}/logit_map",
+            torchvision.utils.make_grid(norm01(spatial[:, :1]), nrow=n), 0)
+        result = model.attention_diagnostics(t_cat, t_cont)
+        if result is not None:
+            w_attn, (h, wd, kh, kw) = result
+            num_heads = w_attn.shape[1]
+            center = (h // 2) * wd + (wd // 2)
+            center_map = w_attn[:, :, center, :].mean(dim=1).reshape(
+                n, 1, kh, kw)
+            tb_writer.add_image(
+                f"{tag_prefix}/attn_center",
+                torchvision.utils.make_grid(norm01(center_map), nrow=n), 0)
+            # Off-center query positions (center + quadrant midpoints),
+            # head-averaged - mirrors train.py's Patches/attn_query_grid,
+            # so a window's attention behavior away from the patch
+            # center isn't invisible here the way a center-only tile
+            # would leave it.
+            positions = [(0.5, 0.5), (0.25, 0.25), (0.25, 0.75),
+                        (0.75, 0.25), (0.75, 0.75)]
+            idxs = [int(round(py * (h - 1))) * wd + int(round(px * (wd - 1)))
+                   for py, px in positions]
+            pos_maps = torch.stack(
+                [w_attn[:, :, i, :].mean(dim=1) for i in idxs],
+                dim=1).reshape(n * len(idxs), 1, kh, kw)
+            tb_writer.add_image(
+                f"{tag_prefix}/attn_query_grid",
+                torchvision.utils.make_grid(norm01(pos_maps),
+                                            nrow=len(idxs)), 0)
+            # Same center query, one tile per head instead of averaged -
+            # mirrors train.py's Patches/attn_center_per_head; a head
+            # that specializes (local vs. global, directional) is
+            # invisible in the head-averaged attn_center tile above.
+            if num_heads > 1:
+                head_maps = w_attn[:, :, center, :].reshape(
+                    n, num_heads, kh, kw
+                ).reshape(n * num_heads, 1, kh, kw)
+                tb_writer.add_image(
+                    f"{tag_prefix}/attn_center_per_head",
+                    torchvision.utils.make_grid(norm01(head_maps),
+                                                nrow=num_heads), 0)
+    tb_writer.add_text(f"{tag_prefix}/scores",
+                       ", ".join(f"{s:.3f}" for s in scores), 0)
 
 
 # ==========================================
@@ -364,6 +742,17 @@ def generate_kmz(input_tif, output_kmz, style="absolute",
             shown = np.clip((dest - p_low) / (p_high - p_low), 0, 1) ** 3.0
         else:
             shown = np.clip(dest, 0, 1)
+    elif style == "quantile" and valid.any():
+        # Color = the cell's rank among THIS map's valid cells (0..1).
+        # Absolute probabilities from a 50/50 presence/pseudo-absence
+        # model saturate over a uniformly-forested box; rank is the
+        # quantity the deployed use ("where do I scout first in this
+        # area") actually needs, and it guarantees exactly (1 -
+        # alpha_below) of the valid area lights up.
+        vals = dest[valid]
+        sv = np.sort(vals)
+        shown = np.zeros_like(dest)
+        shown[valid] = np.searchsorted(sv, vals, side='right') / len(sv)
     else:
         shown = np.clip(dest, 0, 1)          # absolute: color==probability
 
@@ -371,7 +760,11 @@ def generate_kmz(input_tif, output_kmz, style="absolute",
             ).astype(np.uint8)
     alpha = np.full(dest.shape, overlay_alpha, dtype=np.uint8)
     alpha[~valid] = 0                        # nodata fully transparent
-    alpha[np.nan_to_num(dest) < alpha_below] = 0
+    # absolute/stretched hide below an absolute probability; quantile
+    # hides below a RANK ("0.8 = only the top 20% of this box visible").
+    thr_vals = (shown if style == "quantile"
+                else np.nan_to_num(dest))
+    alpha[thr_vals < alpha_below] = 0
     rgba[:, :, 3] = alpha
 
     with tempfile.TemporaryDirectory() as td:
@@ -411,12 +804,36 @@ def main():
                              "pixels (30m each). 4 -> 120m output "
                              "resolution.")
     parser.add_argument("--batch-size", type=int, default=256)
-    parser.add_argument("--style", choices=["absolute", "stretched"],
-                        default="absolute")
+    parser.add_argument("--style",
+                        choices=["absolute", "quantile", "stretched"],
+                        default="absolute",
+                        help="'absolute': color = calibrated probability. "
+                             "'quantile': color = the cell's rank within "
+                             "this map - the right product when the use "
+                             "is ranking candidate habitat inside a box, "
+                             "and immune to the 50/50-design probability "
+                             "inflation. 'stretched': 2-98 percentile "
+                             "stretch + gamma (local contrast only).")
     parser.add_argument("--cmap", default="jet")
     parser.add_argument("--alpha-below", type=float, default=0.15,
-                        help="Probabilities below this render fully "
-                             "transparent in the KMZ.")
+                        help="Cells below this render fully transparent "
+                             "in the KMZ. For --style absolute/stretched "
+                             "it is an absolute probability; for --style "
+                             "quantile it is a rank (0.8 = show only the "
+                             "top 20%% of the mapped area).")
+    parser.add_argument("--prior", type=float, default=None,
+                        help="Expected fraction of the mapped area that "
+                             "is genuinely suitable (0-1). The model's "
+                             "probabilities are calibrated to its 50/50 "
+                             "presence/pseudo-absence design, so over a "
+                             "real landscape they read inflated - and "
+                             "temperature scaling cannot fix that (it "
+                             "never moves a score across 0.5). This "
+                             "applies the standard prior correction "
+                             "(logits shifted by logit(prior)-logit(0.5)) "
+                             "AFTER temperature: e.g. --prior 0.1 makes "
+                             "a displayed 0.8 require a raw calibrated "
+                             "score of ~0.97. Default: no correction.")
     parser.add_argument("--compile", action="store_true",
                         help="torch.compile the model (worthwhile on "
                              "GPU for large areas).")
@@ -430,7 +847,14 @@ def main():
                         help="calibration.json from calibrate.py. Applied "
                              "automatically when the file exists; "
                              "--no-calibration disables.")
-    parser.add_argument("--no-calibration", action="store_true")
+    parser.add_argument("--no-calibration", action="store_true",
+                        help="Ignore calibration.json and score with raw "
+                             "logits (T=1). Use when the checkpoint was "
+                             "trained under a different --loss (or "
+                             "retrained at all) since the calibration "
+                             "was fitted - a temperature is specific to "
+                             "both the weights and the objective they "
+                             "were trained with.")
     parser.add_argument("--temperature", type=float, default=None,
                         help="Manual temperature override (logits are "
                              "divided by this before sigmoid). Overrides "
@@ -442,11 +866,50 @@ def main():
     parser.add_argument("--center-skip",
                         action=argparse.BooleanOptionalAction, default=True,
                         help="Only used for old bare checkpoints.")
+    parser.add_argument("--tensorboard", action="store_true",
+                        help="Log coverage/score-distribution scalars, "
+                             "the rendered suitability map, a per-NLCD-"
+                             "class mean-score breakdown, and the "
+                             "model's own top/bottom-scoring window "
+                             "patches (+ spatial logit map, + attention "
+                             "if --early-attn was active) to "
+                             "TensorBoard, under --tensorboard-dir/"
+                             "<timestamp>_predict_<region>. Uses the "
+                             "SAME base directory train.py does by "
+                             "default, so a prediction run and the "
+                             "training runs that produced its "
+                             "checkpoint show up side by side. Requires "
+                             "the tensorboard package (pip install "
+                             "tensorboard).")
+    parser.add_argument("--tensorboard-dir", default="runs",
+                        help="Base directory for --tensorboard logs.")
+    parser.add_argument("--tb-top-n", type=int, default=8,
+                        help="Number of highest- and lowest-scoring "
+                             "windows to visualize under --tensorboard.")
     args = parser.parse_args()
 
     os.makedirs(OUT_DIR, exist_ok=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Device: {device}")
+
+    tb_writer = None
+    if args.tensorboard:
+        try:
+            from torch.utils.tensorboard import SummaryWriter
+        except ImportError:
+            raise SystemExit(
+                "--tensorboard requires the tensorboard package: "
+                "pip install tensorboard")
+        run_name = (f"{dt.datetime.now():%Y%m%d_%H%M%S}_predict_"
+                   f"{args.region}{'_custom' if args.bounds else ''}")
+        tb_logdir = os.path.join(args.tensorboard_dir, run_name)
+        tb_writer = SummaryWriter(tb_logdir)
+        tb_writer.add_text("run/command", " ".join(sys.argv), 0)
+        tb_writer.add_text("run/args",
+                           f"```\n{json.dumps(vars(args), indent=2, default=str)}\n```",
+                           0)
+        print(f"   TensorBoard logging to {tb_logdir} (view with: "
+              f"tensorboard --logdir {args.tensorboard_dir})")
 
     data = GrouseData()
     rd = data[args.region]
@@ -455,44 +918,165 @@ def main():
         raise SystemExit(f"No usable features on disk for {args.region}.")
     print(f"Features (discovered): {features}")
 
-    model, cat_f, cont_f, features = load_model(
+    model, cat_f, cont_f, features, ckpt_cfg = load_model(
         args.model, features, device, cli_pool=args.pool,
         cli_center_skip=args.center_skip)
+
+    def _say(msg, tag="events/calibration"):
+        print(msg)
+        if tb_writer is not None:
+            tb_writer.add_text(tag, msg.strip(), 0)
 
     temperature = 1.0
     if args.temperature is not None:
         temperature = float(args.temperature)
-        print(f"Calibration: manual temperature T={temperature:.3f}")
+        _say(f"Calibration: manual temperature T={temperature:.3f}")
     elif not args.no_calibration and os.path.exists(args.calibration):
-        import json
         with open(args.calibration) as f:
             cal = json.load(f)
         temperature = float(cal.get("temperature", 1.0))
-        print(f"Calibration: T={temperature:.3f} from {args.calibration} "
-              f"(fitted {cal.get('fitted_at', '?')}, "
-              f"ECE {cal.get('ece_before', float('nan')):.3f} -> "
-              f"{cal.get('ece_after', float('nan')):.3f})")
+        _say(f"Calibration: T={temperature:.3f} from {args.calibration} "
+             f"(fitted {cal.get('fitted_at', '?')}, "
+             f"ECE {cal.get('ece_before', float('nan')):.3f} -> "
+             f"{cal.get('ece_after', float('nan')):.3f})")
         if cal.get("model_path") and os.path.abspath(args.model) !=                 cal["model_path"]:
-            print(f"   [warn] calibration was fitted on "
-                  f"{cal['model_path']}, but you're predicting with "
-                  f"{os.path.abspath(args.model)} - temperatures are "
-                  f"model-specific; re-run calibrate.py for this "
-                  f"checkpoint.")
+            _say(f"   [warn] calibration was fitted on "
+                 f"{cal['model_path']}, but you're predicting with "
+                 f"{os.path.abspath(args.model)} - temperatures are "
+                 f"model-specific; re-run calibrate.py for this "
+                 f"checkpoint.")
+        # Same PATH is not same MODEL: retraining overwrites the .pth
+        # in place (possibly with a different --loss entirely), and the
+        # model_path check above cannot see that. A fit older than the
+        # checkpoint file is a fit on weights that no longer exist.
+        try:
+            fitted = dt.datetime.fromisoformat(cal["fitted_at"])
+            written = dt.datetime.fromtimestamp(
+                os.path.getmtime(args.model))
+            if fitted < written:
+                _say(f"   [warn] calibration was fitted "
+                     f"{fitted:%Y-%m-%d %H:%M} but the checkpoint file "
+                     f"was written {written:%Y-%m-%d %H:%M} - the fit "
+                     f"predates the current weights (retrained since, "
+                     f"perhaps with a different --loss?). Re-run "
+                     f"calibrate.py, or pass --no-calibration to score "
+                     f"with raw logits.")
+        except (KeyError, ValueError, OverflowError, OSError):
+            pass
+        bias = loss_logit_bias(ckpt_cfg)
+        if bias is not None:
+            reason, off = bias
+            _say(f"   [warn] this checkpoint was trained with {reason}, "
+                 f"which builds a constant logit offset (~{off:+.2f}) "
+                 f"into the model. A temperature is a pure SCALE and "
+                 f"cannot remove an offset, so calibrated probabilities "
+                 f"remain shifted. Remedies: --prior (an explicit "
+                 f"offset), --style quantile (rank-based, offset-"
+                 f"immune), or --no-calibration to drop the "
+                 f"temperature.", tag="events/bias_warning")
     else:
-        print("Calibration: none (raw probabilities). Run calibrate.py "
-              "to fit one.")
+        _say("Calibration: none (raw probabilities). Run calibrate.py "
+             "to fit one.")
+
+    logit_shift = 0.0
+    if args.prior is not None:
+        if not (0.0 < args.prior < 1.0):
+            raise SystemExit(f"--prior must be in (0, 1), got {args.prior}")
+        logit_shift = math.log(args.prior / (1.0 - args.prior))
+        _say(f"Prior correction: deployment prevalence {args.prior:g} "
+             f"(training design 0.5) -> calibrated logits shifted by "
+             f"{logit_shift:+.3f}. A displayed 0.5 now requires a raw "
+             f"calibrated score of "
+              f"{1.0 / (1.0 + args.prior / (1.0 - args.prior)):.3f}.")
 
     srcs, ref = open_aligned_sources(rd, cat_f, cont_f)
     try:
         bounds = args.bounds or list(BOXES[args.region])
         window_bounds = bounds_to_window(ref, bounds)
-        heatmap, transform = predict_region(
+        # Every feature the model actually uses, captured per scored
+        # cell for the --tensorboard per-feature correlation breakdown -
+        # cheap (reused from the tensors already loaded for scoring), so
+        # only paid when there's a writer to consume it. edge_features
+        # (same list) additionally captures each feature's per-window
+        # edge/contrast magnitude - tests the "hard boundary" hypothesis
+        # (e.g. a road's canopy/field edge) separately from the plain
+        # value correlation above.
+        capture_features = (cat_f + cont_f) if tb_writer is not None else None
+        edge_features = capture_features
+        heatmap, transform, feature_maps, edge_maps = predict_region(
             model, device, srcs, ref, cat_f, cont_f, window_bounds,
             args.stride, args.batch_size, args.compile,
-            flip_tta=args.flip_tta, temperature=temperature)
+            flip_tta=args.flip_tta, temperature=temperature,
+            logit_shift=logit_shift, capture_features=capture_features,
+            edge_features=edge_features)
+        # Captured here, before srcs close below: the top/bottom-scoring
+        # windows need to be re-read from the SAME open sources.
+        tb_windows = (_tb_capture_windows(
+            model, device, srcs, cat_f, cont_f, heatmap, window_bounds,
+            args.stride, args.tb_top_n, temperature, logit_shift,
+            args.flip_tta) if tb_writer is not None else None)
     finally:
         for s in srcs.values():
             s.close()
+
+    vals = heatmap[np.isfinite(heatmap)]
+    if len(vals):
+        pct5, pct8 = 100 * (vals >= 0.5).mean(), 100 * (vals >= 0.8).mean()
+        print(f"Score distribution: min {vals.min():.3f} | median "
+              f"{np.median(vals):.3f} | p90 {np.percentile(vals, 90):.3f} "
+              f"| max {vals.max():.3f} | {pct5:.1f}% >= 0.5 | "
+              f"{pct8:.1f}% >= 0.8")
+        if args.prior is None and args.style != "quantile" and pct5 > 50.0:
+            print(
+                "   [note] Over half the scored area exceeds p=0.5. The "
+                "model's probabilities are calibrated to its 50/50 "
+                "presence/pseudo-absence design (calibrate.py 'HONEST "
+                "LIMITS'), so over a real landscape they read inflated - "
+                "and temperature scaling cannot shift them (it never "
+                "moves a score across 0.5). Remedies: --prior <expected "
+                "suitable fraction, e.g. 0.1> to re-anchor the "
+                "probabilities, or --style quantile to color/threshold "
+                "by within-map rank (--alpha-below 0.8 then shows only "
+                "the top 20% of the box).")
+
+    if tb_writer is not None:
+        coverage = 100.0 * len(vals) / heatmap.size if heatmap.size else 0.0
+        tb_writer.add_scalar("Predict/coverage_pct", coverage, 0)
+        tb_writer.add_scalar("Predict/temperature", temperature, 0)
+        tb_writer.add_scalar("Predict/prior_logit_shift", logit_shift, 0)
+        if len(vals):
+            tb_writer.add_scalar("Predict/score_min", float(vals.min()), 0)
+            tb_writer.add_scalar("Predict/score_median",
+                                 float(np.median(vals)), 0)
+            tb_writer.add_scalar("Predict/score_p90",
+                                 float(np.percentile(vals, 90)), 0)
+            tb_writer.add_scalar("Predict/score_max", float(vals.max()), 0)
+            tb_writer.add_scalar("Predict/pct_ge_0.5", float(pct5), 0)
+            tb_writer.add_scalar("Predict/pct_ge_0.8", float(pct8), 0)
+            tb_writer.add_histogram("Diagnostics/predicted_scores", vals, 0)
+            tb_writer.add_image("Map/suitability",
+                                _tb_suitability_image(heatmap, args.cmap), 0)
+        for f in cat_f:
+            if f in feature_maps:
+                _tb_log_categorical_breakdown(
+                    tb_writer, heatmap, feature_maps[f], f,
+                    names=NLCD_NAMES if f == "nlcd" else None)
+        for f in cont_f:
+            if f in feature_maps:
+                _tb_log_continuous_correlation(
+                    tb_writer, heatmap, feature_maps[f], f)
+        for f in cat_f + cont_f:
+            if f in edge_maps:
+                _tb_log_continuous_correlation(
+                    tb_writer, heatmap, edge_maps[f], f, tag_prefix="Edge")
+        if tb_windows is not None:
+            for key, prefix in (("top", "Windows/top_score"),
+                                ("bottom", "Windows/bottom_score")):
+                w = tb_windows.get(key)
+                if w is not None:
+                    _tb_log_windows(tb_writer, prefix, model, cat_f,
+                                    cont_f, w)
+        tb_writer.close()
 
     tag = args.region + ("_custom" if args.bounds else "")
     tif_path = os.path.join(OUT_DIR, f"{tag}_suitability.tif")

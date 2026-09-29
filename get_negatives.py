@@ -45,12 +45,26 @@ EOD_DATASET_KEY = "4fa7b334-ce0d-4e88-aaae-2e0c138d049e"
 STATES = {"ME": "Maine", "NH": "New Hampshire", "VT": "Vermont"}
 
 TARGET_SPECIES = {
+    # Mature-upland-forest guild (original set).
     "Ovenbird": "Seiurus aurocapilla",
     "Black-throated Blue Warbler": "Setophaga caerulescens",
     "Hermit Thrush": "Catharus guttatus",
     "Blue-headed Vireo": "Vireo solitarius",
     "Brown Creeper": "Certhia americana",
     "Pileated Woodpecker": "Dryocopus pileatus",
+    # Wetland/lowland guild - added because the upland-only set left
+    # wetlands almost undefined as negatives (diagnose_wetland.py: only
+    # ~6-8% of GBIF negatives fall in NLCD wetland classes vs ~12-14%
+    # of positives). These are birds that specifically indicate wet
+    # shrub/emergent/lowland habitat, the plausible confusion class for
+    # aspen/regen (both are low, dense, early-successional in this
+    # feature space) - their presence records give the negative class
+    # real wetland coverage instead of relying on scarce non-target
+    # background there.
+    "Alder Flycatcher": "Empidonax alnorum",
+    "Common Yellowthroat": "Geothlypis trichas",
+    "Swamp Sparrow": "Melospiza georgiana",
+    "Northern Waterthrush": "Parkesia noveboracensis",
 }
 
 PAGE_LIMIT = 300

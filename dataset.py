@@ -32,14 +32,14 @@ from rasterio.windows import Window
 import rasterio
 
 from models import FEATURE_SPEC
-
-NODATA_SENTINELS = {-9999, -32768, 32767, -1111}
+from grouse_data import NODATA_SENTINELS, grid_mismatch
 
 
 class GrousePatchDataset(Dataset):
     def __init__(self, points_df, region_data, cat_features, cont_features,
                  img_size=64, expand_rotations=False, label=None,
-                 spec=None, cache_dir=None, jitter=0, augment=False):
+                 spec=None, cache_dir=None, jitter=0, augment=False,
+                 soft_labels=None):
         """points_df needs longitude/latitude/year columns; 'label' column
         used unless the label argument overrides it; 'weight' column used
         when present (else 1.0). region_data: a grouse_data.RegionData.
@@ -52,10 +52,19 @@ class GrousePatchDataset(Dataset):
             always real data, never fill.
         augment   : random D4 symmetry (8 orientations) + random jitter
             per access, instead of the deterministic idx%4 rotation.
-            Train only - validation must stay deterministic."""
+            Train only - validation must stay deterministic.
+        soft_labels : optional per-point array, same length and row
+            order as points_df, of a distillation teacher's averaged
+            probability. When given, __getitem__ returns a 5th tensor
+            (cat_x, cont_x, label, weight, soft_label) instead of 4 -
+            opt-in only, so every caller that doesn't pass this sees no
+            change at all."""
         self.spec = spec or FEATURE_SPEC
         self.cat_features = list(cat_features)
         self.cont_features = list(cont_features)
+        self._scales = np.array(
+            [[[float(self.spec[f].get("scale", 1.0))]]
+             for f in self.cont_features], dtype=np.float32)
         self.img_size = int(img_size)
         self.expand_rotations = bool(expand_rotations)
         self.augment = bool(augment)
@@ -74,12 +83,37 @@ class GrousePatchDataset(Dataset):
         if 'weight' not in df.columns:
             df['weight'] = 1.0
         df['weight'] = df['weight'].fillna(1.0)
+        if soft_labels is not None:
+            soft_labels = np.asarray(soft_labels, dtype=np.float64)
+            if len(soft_labels) != len(df):
+                raise ValueError(
+                    f"soft_labels length {len(soft_labels)} doesn't match "
+                    f"points_df length {len(df)} - must be aligned "
+                    f"row-for-row with the (pre-rotation-expansion) points.")
+            df['soft_label'] = soft_labels
         if 'year' not in df.columns or df['year'].isna().all():
             df['year'] = max(self.rd.raster_years(self.cat_features[0])
                              if self.cat_features else
                              self.rd.raster_years(self.cont_features[0]))
         df['year'] = df['year'].fillna(df['year'].max()).astype(int)
         self.df = df
+        # Per-point columns as plain arrays. __getitem__ runs millions of
+        # times per training run and a pandas `df.iloc[i]` row lookup
+        # costs ~40 us of index/dtype machinery for five scalars
+        # (profiled: 16% of a cached item); indexing these arrays costs
+        # ~1 us. Same values, same dtypes as the DataFrame columns. The
+        # label/weight tensors are pre-built so an item returns a 0-d
+        # view instead of constructing a tensor from a Python float.
+        self._lon = df['longitude'].to_numpy(dtype=np.float64)
+        self._lat = df['latitude'].to_numpy(dtype=np.float64)
+        self._year = df['year'].to_numpy(dtype=np.int64)
+        self._label_t = torch.from_numpy(
+            df['label'].to_numpy(dtype=np.float32))
+        self._weight_t = torch.from_numpy(
+            df['weight'].to_numpy(dtype=np.float32))
+        self._soft_t = (torch.from_numpy(
+            df['soft_label'].to_numpy(dtype=np.float32))
+            if 'soft_label' in df.columns else None)
 
         # Resolve (feature, record-year) -> raster path once, up front.
         all_feats = self.cat_features + self.cont_features
@@ -102,6 +136,7 @@ class GrousePatchDataset(Dataset):
         self._transformers = None
         self._cache_pid = None
 
+        self._check_grid_alignment()
         self._probe_first_point()
 
         self.cache = None
@@ -164,6 +199,49 @@ class GrousePatchDataset(Dataset):
                 except Exception:
                     pass
         self._handles, self._transformers, self._cache_pid = None, None, None
+
+    def _check_grid_alignment(self):
+        """Every raster this dataset reads must sit on ONE pixel grid.
+        _read_patch cuts each feature's window from that feature's own
+        raster grid (transforming the point into each raster's CRS
+        independently), which is only a stack of co-registered channels
+        if the grids are the same grid. Two rasters in different
+        projections give windows whose axes point in different
+        directions: the centre pixel agrees, the corners do not. That
+        is exactly what happened with tcc/nlcd (written in EPSG:5070)
+        against the LFPS clips (a local Albers) - 11 px of corner
+        misregistration in every training patch, invisible to every
+        metric because validation is built the same way, and absent at
+        prediction time because predict.py warps onto one grid.
+
+        Header reads only (no data), with throwaway handles that are
+        closed before any DataLoader worker forks. Hard failure, not a
+        warning: a model trained on rotated channels is wrong in a way
+        nothing downstream can detect."""
+        paths = sorted(set(self._path_for.values()))
+        if len(paths) < 2:
+            return
+        feats = self.cat_features + self.cont_features
+        first_year = int(sorted(self.df['year'].unique())[0])
+        ref_path = self._path_for[(feats[0], first_year)]
+        bad = []
+        with rasterio.open(ref_path) as ref:
+            for p in paths:
+                if p == ref_path:
+                    continue
+                with rasterio.open(p) as src:
+                    why = grid_mismatch(src, ref)
+                if why:
+                    bad.append(f"{os.path.basename(p)}: {why}")
+        if bad:
+            raise ValueError(
+                f"Feature rasters are not on one pixel grid (reference: "
+                f"{os.path.basename(ref_path)}). The training reader "
+                f"would stack misregistered channels:\n  "
+                + "\n  ".join(bad)
+                + "\nRun `python realign_rasters.py --apply` to warp them "
+                f"onto the region's template grid (the patch cache "
+                f"rebuilds itself), then retrain from scratch.")
 
     def _probe_first_point(self):
         """Read one patch for the first point at construction time, with
@@ -261,9 +339,13 @@ class GrousePatchDataset(Dataset):
         return arr
 
     def _raw_stack(self, i, lon, lat, year):
-        """(n_feat, read_size, read_size) float32, nodata already 0."""
+        """(n_feat, read_size, read_size), nodata already 0. int16 straight
+        from the cache when there is one (the values are integral either
+        way - every raster is int16 - so _to_tensors converts each half
+        directly to its target dtype instead of paying for a float32
+        copy of the whole stack first); float32 from a live read."""
         if self.cache is not None:
-            return np.asarray(self.cache[i], dtype=np.float32)
+            return self.cache[i]
         feats = self.cat_features + self.cont_features
         return np.stack([
             np.nan_to_num(self._read_patch(self._path_for[(f, year)], lon, lat),
@@ -274,55 +356,78 @@ class GrousePatchDataset(Dataset):
             i, rot = idx // 4, idx % 4
         else:
             i, rot = idx, 0
-        row = self.df.iloc[i]
-        lon, lat, year = (float(row['longitude']), float(row['latitude']),
-                          int(row['year']))
+        lon, lat, year = (float(self._lon[i]), float(self._lat[i]),
+                          int(self._year[i]))
 
         stack = self._raw_stack(i, lon, lat, year)
 
-        n, pad = self.img_size, self.pad
-        flip = False
         if self.augment:
-            # torch's RNG (not numpy's) because DataLoader reseeds it per
-            # worker AND per epoch; numpy's global seed is duplicated
-            # across workers, which would make every worker draw the same
-            # "random" augmentation sequence.
-            rot = int(torch.randint(0, 4, (1,)).item())
-            flip = bool(torch.randint(0, 2, (1,)).item())
+            # D4 symmetry: rotation covers 4 of the 8 orientations, the
+            # reflection the rest. Habitat suitability is invariant to
+            # both, so this is free label-preserving data.
+            cat_x, cont_x = self._augmented_view(stack)
+        else:
+            n, pad = self.img_size, self.pad
             if pad:
-                dy = int(torch.randint(-pad, pad + 1, (1,)).item())
-                dx = int(torch.randint(-pad, pad + 1, (1,)).item())
-            else:
-                dy = dx = 0
-            stack = stack[:, pad + dy:pad + dy + n, pad + dx:pad + dx + n]
-        elif pad:
-            stack = stack[:, pad:pad + n, pad:pad + n]
+                stack = stack[:, pad:pad + n, pad:pad + n]
+            cat_x, cont_x = self._to_tensors(stack)
+            if rot:    # deterministic idx%4 rotation (val / --no-augment)
+                cat_x = torch.rot90(cat_x, k=rot, dims=(1, 2))
+                cont_x = torch.rot90(cont_x, k=rot, dims=(1, 2))
 
+        yl = self._label_t[i]
+        w = self._weight_t[i]
+        if self._soft_t is not None:
+            return cat_x, cont_x, yl, w, self._soft_t[i]
+        return cat_x, cont_x, yl, w
+
+    def _to_tensors(self, s):
+        """Cropped (n_feat, n, n) float stack -> (cat_x int64,
+        cont_x scaled float32). The single tensorize path shared by
+        every view (deterministic, augmented, SSL)."""
+        n = self.img_size
         n_cat = len(self.cat_features)
-        cat_np, cont_np = stack[:n_cat], stack[n_cat:]
-        cat_x = (torch.from_numpy(np.ascontiguousarray(cat_np)).long()
+        cat_np, cont_np = s[:n_cat], s[n_cat:]
+        # astype() makes the contiguous copy AND the dtype change in one
+        # pass (int16 -> int64 for codes, int16/float32 -> float32 for
+        # the continuous channels), identical values to the previous
+        # float32-then-.long() route because every stored value is an
+        # integer within int16 range.
+        cat_x = (torch.from_numpy(cat_np.astype(np.int64))
                  if n_cat else torch.zeros((0, n, n), dtype=torch.long))
         if len(self.cont_features):
-            scales = np.array([[[float(self.spec[f].get("scale", 1.0))]]
-                               for f in self.cont_features], dtype=np.float32)
             cont_x = torch.from_numpy(
-                np.ascontiguousarray(cont_np / scales)).float()
+                cont_np.astype(np.float32) / self._scales)
         else:
             cont_x = torch.zeros((0, n, n), dtype=torch.float32)
+        return cat_x, cont_x
 
-        # D4 symmetry: rotation alone covers 4 of the 8 orientations;
-        # adding the reflection covers the rest. Habitat suitability is
-        # invariant to both, so this is free label-preserving data.
+    def _augmented_view(self, stack):
+        """One randomly augmented view (jitter crop + random D4
+        orientation) of a raw padded stack -> (cat_x, cont_x). THE
+        augment path: __getitem__ (augment=True) and SSLPairDataset
+        both delegate here, so supervised training and SSL pretraining
+        can never drift apart. torch's RNG (not numpy's) because
+        DataLoader reseeds it per worker AND per epoch; numpy's global
+        seed is duplicated across workers. Draw order (rot, flip, dy,
+        dx) is part of the reproducibility contract."""
+        n, pad = self.img_size, self.pad
+        rot = int(torch.randint(0, 4, (1,)).item())
+        flip = bool(torch.randint(0, 2, (1,)).item())
+        if pad:
+            dy = int(torch.randint(-pad, pad + 1, (1,)).item())
+            dx = int(torch.randint(-pad, pad + 1, (1,)).item())
+        else:
+            dy = dx = 0
+        cat_x, cont_x = self._to_tensors(
+            stack[:, pad + dy:pad + dy + n, pad + dx:pad + dx + n])
         if rot:
             cat_x = torch.rot90(cat_x, k=rot, dims=(1, 2))
             cont_x = torch.rot90(cont_x, k=rot, dims=(1, 2))
         if flip:
             cat_x = torch.flip(cat_x, dims=(2,))
             cont_x = torch.flip(cont_x, dims=(2,))
-
-        yl = torch.tensor(float(row['label']), dtype=torch.float32)
-        w = torch.tensor(float(row['weight']), dtype=torch.float32)
-        return cat_x, cont_x, yl, w
+        return cat_x, cont_x
 
     @property
     def labels(self):
@@ -333,6 +438,35 @@ class GrousePatchDataset(Dataset):
         import numpy as np
         base = self.df['label'].values.astype(np.float32)
         return np.repeat(base, 4) if self.expand_rotations else base
+
+
+class SSLPairDataset(GrousePatchDataset):
+    """Two independently augmented views of the same unlabeled tile per
+    access - the input pair for SimSiam-style self-supervised
+    pretraining (pretrain.py). Each __getitem__ reads the tile's padded
+    stack once and draws two independent (jitter crop + random D4)
+    views from it: the pretext task is "recognize that two overlapping,
+    re-oriented crops show the same piece of landscape", which forces
+    the backbone to encode habitat structure rather than absolute pixel
+    arrangement. Rotation expansion is disabled (orientation is drawn
+    per view instead) and labels are irrelevant."""
+
+    def __init__(self, points_df, region_data, cat_features, cont_features,
+                 img_size=64, jitter=8, **kw):
+        kw.pop("expand_rotations", None)
+        kw.pop("augment", None)
+        kw.pop("label", None)
+        super().__init__(points_df, region_data, cat_features,
+                         cont_features, img_size=img_size,
+                         expand_rotations=False, augment=True,
+                         jitter=jitter, label=0.0, **kw)
+
+    def __getitem__(self, idx):
+        stack = self._raw_stack(idx, float(self._lon[idx]),
+                                float(self._lat[idx]), int(self._year[idx]))
+        cat1, cont1 = self._augmented_view(stack)
+        cat2, cont2 = self._augmented_view(stack)
+        return cat1, cont1, cat2, cont2
 
 
 class StratifiedBatchSampler(torch.utils.data.Sampler):

@@ -32,10 +32,11 @@ Usage:
 """
 import argparse
 
+import numpy as np
 import torch
 from pyproj import Transformer
 
-from grouse_data import GrouseData, NLCD_NAMES
+from grouse_data import GrouseData, NLCD_NAMES, MISSING_CODE
 from predict import (load_model, open_aligned_sources, read_window_stack,
                      IMG_SIZE)
 from models import (FEATURE_SPEC, split_features, road_dist_decode,
@@ -122,20 +123,25 @@ def main():
         for i, f in enumerate(disk_cat):
             code = int(cat[i, cy_px, cx_px])
             label = f" ({NLCD_NAMES[code]})" if f == "nlcd" and code in NLCD_NAMES else ""
+            if code == MISSING_CODE:
+                label = " (NODATA)"
             frac_same = float((cat[i] == code).mean())
             print(f"   {f:8s} = {code}{label}  "
                  f"[{frac_same * 100:.0f}% of the surrounding window "
                  f"shares this code]")
         for i, f in enumerate(disk_cont):
             val = float(cont[i, cy_px, cx_px])
-            window_mean = float(cont[i].mean())
+            window_mean = float(np.nanmean(cont[i])) if np.isfinite(
+                cont[i]).any() else float("nan")
             # Several continuous features are stored log-encoded or
             # fixed-point, so the model-input number is meaningless to
             # read directly - undo the FEATURE_SPEC scale, then the
             # storage encoding, to get back to the real-world unit.
             extra = ""
             stored = val * float(FEATURE_SPEC[f].get("scale", 1.0))
-            if f == "road_dist":
+            if np.isnan(val):
+                extra = "  (NODATA)"
+            elif f == "road_dist":
                 extra = (f"  -> {road_dist_decode(stored):,.0f} m to "
                         f"nearest paved road")
             elif f == "tsd":

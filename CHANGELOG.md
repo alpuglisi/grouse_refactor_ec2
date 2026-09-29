@@ -16,6 +16,82 @@ the diff.
 
 ---
 
+## Nodata validity channels, out-of-vocab codes as missing, dual branch on by default, Platt calibration (2026-09-29)
+
+Four fixes from an architecture review. **Cold start required** for the
+first two (the stem gets one validity channel per feature, and Branch B
+exists): `--resume` / `--init-from` against an older checkpoint needs
+`--no-missing-mask --dual-branch off`. Every existing checkpoint keeps
+loading and scores **bit-identically** to before - its config has no
+`missing_mask` key, which `config_to_model_kwargs` reads as False.
+Verified on synthetic rasters: dataset live and cached reads, a real
+two-epoch `fit()`, reload through `predict.load_model`, and a full
+`predict_region` pass. No real data or GPU in the environment that made
+this, so **none of the four has been measured on the grouse data** -
+compare against a run with `--no-missing-mask --dual-branch off`.
+
+**1. Nodata is no longer fed to the network as a real 0.** Every reader
+collapsed nodata to 0 before the model saw it, but 0 is a legitimate
+value for most features, and for two of the new ones it is an extreme
+one: `road_dist` 0 = on a paved road, `tsd` 0 = disturbed this year.
+Every patch overlapping a state border or raster edge therefore showed
+the model a road through a fresh clearcut, and `predict.py` only masked
+windows whose *centre* pixel was nodata. Categorical nodata landed on
+the padding vector, which for `fdist` also means "no disturbance".
+Now nodata travels as `grouse_data.MISSING_CODE` (-32768, already a
+sentinel) in `cat_x` and NaN in `cont_x`, from both readers
+(`dataset.py`, `predict.read_window_stack`) through the int16 patch
+cache (versioned key, so old caches rebuild instead of serving 0s).
+`GrouseResNet(missing_mask=True)` zeroes them exactly as before and
+appends one validity channel per feature. Also fixed on the way:
+`predict._safe_windowed_read` padded off-raster pixels with 0 and
+ignored the source's own nodata value, where the training reader treated
+both as nodata. The centre-pixel mask in `predict_region` now reads
+`MISSING_CODE`/NaN, so a legitimate 0 in the reference band is never
+masked (the old `== 0 and ref_nodata != 0` test).
+
+**2. The default model now has a resolution-preserving branch**
+(`--dual-branch dilated --dual-branch-channels 32`; was `off`). The
+trunk's receptive field is ~227 px against a 64 px patch, so every cell
+of its 8x8 logit map sees the whole patch plus padding, and
+center/gauss/attn pooling were reweighting near-identical views. Branch
+B's cells see ~33 px around themselves at native resolution. Its head is
+zero-initialized, so a fresh model is exactly the trunk-only model until
+gradients move it. `dilated`/32 was picked over the class's own `unet`/64
+on cost: measured on CPU at batch 32, +88% step time and +0.08M params
+against +230% and +0.60M (the model already overfits), same locality.
+`score_ensemble` and `--distill-from` no longer pass the CLI
+`--dual-branch` as the fallback for checkpoints that lack the key: such
+a checkpoint predates Branch B, so the right fallback is `off`.
+
+**4. Out-of-vocab codes are no longer silent at inference.** `fit()`
+only checks the sample taken when training starts. With `missing_mask`,
+`embed()` treats a code at or above its vocab as nodata instead of
+clamping it onto row vocab-1, which is a real class. The legacy clamp is
+kept for older checkpoints, which were trained with it.
+`models.warn_out_of_vocab`, called from `d4_tta_logits` (the one
+inference scorer), prints once per model and feature when that happens.
+
+**5. Calibration fits a bias, not just a temperature.** `calibrate.py`
+now fits Platt scaling, p = sigmoid(a * logit + b). Temperature
+scaling is the `a` half. The `b` half is the constant offset that focal
+alpha, L_AN-full lambda, label smoothing and balanced batches build into
+the logits, and no temperature can remove it. The JSON records `scale`,
+`bias` and `val_prevalence` (`temperature` = 1/scale is kept for older
+readers). The script also reports cross-fitted (5-fold, out-of-sample)
+ECE/NLL next to the in-sample ones, and prints the temperature-only fit
+for comparison. On a synthetic offset-plus-overconfident case, Platt ECE
+was 0.007 against 0.162 for temperature only.
+`predict.py` applies both terms, and `--prior` now shifts by
+`logit(prior) - logit(val_prevalence)` instead of assuming a 0.5
+design. Its "temperature can't remove the offset" warning now only fires
+for an old temperature-only `calibration.json`. What calibration
+**cannot** do is unchanged: presence/pseudo-absence data carries no
+information about real prevalence, so without `--prior` the
+probabilities are relative to the validation design.
+
+---
+
 ## Training-loop throughput: same numbers, fewer operations (2026-09-20)
 
 Constraint for this pass: wall-clock only - nothing the model sees,

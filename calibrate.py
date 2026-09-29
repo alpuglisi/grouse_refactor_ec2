@@ -18,25 +18,36 @@ WHAT IT DOES
      compares each bin's mean prediction against its observed positive
      rate. Reports ECE (expected calibration error - the count-weighted
      mean gap), MCE (worst bin gap), Brier score, and NLL.
-  3. TEMPERATURE SCALING (Guo et al. 2017): fits a single scalar T that
-     rescales logits (p = sigmoid(logit / T)) to minimize NLL on the
-     validation set. T > 1 means the model was overconfident and gets
-     softened; T < 1 means underconfident. Because it's a monotone
-     transform of the logit, RANKING IS PERFECTLY PRESERVED - AUC/AP are
-     bit-identical before and after (verified in the output).
-  4. Writes data/calibration/calibration.json (consumed automatically by
-     predict.py), a reliability CSV, and a reliability-diagram PNG.
+  3. PLATT SCALING: fits p = sigmoid(a * logit + b) by minimizing NLL
+     on the validation set. The SCALE a is what temperature scaling
+     fits (a = 1/T: a < 1 softens an overconfident model). The BIAS b
+     is what temperature scaling cannot fit: the training objective
+     bakes a constant log-odds offset into the logits (focal alpha,
+     L_AN-full lambda, label smoothing, class-balanced batches), and a
+     pure scale is symmetric about logit 0, so no temperature can move
+     a score across 0.5. With a > 0 it's a monotone transform, so
+     RANKING IS PERFECTLY PRESERVED - AUC/AP are identical before and
+     after (verified in the output). The plain temperature fit is
+     still printed for comparison.
+  4. Reports the after-calibration metrics twice: in-sample, and
+     CROSS-FITTED (5 folds; each point calibrated by a fit that never
+     saw it), which is the honest number.
+  5. Writes data/calibration/calibration.json (consumed automatically by
+     predict.py, which applies a and b, and re-anchors --prior against
+     the validation prevalence recorded here), a reliability CSV, and a
+     reliability-diagram PNG.
 
 HONEST LIMITS (printed in the output too):
-  - Fitted and evaluated on the same validation set. Standard practice
-    for temperature scaling (it's ONE parameter, overfit risk is tiny),
-    but the block-split val set is the only held-out data there is.
-  - Calibrated to the VALIDATION prevalence (~50/50 by construction).
-    Real-landscape prevalence of "grouse habitat" is not 50%, so the
-    calibrated probabilities mean "relative to a balanced
-    presence/pseudo-absence design", not "true occupancy probability".
-    That's inherent to how the training data was built, not fixable by
-    any post-hoc scaling.
+  - Fitted on the same validation set that picked the checkpoint. Two
+    parameters on thousands of points barely overfit (the cross-fitted
+    numbers show how much), but the block-split val set is the only
+    held-out data there is.
+  - Calibrated to the VALIDATION prevalence (recorded in the JSON).
+    Real-landscape prevalence of "grouse habitat" is unknown, and no
+    post-hoc scaling can recover it from presence/pseudo-absence data:
+    the calibrated probabilities mean "relative to the validation
+    design" until predict.py --prior supplies a deployment
+    prevalence.
 
 USAGE
     python calibrate.py                          # default checkpoint
@@ -178,6 +189,55 @@ def fit_temperature(logits, y):
     return 1.0 / s          # temperature T
 
 
+def nll_ab(logits, y, a, b):
+    z = a * logits + b
+    return float(np.mean(np.logaddexp(0.0, z) - y * z))
+
+
+def fit_platt(logits, y, iters=100):
+    """Minimize NLL over (a, b) in p = sigmoid(a*logit + b): a
+    one-feature logistic regression, convex, solved by Newton's method
+    with step halving. Dependency-free, exact to ~1e-10."""
+    logits = np.asarray(logits, dtype=np.float64)
+    y = np.asarray(y, dtype=np.float64)
+    X = np.stack([logits, np.ones_like(logits)], axis=1)
+    w = np.array([1.0, 0.0])
+    f = nll_ab(logits, y, *w)
+    for _ in range(iters):
+        p = 1.0 / (1.0 + np.exp(-np.clip(X @ w, -500, 500)))
+        g = X.T @ (p - y) / len(y)
+        H = (X * (p * (1 - p))[:, None]).T @ X / len(y)
+        step = np.linalg.solve(H + 1e-9 * np.eye(2), g)
+        t, improved = 1.0, False
+        while t > 1e-8:
+            w_new = w - t * step
+            f_new = nll_ab(logits, y, *w_new)
+            if f_new <= f:
+                improved = True
+                break
+            t *= 0.5
+        if not improved:
+            break
+        converged = f - f_new < 1e-12
+        w, f = w_new, f_new
+        if converged:
+            break
+    return float(w[0]), float(w[1])
+
+
+def cross_fitted_probs(logits, y, k=5, seed=0):
+    """Out-of-fold Platt probabilities: every point is calibrated by a
+    fit on the OTHER k-1 folds, so metrics on them are not flattered by
+    fitting and scoring the same points."""
+    idx = np.random.default_rng(seed).permutation(len(logits))
+    out = np.empty(len(logits), dtype=np.float64)
+    for fold in np.array_split(idx, k):
+        train = np.setdiff1d(idx, fold)
+        a, b = fit_platt(logits[train], y[train])
+        out[fold] = 1.0 / (1.0 + np.exp(-(a * logits[fold] + b)))
+    return out
+
+
 def reliability(probs, y, n_bins):
     """Equal-width probability bins -> (rows, ece, mce).
     Each row: (lo, hi, count, mean_pred, observed_rate, gap)."""
@@ -233,7 +293,7 @@ def save_plot(path, probs_before, probs_after, y, n_bins):
             len(probs), 1.0 / len(probs)), alpha=0.25, label="prediction density")
         ax.set_xlabel("predicted probability")
         ax.set_ylabel("observed positive rate")
-        ax.set_title(f"Reliability - {name} temperature scaling")
+        ax.set_title(f"Reliability - {name} Platt scaling")
         ax.legend(fontsize=8)
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
@@ -244,7 +304,7 @@ def save_plot(path, probs_before, probs_after, y, n_bins):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Reliability analysis + temperature scaling for the "
+        description="Reliability analysis + Platt scaling for the "
                     "trained grouse model.")
     parser.add_argument("--model", default="grouse_single_best.pth")
     parser.add_argument("--regions", nargs="+", default=["ME", "NH", "VT"])
@@ -284,13 +344,9 @@ def main():
         print(f"\n[note] this checkpoint was trained with {reason}: the "
               f"objective's asymmetric weighting builds a constant logit "
               f"offset (~{off:+.2f}) into the model BY DESIGN. A "
-              f"temperature is a pure scale and cannot remove an offset, "
-              f"so expect residual one-sided gaps in the AFTER table "
-              f"below; the fitted T will be a compromise between fixing "
-              f"confidence scale and shrinking the offset. predict.py "
-              f"--prior applies exactly the offset correction this "
-              f"cannot, and --style quantile is immune to offsets "
-              f"entirely.")
+              f"temperature alone could not remove it; the Platt BIAS "
+              f"fitted below does (expect a fitted bias of roughly "
+              f"{-off:+.2f}, plus whatever else the design shifted).")
 
     _, val_ds, _ = build_datasets(data, args.regions, features,
                                   args.img_size,
@@ -309,46 +365,77 @@ def main():
     probs = 1.0 / (1.0 + np.exp(-logits))
     rows_b, ece_b, mce_b = reliability(probs, y, args.bins)
     auc_b, ap_b = roc_auc(logits, y), average_precision(logits, y)
-    print_table("RELIABILITY - BEFORE temperature scaling", rows_b)
+    print_table("RELIABILITY - BEFORE calibration", rows_b)
     print(f"\n  ECE {ece_b:.4f} | MCE {mce_b:.4f} | Brier "
           f"{brier(probs, y):.4f} | NLL {nll(logits, y):.4f} | "
           f"AUC {auc_b:.4f} | AP {ap_b:.4f}")
 
-    T = fit_temperature(logits, y)
-    logits_c = logits / T
+    prevalence = float(np.mean(y))
+    T_only = fit_temperature(logits, y)
+    ece_T = reliability(1.0 / (1.0 + np.exp(-logits / T_only)), y,
+                        args.bins)[1]
+    a, b = fit_platt(logits, y)
+    if a <= 0:
+        raise SystemExit(
+            f"Platt fit gave a non-positive scale (a={a:.4f}): on this "
+            f"validation set the logits carry no usable ranking signal "
+            f"(AUC {auc_b:.3f}), and calibrating them would invert or "
+            f"flatten the map. Not writing a calibration - fix the "
+            f"model first.")
+    T = 1.0 / a
+    logits_c = a * logits + b
     probs_c = 1.0 / (1.0 + np.exp(-logits_c))
     rows_a, ece_a, mce_a = reliability(probs_c, y, args.bins)
     auc_a, ap_a = roc_auc(logits_c, y), average_precision(logits_c, y)
-    print_table(f"RELIABILITY - AFTER temperature scaling (T = {T:.3f})",
-                rows_a)
+    print_table(f"RELIABILITY - AFTER Platt scaling (a = {a:.3f}, "
+                f"b = {b:+.3f}), in-sample", rows_a)
     print(f"\n  ECE {ece_a:.4f} | MCE {mce_a:.4f} | Brier "
           f"{brier(probs_c, y):.4f} | NLL {nll(logits_c, y):.4f} | "
           f"AUC {auc_a:.4f} | AP {ap_a:.4f}")
+    probs_cv = cross_fitted_probs(logits, y)
+    _, ece_cv, mce_cv = reliability(probs_cv, y, args.bins)
+    nll_cv = float(-np.mean(y * np.log(np.clip(probs_cv, 1e-12, 1))
+                            + (1 - y) * np.log(np.clip(1 - probs_cv,
+                                                       1e-12, 1))))
+    print(f"  cross-fitted (5-fold, out-of-sample): ECE {ece_cv:.4f} | "
+          f"MCE {mce_cv:.4f} | Brier {brier(probs_cv, y):.4f} | "
+          f"NLL {nll_cv:.4f}")
+    print(f"  (temperature-only fit for comparison: T = {T_only:.3f}, "
+          f"ECE {ece_T:.4f})")
     print(f"\n  Ranking preserved: AUC before {auc_b:.6f} == after "
           f"{auc_a:.6f} -> {abs(auc_b - auc_a) < 1e-9}")
 
-    if T > 1.05:
-        verdict = (f"OVERCONFIDENT by a factor of ~{T:.2f}: raw "
-                   f"probabilities are pushed toward the extremes; "
-                   f"dividing logits by {T:.3f} corrects them. This is "
-                   f"the direct explanation for saturated 'everything is "
-                   f"red' maps at high alpha thresholds.")
-    elif T < 0.95:
-        verdict = (f"UNDERCONFIDENT (T={T:.2f} < 1): probabilities are "
-                   f"compressed toward 0.5; scaling sharpens them.")
+    if a < 1 / 1.05:
+        scale_v = (f"OVERCONFIDENT by a factor of ~{T:.2f}: raw logits "
+                   f"are stretched toward the extremes and get "
+                   f"multiplied by {a:.3f}")
+    elif a > 1.05:
+        scale_v = (f"UNDERCONFIDENT (scale {a:.2f} > 1): probabilities "
+                   f"are compressed toward 0.5 and get sharpened")
     else:
-        verdict = (f"Already well calibrated (T={T:.2f} ~ 1): the map's "
-                   f"appearance reflects what the model genuinely "
-                   f"believes, so 'all red' would mean it genuinely "
-                   f"rates the area uniformly high.")
-    print(f"\nVERDICT: {verdict}")
-    print("\nCAVEAT: probabilities are calibrated to the ~balanced "
-          "validation prevalence, not to true landscape occupancy - "
-          "inherent to the presence/pseudo-absence design.")
+        scale_v = f"confidence scale already about right (a = {a:.2f})"
+    shift_p = 1.0 / (1.0 + np.exp(-b))
+    print(f"\nVERDICT: {scale_v}; bias {b:+.3f} moves a raw logit of 0 "
+          f"to p = {shift_p:.3f} - a constant offset (training "
+          f"objective, balanced batches, label smoothing) that "
+          f"temperature scaling could never remove.")
+    print(f"\nCAVEAT: probabilities are calibrated to the validation "
+          f"prevalence ({prevalence:.3f} positive), not to true "
+          f"landscape occupancy - inherent to the presence/pseudo-"
+          f"absence design. predict.py --prior re-anchors them to a "
+          f"deployment prevalence you supply.")
 
     os.makedirs(args.out, exist_ok=True)
     payload = {
+        # p = sigmoid(scale * logit + bias). predict.py reads these;
+        # "temperature" (= 1/scale) is kept for older readers and is
+        # NOT a complete calibration on its own.
+        "method": "platt",
+        "scale": float(a),
+        "bias": float(b),
         "temperature": float(T),
+        "val_prevalence": prevalence,
+        "temperature_only": float(T_only),
         "fitted_at": dt.datetime.now().isoformat(timespec="seconds"),
         "model_path": os.path.abspath(args.model),
         "regions": args.regions,
@@ -356,9 +443,8 @@ def main():
         "flip_tta": bool(args.flip_tta),
         "n_points": int(len(logits)),
         # The objective the checkpoint was trained with (None for
-        # pre-metadata checkpoints): a temperature is only a complete
-        # calibration for symmetric losses, and predict.py uses this
-        # plus the checkpoint's own config to warn about mismatches.
+        # pre-metadata checkpoints), kept as provenance: the Platt bias
+        # above already absorbs the offset it implies.
         "loss": (ckpt_cfg or {}).get("loss"),
         "an_pos_weight": (ckpt_cfg or {}).get("an_pos_weight"),
         "focal_alpha": (ckpt_cfg or {}).get("focal_alpha"),
@@ -366,6 +452,7 @@ def main():
         "mce_before": mce_b, "mce_after": mce_a,
         "brier_before": brier(probs, y), "brier_after": brier(probs_c, y),
         "nll_before": nll(logits, y), "nll_after": nll(logits_c, y),
+        "ece_cross_fitted": ece_cv, "nll_cross_fitted": nll_cv,
         "auc": auc_b, "ap": ap_b,
     }
     json_path = os.path.join(args.out, "calibration.json")
@@ -382,14 +469,13 @@ def main():
     png_path = os.path.join(args.out, "reliability.png")
     save_plot(png_path, probs, probs_c, y, args.bins)
     print(f"\nSaved: {json_path}\n       {csv_path}\n       {png_path}")
-    print("predict.py picks up the temperature automatically from "
+    print("predict.py picks up the scale and bias automatically from "
           "calibration.json.")
-    print("NOTE: temperature calibrates probabilities to the ~50/50 "
-          "presence/pseudo-absence validation design; it is symmetric "
-          "about p=0.5 and can never move a score across it. If a "
-          "predicted map lights up wall-to-wall, that is prior "
-          "mismatch, not a bad temperature - use predict.py --prior "
-          "<expected suitable fraction> or --style quantile.")
+    print(f"NOTE: these probabilities are relative to the validation "
+          f"design ({prevalence:.0%} positive). If a predicted map lights "
+          f"up wall-to-wall, that is prior mismatch, not a bad fit - use "
+          f"predict.py --prior <expected suitable fraction> or --style "
+          f"quantile.")
 
 
 if __name__ == "__main__":

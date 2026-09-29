@@ -363,9 +363,7 @@ def score_ensemble(members, features, val_ds, args):
             keep_early_resolution=args.keep_early_resolution,
             early_attn=args.early_attn,
             early_attn_heads=args.early_attn_heads,
-            early_attn_kv_stride=args.early_attn_kv_stride,
-            dual_branch=args.dual_branch,
-            dual_branch_channels=args.dual_branch_channels))
+            early_attn_kv_stride=args.early_attn_kv_stride))
         model = GrouseResNet(cat_f, cont_f,
                              spec=spec_with_checkpoint_vocab(state),
                              pretrained=False, **kw).to(device).eval()
@@ -611,7 +609,7 @@ def main():
                              "this factor via a strided conv first "
                              "(queries stay full-res) - roughly "
                              "kv_stride^2 cheaper, small fidelity cost.")
-    parser.add_argument("--dual-branch", default="off",
+    parser.add_argument("--dual-branch", default="dilated",
                         choices=["off", "unet", "dilated"],
                         help="Add a second, resolution-preserving "
                              "multi-scale branch ('Branch B') alongside "
@@ -622,14 +620,32 @@ def main():
                              "B keeps the native 64x64 grid and grows "
                              "its receptive field by dilation instead. "
                              "'unet' = shallow U-Net-lite with a "
-                             "dilated bottleneck (recommended); "
-                             "'dilated' = pure ASPP-style stack, no "
-                             "downsampling at all. Ablate against "
-                             "'off' - if the trunk (esp. with "
-                             "--keep-early-resolution/--early-attn) "
-                             "already captures it, B adds cost without "
-                             "signal.")
-    parser.add_argument("--dual-branch-channels", type=int, default=64)
+                             "dilated bottleneck; 'dilated' = pure "
+                             "ASPP-style stack, no downsampling at all. "
+                             "DEFAULT 'dilated' (with 32 channels): the "
+                             "trunk's receptive field (~227 px) exceeds "
+                             "the 64 px patch, so every cell of its 8x8 "
+                             "logit map sees the whole patch and "
+                             "center/gauss/attn pooling cannot actually "
+                             "localize; Branch B's cells see ~33 px "
+                             "around themselves at native resolution. "
+                             "Its head is zero-init, so a fresh model "
+                             "starts EXACTLY equal to the trunk-only "
+                             "one. Measured on CPU, batch 32: +88%% "
+                             "step time and +0.08M params (unet/64: "
+                             "+230%%, +0.60M). 'off' restores the old "
+                             "default - ablate against it.")
+    parser.add_argument("--missing-mask",
+                        action=argparse.BooleanOptionalAction, default=True,
+                        help="Append one validity channel per feature "
+                             "(1 = data, 0 = nodata) to the model input, "
+                             "and treat out-of-vocab categorical codes "
+                             "as nodata. Without it nodata reaches the "
+                             "network as 0, a real value for most "
+                             "features (road_dist 0 = on a road, tsd 0 "
+                             "= disturbed this year). Changes the stem "
+                             "width: cold start.")
+    parser.add_argument("--dual-branch-channels", type=int, default=32)
     parser.add_argument("--center-skip",
                         action=argparse.BooleanOptionalAction, default=True,
                         help="Feed the center pixel's feature vector "
@@ -940,9 +956,7 @@ def main():
                 keep_early_resolution=args.keep_early_resolution,
                 early_attn=args.early_attn,
                 early_attn_heads=args.early_attn_heads,
-                early_attn_kv_stride=args.early_attn_kv_stride,
-                dual_branch=args.dual_branch,
-                dual_branch_channels=args.dual_branch_channels))
+                early_attn_kv_stride=args.early_attn_kv_stride))
             t_spec = spec_with_checkpoint_vocab(state)
             for note in checkpoint_vocab_notes(t_spec, cat_f):
                 print(f"   [note] teacher {ckpt_path}: {note} - the "
@@ -1086,6 +1100,7 @@ def main():
             early_attn_lr_factor=args.early_attn_lr_factor,
             dual_branch=args.dual_branch,
             dual_branch_channels=args.dual_branch_channels,
+            missing_mask=args.missing_mask,
             label_smoothing=overrides.get('label_smoothing',
                                           args.label_smoothing),
             ema_decay=args.ema, lr=lr,

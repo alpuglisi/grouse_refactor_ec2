@@ -237,6 +237,7 @@ class GrouseModelHandler:
                  early_attn_dropout=0.1, early_attn_droppath=0.1,
                  early_attn_pos_mode='rel', early_attn_lr_factor=0.1,
                  dual_branch='off', dual_branch_channels=64,
+                 missing_mask=False,
                  pos_threshold=0.75, neg_threshold=0.25,
                  strict_objective=None,
                  divergence_patience=3, on_divergence='warn',
@@ -353,7 +354,8 @@ class GrouseModelHandler:
             early_attn_droppath=early_attn_droppath,
             early_attn_pos_mode=early_attn_pos_mode,
             dual_branch=dual_branch,
-            dual_branch_channels=dual_branch_channels).to(self.device)
+            dual_branch_channels=dual_branch_channels,
+            missing_mask=missing_mask).to(self.device)
         if dual_branch != 'off':
             n_b = (sum(p.numel() for p in
                        self.model.spatial_branch.parameters())
@@ -493,6 +495,11 @@ class GrouseModelHandler:
                            "dual_branch": self.model.dual_branch,
                            "dual_branch_channels":
                                self.model._dual_branch_channels,
+                           # Validity channels (stem width) AND input
+                           # semantics: a missing_mask model treats
+                           # out-of-vocab codes as nodata instead of
+                           # clamping them.
+                           "missing_mask": self.model.missing_mask,
                            # Embedding-table rows per categorical
                            # feature. Geometry, like the keys above,
                            # but it also lives in the state dict itself
@@ -825,8 +832,11 @@ class GrouseModelHandler:
         # INPUT check first: if the patches themselves are identical /
         # all-zero across samples, no training configuration can help -
         # abort with the diagnosis instead of burning epochs.
-        in_std = max(cat_x.float().std().item(),
-                     cont_x.std().item() if cont_x.numel() else 0.0)
+        # Nodata (MISSING_CODE / NaN) is zeroed first, as embed() does,
+        # so an all-nodata sample set still reads as constant here.
+        in_std = max(cat_x.clamp_min(0).float().std().item(),
+                     torch.nan_to_num(cont_x).std().item()
+                     if cont_x.numel() else 0.0)
         if in_std < 1e-9:
             raise SystemExit(
                 "FEED CHECK FAILED: the input patches themselves are "
@@ -836,10 +846,10 @@ class GrouseModelHandler:
                 "fill due to a raster CRS/bounds mismatch. (The dataset's "
                 "construction-time probe should also have caught this - "
                 "if you're seeing this, inspect the patch reads.)")
-        # VOCAB check: embed() clamps every categorical code into
-        # [0, vocab-1], so a code at or above the vocab is silently
-        # merged into the top index - nothing crashes, the feature just
-        # loses whatever those codes meant. That is exactly how the
+        # VOCAB check: a code at or above the vocab has no embedding row
+        # of its own. Legacy (no missing_mask) models clamp it into the
+        # top index; missing_mask models treat it as nodata - either
+        # way the feature loses whatever those codes meant, silently. That is exactly how the
         # LANDFIRE herbaceous block (EVC 310-399, EVH 301-310) vanished
         # under the old vocab of 300. Checked here on the same spread
         # sample, loudly, so a code space outgrowing FEATURE_SPEC can't
@@ -852,8 +862,9 @@ class GrouseModelHandler:
                 print(f"   [warn] {name}: codes up to {top} seen in the "
                       f"sample but vocab is {vocab} - {n_over:,} pixels "
                       f"({100.0 * n_over / cat_x[:, k].numel():.2f}%) "
-                      f"will be CLAMPED onto index {vocab - 1} and lose "
-                      f"their meaning. Raise FEATURE_SPEC['{name}']"
+                      f"will be "
+                      f"{'treated as MISSING' if self.model.missing_mask else f'CLAMPED onto index {vocab - 1}'}"
+                      f" and lose their meaning. Raise FEATURE_SPEC['{name}']"
                       f"['vocab'] (a cold-start geometry change).")
         self.model.train()
         with torch.no_grad():
@@ -1523,7 +1534,7 @@ class GrouseModelHandler:
         min-max normalization, which would repaint colors depending on
         which classes happen to appear in one patch, making two crops
         visually incomparable). Index 0 (every categorical feature's
-        padding_idx) always renders black. High-vocab features (e.g.
+        padding_idx) and nodata always render black. High-vocab features (e.g.
         evt/sclass, thousands of codes) wrap the 20-color palette, so
         colors stop being globally unique past ~20 distinct codes in
         view at once - still shows boundary/patch structure, just not
@@ -1536,7 +1547,7 @@ class GrouseModelHandler:
         idx = idx_map.squeeze(1).detach().cpu().numpy()
         rgb = np.zeros((*idx.shape, 3), dtype=np.float32)
         for v in np.unique(idx):
-            if v == 0:
+            if v <= 0:          # padding, "none" (-1) or MISSING_CODE
                 continue
             rgb[idx == v] = palette((int(v) % 20) / 20.0)[:3]
         return torch.from_numpy(rgb).permute(0, 3, 1, 2)
@@ -1616,7 +1627,7 @@ class GrouseModelHandler:
             ANY nonzero pixel - whether it was 50 ft2/acre or 380 -
             got stretched to identical pure white, and real magnitude
             never reached the pixel."""
-            return m.clamp(0, 1).float().cpu()
+            return torch.nan_to_num(m).clamp(0, 1).float().cpu()
 
         with torch.no_grad():
             if tb_images:

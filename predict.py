@@ -36,16 +36,16 @@ Earth GroundOverlay. Three explicit styles:
                     maximizes local contrast, NOT comparable across maps
 
 PROBABILITY SEMANTICS / why a whole-forest box can light up: the model
-is trained and calibrated on a ~50/50 presence/pseudo-absence design
-(see calibrate.py "HONEST LIMITS"), so p=0.5 means "even odds AGAINST A
-SAMPLED PSEUDO-ABSENCE", not "50% of such cells hold grouse". Over a
-real landscape whose suitable fraction is far below 50%, those
-probabilities read inflated - and temperature scaling cannot shift
-them, because sigmoid(logit/T) is symmetric about p=0.5: no T moves a
-score across 0.5. Fixes: --prior <f> re-anchors the calibrated logits
-to an expected deployment prevalence f (the standard
-logit(f)-logit(0.5) prior correction), or --style quantile sidesteps
-absolute probabilities entirely.
+is trained on a class-balanced presence/pseudo-absence design and
+calibrated (calibrate.py: Platt scale + bias) against the validation
+set's prevalence, so p=0.5 means "even odds AGAINST A SAMPLED
+PSEUDO-ABSENCE", not "50% of such cells hold grouse". Over a real
+landscape whose suitable fraction is far below that, the probabilities
+read inflated, and no calibration fitted on this data can know the true
+prevalence. --prior <f> supplies it: calibrated logits are shifted by
+logit(f) - logit(validation prevalence), the standard prior
+correction. --style quantile sidesteps absolute probabilities
+entirely.
 
 Usage:
     python predict.py --region ME
@@ -83,7 +83,7 @@ if not os.path.exists(os.path.join(_here, "grouse_data.py")):
     if os.path.exists(os.path.join(_parent, "grouse_data.py")):
         sys.path.insert(0, _parent)
 
-from grouse_data import GrouseData, NLCD_NAMES, NODATA_SENTINELS
+from grouse_data import GrouseData, NLCD_NAMES, NODATA_SENTINELS, MISSING_CODE
 from models import (GrouseResNet, FEATURE_SPEC, split_features,
                     config_to_model_kwargs, d4_tta_logits,
                     spec_with_checkpoint_vocab, checkpoint_vocab_notes)
@@ -198,14 +198,19 @@ def bounds_to_window(ref, bounds, pad=100):
     return r_start, r_end, c_start, c_end
 
 
-def _safe_windowed_read(src, window, fill_value=0):
+def _safe_windowed_read(src, window, fill_value=MISSING_CODE):
     """Boundless-equivalent read that works for BOTH plain rasterio
     datasets and WarpedVRT sources. GDAL/rasterio does not support
     native boundless=True reads against a WarpedVRT (raises
     'WarpedVRT does not permit boundless reads') - this reads whatever
     portion of the window actually overlaps the source and manually
     pads the rest with fill_value, which is exactly what boundless=True
-    does for a plain dataset, so behavior is identical for both."""
+    does for a plain dataset, so behavior is identical for both.
+
+    Off-raster pixels and the source's own nodata value both come back
+    as MISSING_CODE (the default fill), matching dataset._read_patch:
+    the training reader treats both as nodata, and the old fill of 0
+    fed every off-raster pixel to the model as a real 0."""
     col0, row0, w, h = (window.col_off, window.row_off,
                         int(window.width), int(window.height))
     rc0, rr0 = max(0, col0), max(0, row0)
@@ -214,6 +219,8 @@ def _safe_windowed_read(src, window, fill_value=0):
     if rc1 > rc0 and rr1 > rr0:
         data = src.read(1, window=Window(rc0, rr0, rc1 - rc0, rr1 - rr0)
                         ).astype(np.float32)
+        if src.nodata is not None:
+            data[data == np.float32(src.nodata)] = fill_value
         dc, dr = rc0 - col0, rr0 - row0
         out[dr:dr + data.shape[0], dc:dc + data.shape[1]] = data
     return out
@@ -221,8 +228,9 @@ def _safe_windowed_read(src, window, fill_value=0):
 
 def read_window_stack(srcs, cat_f, cont_f, window):
     """One raster window -> the (cat int64, cont float32) stacks the
-    model consumes: sentinels zeroed, continuous channels divided by
-    their FEATURE_SPEC scale.
+    model consumes: nodata as MISSING_CODE in cat and NaN in cont
+    (GrouseResNet.embed() turns both into validity channels),
+    continuous channels divided by their FEATURE_SPEC scale.
 
     THE single inference-side definition of "raw pixels -> model
     input". It was written out three times (read_strip,
@@ -232,17 +240,16 @@ def read_window_stack(srcs, cat_f, cont_f, window):
 
     Note this is deliberately NOT shared with dataset.py's training
     path, which routes sentinels through NaN first so it can run its
-    100%-nodata geolocation probe (impossible once 0 is in the array,
-    since 0 is also a legitimate value). The two converge on the same
-    numbers - dataset.py nan_to_num's to 0 - by different routes, for
+    100%-nodata geolocation probe. The two converge on the same
+    numbers - MISSING_CODE / NaN for nodata - by different routes, for
     a reason."""
     cat = np.stack([_safe_windowed_read(srcs[f], window)
                    for f in cat_f]).astype(np.int64)
     cont = np.stack([_safe_windowed_read(srcs[f], window)
                     for f in cont_f]).astype(np.float32)
     for s in NODATA_SENTINELS:
-        cat[cat == s] = 0
-        cont[cont == s] = 0.0
+        cat[cat == s] = MISSING_CODE
+        cont[cont == s] = np.nan
     for i, f in enumerate(cont_f):
         cont[i] /= float(FEATURE_SPEC[f].get("scale", 1.0))
     return cat, cont
@@ -303,9 +310,6 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
     edge_maps = {f: np.full((out_h, out_w), np.nan, dtype=np.float32)
                 for f in list(edge_cat_capture) + list(edge_cont_capture)}
 
-    # Reference-layer nodata mask for honest masking of no-coverage cells.
-    ref_nodata = ref.nodata if ref.nodata is not None else -9999
-
     if use_compile:
         print("   Compiling model graph (torch.compile)...")
         model = torch.compile(model)
@@ -325,7 +329,8 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
             cat_np, cont_np = read_strip(srcs, cat_f, cont_f,
                                          r_start + y0, rows_here,
                                          c_start, width)
-            ref_band = cat_np[0] if cat_f else cont_np[0]
+            ref_missing = (cat_np[0] == MISSING_CODE if cat_f
+                           else np.isnan(cont_np[0]))
 
             ys = list(range(0, rows_here - IMG_SIZE + 1, stride))
             xs = list(range(0, width - IMG_SIZE + 1, stride))
@@ -338,8 +343,8 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                 keep, cat_b, cont_b = [], [], []
                 for (y, x) in chunk:
                     cy, cx = y + IMG_SIZE // 2, x + IMG_SIZE // 2
-                    if ref_band[cy, cx] == 0 and ref_nodata != 0:
-                        # center pixel had no data (filled to 0) - mask
+                    if ref_missing[cy, cx]:
+                        # center pixel has no data - mask
                         continue
                     keep.append((y, x))
                     cat_b.append(cat_np[:, y:y + IMG_SIZE, x:x + IMG_SIZE])
@@ -368,7 +373,7 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                         dim=(1, 2))
                     edge_cat_vals[f] = (0.5 * (neq_x + neq_y)).cpu().numpy()
                 for f, idx in edge_cont_capture.items():
-                    ch = t_cont[:, idx]
+                    ch = torch.nan_to_num(t_cont[:, idx])
                     dx = (ch[:, :, 1:] - ch[:, :, :-1]).abs().mean(dim=(1, 2))
                     dy = (ch[:, 1:, :] - ch[:, :-1, :]).abs().mean(dim=(1, 2))
                     edge_cont_vals[f] = (0.5 * (dx + dy)).cpu().numpy()
@@ -379,9 +384,9 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                 pooled_logit = d4_tta_logits(model, t_cat, t_cont,
                                              flip_tta=flip_tta,
                                              autocast=autocast)
-                # Temperature first (calibrates the val-design scale),
-                # then the prior shift (converts calibrated logits from
-                # the 50/50 training prior to the deployment prior).
+                # Calibration scale (1/temperature), then logit_shift =
+                # calibration bias + any prior shift from the
+                # validation prevalence to the deployment prior.
                 probs = torch.sigmoid(
                     pooled_logit / temperature
                     + logit_shift).float().cpu().numpy()
@@ -394,6 +399,8 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                         if cat_capture or cont_capture:
                             cy, cx = y + IMG_SIZE // 2, x + IMG_SIZE // 2
                             for f, idx in cat_capture.items():
+                                # MISSING_CODE < 0: excluded downstream
+                                # like the -1 "not scored" fill.
                                 feature_maps[f][gy, gx] = int(
                                     cat_np[idx, cy, cx])
                             for f, idx in cont_capture.items():
@@ -623,7 +630,7 @@ def _tb_log_windows(tb_writer, tag_prefix, model, cat_f, cont_f, window):
         by FEATURE_SPEC scale (read_window_stack), so it's fixed and
         comparable across windows; norm01's per-sample min/max stretch
         was throwing that away."""
-        return m.clamp(0, 1).float().cpu()
+        return torch.nan_to_num(m).clamp(0, 1).float().cpu()
 
     with torch.no_grad():
         for ci, fname in enumerate(cont_f):
@@ -803,17 +810,18 @@ def main():
                              "top 20%% of the mapped area).")
     parser.add_argument("--prior", type=float, default=None,
                         help="Expected fraction of the mapped area that "
-                             "is genuinely suitable (0-1). The model's "
-                             "probabilities are calibrated to its 50/50 "
-                             "presence/pseudo-absence design, so over a "
-                             "real landscape they read inflated - and "
-                             "temperature scaling cannot fix that (it "
-                             "never moves a score across 0.5). This "
-                             "applies the standard prior correction "
-                             "(logits shifted by logit(prior)-logit(0.5)) "
-                             "AFTER temperature: e.g. --prior 0.1 makes "
-                             "a displayed 0.8 require a raw calibrated "
-                             "score of ~0.97. Default: no correction.")
+                             "is genuinely suitable (0-1). Calibrated "
+                             "probabilities are relative to the "
+                             "validation design's prevalence (recorded "
+                             "in calibration.json; 0.5 assumed without "
+                             "one), so over a real landscape they read "
+                             "inflated. This applies the standard prior "
+                             "correction AFTER calibration: logits "
+                             "shifted by logit(prior) - logit(that "
+                             "prevalence). E.g. --prior 0.1 against a "
+                             "0.5 design makes a displayed 0.8 require "
+                             "a calibrated score of ~0.97. Default: no "
+                             "correction.")
     parser.add_argument("--compile", action="store_true",
                         help="torch.compile the model (worthwhile on "
                              "GPU for large areas).")
@@ -829,16 +837,15 @@ def main():
                              "--no-calibration disables.")
     parser.add_argument("--no-calibration", action="store_true",
                         help="Ignore calibration.json and score with raw "
-                             "logits (T=1). Use when the checkpoint was "
-                             "trained under a different --loss (or "
-                             "retrained at all) since the calibration "
-                             "was fitted - a temperature is specific to "
-                             "both the weights and the objective they "
-                             "were trained with.")
+                             "logits. Use when the checkpoint was "
+                             "retrained since the calibration was "
+                             "fitted - a calibration is specific to the "
+                             "weights and the objective they were "
+                             "trained with.")
     parser.add_argument("--temperature", type=float, default=None,
                         help="Manual temperature override (logits are "
-                             "divided by this before sigmoid). Overrides "
-                             "--calibration.")
+                             "divided by this before sigmoid, no bias). "
+                             "Overrides --calibration.")
     parser.add_argument("--pool", default="attn",
                         choices=["mean", "center", "gauss", "attn"],
                         help="Only used for OLD bare checkpoints with no "
@@ -907,18 +914,37 @@ def main():
         if tb_writer is not None:
             tb_writer.add_text(tag, msg.strip(), 0)
 
-    temperature = 1.0
+    # Calibrated logit = logit / temperature + cal_bias (Platt scale and
+    # bias); the prior correction is added on top. predict_region takes
+    # the two as (temperature, logit_shift).
+    temperature, cal_bias, val_prevalence = 1.0, 0.0, 0.5
+    has_bias = False
     if args.temperature is not None:
         temperature = float(args.temperature)
         _say(f"Calibration: manual temperature T={temperature:.3f}")
     elif not args.no_calibration and os.path.exists(args.calibration):
         with open(args.calibration) as f:
             cal = json.load(f)
-        temperature = float(cal.get("temperature", 1.0))
-        _say(f"Calibration: T={temperature:.3f} from {args.calibration} "
-             f"(fitted {cal.get('fitted_at', '?')}, "
-             f"ECE {cal.get('ece_before', float('nan')):.3f} -> "
-             f"{cal.get('ece_after', float('nan')):.3f})")
+        if "scale" in cal and "bias" in cal:
+            temperature = 1.0 / float(cal["scale"])
+            cal_bias = float(cal["bias"])
+            val_prevalence = float(cal.get("val_prevalence", 0.5))
+            has_bias = True
+            _say(f"Calibration: Platt scale {cal['scale']:.3f}, bias "
+                 f"{cal_bias:+.3f} from {args.calibration} (fitted "
+                 f"{cal.get('fitted_at', '?')}, ECE "
+                 f"{cal.get('ece_before', float('nan')):.3f} -> "
+                 f"{cal.get('ece_cross_fitted', cal.get('ece_after', float('nan'))):.3f} "
+                 f"cross-fitted; validation prevalence "
+                 f"{val_prevalence:.3f})")
+        else:
+            temperature = float(cal.get("temperature", 1.0))
+            _say(f"Calibration: T={temperature:.3f} from "
+                 f"{args.calibration} - an OLD temperature-only fit "
+                 f"(fitted {cal.get('fitted_at', '?')}, "
+                 f"ECE {cal.get('ece_before', float('nan')):.3f} -> "
+                 f"{cal.get('ece_after', float('nan')):.3f}). Re-run "
+                 f"calibrate.py for scale + bias.")
         if cal.get("model_path") and os.path.abspath(args.model) !=                 cal["model_path"]:
             _say(f"   [warn] calibration was fitted on "
                  f"{cal['model_path']}, but you're predicting with "
@@ -944,7 +970,7 @@ def main():
         except (KeyError, ValueError, OverflowError, OSError):
             pass
         bias = loss_logit_bias(ckpt_cfg)
-        if bias is not None:
+        if bias is not None and not has_bias:
             reason, off = bias
             _say(f"   [warn] this checkpoint was trained with {reason}, "
                  f"which builds a constant logit offset (~{off:+.2f}) "
@@ -958,16 +984,18 @@ def main():
         _say("Calibration: none (raw probabilities). Run calibrate.py "
              "to fit one.")
 
-    logit_shift = 0.0
+    logit_shift = cal_bias
     if args.prior is not None:
         if not (0.0 < args.prior < 1.0):
             raise SystemExit(f"--prior must be in (0, 1), got {args.prior}")
-        logit_shift = math.log(args.prior / (1.0 - args.prior))
+        prior_shift = (math.log(args.prior / (1.0 - args.prior))
+                       - math.log(val_prevalence / (1.0 - val_prevalence)))
+        logit_shift += prior_shift
+        needed = 1.0 / (1.0 + math.exp(prior_shift))
         _say(f"Prior correction: deployment prevalence {args.prior:g} "
-             f"(training design 0.5) -> calibrated logits shifted by "
-             f"{logit_shift:+.3f}. A displayed 0.5 now requires a raw "
-             f"calibrated score of "
-              f"{1.0 / (1.0 + args.prior / (1.0 - args.prior)):.3f}.")
+             f"(validation design {val_prevalence:.3f}) -> calibrated "
+             f"logits shifted by {prior_shift:+.3f}. A displayed 0.5 now "
+             f"requires a calibrated score of {needed:.3f}.")
 
     srcs, ref = open_aligned_sources(rd, cat_f, cont_f)
     try:
@@ -1009,11 +1037,11 @@ def main():
         if args.prior is None and args.style != "quantile" and pct5 > 50.0:
             print(
                 "   [note] Over half the scored area exceeds p=0.5. The "
-                "model's probabilities are calibrated to its 50/50 "
-                "presence/pseudo-absence design (calibrate.py 'HONEST "
+                "model's probabilities are relative to its presence/"
+                "pseudo-absence validation design (calibrate.py 'HONEST "
                 "LIMITS'), so over a real landscape they read inflated - "
-                "and temperature scaling cannot shift them (it never "
-                "moves a score across 0.5). Remedies: --prior <expected "
+                "no calibration fitted on that data can know the real "
+                "prevalence. Remedies: --prior <expected "
                 "suitable fraction, e.g. 0.1> to re-anchor the "
                 "probabilities, or --style quantile to color/threshold "
                 "by within-map rank (--alpha-below 0.8 then shows only "
@@ -1023,7 +1051,8 @@ def main():
         coverage = 100.0 * len(vals) / heatmap.size if heatmap.size else 0.0
         tb_writer.add_scalar("Predict/coverage_pct", coverage, 0)
         tb_writer.add_scalar("Predict/temperature", temperature, 0)
-        tb_writer.add_scalar("Predict/prior_logit_shift", logit_shift, 0)
+        tb_writer.add_scalar("Predict/calibration_bias", cal_bias, 0)
+        tb_writer.add_scalar("Predict/total_logit_shift", logit_shift, 0)
         if len(vals):
             tb_writer.add_scalar("Predict/score_min", float(vals.min()), 0)
             tb_writer.add_scalar("Predict/score_median",

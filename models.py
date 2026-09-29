@@ -24,6 +24,7 @@ import torch.nn.functional as F
 from torchvision import models
 
 from blocks import CBAM
+from grouse_data import MISSING_CODE
 
 # Relative-position geometry for EarlyAttentionBlock's 'rel' mode.
 # ROPE_BASE: frequency base for the 2D rotary embedding; 100 (not the
@@ -749,6 +750,38 @@ def treemap_decode(feature, stored):
             / TREEMAP_FIXED[feature]["mult"])
 
 
+_OOV_WARNED = set()
+
+
+def warn_out_of_vocab(model, cat_x):
+    """Print, once per (model, feature), when cat_x holds codes at or
+    above that feature's embedding vocab. The model can't learn anything
+    about such codes: missing_mask models treat them as nodata, older
+    ones clamp them onto the top row (which is a real class). Either
+    way it means the rasters carry a code space the checkpoint was
+    never built for - a new LANDFIRE vintage or region - and that must
+    not pass silently at inference, where fit()'s start-of-training
+    sample check never runs. One device sync per call."""
+    if not model.cat_features:
+        return
+    vocab = torch.tensor([model._vocab[f] for f in model.cat_features],
+                         device=cat_x.device).view(1, -1, 1, 1)
+    over = cat_x >= vocab
+    counts = over.sum(dim=(0, 2, 3)).tolist()
+    for k, name in enumerate(model.cat_features):
+        key = (id(model), name)
+        if counts[k] and key not in _OOV_WARNED:
+            _OOV_WARNED.add(key)
+            top = int(cat_x[:, k].max())
+            fate = ("treated as MISSING" if model.missing_mask
+                    else f"CLAMPED onto index {model._vocab[name] - 1}")
+            print(f"   [warn] {name}: {counts[k]:,} pixels in this batch "
+                  f"carry codes up to {top}, beyond the checkpoint's "
+                  f"vocab of {model._vocab[name]} - {fate}. The rasters "
+                  f"use codes this model was never trained on (new "
+                  f"vintage/region?); check them with scan_codes.py.")
+
+
 @torch.no_grad()
 def d4_tta_logits(model, cat_x, cont_x, flip_tta=True, autocast=None):
     """Pooled logit over the D4 symmetry group: 4 rotations, each
@@ -777,6 +810,7 @@ def d4_tta_logits(model, cat_x, cont_x, flip_tta=True, autocast=None):
     assembled differently because the data pipeline already did half
     the work."""
     import contextlib
+    warn_out_of_vocab(model, cat_x)
     ctx = autocast if autocast is not None else contextlib.nullcontext()
     views = []
     for k in range(4):
@@ -798,6 +832,9 @@ def config_to_model_kwargs(cfg, defaults=None):
     rebuilds identical geometry and a new config key is added here
     once instead of copy-pasted three times.
 
+    missing_mask absent -> False: every checkpoint written before the
+    validity channels existed was trained on nodata-as-0 inputs.
+
     Legacy chain: early_attn_pos_mode missing -> interim checkpoints
     stored early_attn_pos_enc (bool -> 'abs'); ones from before either
     fix stored neither -> the 'none' default (position-blind, matching
@@ -812,7 +849,8 @@ def config_to_model_kwargs(cfg, defaults=None):
                 keep_early_resolution=False, early_attn=False,
                 early_attn_heads=4, early_attn_kv_stride=1,
                 early_attn_pos_mode='none',
-                dual_branch='off', dual_branch_channels=64)
+                dual_branch='off', dual_branch_channels=64,
+                missing_mask=False)
     if defaults:
         base.update(defaults)
     cfg = cfg or {}
@@ -903,7 +941,8 @@ class GrouseResNet(nn.Module):
                  early_attn_heads=4, early_attn_kv_stride=1,
                  early_attn_dropout=0.1, early_attn_droppath=0.1,
                  early_attn_pos_mode='rel',
-                 dual_branch='off', dual_branch_channels=64):
+                 dual_branch='off', dual_branch_channels=64,
+                 missing_mask=False):
         """cat_features / cont_features: ordered feature-name lists (from
         split_features). Geometry is derived from them + the spec.
 
@@ -916,7 +955,19 @@ class GrouseResNet(nn.Module):
         ~1.9 km across, so 'mean' spreads one point's label over ~3.7 km2
         of mostly irrelevant ground and gives the center cell 1/64 of the
         vote. A naive-Bayes model on the center pixel's codes alone scores
-        val AUC 0.865 on this data, so that dilution is expensive."""
+        val AUC 0.865 on this data, so that dilution is expensive.
+
+        missing_mask: append one VALIDITY channel per feature (1 = real
+          data, 0 = nodata) to the embedded input, so the network can
+          tell "no data here" from any real value. Without it nodata
+          reaches the stem as 0 / the padding vector, which is a real
+          reading for most features (road_dist 0 = on a road, tsd 0 =
+          disturbed this year) - every edge-of-coverage patch then
+          looked like a road through a fresh clearcut. With it, a
+          categorical code at or above its vocab is ALSO treated as
+          missing instead of being clamped onto the top row (a live
+          code). False reproduces the pre-mask behaviour exactly, for
+          checkpoints trained without it."""
         super(GrouseResNet, self).__init__()
         spec = spec or FEATURE_SPEC
         self.pool_mode = pool
@@ -940,9 +991,14 @@ class GrouseResNet(nn.Module):
         resnet.layer4[0].conv1.stride = (1, 1)
         resnet.layer4[0].downsample[0].stride = (1, 1)
 
-        # Stem width derived from the live feature set.
+        # Stem width derived from the live feature set (+ one validity
+        # channel per feature under missing_mask).
+        self.missing_mask = bool(missing_mask)
         total_in_channels = (sum(spec[f]["dim"] for f in self.cat_features)
                              + len(self.cont_features))
+        if self.missing_mask:
+            total_in_channels += (len(self.cat_features)
+                                  + len(self.cont_features))
         self.total_in_channels = total_in_channels
         self.conv1 = nn.Conv2d(total_in_channels, 64, kernel_size=7,
                                stride=2, padding=3, bias=False)
@@ -1034,10 +1090,25 @@ class GrouseResNet(nn.Module):
     def embed(self, cat_x, cont_x):
         """Stack every feature into the (B, C, H, W) input tensor: one
         embedding block per categorical feature, one raw channel per
-        continuous one."""
-        parts = []
+        continuous one, then (missing_mask) one validity channel per
+        feature.
+
+        Nodata arrives as MISSING_CODE in cat_x and NaN in cont_x (see
+        dataset.py / predict.read_window_stack). Either way it is fed
+        to the embedding / stem as 0, exactly as before; missing_mask
+        adds the channels that say which 0s were really absent."""
+        parts, valid = [], []
         for k, name in enumerate(self.cat_features):
-            idx = torch.clamp(cat_x[:, k], 0, self._vocab[name] - 1)
+            codes = cat_x[:, k]
+            vocab = self._vocab[name]
+            idx = torch.clamp(codes, 0, vocab - 1)
+            if self.missing_mask:
+                # Out-of-vocab codes are unknown to this table: route
+                # them to padding and flag them, rather than clamping
+                # them onto row vocab-1, which is some real class.
+                miss = (codes == MISSING_CODE) | (codes >= vocab)
+                idx = idx.masked_fill(miss, 0)
+                valid.append(~miss)
             e = self.embeddings[name](idx).permute(0, 3, 1, 2)
             if self.training and self.embed_dropout > 0:
                 # Drop whole feature planes, not scattered activations:
@@ -1048,7 +1119,13 @@ class GrouseResNet(nn.Module):
                 e = e * keep / (1.0 - self.embed_dropout)
             parts.append(e)
         if len(self.cont_features) > 0:
-            parts.append(cont_x)
+            nan = torch.isnan(cont_x)
+            parts.append(cont_x.masked_fill(nan, 0.0))
+            if self.missing_mask:
+                valid.extend((~nan).unbind(1))
+        if self.missing_mask and valid:
+            dtype = parts[0].dtype
+            parts.append(torch.stack(valid, dim=1).to(dtype))
         return torch.cat(parts, dim=1)
 
     def forward(self, cat_x, cont_x):

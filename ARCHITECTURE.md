@@ -156,13 +156,15 @@ net, not the mechanism. A new raster source must be written on the
 template grid, not merely in the same nominal projection family.
 
 **A categorical `vocab` must cover the raster's whole code domain, or
-the top of it silently disappears.** `GrouseResNet.embed` clamps codes
-into `[0, vocab-1]`; a code at or above the vocab lands on the top index
-and nothing crashes. That is how the LANDFIRE herbaceous block vanished:
+the top of it silently disappears.** Legacy (`missing_mask=False`)
+models clamp codes into `[0, vocab-1]`, so a code at or above the vocab
+lands on the top index; `missing_mask` models treat it as nodata. Either
+way nothing crashes and the code's meaning is gone. That is how the LANDFIRE herbaceous block vanished:
 EVC encodes herb cover as 310–399 and EVH herb height as 301–310 (three
 life-form blocks since LF 2016 Remap, identical LF2022–LF2025), and both
-features had `vocab: 300` until 2026-09-20. `fit()` now checks the spread
-sample against the vocab and warns by name; raising a vocab is a
+features had `vocab: 300` until 2026-09-20. `fit()` checks the spread
+sample against the vocab and `d4_tta_logits` checks every inference
+batch, both warning by name; raising a vocab is a
 cold-start geometry change (the table is in the state dict).
 
 **`--select-min-delta` compares against the last SAVED checkpoint, not
@@ -237,16 +239,30 @@ constraint. The cost is that the filter also cannot warn when a mapping is
 stale — `generate_treemap_features.py` prints the mapping and flags any
 gap over 2 years itself.
 
-**The patch cache keys on the feature list and raster mtimes**, so it
+**Nodata is `MISSING_CODE` / NaN from the reader to `embed()`, never
+0.** `grouse_data.MISSING_CODE` in categorical channels and in the int16
+patch cache, NaN in continuous channels after scaling. 0 is a real
+reading for most features (`road_dist` 0 = on a road, `tsd` 0 = disturbed
+this year). `GrouseResNet.embed()` is the only place missing becomes 0,
+and with `missing_mask` it also emits the validity channels that say so.
+A new reader must keep the marker; diagnostics may `clamp_min(0)` /
+`nan_to_num` for display, never on the model's input.
+
+**The patch cache keys on the feature list and raster mtimes** (plus a
+storage-format tag, bumped when the nodata convention changed — bump it
+again if the stored convention ever changes), so it
 self-invalidates when either changes — but it stores **int16**, so a
 continuous feature must survive integer truncation (scaling happens
 after, at tensorize time).
 
-**Temperature scaling cannot change a map's spatial pattern.** It is a
-monotonic transform of the logits: it moves absolute scores, never their
-ordering. A region that looks hot relative to its neighbours will still
-look hot at any temperature. Calibration is never the explanation for
-*where* a map is bright.
+**Calibration cannot change a map's spatial pattern.** `calibrate.py`'s
+Platt fit (scale and bias) is a monotonic transform of the logits: it
+moves absolute scores, never their ordering. A region that looks hot
+relative to its neighbours will still look hot after calibration.
+Calibration is never the explanation for *where* a map is bright. Nor
+can it recover real prevalence from presence/pseudo-absence data;
+`predict.py --prior` supplies that, relative to the `val_prevalence`
+recorded in `calibration.json`.
 
 **30m rasters cannot resolve a two-lane road.** Verified with
 `inspect_point.py`: a point on Route 16 pavement reads `nlcd=90 WOODY
@@ -256,8 +272,9 @@ unsound; that is what `road_dist` exists to supply.
 
 **There is exactly one inference-side scorer and one inference-side
 patch reader.** `models.d4_tta_logits` (4 rotations × optional mirror,
-averaged BEFORE the sigmoid) and `predict.read_window_stack` (sentinels
-zeroed, continuous channels divided by their `FEATURE_SPEC` scale) each
+averaged BEFORE the sigmoid) and `predict.read_window_stack` (nodata to
+`MISSING_CODE`/NaN, continuous channels divided by their `FEATURE_SPEC`
+scale) each
 had three copies. Nothing about a divergence between copies would
 crash — the deployed map and the diagnostics meant to explain it would
 simply stop agreeing, each internally consistent. Add a new inference
@@ -267,6 +284,5 @@ path by calling these, never by re-deriving them.
 comes from the dataset (`expand_rotations=True`) with only the mirror
 added in code (`GrouseModelHandler._pooled_logits`), and its patch read
 routes sentinels through NaN first so the 100%-nodata geolocation probe
-can fire (impossible once 0 is in the array, since 0 is a legitimate
-value). Same numbers by different routes, for reasons — do not "unify"
+can fire, then stores `MISSING_CODE`. Same numbers by different routes, for reasons — do not "unify"
 them without reading both.

@@ -71,6 +71,18 @@ WETLAND_NLCD_CLASSES = (90, 95)
 # ==========================================
 NODATA_SENTINELS = (-9999, -32768, 32767, -1111)
 
+# The ONE in-memory marker for "this pixel has no data", used from the
+# patch readers through to the model's embed(). Categorical channels
+# carry it as an integer code; continuous channels carry NaN instead
+# (a scaled float has no spare integer to reserve). It replaces the old
+# convention of collapsing nodata to 0, which is a legitimate value for
+# most features - road_dist 0 is "on a paved road", tsd 0 is "disturbed
+# this year" - so every out-of-coverage pixel was reaching the network
+# as a road running through a fresh clearcut. -32768 is already a
+# sentinel (above), so no real raster value collides with it, and it
+# fits the int16 patch cache.
+MISSING_CODE = -32768
+
 
 # ==========================================
 # CONFIG

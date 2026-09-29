@@ -8,6 +8,10 @@ neither exists anymore). Serves (cat_x, cont_x, y, w) samples where:
   cat_x  : (n_cat, H, W) integer patch stack, one channel per
            categorical feature (spec order)
   cont_x : (n_cont, H, W) float patch stack, scaled per FEATURE_SPEC
+           Nodata is carried as grouse_data.MISSING_CODE in cat_x and
+           NaN in cont_x - never collapsed to 0, which is a real value
+           for most features. GrouseResNet.embed() turns both into its
+           validity channels.
   y      : label float (1.0 positives / 0.0 negatives)
   w      : per-sample weight (negatives carry their envelope-derived
            weight from generate_negatives.py; positives default 1.0)
@@ -32,7 +36,7 @@ from rasterio.windows import Window
 import rasterio
 
 from models import FEATURE_SPEC
-from grouse_data import NODATA_SENTINELS, grid_mismatch
+from grouse_data import NODATA_SENTINELS, MISSING_CODE, grid_mismatch
 
 
 class GrousePatchDataset(Dataset):
@@ -151,6 +155,10 @@ class GrousePatchDataset(Dataset):
         rather than silently serving stale patches."""
         import hashlib
         h = hashlib.sha1()
+        # Storage-format version. v2 stores nodata as MISSING_CODE; v1
+        # (unversioned) collapsed it to 0, and serving a v1 file to this
+        # code would feed every old nodata pixel as a real 0.
+        h.update(b"nodata-format-v2")
         feats = self.cat_features + self.cont_features
         h.update(repr(feats).encode())
         h.update(repr(self.read_size).encode())
@@ -171,8 +179,8 @@ class GrousePatchDataset(Dataset):
         shape = (n_pts, n_feat, self.read_size, self.read_size)
         if os.path.exists(path):
             return np.load(path, mmap_mode='r')
-        # Values are stored POST nodata-cleanup (sentinels -> 0) as int16:
-        # every LANDFIRE band is int16 and every code fits, so this is
+        # Values are stored as int16 with nodata as MISSING_CODE: every
+        # LANDFIRE band is int16 and every code fits, so this is
         # lossless and a quarter the size of float32.
         tmp = path + f".tmp{os.getpid()}"
         arr = np.lib.format.open_memmap(tmp, mode='w+', dtype=np.int16,
@@ -184,7 +192,8 @@ class GrousePatchDataset(Dataset):
             yr = int(row['year'])
             for k, f in enumerate(feats):
                 patch = self._read_patch(self._path_for[(f, yr)], lon, lat)
-                arr[i, k] = np.nan_to_num(patch, nan=0.0).astype(np.int16)
+                arr[i, k] = np.nan_to_num(
+                    patch, nan=MISSING_CODE).astype(np.int16)
         arr.flush()
         del arr
         os.replace(tmp, path)
@@ -339,7 +348,7 @@ class GrousePatchDataset(Dataset):
         return arr
 
     def _raw_stack(self, i, lon, lat, year):
-        """(n_feat, read_size, read_size), nodata already 0. int16 straight
+        """(n_feat, read_size, read_size), nodata as MISSING_CODE. int16 straight
         from the cache when there is one (the values are integral either
         way - every raster is int16 - so _to_tensors converts each half
         directly to its target dtype instead of paying for a float32
@@ -349,7 +358,7 @@ class GrousePatchDataset(Dataset):
         feats = self.cat_features + self.cont_features
         return np.stack([
             np.nan_to_num(self._read_patch(self._path_for[(f, year)], lon, lat),
-                          nan=0.0) for f in feats])
+                          nan=MISSING_CODE) for f in feats])
 
     def __getitem__(self, idx):
         if self.expand_rotations:
@@ -384,7 +393,8 @@ class GrousePatchDataset(Dataset):
     def _to_tensors(self, s):
         """Cropped (n_feat, n, n) float stack -> (cat_x int64,
         cont_x scaled float32). The single tensorize path shared by
-        every view (deterministic, augmented, SSL)."""
+        every view (deterministic, augmented, SSL). Nodata stays
+        MISSING_CODE in cat_x and becomes NaN in cont_x."""
         n = self.img_size
         n_cat = len(self.cat_features)
         cat_np, cont_np = s[:n_cat], s[n_cat:]
@@ -396,8 +406,11 @@ class GrousePatchDataset(Dataset):
         cat_x = (torch.from_numpy(cat_np.astype(np.int64))
                  if n_cat else torch.zeros((0, n, n), dtype=torch.long))
         if len(self.cont_features):
-            cont_x = torch.from_numpy(
-                cont_np.astype(np.float32) / self._scales)
+            vals = cont_np.astype(np.float32)
+            missing = vals == MISSING_CODE
+            vals /= self._scales
+            vals[missing] = np.nan
+            cont_x = torch.from_numpy(vals)
         else:
             cont_x = torch.zeros((0, n, n), dtype=torch.float32)
         return cat_x, cont_x

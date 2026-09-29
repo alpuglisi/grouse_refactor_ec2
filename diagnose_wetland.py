@@ -47,7 +47,8 @@ from torch.utils.data import DataLoader
 _here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _here)
 
-from grouse_data import GrouseData, NLCD_NAMES, WETLAND_NLCD_CLASSES
+from grouse_data import (GrouseData, NLCD_NAMES, WETLAND_NLCD_CLASSES,
+                         MISSING_CODE)
 from models import FEATURE_SPEC
 from dataset import GrousePatchDataset
 
@@ -114,7 +115,9 @@ def composition_table(name, codes):
 def score_points(model, ds, device, nlcd_idx=None, batch_size=256,
                  workers=4):
     """Per-POINT mean sigmoid over the 4 stored rotations. nlcd_idx set
-    -> that categorical channel is replaced by padding (ablation)."""
+    -> that categorical channel is replaced by nodata (ablation):
+    padding for every model, plus a cleared validity channel for
+    missing_mask models - "nlcd unknown", not "nlcd = a real 0"."""
     loader = DataLoader(ds, batch_size=batch_size, num_workers=workers)
     outs = []
     for cat_x, cont_x, _y, _w in loader:
@@ -122,7 +125,7 @@ def score_points(model, ds, device, nlcd_idx=None, batch_size=256,
         cont_x = cont_x.to(device)
         if nlcd_idx is not None:
             cat_x = cat_x.clone()
-            cat_x[:, nlcd_idx] = 0
+            cat_x[:, nlcd_idx] = MISSING_CODE
         outs.append(torch.sigmoid(
             model.logits(cat_x, cont_x).float()).squeeze(1).cpu())
     s = torch.cat(outs).numpy()

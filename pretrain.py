@@ -144,6 +144,12 @@ def main():
                              "ImageNet weights.")
     parser.add_argument("--keep-early-resolution",
                         action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--missing-mask",
+                        action=argparse.BooleanOptionalAction, default=True,
+                        help="Per-feature validity channels, as train.py "
+                             "--missing-mask. Must match the supervised "
+                             "run or the stem conv (its width) won't "
+                             "transfer.")
     parser.add_argument("--early-attn",
                         action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--early-attn-heads", type=int, default=4)
@@ -194,7 +200,8 @@ def main():
         early_attn=args.early_attn,
         early_attn_heads=args.early_attn_heads,
         early_attn_kv_stride=args.early_attn_kv_stride,
-        early_attn_pos_mode=args.early_attn_pos)
+        early_attn_pos_mode=args.early_attn_pos,
+        missing_mask=args.missing_mask)
     model = SimSiam(encoder).to(device)
     if device.type == 'cuda':
         torch.backends.cudnn.benchmark = True
@@ -257,6 +264,7 @@ def main():
                 "early_attn_heads": args.early_attn_heads,
                 "early_attn_kv_stride": args.early_attn_kv_stride,
                 "early_attn_pos_mode": args.early_attn_pos,
+                "missing_mask": args.missing_mask,
             },
             "ssl": {"method": "simsiam", "epoch": epoch + 1,
                     "epochs": args.epochs,

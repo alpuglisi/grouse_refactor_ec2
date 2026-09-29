@@ -19,10 +19,13 @@ order. Entries BUG-0019..0021 were found in a third pass, triggered by the
 user directly asking whether `CLAUDE.md` §3.5's mandatory sweep step was
 actually being followed — it wasn't, for most preventive actions (see
 BUG-0019). Running the five outstanding sweeps found two more real
-findings (BUG-0020, BUG-0021) and confirmed three PAs clean.
+findings (BUG-0020, BUG-0021) and confirmed three PAs clean. BUG-0022
+(2026-09-29) is a process defect in diagnosing a user-reported wrong
+prediction map, logged at the user's request.
 
 | ID | Date | Symptom | Root cause | Remediation | Status |
 |----|------|---------|------------|-------------|--------|
+| BUG-0022 | 2026-09-29 | A user-reported wrong prediction map (Errol, NH) was answered three times with asserted causes (a state-line/road-data edge) and a proposed code change + retrain, none verified, before any systematic trace | No standing rule that a reported wrong output is diagnosed from an established symptom through checks that could falsify a hypothesis; a rejected hypothesis was replaced by a sibling on the same premise | PA-0016 added; end-to-end trace since done (no code defect in inputs/reader/model/calibration/KMZ) | OPEN — reported map defect still unidentified |
 | BUG-0021 | 2026-09-22 | `predict.py`/`calibrate.py` reimplement checkpoint-config handling instead of using the shared `check_checkpoint_config` (PA-0009 sweep) | Two independent, both-correct mechanisms solve the same problem (BUG-0010's concern) without sharing code | None — verified not a live risk (both already reconstruct from the checkpoint's config); recommend a future CR to unify | OPEN, low priority |
 | BUG-0020 | 2026-09-22 | 13 files independently hardcode paths duplicating `PATH_TEMPLATES`, worst in `organize_project.py` (PA-0003 sweep) | `PATH_TEMPLATES` introduced as single source of truth, but no migration swept pre-existing/independent hardcodings onto it | None — deferred, scope too large for this pass; recommend a future CR (path-derivation helpers) | OPEN |
 | BUG-0019 | 2026-09-22 | Preventive-action sweeps (`CLAUDE.md` §3.5) were not consistently run when new PAs were added — 5 of 14 had zero documented sweep activity | The sweep step depends on the implementing session remembering to run and record it, with no structural checkpoint forcing that or making its absence visible | Ran the 5 outstanding sweeps (this pass); added a **Swept?** column to `PREVENTIVE_ACTIONS.md` (PA-0015) so an unswept rule is visible without grepping every bug doc | CLOSED |

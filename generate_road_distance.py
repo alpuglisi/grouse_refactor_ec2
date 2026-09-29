@@ -78,7 +78,13 @@ from grouse_data import GrouseData
 from models import ROAD_DIST_MAX_M, road_dist_encode
 
 CACHE_DIR = "data/roads"
-TIGER_YEAR = 2023
+# TIGER/Line vintage. 2025 shapefiles were released September 2025
+# (database updates through May 2025); a 2026 vintage was in progress
+# for the geodatabase formats as of September 2026, so --tiger-year can
+# be raised once the shapefiles are confirmed live. Changing the
+# vintage changes road_dist's VALUES (not its geometry): re-run this
+# script, and the patch cache rebuilds itself from the new mtimes.
+TIGER_YEAR = 2025
 STATE_FIPS = {"ME": "23", "NH": "33", "VT": "50"}
 PAVED_MTFCC_DEFAULT = ["S1100", "S1200", "S1400", "S1630", "S1640"]
 
@@ -92,31 +98,31 @@ def _download(url, path):
     return path
 
 
-def county_fips(state_fp):
+def county_fips(state_fp, tiger_year=TIGER_YEAR):
     """County FIPS codes for a state, from TIGER's national county file
     (one ~80MB download, cached, shared by all three regions)."""
     import geopandas as gpd
-    path = os.path.join(CACHE_DIR, f"tl_{TIGER_YEAR}_us_county.zip")
-    _download(f"https://www2.census.gov/geo/tiger/TIGER{TIGER_YEAR}/COUNTY/"
-              f"tl_{TIGER_YEAR}_us_county.zip", path)
+    path = os.path.join(CACHE_DIR, f"tl_{tiger_year}_us_county.zip")
+    _download(f"https://www2.census.gov/geo/tiger/TIGER{tiger_year}/COUNTY/"
+              f"tl_{tiger_year}_us_county.zip", path)
     counties = gpd.read_file(path)
     sel = counties[counties["STATEFP"] == state_fp]
     return sorted(sel["COUNTYFP"].tolist())
 
 
-def load_paved_roads(region, mtfcc, target_crs):
+def load_paved_roads(region, mtfcc, target_crs, tiger_year=TIGER_YEAR):
     """Every county's TIGER roads for this state, filtered to the paved
     MTFCC classes and reprojected to the region raster's CRS."""
     import geopandas as gpd
     import pandas as pd
     state_fp = STATE_FIPS[region]
-    fips = county_fips(state_fp)
-    print(f"   {region}: {len(fips)} counties")
+    fips = county_fips(state_fp, tiger_year)
+    print(f"   {region}: {len(fips)} counties (TIGER {tiger_year})")
     frames = []
     for cf in fips:
-        name = f"tl_{TIGER_YEAR}_{state_fp}{cf}_roads.zip"
+        name = f"tl_{tiger_year}_{state_fp}{cf}_roads.zip"
         path = os.path.join(CACHE_DIR, name)
-        _download(f"https://www2.census.gov/geo/tiger/TIGER{TIGER_YEAR}/"
+        _download(f"https://www2.census.gov/geo/tiger/TIGER{tiger_year}/"
                   f"ROADS/{name}", path)
         gdf = gpd.read_file(path)
         kept = gdf[gdf["MTFCC"].isin(mtfcc)]
@@ -152,7 +158,7 @@ def build_distance_raster(roads, template_path):
     return road_dist_encode(dist_m), dist_m, transform, crs
 
 
-def process_region(region, data, mtfcc):
+def process_region(region, data, mtfcc, tiger_year=TIGER_YEAR):
     print(f"\n{'=' * 60}\n{region}\n{'=' * 60}")
     rd = data[region]
     template_feature = next(
@@ -176,7 +182,7 @@ def process_region(region, data, mtfcc):
 
     with rasterio.open(template) as src:
         target_crs = src.crs
-    roads = load_paved_roads(region, mtfcc, target_crs)
+    roads = load_paved_roads(region, mtfcc, target_crs, tiger_year)
     encoded, dist_m, transform, crs = build_distance_raster(roads, template)
     # Reported in METRES (the encoded raster is log-scaled - see
     # models.road_dist_encode). A median anywhere near ROAD_DIST_MAX_M
@@ -218,6 +224,11 @@ def main():
                     help="TIGER MTFCC road classes to treat as paved. "
                          "Default: %(default)s. Use S1100 S1200 for a "
                          "strict highways-only definition.")
+    ap.add_argument("--tiger-year", type=int, default=TIGER_YEAR,
+                    help="TIGER/Line vintage to download. Default: "
+                         "%(default)s. Raise it when a newer shapefile "
+                         "release is confirmed live; the URL pattern is "
+                         "unchanged across vintages.")
     args = ap.parse_args()
 
     try:
@@ -226,10 +237,10 @@ def main():
         raise SystemExit("generate_road_distance.py needs geopandas: "
                          "pip install geopandas")
 
-    print(f"Paved MTFCC classes: {args.mtfcc}")
+    print(f"Paved MTFCC classes: {args.mtfcc} | TIGER {args.tiger_year}")
     data = GrouseData()
     for region in args.regions:
-        process_region(region, data, args.mtfcc)
+        process_region(region, data, args.mtfcc, args.tiger_year)
     print("\nDone. Re-run train.py - 'road_dist' is now discoverable in "
          "FEATURE_SPEC/RASTER_FEATURES and will be picked up "
          "automatically. NOTE: this adds an input channel, which is a "

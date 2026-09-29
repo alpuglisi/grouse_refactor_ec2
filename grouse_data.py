@@ -142,17 +142,50 @@ RASTER_FEATURES = ["evt", "evh", "evc", "sclass", "fdist", "ch", "cc",
 # Year-matching policy: a sighting's year resolves to the exact raster
 # year when present, else the CLOSEST year (ties -> earlier year, i.e.
 # conditions that existed at sighting time). This tolerance is the
-# ACCEPTABILITY window: train.py EXCLUDES training records whose gap to
-# every feature's nearest vintage exceeds it (data that far from the
-# sighting date describes a different landscape), and raster_path warns
-# once per feature when a lookup outside it still resolves (validation
-# and analysis paths, which are not filtered).
+# ACCEPTABILITY window: train.py EXCLUDES training AND validation
+# records whose gap to any feature's nearest vintage exceeds it (data
+# that far from the sighting date describes a different landscape), and
+# raster_path warns once per feature when a lookup outside it still
+# resolves (the analysis scripts, which are not filtered).
 YEAR_MATCH_TOLERANCE = 2
 
 
 class MissingDataError(FileNotFoundError):
     """A requested file doesn't exist, with the resolved path in the
     message so the fix is obvious."""
+
+
+def grid_mismatch(src, ref, tol=1e-3):
+    """None when raster `src` sits on raster `ref`'s pixel grid - same
+    CRS, same pixel size, no rotation, pixel edges coincident (the
+    EXTENT may differ; a clip of the same grid is still the same grid).
+    Otherwise a short reason string.
+
+    The single definition of "same grid" for the project. dataset.py
+    refuses to build a training set from features that fail it,
+    realign_rasters.py fixes files that fail it, and
+    download_tcc_nlcd.py checks its output against it. Why it exists:
+    the training reader cuts each feature's 64x64 window from THAT
+    raster's own pixel grid, so two rasters in different projections
+    give windows whose axes point in different directions - measured at
+    11 px of corner misregistration between the Earth Engine products
+    (EPSG:5070) and the LFPS clips (a local Albers) before this check
+    existed. predict.py warps everything onto one grid, so the model
+    trained on rotated channels and was deployed on aligned ones."""
+    if src.crs != ref.crs:
+        return (f"CRS differs: {src.crs.to_string()[:60]!r} vs "
+                f"{ref.crs.to_string()[:60]!r}")
+    s, r = src.transform, ref.transform
+    if (abs(s.a - r.a) > tol * abs(r.a) or abs(s.e - r.e) > tol * abs(r.e)
+            or max(abs(s.b), abs(s.d), abs(r.b), abs(r.d)) > tol):
+        return (f"pixel size/rotation differs: ({s.a:g}, {s.e:g}) vs "
+                f"({r.a:g}, {r.e:g})")
+    dx = (s.c - r.c) / r.a
+    dy = (s.f - r.f) / r.e
+    if abs(dx - round(dx)) > tol or abs(dy - round(dy)) > tol:
+        return (f"pixel edges offset by ({dx - round(dx):+.3f}, "
+                f"{dy - round(dy):+.3f}) px")
+    return None
 
 
 # ==========================================
@@ -242,7 +275,7 @@ class RegionData:
         year, i.e. the conditions that existed at sighting time). A
         resolution farther than max_year_gap (default: the shared
         YEAR_MATCH_TOLERANCE constant, currently +/-2 years) still
-        resolves so unfiltered paths (validation, analysis) never
+        resolves so unfiltered paths (the analysis scripts) never
         hard-crash on sparse vintages, but prints a one-time
         warning naming the gap - the +/-1-year matching policy is
         enforced whenever the data allows and loud when it can't be.
@@ -289,13 +322,26 @@ class RegionData:
             return path
 
         # Resolved file exists but is invalid - fall back to the most
-        # recent valid year among everything else on disk.
+        # recent valid year among everything else on disk. Loud, once
+        # per (feature, year): an empty placeholder vintage (e.g. a
+        # LANDFIRE GeoArea not yet published when it was fetched) is
+        # legitimate to keep on disk while waiting for the real data,
+        # but nobody should discover months later that "2025" was 2024.
         for candidate_year in sorted(years, reverse=True):
             if candidate_year == year:
                 continue
             candidate_path = self.path("raster", feature=feature,
                                        year=candidate_year)
             if self._is_valid_raster(candidate_path):
+                key = (feature, year)
+                if key not in self._year_gap_warned:
+                    self._year_gap_warned.add(key)
+                    print(f"   [warn] [{self.region}] {feature} {year} is "
+                          f"on disk but empty (fails content validation) "
+                          f"- using {candidate_year} instead. Once "
+                          f"LANDFIRE publishes it, run download_rev.py "
+                          f"--refetch-empty (existing files are never "
+                          f"overwritten; the placeholder is backed up).")
                 return candidate_path
         raise MissingDataError(
             f"[{self.region}] every {feature} raster on disk ({years}) "

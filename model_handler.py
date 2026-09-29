@@ -286,6 +286,9 @@ class GrouseModelHandler:
         # when fit() was never called (e.g. loading a checkpoint).
         self._mem_fmt = torch.preserve_format
         self._clip_params = None
+        # What _pooled_logits calls: model.logits, or its compiled form
+        # once fit(compile_model=True) has installed one.
+        self._logits_fn = None
         if select_by not in ('loss', 'auc', 'rank', 'strict'):
             raise ValueError(f"select_by must be 'loss'/'auc'/'rank'/"
                              f"'strict', got {select_by!r}")
@@ -381,6 +384,7 @@ class GrouseModelHandler:
                  f"drop_path={early_attn_droppath}, "
                  f"lr_factor={early_attn_lr_factor} "
                  f"(zero-init: identity at start).")
+        self._logits_fn = self.model.logits
         print(f"GrouseModelHandler: device={self.device.type}, "
               f"categorical={self.cat_features}, "
               f"continuous={self.cont_features}, "
@@ -389,11 +393,26 @@ class GrouseModelHandler:
 
     # ---- internals -------------------------------------------------------
     def _pooled_logits(self, cat_x, cont_x, tta=False):
-        out = self.model.logits(cat_x, cont_x)
+        """The logit the training and validation loops consume. With
+        tta (validation) and flip_tta, the mirrored view is scored in
+        the SAME forward pass as the original - the two batches are
+        concatenated, run once, and averaged - instead of two calls.
+        Same numbers (verified bit-identical on CPU: eval-mode
+        BatchNorm uses running statistics, so nothing depends on batch
+        composition), half the kernel launches, and one forward of 2B
+        instead of two of B; memory per validation forward doubles,
+        which is within the documented eval batch sizes (early_attn
+        models keep the training batch, others widen to 512).
+
+        Routed through self._logits_fn so fit(compile_model=True) can
+        swap in a torch.compile'd version of model.logits without the
+        callers knowing."""
         if tta and self.flip_tta:
-            out = 0.5 * (out + self.model.logits(cat_x.flip(-1),
-                                                 cont_x.flip(-1)))
-        return out
+            b = cat_x.shape[0]
+            out = self._logits_fn(torch.cat([cat_x, cat_x.flip(-1)]),
+                                  torch.cat([cont_x, cont_x.flip(-1)]))
+            return 0.5 * (out[:b] + out[b:])
+        return self._logits_fn(cat_x, cont_x)
 
     def _batch_loss(self, criterion, outputs, y, w, smooth=None,
                     margin=False, teacher_p=None, distill_alpha=None):
@@ -474,6 +493,16 @@ class GrouseModelHandler:
                            "dual_branch": self.model.dual_branch,
                            "dual_branch_channels":
                                self.model._dual_branch_channels,
+                           # Embedding-table rows per categorical
+                           # feature. Geometry, like the keys above,
+                           # but it also lives in the state dict itself
+                           # (embeddings.<f>.weight), which is what
+                           # loaders read (models.spec_with_checkpoint_
+                           # vocab); recorded here so --resume's
+                           # geometry comparison names a vocab change
+                           # instead of failing on a tensor shape.
+                           "vocab": {f: int(self.spec[f]["vocab"])
+                                     for f in self.cat_features},
                            # Not geometry, but consumers of the LOGITS
                            # need it: an asymmetric objective (an_full
                            # with lambda != 1, focal with alpha != 0.5)
@@ -596,6 +625,16 @@ class GrouseModelHandler:
               f"{f'; {len(mismatched)} shape-mismatched skipped' if mismatched else ''}"
               f"{f'; {len(absent)} checkpoint-only ignored' if absent else ''}. "
               f"Loaded parameters train in the backbone LR group.")
+        if mismatched:
+            # Name them: a mismatch is either a feature-set change (stem
+            # width) or an embedding vocab change (table rows) - both
+            # are documented cold-start geometry changes, and the
+            # tensor names say which.
+            shown = ", ".join(
+                f"{k} {tuple(state[k].shape)}->{tuple(msd[k].shape)}"
+                for k in mismatched[:6])
+            print(f"   [note] shape-mismatched (stay fresh): {shown}"
+                  f"{' ...' if len(mismatched) > 6 else ''}")
         if cfg and cfg.get("features"):
             here = set(self.cat_features) | set(self.cont_features)
             if set(cfg["features"]) != here:
@@ -604,6 +643,50 @@ class GrouseModelHandler:
                       f"{sorted(here)} - shared tensors transferred, "
                       f"the rest stay fresh.")
         return set(matched)
+
+    def _install_compiled_logits(self, dynamic_dropout):
+        """--compile: torch.compile the scoring path. It is model.logits
+        that has to be compiled, NOT the module: torch.compile(module)
+        only wraps forward(), and this project scores through logits()
+        (pooling + centre skip + Branch B), which forward() never
+        touches - predict.py's --compile was a silent no-op for exactly
+        that reason. Installed AFTER the channels_last conversion so the
+        traced graph sees the final parameter tensors.
+
+        Numerics: inductor fuses and reorders elementwise chains, so
+        eval-mode outputs match eager to floating-point rounding
+        (measured 1.5e-8 on CPU, fp32), not bit-for-bit. In TRAIN mode
+        there is a second, larger difference: inductor lowers dropout
+        to its own RNG, so the dropout masks are different draws from
+        the same Bernoulli(p) - the training trajectory is therefore a
+        different random path, like a different seed, not a rounding
+        perturbation (measured on a 2-epoch synthetic run: epoch-1 loss
+        0.1217 eager vs 0.1219 compiled, epoch-2 0.1174 vs 0.1196, same
+        val metrics to 3 decimals). Dropout VALUES and their schedule
+        are unchanged. Opt-in for both reasons.
+
+        --dynamic-dropout: _set_dropout mutates nn.Dropout.p and
+        model.embed_dropout - module attributes, which dynamo guards on
+        as constants - so every NEW dropout value recompiles the graph
+        (measured: 4 distinct values -> 4 unique graphs, and
+        specialize_float=False does not change that, since these are
+        attributes rather than call arguments). Two consequences, one
+        handled here: dynamo stops compiling and silently falls back to
+        EAGER once cache_size_limit (default 8) distinct variants exist,
+        which a 0.01 step reaches by the ninth change - so the limit is
+        raised well past what the schedule can produce. The remaining
+        cost is one recompile per epoch in which dropout moved (tens of
+        seconds each), which is small against an epoch but not zero -
+        the reason --compile is a flag, not the default."""
+        import torch._dynamo
+        cfg = torch._dynamo.config
+        if dynamic_dropout:
+            cfg.cache_size_limit = max(getattr(cfg, "cache_size_limit", 8),
+                                       128)
+        self._logits_fn = torch.compile(self.model.logits)
+        print(f"   torch.compile: model.logits compiled (first train and "
+              f"first eval batch pay the compile)"
+              f"{'; dynamic dropout: expect one recompile per epoch the dropout value changes (cache limit raised so it never falls back to eager)' if dynamic_dropout else ''}.")
 
     # ---- training --------------------------------------------------------
     def _eval_batch_size(self, batch_size, requested=None):
@@ -624,7 +707,8 @@ class GrouseModelHandler:
             tb_images=True, tb_attention=True, tb_embeddings=True,
             tb_embeddings_every=10, resume_from=None, dynamic_dropout=False,
             dynamic_dropout_min=None, dynamic_dropout_max=None,
-            dynamic_dropout_step=0.01, distill_alpha=None):
+            dynamic_dropout_step=0.01, distill_alpha=None,
+            compile_model=False):
         """train_labels + optional batch_pos_frac enable STRATIFIED
         batching: every training batch contains both classes at a fixed
         composition (dataset's global ratio by default), so a constant
@@ -664,6 +748,8 @@ class GrouseModelHandler:
             self.model = self.model.to(memory_format=torch.channels_last)
             self._mem_fmt = torch.channels_last
         chan_last = self._mem_fmt
+        if compile_model:
+            self._install_compiled_logits(dynamic_dropout)
         # Cached once: clip_grad_norm_ otherwise re-walks the whole
         # module tree to rebuild this list on every step.
         self._clip_params = [p for p in self.model.parameters()
@@ -750,6 +836,25 @@ class GrouseModelHandler:
                 "fill due to a raster CRS/bounds mismatch. (The dataset's "
                 "construction-time probe should also have caught this - "
                 "if you're seeing this, inspect the patch reads.)")
+        # VOCAB check: embed() clamps every categorical code into
+        # [0, vocab-1], so a code at or above the vocab is silently
+        # merged into the top index - nothing crashes, the feature just
+        # loses whatever those codes meant. That is exactly how the
+        # LANDFIRE herbaceous block (EVC 310-399, EVH 301-310) vanished
+        # under the old vocab of 300. Checked here on the same spread
+        # sample, loudly, so a code space outgrowing FEATURE_SPEC can't
+        # do it again unnoticed.
+        for k, name in enumerate(self.cat_features):
+            vocab = int(self.spec[name]["vocab"])
+            top = int(cat_x[:, k].max())
+            if top >= vocab:
+                n_over = int((cat_x[:, k] >= vocab).sum())
+                print(f"   [warn] {name}: codes up to {top} seen in the "
+                      f"sample but vocab is {vocab} - {n_over:,} pixels "
+                      f"({100.0 * n_over / cat_x[:, k].numel():.2f}%) "
+                      f"will be CLAMPED onto index {vocab - 1} and lose "
+                      f"their meaning. Raise FEATURE_SPEC['{name}']"
+                      f"['vocab'] (a cold-start geometry change).")
         self.model.train()
         with torch.no_grad():
             init_logits = self._pooled_logits(cat_x.to(self.device),
@@ -1688,8 +1793,11 @@ class GrouseModelHandler:
                 w = w.to(dev, non_blocking=True)
                 if all_nlcd is not None:
                     hh, ww = cat_x.shape[-2:]
-                    all_nlcd.append(
-                        cat_x[:, nlcd_idx, hh // 2, ww // 2].cpu())
+                    # Kept on device: a .cpu() here was one forced
+                    # synchronization per validation batch, undoing the
+                    # accumulate-then-read-once pattern this loop is
+                    # built on. Gathered with the logits at the end.
+                    all_nlcd.append(cat_x[:, nlcd_idx, hh // 2, ww // 2])
                 # smooth=0.0: validation loss must stay on the same
                 # scale regardless of the training-side smoothing, or
                 # runs aren't comparable.
@@ -1719,7 +1827,7 @@ class GrouseModelHandler:
                 all_y.append(y.squeeze(1))
         logits = torch.cat(all_logits).cpu().numpy()
         ys = torch.cat(all_y).cpu().numpy()
-        nlcd_codes = (torch.cat(all_nlcd).numpy()
+        nlcd_codes = (torch.cat(all_nlcd).cpu().numpy()
                      if all_nlcd is not None else None)
         val_loss = float(val_loss)
         correct = int(correct)

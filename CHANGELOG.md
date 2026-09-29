@@ -16,6 +16,394 @@ the diff.
 
 ---
 
+## Training-loop throughput: same numbers, fewer operations (2026-09-20)
+
+Constraint for this pass: wall-clock only - nothing the model sees,
+learns from, or does may change. Every change below was checked
+against a clean checkout of the previous commit on synthetic data (the
+fake-RegionData + patched `_read_patch` harness), by capturing outputs
+BEFORE editing and comparing AFTER: 113 dataset items across the
+augmented, deterministic, soft-label and SSL-pair paths bit-identical
+in values and dtypes, and all 17 outputs of `evaluate()` identical.
+No real data or GPU exists in the environment that made these, so the
+speedups are argued from profiles and kernel counts, not measured on
+the training box - `bench_pipeline.py` is the protocol for that.
+
+**1. Loader: no pandas in the per-item path** (`dataset.py`).
+Profiled on the cached path (the steady state after epoch 1): 238 us
+per item, of which `df.iloc[i]` was 39 us and an avoidable float32 copy
+of the int16 cache block another ~35 us. Per-point columns are now
+plain arrays built once; the label/weight/soft-label tensors are
+pre-built so an item returns a 0-d view; `_raw_stack` hands the cache's
+int16 block through and `_to_tensors` converts each half straight to
+its target dtype. After: 89 us per item on the augmented path (2.7x),
+50 us on the validation path. This matters exactly when the loader is
+the bottleneck, which train.py's own comments say it is; the
+`--jitter`, `expand_rotations`, D4 and RNG draw order are untouched.
+
+**2. Validation TTA in one forward pass** (`model_handler._pooled_logits`).
+The mirrored view was a second `model.logits` call per batch; it is now
+concatenated onto the batch and scored in the same call. Bit-identical
+(eval-mode BatchNorm uses running statistics, so nothing depends on
+batch composition - verified `torch.equal` on CPU), half the kernel
+launches for the whole validation pass, one forward of 2B instead of
+two of B. Memory per validation forward doubles, inside the documented
+eval batch sizes. Incidentally measured on this CPU: the synthetic
+validation pass went from 51 s to 35 s.
+
+**3. One less sync per validation batch** (`model_handler.evaluate`).
+The nlcd centre-code gather did `.cpu()` every batch - one forced
+device synchronization per batch, in a loop built on the
+accumulate-then-read-once pattern. Kept on device, gathered at the end.
+
+**4. `--compile` (opt-in)** (`train.py`, `model_handler.fit`). Compiles
+`model.logits` - the module's `forward()` is never what training calls,
+which is why predict.py's `--compile` was a no-op. Eval outputs match
+eager to floating-point rounding (1.5e-8 on CPU fp32), NOT bit-for-bit,
+because inductor fuses and reorders elementwise chains. In train mode
+the difference is larger and worth knowing: inductor lowers dropout to
+its own RNG, so the masks are different draws from the same
+Bernoulli(p) and the run follows a different random trajectory - the
+same kind of difference as a different `--seed`, not a change to what
+dropout does (2-epoch synthetic run: epoch-1 loss 0.1217 eager vs
+0.1219 compiled, epoch-2 0.1174 vs 0.1196, val metrics equal to 3
+decimals). Hence a flag, off by default.
+With `--dynamic-dropout` every new dropout value recompiles (measured:
+`nn.Dropout.p` is a module attribute dynamo treats as a constant); the
+recompile cache limit is raised so it can never silently fall back to
+eager, and the cost is one recompile per epoch the value moved.
+Untested on a GPU; the fit() path ran compiled end to end on CPU with
+EMA and dynamic dropout on.
+
+**Not done, deliberately:** bf16 autocast (changes values), fusing the
+four `torch.randint` draws in `_augmented_view` (the draw order is a
+documented reproducibility contract), batching predict.py's eight D4
+views (out of this pass's scope: train loop only).
+
+**Protocol** (`bench_pipeline.py`): `loader` samples/s with the GPU
+idle, `eval` seconds for one validation pass, `train` samples/s over
+N real fit() steps; run once per revision, twice each, keep the second.
+
+**Measured on the training box** (ME+NH+VT, 47,244 train items, batch
+32, 14 workers, early_attn + keep_early_resolution + dual_branch unet):
+
+| | loader /s | validation pass | train step /s |
+|---|---|---|---|
+| before (6499e43) | 5,590 | 5.6 s | ~930 |
+| after, eager | 5,560 | 4.1 s | ~900 |
+| after, `--compile` | 5,676 | 3.3 s | 1,436 |
+
+Reading: the loader has 6x headroom over the GPU at 14 workers, so
+change 1 cannot show here (it would with fewer workers). The step rate
+is GPU-bound and unchanged by changes 2-3; the validation pass is 27%
+faster (41% compiled). `--compile` is a 1.6x on the step itself, about
+a third off an epoch - BUT the train-mode compile costs ~25 s, and with
+`--dynamic-dropout` every new dropout value recompiles, so a 36 s
+compiled epoch plus a 25 s recompile is slower than the 56 s eager
+epoch. Guidance: `--compile` without dynamic dropout, eager with it.
+Holding the dropout probability in a tensor buffer (a custom dropout
+module) would remove the recompile entirely; not done, since it
+changes the model's dropout implementation and the eager random
+stream, which is a decision for the owner.
+
+---
+
+## Validation now filtered by the same year-gap rule as training
+## (2026-09-20)
+
+`filter_by_year_gap` applied to training records only; validation kept
+every point, resolving old sightings to whatever vintage was nearest,
+however far. The original reason was comparability across the policy's
+introduction (`6659f57`). Reversed on request: a validation point scored
+against a raster more than 2 years from its sighting is not evidence
+about that landscape either, so the metric it contributes to measures
+the wrong thing, and predict.py's latest-vintage rule means deployment
+never sees such a gap. Training, validation and (by construction)
+prediction now all sit inside one tolerance. `--max-year-gap` is the
+flag's new name; `--max-train-year-gap` remains as an alias. Expect the
+validation count to drop on the next run (the exclusion lines name how
+many, per region and set) and validation metrics to shift accordingly -
+they are not comparable with runs before this change. calibrate.py
+builds its validation set through the same function, so calibration
+sees the filtered set too.
+
+---
+
+## Data-access findings adopted from an external source review
+## (2026-09-20)
+
+An external research pass over the five raster sources reported these
+points; each was weighed against the code rather than taken on faith,
+and the network here could not reach any of the hosts to verify them,
+so every change below is written to be correct under either outcome.
+
+**LF2025 for New England does not exist yet.** LANDFIRE's delivery
+schedule puts the NE vegetation GeoArea (EVT/EVH/EVC/CH/CC) at
+November 2026 and SClass for every extent at December 2026; the live
+`Landfire_LF2025` folder lists no SClass at all. The empty 2025 clips
+on the box are therefore expected, and the placeholder handling in the
+entry below is the right posture until then. Adopted: `download_rev.py`
+now reads the per-vintage ArcGIS folder listing
+(`.../arcgis/rest/services/Landfire_LF{year}?f=pjson`) before planning
+and skips any product the vintage does not publish, with one line per
+skipped product. An unreachable listing degrades to the old behaviour
+(try the job) rather than blocking. The post-download content check
+stays: a product can be listed for CONUS and still be empty for one
+GeoArea.
+
+**TCC v2025-6 asset ID spelling.** The report says the Earth Engine
+asset is `.../TCC/Product_Version/2025-6` (slash) while the code probed
+`.../TCC/Product_Version_2025-6` (underscore, the catalog page slug).
+Unverifiable from here - and it matters because a wrong spelling fails
+the probe SILENTLY and `resolve_collection` falls back to v2023-5,
+losing 2024 and 2025 TCC. Adopted: both spellings are probed, slash
+first, and `resolve_collection` now prints which collection it settled
+on and which it skipped. **Check on the box:** if
+`data/landfire/ME_2024_tcc.tif` or `ME_2025_tcc.tif` do not exist, the
+probe had been failing; re-run `download_tcc_nlcd.py --features tcc`
+after pulling and watch the `[note] using ...` line.
+
+**Annual Disturbance bundle filename.** Seen under both
+`USAnnualDisturbance_1999_present.zip` and (post-January-2026
+renaming) `AnnualDisturbance_1999_present.zip`. Adopted: both names
+tried in order, partial downloads removed on failure, and an existing
+cached copy under either name is reused. Final Dist25 is scheduled for
+September 2026: re-pull the bundle once it lands so `tsd` for 2025
+reflects observed disturbance rather than the clock running on 2024.
+
+**TIGER/Line vintage.** 2025 shapefiles were released September 2025.
+Adopted: `TIGER_YEAR` 2023 -> 2025, exposed as `--tiger-year` for the
+2026 release once confirmed. This changes road_dist VALUES (new roads,
+realigned geometry) not model geometry; re-run
+`generate_road_distance.py` to take it, the cache rebuilds itself.
+
+**Not adopted, deliberately:**
+- Topo codes: the report flags `LF{year}_SlpD` for years other than
+  2020 and `SlpD` meaning degrees. The code already fetches topo at
+  LF2020 only and copies it; neither slope nor aspect is in
+  `FEATURE_SPEC`, so the unit is moot until terrain is revisited.
+- Switching LFPS jobs to per-layer ImageServer `exportImage`, and
+  per-year `exportImage` clips instead of the 1.9 GB disturbance
+  bundle: real transfer savings, but a rewrite of two working
+  downloaders for data that is already on disk. Recorded here as the
+  route to take if either downloader has to be redone.
+- Caching Annual NLCD from MRLC instead of the community Earth Engine
+  asset: the EE asset is current (2025 layers added August 2026); the
+  risk is real but not worth a new ingestion path today.
+- TreeMap 2023 via the RDS archive: the EE probe-and-fallback picks
+  v2023 up automatically once it is catalogued; band names are already
+  verified at runtime by `resolve_band`.
+
+---
+
+## Empty placeholder vintages: keep them, but say so and re-fetch them
+## (2026-09-20)
+
+The 2025 EVC clips on the box are all-nodata placeholders from before
+`download_rev.py` validated content - LANDFIRE had not published that
+GeoArea. They are deliberately kept on disk while the real data is
+being obtained, which was already safe (`raster_path` content-validates
+and falls back to the newest valid vintage) but silent, and
+`download_rev.py` skipped any existing file, so the placeholder would
+have blocked the real download forever. Now: `raster_path` warns once
+per (feature, year) when it substitutes a vintage for an empty file,
+and `plan_tasks` can re-plan an existing file below
+`MIN_VALID_PIXEL_FRAC` - but only with `--refetch-empty`. **The default
+is to skip every existing file, placeholder or not** (asked for
+explicitly, after a first version that re-fetched by default). Verified
+with a synthetic empty 2025 raster beside a valid 2024 one.
+
+**`download_rev.py` never overwrites or deletes an existing file**
+(asked for explicitly: the placeholders are being kept while the real
+data is sourced). It used to extract straight onto the final path and
+`os.remove` it when the content check failed - a re-fetch that came
+back empty again would have deleted the placeholder. Now every download
+lands in a temp file, is validated there, and only a valid result moves
+into place; whatever was at that path first moves, unchanged, to
+`data/landfire/replaced/` (a subdirectory the discovery globs never
+see; an earlier backup of the same name gets a timestamp rather than
+being replaced). Attribute-table sidecars already on disk are left
+alone too. With the default (no `--refetch-empty`) the script never
+touches an existing path at all. Verified end to end against a mocked
+LFPS: an empty re-fetch
+leaves the placeholder byte-identical and no temp files; a valid one
+backs it up and installs the new file; a second valid one keeps both
+backups.
+
+---
+
+## tcc/nlcd were on a different pixel grid from every other feature:
+## rotated 11 px against the rest of every training patch (2026-09-20)
+
+Found by tracing the raster-to-tensor path after the vocab review, and
+measured on the training box before anything was changed. Every
+feature writer but one builds on the region's template grid (the
+latest EVT clip, in the LFPS per-request local Albers):
+`generate_road_distance.py` rasterizes onto it, and
+`generate_time_since_disturbance.py` / `generate_treemap_features.py`
+warp onto it. `download_tcc_nlcd.py` did not - it wrote tcc and nlcd on
+Earth Engine's EPSG:5070 lattice. Two Albers projections with different
+central meridians have grid norths that differ by the meridian
+convergence, so the two grids are rotated relative to each other.
+
+That matters because `dataset.py` cuts each feature's 64x64 window
+from that feature's OWN raster grid (it transforms the point into each
+raster's CRS and reads around the pixel it lands in). The centre pixel
+agrees across channels; the window axes do not. Measured for a point in
+Maine: road_dist and tsd 0 px off the evt window at every corner, nlcd
+and tcc **11 px** off. So every training patch carried land cover and
+canopy cover rotated against the other thirteen channels, out to a
+third of the patch width at the corners.
+
+Nothing could show it. Validation is built by the same reader, so val
+metrics were internally consistent with the rotated data. `predict.py`
+wraps every raster in a WarpedVRT onto the reference grid, so the
+deployed model saw ALIGNED inputs it had never trained on - and
+`inspect_point.py` goes through that same aligned path, so "checking
+the model's raw inputs" could never reveal what training actually
+saw. The train/serve skew is silent by construction.
+
+Fixed in three places, one definition:
+- `grouse_data.grid_mismatch(src, ref)` is the single definition of
+  "same grid": same CRS, same pixel size, no rotation, pixel edges
+  coincident. Extent may differ (a clip of the grid is still the grid).
+- `realign_rasters.py` warps every raster that fails it onto the
+  region's template grid, nearest-neighbour. It never overwrites data:
+  the unaligned original is moved, byte-for-byte, into
+  `data/landfire/unaligned/` (a subdirectory, so no discovery glob sees
+  it; `--backup-dir` relocates it; an existing backup is never
+  replaced) and the realigned raster is written at the original path.
+  Dry run by default, `--apply` writes. The patch cache keys on raster
+  mtimes so it rebuilds itself.
+- `dataset.py` now checks every raster it will read against the first
+  one at construction and REFUSES a mixed set, naming the files and the
+  fix. Hard failure on purpose: a model trained on rotated channels is
+  wrong in a way nothing downstream can detect.
+- `download_tcc_nlcd.py` warps its merged 5070 mosaic onto the template
+  before writing, so new downloads land aligned; with no LANDFIRE clip
+  on disk yet it keeps 5070 and says so, and the dataset guard catches
+  it later.
+
+**Action on the box: `python realign_rasters.py --apply`, then retrain
+from scratch.** Every existing checkpoint was trained on the rotated
+channels; the aligned inputs are a different distribution.
+
+Not changed: `predict.py`'s VRT alignment stays as a safety net, but it
+is no longer the mechanism by which inputs become co-registered - the
+files are.
+
+Verified with synthetic rasters (a local-Albers template and an
+EPSG:5070 raster carrying a ground-truth field keyed to lon/lat):
+11 px corner misregistration before, the same figure the box reported;
+the dataset guard refuses the pair by name; after `warp_to_grid` the
+misregistration is 0 px, the warped pixels agree with the template's
+ground truth at 94% (the rest is checkerboard-edge nearest-neighbour
+noise), and the dataset builds. A same-CRS clip at a different extent
+passes `grid_mismatch`; a 0.4 px edge offset fails it.
+
+---
+
+## models.py: evh/evc vocab 300 was clamping LANDFIRE's entire
+## herbaceous block onto one shrub code (2026-09-20)
+
+Found by static review, then confirmed against the official LANDFIRE
+Attribute Data Dictionaries for every vintage on disk (LF2022-LF2025).
+Since the LF 2016 Remap, EVC and EVH are laid out in three life-form
+blocks: EVC tree 110-199 / shrub 210-299 / herb 310-399 (one code per
+percent), EVH tree 101-199 / shrub 201-230 / herb 301-310 (decimetre
+steps). `FEATURE_SPEC` had `vocab: 300` for both, and
+`GrouseResNet.embed` clamps every code into `[0, vocab-1]` - so all
+90 EVC herb codes and all 10 EVH herb codes were being mapped to index
+299 before the embedding lookup. For EVC, 299 is a LIVE code, "Shrub
+Cover >= 99%": every herb-dominated pixel (openings, hayfields, wet
+meadows - the drumming and brood-foraging cover this species keys on)
+was handed the densest-shrub embedding, and herb cover percent was
+unlearnable. For EVH, 299 is undefined, so herb height collapsed to one
+dead index rather than aliasing. Nothing crashed, nothing warned; the
+codes survive intact in the rasters and the int16 patch cache, and the
+loss happened only at the clamp. The vocab appears to have been carried
+over from the original project's hardcoded embeddings, sized for the
+pre-Remap 10%-binned codes (101-129), and never revisited when LF2022
+vintages arrived.
+
+`sclass` (max 180), `evt` (documented domain 4401-9994, vocab 10000)
+and `fdist` (max 733, vocab 10000) are unaffected.
+
+Fixed: `evh`/`evc` vocab -> 512. The documented maximum is 399; 512
+costs nothing and leaves headroom. **This is a cold-start geometry
+change** - the embedding tables are in the state dict, so `--resume`
+and `--init-from` are invalid against every earlier checkpoint
+(`load_backbone` skips the two mismatched tables by name and transfers
+the rest, which is its documented behaviour; `--resume`'s config
+comparison now includes `vocab` so it names the change instead of
+failing on a tensor shape).
+
+**Existing checkpoints stay deployable.** `predict.py`, `calibrate.py`,
+`train.score_ensemble` and the `--distill-from` loader now rebuild each
+categorical feature's vocab from the checkpoint's own
+`embeddings.<f>.weight` rows (`models.spec_with_checkpoint_vocab`),
+not from today's `FEATURE_SPEC`. A pre-change checkpoint therefore
+loads with vocab 300 and keeps clamping at inference exactly as it did
+in training - the right behaviour for THAT model, whose weights only
+know the collapsed code. The fix for the collapse itself is a retrain.
+
+Added a loud guard so this class of bug can't recur silently:
+`fit()`'s init-time feed check now compares each categorical feature's
+maximum code in the spread sample against its vocab and warns by name
+with the affected pixel fraction. `scan_codes.py` does the same over
+the rasters on disk, per region and vintage, against FEATURE_SPEC.
+
+Confirmed on the training box before the change was committed: the
+downloaded `LF2024_EVC.csv`/`LF2025_EVC.csv` tables run to 399 and
+`LF2024_EVH.csv`/`LF2025_EVH.csv` to 310 (SClass to 180), and the
+ME/NH/VT rasters themselves carry EVC codes up to 385 and EVH codes
+303-310 in every 2023/2024 vintage. (The first-draft scan script in
+`research_request_vocab_and_distill.md` passed a 3-D `out_shape` to a
+single-band read and so sampled only the first decimated row - its
+code lists were right, its percentages were not; `scan_codes.py` reads
+the full decimated band.)
+
+Not done, deliberately: re-encoding EVC/EVH as (life-form class +
+ordinal scalar) instead of one embedding row per code. The codes are
+ordinal within a block and categorical across blocks, and a per-code
+table has to learn 90 near-identical vectors from data. That is a
+better representation and the same cold start, but it is a modelling
+change, not a bug fix, and is left as a decision for the next retrain.
+
+Verified offline with synthetic checkpoints (no real data or torch GPU
+here): a wrapped checkpoint written under vocab 300 loads through
+`spec_with_checkpoint_vocab` and scores; the same state fails against
+the bare new spec with the expected embedding-shape error; a
+post-change checkpoint round-trips; and `--distill-from`'s feature
+check rejects a mismatched teacher with the new message.
+
+---
+
+## train.py: `--distill-from` rebuilt teachers from the disk feature
+## list, not their own (2026-09-20)
+
+`predict.py` and `calibrate.py` treat a wrapped checkpoint's
+`config["features"]` as authoritative (ARCHITECTURE.md invariant). The
+`--distill-from` loader did not: it built every teacher from THIS run's
+disk-discovered feature list. A teacher trained on a different set
+either failed with a raw tensor-shape traceback or - when the channel
+counts happened to agree - loaded cleanly and read one feature's
+channel as another, emitting confident nonsense as the soft target with
+no error anywhere.
+
+Fixed by refusing: the teacher's feature list (compared in spec order,
+so an explicit `--features` given in another order still matches) must
+equal this run's, and the error names the missing and extra features
+and the two remedies (restore the teacher's rasters / `--features`, or
+retrain the teachers). Supporting mixed feature sets was rejected - a
+teacher is scored on the student's patches, so it would need one
+dataset per distinct teacher list. Bare teachers with no config warn
+and fall through to the shape check. Teachers also now rebuild with
+their own embedding vocab (see the entry above), so a pre-vocab-change
+member can still teach a post-change student.
+
+---
+
 ## train.py: `--distill-from` - collapse an ensemble into one deployable
 ## checkpoint via distillation, not weight-averaging (2026-09-20)
 

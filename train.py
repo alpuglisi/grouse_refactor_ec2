@@ -166,12 +166,13 @@ def sample_background_points(rd, features, n, seed=0):
 
 
 def filter_by_year_gap(df, rd, features, tolerance, what, region):
-    """Drop TRAINING records whose sighting year has no raster within
-    +/-tolerance years for one or more features - environmental data
-    that far from the sighting date describes a different landscape, so
-    the record is not evidence about its own label. Records with no
-    year are kept (the dataset assigns them the latest vintage, i.e.
-    they claim current conditions). tolerance < 0 disables."""
+    """Drop records (training and validation alike) whose sighting year
+    has no raster within +/-tolerance years for one or more features -
+    environmental data that far from the sighting date describes a
+    different landscape, so the record is not evidence about its own
+    label. Records with no year are kept (the dataset assigns them the
+    latest vintage, i.e. they claim current conditions). tolerance < 0
+    disables."""
     if (tolerance < 0 or 'year' not in df.columns
             or df['year'].isna().all()):
         return df
@@ -251,14 +252,27 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
                                     flip_tta=flip_tta)
     for region_i, region in enumerate(regions):
         rd = data[region]
-        # Year-gap exclusion applies to TRAINING only. Validation keeps
-        # every point so metrics stay comparable across runs and across
-        # this policy's introduction (old-year val points still carry
-        # the once-per-feature staleness warning from grouse_data).
+        # Year-gap exclusion applies to training AND validation with the
+        # same tolerance: a validation point scored against a raster
+        # more than `train_year_gap` years from its sighting is not
+        # evidence about that landscape either, and predict.py's
+        # latest-vintage rule already means deployment never sees such
+        # a gap. (Validation was previously left unfiltered to keep
+        # metrics comparable across the policy's introduction; that
+        # comparability has been spent, and a val set holding records
+        # the training set would refuse measured the wrong thing.)
         pos_df = filter_by_year_gap(rd.positives("train"), rd, features,
-                                    train_year_gap, "positive", region)
+                                    train_year_gap, "train positive",
+                                    region)
         neg_df = filter_by_year_gap(rd.negatives("train"), rd, features,
-                                    train_year_gap, "negative", region)
+                                    train_year_gap, "train negative",
+                                    region)
+        val_pos_df = filter_by_year_gap(rd.positives("val"), rd, features,
+                                        train_year_gap, "val positive",
+                                        region)
+        val_neg_df = filter_by_year_gap(rd.negatives("val"), rd, features,
+                                        train_year_gap, "val negative",
+                                        region)
         # Rotation expansion applied to BOTH classes (symmetric 4x ->
         # 1:1 effective balance; see earlier collapse diagnosis).
         p_tr = GrousePatchDataset(pos_df, rd, cat_f, cont_f,
@@ -294,10 +308,10 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
         # val scores stay comparable across runs (and so the evaluator can
         # average them per point as test-time augmentation).
         val_parts.append(GrousePatchDataset(
-            rd.positives("val"), rd, cat_f, cont_f, img_size=img_size,
+            val_pos_df, rd, cat_f, cont_f, img_size=img_size,
             expand_rotations=True, label=1.0, cache_dir=cache_dir))
         val_parts.append(GrousePatchDataset(
-            rd.negatives("val"), rd, cat_f, cont_f, img_size=img_size,
+            val_neg_df, rd, cat_f, cont_f, img_size=img_size,
             expand_rotations=True, label=0.0, cache_dir=cache_dir))
     return (ConcatDataset(train_parts), ConcatDataset(val_parts),
             np.concatenate(train_labels))
@@ -335,7 +349,7 @@ def score_ensemble(members, features, val_ds, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     loader = DataLoader(val_ds, batch_size=256, num_workers=args.workers)
     per_member, ys = [], None
-    from models import config_to_model_kwargs
+    from models import config_to_model_kwargs, spec_with_checkpoint_vocab
     for path, pool in members:
         state, cfg = GrouseModelHandler.unwrap_checkpoint(
             torch.load(path, map_location=device, weights_only=True))
@@ -352,8 +366,9 @@ def score_ensemble(members, features, val_ds, args):
             early_attn_kv_stride=args.early_attn_kv_stride,
             dual_branch=args.dual_branch,
             dual_branch_channels=args.dual_branch_channels))
-        model = GrouseResNet(cat_f, cont_f, pretrained=False,
-                             **kw).to(device).eval()
+        model = GrouseResNet(cat_f, cont_f,
+                             spec=spec_with_checkpoint_vocab(state),
+                             pretrained=False, **kw).to(device).eval()
         model.load_state_dict(state)
         outs, labels = [], []
         with torch.no_grad():
@@ -449,15 +464,19 @@ def main():
     parser.add_argument("--jitter", type=int, default=0,
                         help="Random center offset in pixels for training "
                              "augmentation (0 = off).")
-    parser.add_argument("--max-train-year-gap", type=int, default=2,
-                        help="TRAINING records are EXCLUDED when their "
-                             "sighting year has no raster within this "
-                             "many years for one or more features - "
-                             "environmental data that stale describes a "
-                             "different landscape than the sighting saw. "
-                             "Validation is never filtered (metrics stay "
-                             "comparable across runs). -1 disables and "
-                             "restores nearest-year-whatever-the-gap.")
+    parser.add_argument("--max-year-gap", "--max-train-year-gap",
+                        dest="max_train_year_gap", type=int, default=2,
+                        help="Training AND validation records are "
+                             "EXCLUDED when their sighting year has no "
+                             "raster within this many years for one or "
+                             "more features - environmental data that "
+                             "stale describes a different landscape than "
+                             "the sighting saw. Same rule for both sets, "
+                             "and predict.py's latest-vintage rule means "
+                             "deployment never sees a larger gap either. "
+                             "(--max-train-year-gap is the old name, kept "
+                             "as an alias.) -1 disables and restores "
+                             "nearest-year-whatever-the-gap.")
     parser.add_argument("--augment", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="Random D4 orientation (+ jitter, if set) per "
@@ -828,6 +847,17 @@ def main():
                              "not recomputed per epoch. Incompatible with "
                              "--ensemble > 1 (ambiguous which model would "
                              "be the student).")
+    parser.add_argument("--compile", action="store_true",
+                        help="torch.compile the scoring path "
+                             "(model.logits - the module's forward() is "
+                             "never what training calls). Throughput "
+                             "only; outputs match eager to floating-"
+                             "point rounding, not bit-for-bit, which is "
+                             "why it is opt-in. The first training and "
+                             "first validation batch pay the compile. "
+                             "Works with --dynamic-dropout (see "
+                             "GrouseModelHandler._install_compiled_"
+                             "logits for the recompile handling).")
     parser.add_argument("--distill-alpha", type=float, default=0.5,
                         help="With --distill-from: weight on the true-"
                              "label loss in the blend against the "
@@ -858,7 +888,9 @@ def main():
     distill_models = None
     if args.distill_from:
         import torch as _torch2
-        from models import GrouseResNet, config_to_model_kwargs
+        from models import (GrouseResNet, config_to_model_kwargs,
+                            spec_with_checkpoint_vocab,
+                            checkpoint_vocab_notes)
         _device = _torch2.device("cuda" if _torch2.cuda.is_available()
                                  else "cpu")
         cat_f, cont_f = split_features(features)
@@ -867,9 +899,42 @@ def main():
             state, cfg = GrouseModelHandler.unwrap_checkpoint(
                 _torch2.load(ckpt_path, map_location=_device,
                             weights_only=True))
+            # A teacher is scored on THIS run's datasets, which are
+            # built from THIS run's feature list - so its own feature
+            # list (authoritative for a wrapped checkpoint, see
+            # ARCHITECTURE.md) must be the same list, in the same
+            # channel order. Anything else is either a shape mismatch
+            # (loud but cryptic) or, when the channel counts happen to
+            # agree, a teacher silently reading one feature's channel
+            # as another and emitting confident nonsense as the soft
+            # target. Refuse explicitly rather than let either happen;
+            # supporting mixed feature sets would need one dataset per
+            # distinct teacher list and is not worth it.
+            ckpt_features = (cfg or {}).get("features")
+            if ckpt_features is None:
+                print(f"   [warn] {ckpt_path} is a bare checkpoint with no "
+                      f"feature list - assuming it was trained on this "
+                      f"run's features {features}; a shape mismatch "
+                      f"below means it wasn't.")
+            elif split_features(ckpt_features) != (cat_f, cont_f):
+                # Compared in spec order, so an explicit --features list
+                # given in a different order still matches.
+                raise SystemExit(
+                    f"--distill-from {ckpt_path}: teacher was trained on "
+                    f"features {list(ckpt_features)} but this run uses "
+                    f"{list(features)}. A teacher is scored on this run's "
+                    f"patches, so the two lists must match exactly. "
+                    f"Missing on disk: "
+                    f"{sorted(set(ckpt_features) - set(features))}; "
+                    f"extra on disk: "
+                    f"{sorted(set(features) - set(ckpt_features))}. "
+                    f"Either restore the teacher's rasters (or pass "
+                    f"--features with its list) or retrain the teachers "
+                    f"on the current feature set.")
             # Rebuild from the checkpoint's OWN config (see score_ensemble)
             # - a teacher's architecture doesn't have to, and here mostly
-            # won't, match this run's --pool/etc.
+            # won't, match this run's --pool/etc. Its embedding vocab
+            # sizes likewise come from its own tables.
             kw = config_to_model_kwargs(cfg, defaults=dict(
                 pool=args.pool, center_skip=args.center_skip,
                 keep_early_resolution=args.keep_early_resolution,
@@ -878,9 +943,20 @@ def main():
                 early_attn_kv_stride=args.early_attn_kv_stride,
                 dual_branch=args.dual_branch,
                 dual_branch_channels=args.dual_branch_channels))
-            m = GrouseResNet(cat_f, cont_f, pretrained=False,
+            t_spec = spec_with_checkpoint_vocab(state)
+            for note in checkpoint_vocab_notes(t_spec, cat_f):
+                print(f"   [note] teacher {ckpt_path}: {note} - the "
+                      f"teacher scores with ITS clamp; the student "
+                      f"trains under the current spec.")
+            m = GrouseResNet(cat_f, cont_f, spec=t_spec, pretrained=False,
                              **kw).to(_device).eval()
-            m.load_state_dict(state)
+            try:
+                m.load_state_dict(state)
+            except RuntimeError as e:
+                raise SystemExit(
+                    f"--distill-from {ckpt_path}: checkpoint doesn't match "
+                    f"the model rebuilt from its config (features="
+                    f"{list(features)}, {kw}).\nOriginal error:\n{e}")
             distill_models.append(m)
         print(f"   --distill-from: {len(distill_models)} teacher(s) loaded "
               f"({', '.join(args.distill_from)}), alpha="
@@ -1062,7 +1138,8 @@ def main():
                     dynamic_dropout_max=args.dynamic_dropout_max,
                     dynamic_dropout_step=args.dynamic_dropout_step,
                     distill_alpha=(args.distill_alpha if args.distill_from
-                                   else None))
+                                   else None),
+                    compile_model=args.compile)
         if tb_writer is not None:
             tb_writer.close()
         members.append((path, overrides.get('pool', args.pool)))

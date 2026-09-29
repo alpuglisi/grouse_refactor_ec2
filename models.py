@@ -514,9 +514,25 @@ class DualSpatialBranch(nn.Module):
 # construction are instantiated.
 # ==========================================
 FEATURE_SPEC = {
+    # EVT: LANDFIRE's documented domain is 4401-9994 (LF2022-LF2025 ADDs).
     "evt":    {"kind": "categorical", "vocab": 10000, "dim": 32},
-    "evh":    {"kind": "categorical", "vocab": 300,   "dim": 16},
-    "evc":    {"kind": "categorical", "vocab": 300,   "dim": 16},
+    # EVH / EVC: since LF 2016 Remap, both are laid out in three life-form
+    # blocks and the HERBACEOUS block sits above 300:
+    #   EVC  tree 110-199 (1% steps)  shrub 210-299  herb 310-399
+    #   EVH  tree 101-199 (1 m steps) shrub 201-230  herb 301-310 (0.1 m)
+    # (LF2022-LF2025 Attribute Data Dictionaries; identical across those
+    # vintages.) The vocab was 300 until 2026-09-20, so embed()'s clamp
+    # sent every herb code to index 299 - for EVC a LIVE code ("Shrub
+    # Cover >= 99%"), so herb-dominated pixels were being handed the
+    # densest-shrub embedding, and herb cover/height were unlearnable.
+    # 512 covers the documented maximum (399) with headroom; the table
+    # cost is vocab x dim floats, i.e. nothing. Changing this is a
+    # GEOMETRY change (embedding rows are in the state dict): see
+    # spec_with_checkpoint_vocab for how loaders keep old checkpoints
+    # usable, and ARCHITECTURE.md's invariant.
+    "evh":    {"kind": "categorical", "vocab": 512,   "dim": 16},
+    "evc":    {"kind": "categorical", "vocab": 512,   "dim": 16},
+    # SClass: 1-7 plus 111/112/120/132/180 land-cover fills; max 180.
     "sclass": {"kind": "categorical", "vocab": 300,   "dim": 16},
     # FDist codes run into the low thousands (year/type/severity
     # composites); vocab sized generously - embedding memory is trivial.
@@ -808,6 +824,49 @@ def config_to_model_kwargs(cfg, defaults=None):
                     else base['early_attn_pos_mode'])
     kw['early_attn_pos_mode'] = pos_mode
     return kw
+
+
+def spec_with_checkpoint_vocab(state, spec=None):
+    """A copy of `spec` whose categorical vocab sizes are taken from the
+    checkpoint's OWN embedding tables (embeddings.<f>.weight rows), so a
+    model rebuilt from it loads regardless of what FEATURE_SPEC says
+    today. Features without a table in `state` keep the spec value.
+
+    The companion to config_to_model_kwargs for the one geometry
+    parameter that lives in the state dict rather than the config: an
+    embedding's row count. The evh/evc vocab was raised from 300 to 512
+    on 2026-09-20 (the herbaceous code block sits above 300 - see
+    FEATURE_SPEC); without this, every checkpoint trained before that
+    would stop loading in predict.py / calibrate.py, and every
+    checkpoint trained after it would stop loading anywhere the spec
+    was later changed again. Reading the rows from the tensor makes
+    both the wrapped and the bare checkpoint formats self-describing.
+
+    Note the trade-off this preserves: a pre-change checkpoint rebuilt
+    with vocab 300 still clamps herb codes to 299 at inference, exactly
+    as it did in training. That is the correct behaviour for THAT
+    model (its weights only know the collapsed code); the fix for the
+    collapse itself is a retrain under the new spec."""
+    spec = spec or FEATURE_SPEC
+    out = {}
+    for f, s in spec.items():
+        s = dict(s)
+        if s["kind"] == "categorical":
+            w = state.get(f"embeddings.{f}.weight")
+            if w is not None:
+                s["vocab"] = int(w.shape[0])
+        out[f] = s
+    return out
+
+
+def checkpoint_vocab_notes(spec, cat_features, base=None):
+    """Human-readable list of the categorical features whose vocab in
+    `spec` differs from `base` (default FEATURE_SPEC), for loaders to
+    print - empty when nothing differs."""
+    base = base or FEATURE_SPEC
+    return [f"{f}: vocab {spec[f]['vocab']} (current spec "
+            f"{base[f]['vocab']})" for f in cat_features
+            if f in base and spec[f]["vocab"] != base[f]["vocab"]]
 
 
 def gauss_weight_map(h, w, device=None):

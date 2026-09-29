@@ -80,6 +80,9 @@ assignments).
 | `diagnose_wetland.py` | Per-NLCD-class composition and score breakdown. |
 | `diagnose_training.py` | Training-set sanity checks. |
 | `check_exotic.py`, `check_raster.py`, `dupe_check.py` | One-off data-integrity checks. |
+| `scan_codes.py` | Per raster: code range on disk vs each categorical feature's `FEATURE_SPEC` vocab (what the clamp would destroy). |
+| `realign_rasters.py` | Per region: which rasters are off the template pixel grid, and (`--apply`) warps them onto it. |
+| `bench_pipeline.py` | Throughput of the loader, one validation pass and N real training steps on the real data - the before/after protocol for any speed change. |
 | `smoke_test_training.py` | Fast end-to-end training smoke test. |
 | `document_tree.sh` | Inventories the working directory — every file with size and date, plus a **feature × year raster coverage matrix per region**. Data files are gitignored and never reach a clone, so this is how the year-vintage situation becomes reviewable from the repo. |
 | `tune.py`, `tune_bins.py` | Hyperparameter / envelope-bin sweeps. |
@@ -131,7 +134,36 @@ carries its own feature list and geometry, and that list is
 authoritative on load. Bare (older) is a raw `state_dict` with no
 feature list, so loading it depends on what is on disk *now* — which
 breaks whenever the disk feature set changes. `config_to_model_kwargs`
-owns every geometry key and legacy fallback.
+owns every geometry key and legacy fallback — except one that lives in
+the weights themselves: each categorical embedding's row count (its
+`vocab`). Loaders take that from the checkpoint's own
+`embeddings.<f>.weight` via `models.spec_with_checkpoint_vocab`, never
+from today's `FEATURE_SPEC`, so a checkpoint keeps loading after the
+spec changes. Any new loader must do both.
+
+**Every feature raster of a region must sit on ONE pixel grid - the
+region's template (its latest EVT clip).** The training reader cuts
+each feature's window from that feature's own raster grid, so it only
+produces co-registered channels when the grids are the same grid; two
+projections give windows whose axes point different ways (tcc/nlcd in
+EPSG:5070 were 11 px off the LFPS local-Albers evt window at the patch
+corners, in every training patch, undetectable by any metric because
+validation reads the same way). `grouse_data.grid_mismatch` is the one
+definition of "same grid"; `dataset.py` refuses a mixed set at
+construction; `realign_rasters.py --apply` fixes files; every raster
+writer warps onto the template. `predict.py`'s VRT alignment is a safety
+net, not the mechanism. A new raster source must be written on the
+template grid, not merely in the same nominal projection family.
+
+**A categorical `vocab` must cover the raster's whole code domain, or
+the top of it silently disappears.** `GrouseResNet.embed` clamps codes
+into `[0, vocab-1]`; a code at or above the vocab lands on the top index
+and nothing crashes. That is how the LANDFIRE herbaceous block vanished:
+EVC encodes herb cover as 310–399 and EVH herb height as 301–310 (three
+life-form blocks since LF 2016 Remap, identical LF2022–LF2025), and both
+features had `vocab: 300` until 2026-09-20. `fit()` now checks the spread
+sample against the vocab and warns by name; raising a vocab is a
+cold-start geometry change (the table is in the state dict).
 
 **`--select-min-delta` compares against the last SAVED checkpoint, not
 the running maximum.** This is deliberate: max-based selection creeps
@@ -200,7 +232,7 @@ problem, and it is one fewer CONUS download.
 never shrink retention.** TreeMap has 2016/2020/2022/2023; the stack has
 its own vintages. Writing every one of our years from the nearest TreeMap
 year keeps a file present for each, so the `all()` year-gap filter
-(`train.py:182`) sees no change and LANDFIRE remains the binding
+(`train.py`'s `filter_by_year_gap`, applied to training and validation alike) sees no change and LANDFIRE remains the binding
 constraint. The cost is that the filter also cannot warn when a mapping is
 stale — `generate_treemap_features.py` prints the mapping and flags any
 gap over 2 years itself.

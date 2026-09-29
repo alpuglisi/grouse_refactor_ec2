@@ -21,11 +21,33 @@ not checked. Do not repeat that.
 5. **"No defect found in steps X, Y, Z" is a valid result.** Say exactly
    that. Never present it as a resolution.
 
-### Already ruled out: do not revisit
-The user has rejected **the NH/ME state line (and per-state
-`road_dist` road data) as the problem**. Do not raise it again unless a
-check in this plan produces new evidence *and* the user agrees it
-matters.
+### The reported symptom (user, 2026-09-29, verbatim)
+> "everything on the maine side of the state border is ranked
+> significantly higher than the new hampshire side despite being
+> essentially the same habitat"
+
+### Status of the road_dist hypothesis
+The user rejected the first answer, which asserted per-state road data
+(`road_dist`) as the cause without any check. What they rejected, and on
+what basis, is not recorded, so **treat `road_dist` as an untested
+hypothesis, neither confirmed nor ruled out.** Settle it with the checks
+in steps 3 and 6 before any conclusion. Ask the user whether they have
+already inspected `road_dist` values on the Maine side; if so, record
+what they saw here.
+
+Code trace (read in code only; no real data examined): of the 15 inputs,
+`road_dist` is the only one whose construction depends on which side of
+the state line a pixel falls.
+- `generate_road_distance.py:113-125` uses TIGER roads for NH counties
+  only.
+- Every other input for the NH region is a rectangle (LANDFIRE request
+  box to −70.60, Earth Engine `region_grid`), or is built over that
+  rectangle's grid (`tsd`).
+- The model has no location or region input.
+
+If step 6 shows the Maine-side jump survives blanking `road_dist`, the
+cause lies outside what the code shows (the data values themselves).
+Continue with steps 3–5 comparing inputs on matched Maine/NH points.
 
 ### Already checked in code (not against real data)
 - Every input except `road_dist` is a rectangle reaching −70.60
@@ -62,8 +84,9 @@ rasters and checkpoint. Treat them as "not yet confirmed on real data".
   - Mostly yellow/orange west of about 71°01′W; red east of it; cyan and
     blue on wetlands and lake margins.
   - Lakes transparent (scored below `--alpha-below 0.15`).
-- **The user's statement of what is wrong:** *not yet recorded. Get it
-  in step 0.*
+- **The user's statement of what is wrong:** see §0. Maine-side cells
+  score significantly higher than NH-side cells of essentially the same
+  habitat.
 
 ## 2. Step 0: establish the symptom (required, do this first)
 Ask the user:
@@ -78,6 +101,10 @@ Ask the user:
 
 Write the answers down (§10). Pick the steps below that bear on the
 symptom, but run steps 1 and 2 regardless; they are cheap.
+
+For this symptom, also ask for matched pairs: one Maine point and one NH
+point the user considers the same habitat. Run steps 3 and 6 on those
+pairs first.
 
 ## 3. Step 1: inventory (what exactly was run)
 Save as `inv_inventory.py` and run `python inv_inventory.py`.

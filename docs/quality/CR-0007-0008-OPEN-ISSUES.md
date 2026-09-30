@@ -149,8 +149,8 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 - [ ] CR-0007 P7 docs-import check: extend to `import_module`/`__import__`, `exec`/`compile`, and any `.path.insert/append` receiver (CR-0007 v9.2 reviewer A, LOW); limit stated in the CR
 
 ## CR-0009 v5 (round-4 follow-ups, 2026-09-30)
-- [ ] Round-4 MEDIUM/LOW items A-D1..D4, A-L1..L5, B-D1..D4, B-L1..L8: addressed in CR-0009 v5 text; tick after round-5 reviewers confirm (dispositions: `CR-0009-review-log.md` § v5 dispositions) — owner: CR-0009's author
-- [ ] Items above addressed by CR-0009 v5, to tick on round-5 confirmation: "update the expected positive count to 6,232" (cited from CR-0012 § Impact), BUG-0039 (rows OBS with PA-0021(f) fields), "`:64` says when CR-0007/CR-0012 land" (§ Baselines: CR-0012 only; verified the point files are byte-identical to CR-0007's backup) — owner: CR-0009's author
+- [x] (round 5 confirmed, 9d8c1c9) Round-4 MEDIUM/LOW items A-D1..D4, A-L1..L5, B-D1..D4, B-L1..L8: addressed in CR-0009 v5 text; tick after round-5 reviewers confirm (dispositions: `CR-0009-review-log.md` § v5 dispositions) — owner: CR-0009's author
+- [x] (round 5 confirmed, 9d8c1c9) Items above addressed by CR-0009 v5, to tick on round-5 confirmation: "update the expected positive count to 6,232" (cited from CR-0012 § Impact), BUG-0039 (rows OBS with PA-0021(f) fields), "`:64` says when CR-0007/CR-0012 land" (§ Baselines: CR-0012 only; verified the point files are byte-identical to CR-0007's backup) — owner: CR-0009's author
 - [ ] `data/maps/STALE_SEE_CR-0010.txt`: the directory holds `analyze_grouse.py` sightings diagnostics (PNGs rewritten 2026-09-30 11:42, after the marker) and an input download, no model outputs; CR-0009 does not regenerate them. Decide whether the marker still applies — owner: CR-0010's author
 - [ ] `old_road_dist/` ownership (item above): CR-0009 v5 no longer reads it (the reproduction uses current rasters; +4,255 m is quoted, not re-measured) — owner unchanged (CR-0014 or user)
 

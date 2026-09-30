@@ -1,1 +1,27 @@
 == wrong tree: after_thin
+MC exit 1
+MC1 ME rows: FAIL new 2846, pre-registered 2854, missing 8, extra 0, differing 1
+MC1 ME kept lines: FAIL header equal=True; 1 kept rows differ beyond the pre-registered split changes (7 split changes)
+MC1 NH rows: FAIL new 823, pre-registered 827, missing 4, extra 0, differing 0
+MC1 VT rows: FAIL new 1126, pre-registered 1128, missing 2, extra 0, differing 0
+MC2: FAIL new 3204 rows, pre-registered 3205
+MC3: FAIL header/rows equal length=True; 501/501 pre-registered split changes found; 2 rows differ otherwise
+MC4 ME rows: FAIL new 2846, pre-registered 2854, missing 8, extra 0
+MC4 NH rows: FAIL new 823, pre-registered 827, missing 4, extra 0
+MC4 VT rows: FAIL new 1126, pre-registered 1128, missing 2, extra 0
+MC: FAIL (33/42 checks pass)
+== wrong tree: off_by_one
+MC exit 1
+MC1 ME rows: FAIL new 2256, pre-registered 2854, missing 601, extra 3, differing 10
+MC1 ME kept lines: FAIL header equal=True; 10 kept rows differ beyond the pre-registered split changes (6 split changes)
+MC1 NH rows: FAIL new 697, pre-registered 827, missing 132, extra 2, differing 2
+MC1 NH kept lines: FAIL header equal=True; 2 kept rows differ beyond the pre-registered split changes (0 split changes)
+MC1 VT rows: FAIL new 933, pre-registered 1128, missing 195, extra 0, differing 2
+MC1 VT kept lines: FAIL header equal=True; 2 kept rows differ beyond the pre-registered split changes (1 split changes)
+MC2: FAIL new 2702 rows, pre-registered 3205
+MC3: FAIL header/rows equal length=True; 501/501 pre-registered split changes found; 408 rows differ otherwise
+MC4 ME rows: FAIL new 2256, pre-registered 2854, missing 598, extra 0
+MC4 NH rows: FAIL new 697, pre-registered 827, missing 131, extra 1
+MC4 VT rows: FAIL new 933, pre-registered 1128, missing 195, extra 0
+MC: FAIL (31/42 checks pass)
+== wrong tree: source

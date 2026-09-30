@@ -1,11 +1,13 @@
 # CR-0019: One year floor for both classes, applied at selection; the train-time year-gap filter refuses instead of dropping
 
-**Status: PROPOSED (v2), 2026-09-30.** Verdicts and dispositions:
+**Status: APPROVED (v3), 2026-09-30.** Author + reviewers approved; user
+pre-authorised (2026-09-30). Verdicts and dispositions:
 `CR-0019-review-log.md`. This document states only current intent.
 
 ## Scope
-Select positives only from `YEAR_MIN = 2020`, the first year both label
-classes were acquired, at CR-0012 positives step 2 (before thinning), so
+Select both classes only from `YEAR_MIN = 2020`, the first year both
+label classes were acquired: positives at CR-0012 positives step 2
+(before thinning), negative candidates at pool step 1, so
 the split files carry one year floor for both classes and the 1:1 draw is
 made against the positives that actually train. Make
 `train.filter_by_year_gap` refuse, instead of silently dropping, any
@@ -97,12 +99,15 @@ is the rows after both conditions; the manifest schema is unchanged.
   not a silent choice.
 
 **Pool step 1, as amended.** After loading each region's candidates,
-raise `ValueError` if any row has a **non-null** `year < YEAR_MIN`. A
-null-year candidate keeps its CR-0012 behaviour (dropped at step 7, no
-envelope values). This is a guard, not a filter: all 265,212 raw candidates are 2020–2024 today,
-so no row and no count changes. A later re-fetch with older years then
-fails loudly and forces a reviewed `YEAR_MIN` change, instead of silently
-widening one class.
+drop every row with a **non-null** `year < YEAR_MIN`. A null-year
+candidate keeps its CR-0012 behaviour (dropped at step 7, no envelope
+values). The manifest count `"1"` is the rows after this drop. All
+265,212 raw candidates are 2020–2024 today, so no row and no count
+changes (the pre-registration and MC are unaffected). The same constant
+now selects both classes, so `YEAR_MIN` is a working knob: raising it
+(e.g. to 2021 for a tolerance of 1) needs no other code change, while
+lowering it below the negatives' acquisition floor makes E14(b) fail
+until negatives are re-acquired.
 
 **Draw.** Unchanged: per region and split, `n = round(n_pos × NEG_RATIO)`
 against the new positives.
@@ -111,7 +116,7 @@ against the new positives.
 row would be excluded, raise `SystemExit` naming the region, the class
 and split (`what`), the row count, the years, the tolerance, and the
 remedy (`--max-year-gap -1` or a larger value, or a reviewed `YEAR_MIN`
-change). Otherwise return the frame unchanged (same return expression as
+change, which regenerates the split files). Otherwise return the frame unchanged (same return expression as
 today). Records with a null year are still kept (unchanged; E14 means
 the split files have none). The signature and the name stay (the name is
 cited in CRs and evidence scripts); the docstring, the `build_datasets`
@@ -130,7 +135,7 @@ equal to what CR-0013 accepted (PA-0029).
 |---|---|
 | `regions.py` | `YEAR_MIN = 2020` and its comment |
 | `prepare_training_data.py` | step 2 as above; module docstring step 2; `measured_constants()` gains `YEAR_MIN` |
-| `generate_negatives.py` | pool step 1 guard; module docstring step 1 |
+| `generate_negatives.py` | pool step 1 floor; module docstring step 1 |
 | `get_negatives.py` | `--years` default from `regions.YEAR_MIN` |
 | `train.py` | `filter_by_year_gap` refuses; docstring, `build_datasets` comment, `--max-year-gap` help |
 | `tests/test_cr0019.py` (new) | § Test plan |
@@ -146,7 +151,7 @@ equal to what CR-0013 accepted (PA-0029).
   updated; that update is part of this CR's review.
 
 **Replay.** Positives step 2 and pool step 1 exactly as §2 (the replay
-raises `ReplayError` where the pipeline raises). R1–R4 then check the
+raises `ReplayError` where the pipeline raises, and drops what it drops). R1–R4 then check the
 change row for row, and R1/R3's count checks read the new `"2"` count.
 
 **New gate E14 (exact).**
@@ -181,21 +186,29 @@ asserts they exist, so no attack passes vacuously (PA-0021(a)).
 | Floor off by one (`year > YEAR_MIN`) | ≥ 1 habitat positive with `year == YEAR_MIN` that survives the thin | R1, R2 |
 | Floor applied to the sightings (source-level cut, so the buffer shrinks) | ≥ 1 candidate within `BUFFER_M` of a `year < YEAR_MIN` sighting only, that survives steps 7–10 and is drawn | R3, R4 |
 | Floor on the train split only | ≥ 1 `year < YEAR_MIN` positive in a validation block | E14(a), R1, R2 |
-| Positives later than every negative (pipeline right, inputs wrong) | a fixture variant whose sightings include a year above every candidate year | E14(b) |
+| Positives later than every negative (pipeline right, inputs wrong) | a fixture variant with ≥ 1 habitat positive whose year is above every candidate year, surviving the window and the thin | E14(b) |
+| No pool floor (pool step 1 unchanged) | ≥ 1 candidate with `year < YEAR_MIN` that survives to C | E14(a) on C, R3 |
 
-A unit test also checks that the replay raises on a candidate with
-`year < YEAR_MIN` and on an evaluated sighting with a null year, and that
-a null-year candidate is still dropped at step 7.
+A unit test also checks that the replay drops a candidate with
+`year < YEAR_MIN`, raises on an evaluated sighting with a null year, and
+still drops a null-year candidate at step 7.
 
 **Existing fixtures (part of deliverables 2 and 3).** Today's fixtures
 contradict the new rules, so they change with this CR:
-- `tests/test_acceptance_split.py`: sighting years `:227` and candidate
-  years `:291`, `:319` move to ≥ `YEAR_MIN` (keeping at least one sighting
-  below it for the attack rows above); the fixture `REGIONS_PY` (`:62`)
-  gains `YEAR_MIN`; the `len(GATE_IDS)` pin (`:1492`) becomes 20.
-- `tests/test_cr0012.py`: candidate years `:593` move to ≥ `YEAR_MIN`;
-  the null-year candidates (`:594`) and the assertion `:835-836` stay
-  (the guard ignores null years).
+- `tests/test_acceptance_split.py`: the fixture `REGIONS_PY` (`:62`)
+  gains `YEAR_MIN`; the `len(GATE_IDS)` pin (`:1492`) becomes 20. The
+  sighting years (`:227`) and candidate years (`:291`, `:319`) are set
+  **deterministically** so that, in the correct tree, the pooled P and N
+  year sets are equal by construction (every year ≥ `YEAR_MIN` present in
+  P has habitat candidates in every drawn cell), with at least one
+  sighting and one candidate below `YEAR_MIN` kept for the attack rows. A
+  test asserts that equality on the correct tree, next to the attack-row
+  existence asserts (so E14(b) cannot fail on the correct fixture by
+  chance).
+- `tests/test_cr0012.py`: **no change.** Its candidate years (`:593`)
+  and sighting years (`:551`) are already ≥ 2023; its null-year
+  candidates (`:594`) and the assertion `:835-836` keep working (null
+  years are still dropped at step 7).
 - Every existing attack row's fixture-existence assertion (CR-0012,
   CR-0013, CR-0017 attacks) must still pass after the edits; a row that
   the floor removes is re-seeded at a year ≥ `YEAR_MIN`, never deleted.
@@ -257,15 +270,31 @@ Within 2020–2024 the two classes' year **distributions** still differ
 predicts the label at AUC 0.6615 after the change (0.6578 today after the
 filter). This is BUG-0034 consequence (b)'s remainder.
 
-Year-matching the draw (per region, split and year) would remove it by
-construction, but today's pool cannot supply it: 6 of 30 cells are short
-of habitat candidates (215 in all; ME train 2024 −70, VT train 2024 −77;
-`preregister.txt` § REJECTED OPTION 1b). Supplying it needs more
-2023–2024 negative candidates, i.e. a GBIF re-fetch (network,
-outward-facing, a user decision) or a design decision on coarser
-matching. It is a separate defect (distribution, not support) and is
-proposed as its own BUG (BUG-NEW-a; the lead allocates the id), owned
-by a future CR (review log § Proposed bookkeeping).
+A large part of it comes from the two classes' **representative-year
+rules** (reviewer A, re-measured by the author on the pre-registered P
+and N):
+- a positive location's `year` is its **latest** visit
+  (`analyze_grouse.collapse_duplicate_locations`);
+- a negative key's `year` is that of its **smallest `gbif_id`**
+  (`generate_negatives.dedup_min_gbif_id`), which is the key's earliest
+  year for 98.9 % of the selected negatives (11.4 % have a later year
+  available).
+
+Year→label AUC is 0.6615 as specified, 0.5584 if positives take
+`max(first_year, 2020)`, and 0.6125 if negatives take their key's latest
+year. So harmonising the rule is a no-network candidate remedy. A
+year-matched draw (per region, split and year) is another, but today's
+pool cannot supply it: 6 of 30 cells are short of habitat candidates
+(215 in all; ME train 2024 −70, VT train 2024 −77; `preregister.txt`
+§ REJECTED OPTION 1b) without more 2023–2024 candidates (a GBIF re-fetch,
+a user decision) or coarser matching.
+
+It is a separate defect (distribution within a common support, not
+support) and a PA-0020 time-axis selection asymmetry in its own right.
+It is proposed as its own BUG (BUG-NEW-a; the lead allocates the id),
+with both representative-year rules and the acquisition order as
+candidate causes to be tested (PA-0016), owned by a future CR (review
+log § Proposed bookkeeping). CR-0019 does not change either rule.
 
 ### 6. Retrain decision: no retrain under this CR
 - `grouse_cr0009.pth` is not retrained here. The follow-up
@@ -306,12 +335,15 @@ by a future CR (review log § Proposed bookkeeping).
   The config sha256 changes, so `standing_checks` refuses all training
   until the new full run writes a record.
   - **Refusal window.** Deliverables 2–3 are committed on an unmerged
-    CR-0019 branch and merged only at deliverable 6 step 1, immediately
-    before the live run. The window is from that merge to the new record
-    (minutes). Before the merge, `train.py`/`calibrate.py` on the working
-    branch are unaffected; merging the `train.py` change alone would
-    refuse every run on today's files, which is why it merges with the
-    data.
+    CR-0019 branch. The live run (deliverable 6) checks that branch out in
+    the live working tree and merges it into `main` only after acceptance
+    passes. The window is from the checkout to the new record (minutes);
+    `main` never carries the change without the data. On failure the tree
+    goes back to `main` and the backed-up files are restored, so no revert
+    commit (and no later revert-of-revert) is ever needed. The record
+    stays valid across the merge: its config sha256 is the file's content,
+    which the merge does not change, and its recorded commit (the branch
+    head) is an ancestor of `main` afterwards.
   - `prepare_training_data.py` itself removes the negatives manifest
     section and the record (its step 6), so the refusal also covers the
     run's intermediate state.
@@ -369,8 +401,11 @@ Every training file is regenerated and the validation set changes.
     raises on a null year;
   - the floor precedes thinning: a pre-floor point first in thin order
     does not suppress its post-floor neighbour;
-  - pool step 1 raises on a candidate with a null year or
-    `year < YEAR_MIN`;
+  - pool step 1 drops a candidate with `year < YEAR_MIN` and keeps one
+    with `year == YEAR_MIN`; a null-year candidate is dropped at step 7,
+    not step 1;
+  - with `YEAR_MIN` set above the lowest candidate year (test seam), both
+    classes are floored and the draw still runs;
   - pool step 6(a) still drops a candidate within `BUFFER_M` of a
     pre-floor sighting only;
   - `filter_by_year_gap` raises when any row would be excluded (message
@@ -419,9 +454,8 @@ Every training file is regenerated and the validation set changes.
       constants test passes only after deliverable 3); the
       read-only run on today's files gives exactly the expected FAILs
       (evidence `acceptance_prefix.txt`).
-- [ ] 3. Pipeline and `train.py` changes (§2), `tests/test_cr0019.py` and
-      the `tests/test_cr0012.py` fixture edit (§3) on the same branch; the
-      suites in § Test plan pass.
+- [ ] 3. Pipeline and `train.py` changes (§2) and `tests/test_cr0019.py`
+      on the same branch; the suites in § Test plan pass.
 - [ ] 4. Scratch-tree real-data run (§ Test plan); evidence under
       `docs/quality/evidence/CR-0019/scratch/`.
 - [ ] 5. Preconditions, recorded before any write under `data/`: no other
@@ -430,14 +464,17 @@ Every training file is regenerated and the validation set changes.
       manifest, the record and the OBS file to
       `/home/ec2-user/grouse_backup/CR-0019/` (mirroring `data/…`),
       sha256 verified; MC0 passes with `--old` = the backup.
-- [ ] 6. Live run, in order: (1) merge the CR-0019 branch;
-      (2) `prepare_training_data.py`; (3) `generate_negatives.py`;
-      (4) MC, old = backup, new = live: PASS; (5) `acceptance_split.py`:
-      20/20 GATEs, record written; (6) `acceptance_split.py --calibrate`.
-      On any FAIL in (2)–(6): restore every backed-up file (sha256
-      verified), record the failure, commit no data evidence, revert the
-      merge, stop. On success commit the evidence, the record copy and the
-      OBS file.
+- [ ] 6. Live run, in order: (1) with a clean working tree and the user
+      told not to commit meanwhile, `git checkout` the CR-0019 branch in
+      the live tree; (2) `prepare_training_data.py`;
+      (3) `generate_negatives.py`; (4) MC, old = backup, new = live: PASS;
+      (5) `acceptance_split.py`: 20/20 GATEs, record written;
+      (6) `acceptance_split.py --calibrate`; (7) `git checkout main` and
+      merge the branch (fast-forward where possible), then re-run
+      `acceptance_split.py --standing`: pass. On any FAIL in (2)–(6):
+      restore every backed-up file (sha256 verified), `git checkout main`,
+      record the failure, commit no data evidence, stop. On success commit
+      the evidence, the record copy and the OBS file.
 - [ ] 7. Pointer lines in CR-0012 §2 and CR-0013 (§ Impact);
       `ARCHITECTURE.md`; `CHANGELOG.md` entry: the data change, the new
       prevalence, CR-0009's baseline no longer comparable, and the §6
@@ -448,15 +485,17 @@ Every training file is regenerated and the validation set changes.
       (§5) filed; PA-0020 Swept? cell (BUG-0034 live instance fixed, the
       source-axis item it owns resolved, sweep by mechanism for any other
       per-class year selection, incl. `train.sample_background_points`'
-      fixed vintage, the envelope-metric epoch (§2) and the duplicated
-      `START_YEAR` literal); tracker: CR-0020, the §6 warning, the
+      fixed vintage, the envelope-metric epoch (§2), the two
+      representative-year rules (§5) and the duplicated `START_YEAR`
+      literal); tracker: CR-0020, the §6 warning, the
       residual, MEDIUM/LOW review items.
 - [ ] 9. Close-out: every item above ticked; status IMPLEMENTED.
 
 ## Out of scope
 - **The retrain, calibration and new baseline** (§6): CR-0020.
-- **The year-matched draw and any negatives re-fetch** (§5): the residual
-  BUG's own CR, after a user decision on network acquisition.
+- **The residual year imbalance** (§5): harmonising the
+  representative-year rules, a year-matched draw or a negatives re-fetch
+  are the residual BUG's own CR.
 - **Changing positive acquisition** (`sightings.py`/`ebird.py`
   `START_YEAR`): 2016 is kept for the buffer and the envelope metrics
   (§2).

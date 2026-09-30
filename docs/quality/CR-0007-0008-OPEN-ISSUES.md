@@ -93,7 +93,7 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 - [ ] CR-0014 residual: Canadian land beyond the grid edge is unseen (NH 6,884 px, VT 1,881 px at the top edges). Closes only with Canadian road data (Statistics Canada NRN) (CR-0014 A4)
 - [x] CR-0009: remove dependence on CR-0007 escape mode; capture additional baselines before CR-0012 lands — text done in CR-0009 v4 (§ Baselines, deliverable 2); the capture itself is pending and is CR-0012 deliverable 0 (0007 A-8/B-2) — **done**: capture committed as CR-0012 deliverable 0 (ticked; `docs/quality/evidence/CR-0009/baseline/`, `SHA256SUMS`)
 - [ ] `DRAFT_BUG-0034` says "DECIDED … fixed in CR-0007": correct to "open; fix owned by a future CR" on promotion (CR-0007 v9 deliverable 6) (0007 FC-C5)
-- [ ] BUG-0034 fix CR (not yet written): per-class drop-rate assert at dataset build (BUG-0034 §8) and mechanism-scoped sweep (e.g. `predict.py:164`); re-calibrate CR-0013 OBS references on the new footing (0007 FA-Q4, FA-Q5)
+- [ ] BUG-0034 fix CR (not yet written): per-class drop-rate assert at dataset build (BUG-0034 §8) and mechanism-scoped sweep (e.g. `predict.py:164`); re-calibrate CR-0013 OBS references on the new footing (0007 FA-Q4, FA-Q5) — **written as CR-0019 (APPROVED v3, 2026-09-30)**: exact train-time refusal + E14 instead of a drop-rate assert; sweep = its deliverable 8; OBS recalibration = its deliverable 6 step 6. Tick at CR-0019 close-out
 - [ ] `old_road_dist/`, `new_road_dist/` are untracked and unprotected; decide ownership (CR-0014 or CR-0009) — not CR-0007 (`INVESTIGATION_REPORT_errol_map.md` is in git) (0007 H-X7)
 
 ## Decisions on the CR-0007 split (user, 2026-09-30)
@@ -116,7 +116,7 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 - [x] `sample_background_points` / BUG-0029 remainder / BUG-0032 → **separate CR-0015** (not yet written). CR-0015 must also restrict AN-background points to **training blocks**, not just the state (CR-0012 A1: ~20 % land in val blocks today)
 - [x] `legacy/download.py` and `download_more.py` deprecation guards → **CR-0007 v9** (same mechanism as BUG-0031)
 - [x] `acceptance_split.py` authorship: **a fresh agent given only CR-0013 + the pinned commit**, never CR-0012's implementation; CR-0012 implemented by a different fresh agent; both transcript ids recorded in the review logs
-- [ ] BUG-0034 scope must include `filter_by_year_gap` running after the split (drops 23.1 % of positives, effective neg:pos ≈ 1.3) and the thin-order interaction (CR-0012 A9)
+- [ ] BUG-0034 scope must include `filter_by_year_gap` running after the split (drops 23.1 % of positives, effective neg:pos ≈ 1.3) and the thin-order interaction (CR-0012 A9) — **in CR-0019 §2** (floor before thinning; filter refuses). Tick at CR-0019 close-out
 - [x] CR-0015 written (v1, 2026-09-30): assumed-negative background — in-state, training blocks only, 0 not nodata (BUG-0032), interim `--an-background` guard. Awaiting review
 
 ## CR-0007 v9 (round-8 follow-ups, 2026-09-30)
@@ -250,3 +250,11 @@ Review follow-ups:
 
 ## CR-0017 deliverable 8 bookkeeping (2026-09-30)
 - [ ] **BUG-0072** (LOW, diagnostic only): `diagnose_water_bias.build_distance_raster` reads NLCD nodata (Canada) as "no water"; 28/8 (ME), 2/1 (NH), 3/2 (VT) positives/negatives nearer nodata than water (`docs/quality/evidence/CR-0017/sweep/water_dist_edge_probe.txt`). Fix: NaN where nodata is nearer than water, summaries drop and count them (two functions, prints change) — owner: next change to `diagnose_water_bias.py` (with BUG-0070's VERDICT item)
+
+## CR-0019 (APPROVED v3, 2026-09-30) — follow-ups
+- [ ] **CR-0020** (to write): retrain from scratch, refit calibration, new validation baseline on the post-CR-0019 split (CR-0009's shape). Owner: lead. CR-0009's baseline (AUC 0.7783, AP 0.6851 at prevalence 0.4372) is not comparable after CR-0019
+- [ ] **Checkpoint warning** (CR-0019 §6): after CR-0019's live run, no pre-CR-0019 checkpoint (`grouse_cr0009.pth` or older) in `calibrate.py --model`, `--distill-from`, `--init-from`, `--resume`, nor evaluated on the new val set (48 of 962 new val negatives were its training negatives). Owner: lead until CR-0020 lands
+- [ ] LOW (CR-0019 A6): the warning above is prose only; mechanical refusal — owner: **BUG-0060**'s CR
+- [ ] **BUG-NEW-a** (proposed in CR-0019 review log § Proposed bookkeeping; next free id BUG-0073): residual within-epoch year imbalance (year→label AUC 0.6615); candidate causes the two representative-year rules and the acquisition order. Owner: lead (files at CR-0019 deliverable 8; fix by its own CR)
+- [ ] LOW (CR-0019 B12): `filter_by_year_gap` refuses via `SystemExit` from a library function; consider a named exception (e.g. a `SystemExit` subclass) for testability — owner: CR-0019 deliverable 3 implementer, decided in its code review
+- [ ] Sweep items for CR-0019 deliverable 8 (PA-0020): `train.sample_background_points` single vintage; envelope-metric epoch (2016+ sightings weighting 2020+ training, CR-0019 B4); the two representative-year rules (A2); duplicated `START_YEAR` (`sightings.py:23`, `ebird.py:20`; B8, PA-0025 review-only) — owner: CR-0019 deliverable 8

@@ -5,9 +5,10 @@ what CR-0019's change must produce, and the numbers the CR quotes.
 The change (CR-0019 section 2):
   positives step 2  keep habitat rows with year >= YEAR_MIN (2020); raise
                     on a null year;
-  pool step 1       raise if any non-null candidate year is < YEAR_MIN
-                    (a guard; today's candidates are all 2020-2024, so it
-                    changes no row - checked and printed below);
+  pool step 1       drop candidates with a non-null year < YEAR_MIN (CR-0019
+                    v3; today's candidates are all 2020-2024, so it changes
+                    no row - checked and printed below as "pool guard", and
+                    therefore not implemented in Floored);
   draw              unchanged (1:1 per region and split against the new
                     positives).
 Also reports, as evidence for a REJECTED option, the supply a year-matched

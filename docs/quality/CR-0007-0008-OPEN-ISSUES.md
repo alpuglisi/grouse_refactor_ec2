@@ -158,3 +158,5 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 - [ ] LOW (owner: CR-0013 replay author): CR-0013's table "I other inputs" does not name the county file `data/roads/tl_2023_us_county.zip`, though `acceptance_split.py:976,1833` requires it as an input. Add it to the table's wording.
 - [ ] LOW (owner: CR-0012 implementer): `P7_GUARDED` in `check_partition.py` does not include the `clean.py` / `legacy/gen_negs.py` guards (they are tested in `test_cr0012`).
 - [ ] LOW (owner: lead): regenerate `PROJECT_TREE.md` after CR-0012 deliverable 6.
+- [ ] LOW (owner: BUG-0047 CR): `generate_negatives.load_evt_crosswalk` and `verify_partition` resolve paths from cwd/`raster_dir`, not the data root; `KEY_DECIMALS` lives in `generate_negatives.py`, outside P6 (CR-0012 code review F3, I-L1, I-L5)
+- [ ] LOW (owner: CR-0012 implementer): `git_state` gives an opaque error outside a git checkout; `organize_project.py:107` stale `block_assignments_` rewrite; `prepare_training_data` imported twice when run as `__main__` (F4, I-L4, I-L6)

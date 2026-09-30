@@ -295,7 +295,7 @@ commit.
   a change; nothing prevents it.
 
 ## Deliverables (in execution order)
-- [ ] 0. **Precondition: CR-0009 deliverable 2 done.**
+- [x] 0. **Precondition: CR-0009 deliverable 2 done.**
       - CR-0009 v4 must be committed.
       - Capture item 3's in-box point set and every other pre-CR
         measurement that CR-0009 lists. Write them to
@@ -305,14 +305,14 @@ commit.
       - Fallback if this is missed: in a git worktree at `05d788d`,
         restore `data/pipeline/` and `data/negatives/` from CR-0007's
         backup, symlink the rasters, and take the measurements there.
-- [ ] 1. **Precondition:** CR-0007 has landed and `check_partition.py`
+- [x] 1. **Precondition:** CR-0007 has landed and `check_partition.py`
       passes. CR-0007's backup manifest verifies.
-- [ ] 2. **Precondition:** CR-0013 is approved, with its script, config and
+- [x] 2. **Precondition:** CR-0013 is approved, with its script, config and
       tests committed.
-- [ ] 3. `regions.py` §1; `prepare_training_data.py` and
+- [x] 3. `regions.py` §1; `prepare_training_data.py` and
       `generate_negatives.py` §2–§3.
-- [ ] 4. `grouse_data.py` §4. Update the readers and docs in Impact.
-- [ ] 5. Standing-check call (§5) and guards (§6).
+- [x] 4. `grouse_data.py` §4. Update the readers and docs in Impact.
+- [x] 5. Standing-check call (§5) and guards (§6).
 - [ ] 6. Run `prepare_training_data.py`, then `generate_negatives.py`,
       then `acceptance_split.py`; every GATE passes. Run the test plan.
       CR-0014 should have landed first; if it lands after, repeat this
@@ -326,6 +326,9 @@ commit.
         part waits for CR-0015.
       - PA-0018's Swept? cell: pooled-holdout enforcement is provided by
         CR-0013.
+      - PA-0023's Swept? cell: the negatives' 300 m buffer against every
+        sighting (pool step 6, all regions) closes the Canadian-sightings
+        question CR-0012 owned (code review, PA-0022).
 
 ## Landing order
 CR-0007 → CR-0013 approved → CR-0009 baselines → **CR-0012** → CR-0009

@@ -360,11 +360,14 @@ class StandingCheckCallSites(unittest.TestCase):
                                side_effect=stop) as sc, \
                 mock.patch.object(train, "split_features",
                                   side_effect=AssertionError("past check")):
+            data = mock.Mock()
+            data.config.base_dir = "/some/tree"
             with self.assertRaises(RuntimeError) as cm:
-                train.build_datasets(None, ["ME"], ["evt"], 48, jitter=8,
+                train.build_datasets(data, ["ME"], ["evt"], 48, jitter=8,
                                      augment=True)
         self.assertIs(cm.exception, stop)
-        sc.assert_called_once_with(48, 8, True)
+        # The tree training reads is the tree checked (code review F1).
+        sc.assert_called_once_with(48, 8, True, data_root="/some/tree")
 
     def test_entry_points_use_build_datasets(self):
         import ast
@@ -389,8 +392,10 @@ class Guards(unittest.TestCase):
                 self.assertTrue(cp.guard_first(path))
                 with open(path) as f:
                     self.assertTrue(f.readline().startswith("raise SystemExit("))
-                r = subprocess.run([sys.executable, path], cwd=ROOT,
-                                   capture_output=True, text=True)
+                # A scratch cwd: a regressed guard must not reach real data/.
+                with tempfile.TemporaryDirectory() as cwd:
+                    r = subprocess.run([sys.executable, path], cwd=cwd,
+                                       capture_output=True, text=True)
                 self.assertNotEqual(r.returncode, 0)
                 self.assertIn("BUG-0031", r.stderr)
 

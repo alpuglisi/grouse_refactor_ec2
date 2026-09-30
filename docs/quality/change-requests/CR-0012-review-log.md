@@ -259,3 +259,28 @@ APPROVED at commit `cec1542`** (the CR file is unchanged since). This is the
 version CR-0013's replay implements (rule 4). The approval commit changed
 only the status block.
 
+
+## Code review of 20a52c1 (2026-09-30)
+Two independent code reviewers (neither the implementer nor CR-0013's
+replay author):
+- Spec conformance (a5a4dd1916686e42e): **APPROVE WITH FOLLOW-UPS**. Ran
+  the pipeline and CR-0013's replay on a synthetic tree: 20 outputs
+  byte-identical, 18/18 gates pass. Positive x/y bit-identical to a fresh
+  transform on all 13,952 real rows.
+- Integration (a2a6431ffe6d3e586): **APPROVE WITH FOLLOW-UPS**. Clean merge;
+  200 tests on the merged tree; replay 18/18 on the merged tree; standing
+  checks refuse and accept as specified; no real-run blocker.
+Merged at 4eb10dd. Dispositions:
+| id | sev | finding | disposition |
+|---|---|---|---|
+| F1 / I-M1 | MEDIUM | `train.py` standing check validates the repo's data, not `data.config.base_dir` | fixed: `data_root=data.config.base_dir`; call-site test asserts it |
+| I-L3 | LOW | guard test runs stale scripts with cwd = repo | fixed: scratch cwd |
+| F2 | LOW | positive x/y inherited from `analyze_grouse.py`'s environment | deliverable 6 recomputes and compares (evidence file) |
+| F3, I-L1 | LOW | crosswalk / county paths ignore non-default roots | tracker (owner: BUG-0047 CR) |
+| F4 | LOW | `git_state` opaque outside a checkout | tracker |
+| F5 | LOW | tie/edge notes | noted; no action (cannot occur today) |
+| I-L4 | LOW | `organize_project.py:107` stale map | tracker |
+| I-L5 | LOW | `KEY_DECIMALS` not in `regions.py` / P6 | tracker (BUG-0047 CR) |
+| I-L6 | LOW | double import as `__main__` | tracker |
+| I-L7 | LOW | PA-0023 cell missing from deliverable 8 | fixed: added |
+| (tracked) | LOW | `P7_GUARDED`, `PROJECT_TREE.md` | already in tracker |

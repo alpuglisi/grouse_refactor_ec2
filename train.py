@@ -246,7 +246,9 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
     # than the WINDOW_PX every record was checked for. Covers every
     # caller: train.py, calibrate.py, bench_pipeline.py.
     import acceptance_split
-    acceptance_split.standing_checks(img_size, jitter, augment)
+    # Check the tree training reads, not the repository's (code review F1).
+    acceptance_split.standing_checks(img_size, jitter, augment,
+                                     data_root=data.config.base_dir)
     cat_f, cont_f = split_features(features)
     train_parts, val_parts, train_labels = [], [], []
     aug = dict(cache_dir=cache_dir, jitter=jitter, augment=augment)

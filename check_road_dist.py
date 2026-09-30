@@ -26,7 +26,7 @@ The raster must be -9999 exactly on ~T | C.
 
 Gates: R0 R0b R1 R2 R3 RD1-RD5 R6 R7 R8 B0 (exit 1 if any fails).
 Observations: X1 |C| and records with centre in C; X2 pixels in T\\C
-closer to a non-US grid edge than to any road; X3 sample points whose
+closer to a grid-edge pixel outside T (Canada or ocean) than to any road; X3 sample points whose
 nearest road lies outside grid + pad.
 
 RD thresholds (derivation, CR-0014): truth is measured from the pixel
@@ -271,9 +271,15 @@ def cmd_fetch(args, pins):
 def cmd_pin(args, pins):
     for r in args.regions:
         D = derive(pins, args.mask_root, r)
-        pins["T"][r] = {"inside": int(D["T"].sum()), "sha256": digest(D["T"])}
+        t_got = {"inside": int(D["T"].sum()), "sha256": digest(D["T"])}
+        if t_got != pins["T"][r]:
+            # T is pre-registered (CR-0008 v7 G0); never overwrite it with
+            # the verifier's own derivation, or R0 would check it against
+            # itself.
+            raise SystemExit(f"{r}: derived T {t_got} != pinned "
+                             f"{pins['T'][r]}; C not pinned")
         pins["C"][r] = {"count": int(D["C"].sum()), "sha256": digest(D["C"])}
-        print(f"{r}: T {pins['T'][r]}  C {pins['C'][r]}  "
+        print(f"{r}: T {t_got} (= pin)  C {pins['C'][r]}  "
               f"road files {len(D['zips'])}", flush=True)
     with open(args.pins, "w") as f:
         json.dump(pins, f, indent=2)
@@ -344,6 +350,8 @@ def cmd_check(args, pins):
         if not files:
             add("R1", "GATE", r, "no files", "files", False)
             continue
+        # R1/R2/RD read one copy; R3 (byte-identical copies) makes that
+        # sufficient, so a --files rehearsal checks only what it names.
         with rasterio.open(files[0]) as s:
             arr = s.read(1)
         nod = arr == NODATA
@@ -361,12 +369,15 @@ def cmd_check(args, pins):
                 tags.get("GROUSE_COVERAGE"), "present",
                 "GROUSE_COVERAGE" in tags)
             bak = os.path.join(args.backup_dir, os.path.basename(f))
-            if os.path.exists(bak):
-                with rasterio.open(bak) as b:
-                    bsig = (dict(b.profile), b.tags(ns="IMAGE_STRUCTURE"))
-                add("R6", "GATE", os.path.basename(f),
-                    "identical" if sig == bsig else "differs", "identical",
-                    sig == bsig)
+            if not os.path.exists(bak):
+                add("R6", "GATE", os.path.basename(f), "no backup file",
+                    "identical", False)
+                continue
+            with rasterio.open(bak) as b:
+                bsig = (dict(b.profile), b.tags(ns="IMAGE_STRUCTURE"))
+            add("R6", "GATE", os.path.basename(f),
+                "identical" if sig == bsig else "differs", "identical",
+                sig == bsig)
         # RD1-RD5
         from shapely import STRtree, points
         tree = STRtree(np.asarray(D["roads"].geometry.values))

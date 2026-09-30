@@ -62,6 +62,22 @@ stale year-copy each fail a gate.
 | A6 | LOW | `testzip()` raises on truncation | **Resolved in v2**; verifier unit-tested (truncated download, poisoned cache) |
 | A7 | LOW | Stratum 5 = ∂T or ∂(T\C)?; U4 trivially true | **Accept** — ∂T stated; U4 note already in v2 |
 
+### Round 2 (bounded re-review of v3)
+| reviewer | verdict |
+|---|---|
+| A — correctness | **APPROVE WITH FOLLOW-UPS** — A1–A7 resolved; `C` pins reproduced exactly (count and digest) in all three regions from an independent road copy; evt sha256 pins match |
+| B — implementability | **APPROVE WITH FOLLOW-UPS** — B1–B9 resolved; all `C` and `T` pins reproduced exactly by an independent implementation (different county selection) |
+
+| # | sev | concern | disposition |
+|---|---|---|---|
+| A8 | LOW | Script's X2 counts every non-US edge (incl. ocean), CR said "Canada-facing" | **Accept** — CR text aligned with the script: an upper bound on the residual |
+| A9 | LOW | R6 silently skipped when a backup file is missing | **Accept** — now a failing R6 row |
+| A10 | LOW | R1/R2 read one copy; sound only with R3 | **Accept** — commented in the script; R3 runs by default |
+| B10 | LOW | `pin` overwrote the T pins with the verifier's own T (R0 would check itself) | **Accept** — `pin` now refuses if derived T ≠ pinned T and writes only C |
+| B11 | LOW | R6 silently skipped without a backup | **Accept** — same fix as A9 |
+| B12 | LOW | `check` on ME may peak at 15–20 GB | **Accept** — deliverable 6: one region at a time, never alongside the generator |
+| — | note | Reviewer could not run the tests (no pytest) | They are `unittest`: `python -m unittest tests.test_check_road_dist` — 10 pass (author run) |
+
 ## Versions
 | version | date | change |
 |---|---|---|
@@ -69,5 +85,5 @@ stale year-copy each fail a gate.
 | v2 | 2026-09-30 | Round-1 reviewer B dispositions |
 | v3 | 2026-09-30 | Round-1 reviewer A dispositions; `check_road_dist.py`, pins and verifier tests written (pre-approval deliverable 1) |
 
-## Author sign-off
-Pending.
+## Quorum (§1.4)
+Reviewer A: APPROVE WITH FOLLOW-UPS (v3). Reviewer B: APPROVE WITH FOLLOW-UPS (v3). Author: **signed off** — user instructed implementation 2026-09-30. **CR-0014 APPROVED (v3).**

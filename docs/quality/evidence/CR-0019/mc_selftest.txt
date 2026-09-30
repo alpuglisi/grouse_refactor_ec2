@@ -1,7 +1,7 @@
 == predicted tree: exit 0 (expected 0)
-MC: PASS (39/39 checks pass)
+MC: PASS (42/42 checks pass)
 == no-op (live as NEW): exit 1 (expected 1)
-MC: FAIL (29/39 checks pass)
+MC: FAIL (32/42 checks pass)
     MC1 ME rows: FAIL new 3660, pre-registered 2854, missing 8, extra 814, differing 7
     MC1 ME kept lines: FAIL header equal=True; 7 kept rows differ beyond the pre-registered split changes (7 split changes)
     MC1 NH rows: FAIL new 1079, pre-registered 827, missing 4, extra 256, differing 0

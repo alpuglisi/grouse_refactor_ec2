@@ -1,0 +1,26 @@
+| tree | expected | MC exit | MC summary | failing checks |
+|---|---|---|---|---|
+| live tree as NEW (no-op) | FAIL | 1 | MC: FAIL (29/39 checks pass) | MC1 ME rows, MC1 ME kept lines, MC1 NH rows, MC1 VT rows, MC1 VT kept lines, MC2, MC3, MC4 ME rows, MC4 NH rows, MC4 VT rows |
+| MC0: OLD = correct tree | FAIL | 1 | MC: FAIL (37/39 checks pass) | MC0, MC3 |
+| correct | PASS | 0 | MC: PASS (39/39 checks pass) | - |
+| noop_replay | FAIL | 1 | MC: FAIL (29/39 checks pass) | MC1 ME rows, MC1 ME kept lines, MC1 NH rows, MC1 VT rows, MC1 VT kept lines, MC2, MC3, MC4 ME rows, MC4 NH rows, MC4 VT rows |
+| off_by_one | FAIL | 1 | MC: FAIL (28/39 checks pass) | MC1 ME rows, MC1 ME kept lines, MC1 NH rows, MC1 NH kept lines, MC1 VT rows, MC1 VT kept lines, MC2, MC3, MC4 ME rows, MC4 NH rows, MC4 VT rows |
+| floor_2019 | FAIL | 1 | MC: FAIL (28/39 checks pass) | MC1 ME rows, MC1 ME kept lines, MC1 NH rows, MC1 NH kept lines, MC1 VT rows, MC1 VT kept lines, MC2, MC3, MC4 ME rows, MC4 NH rows, MC4 VT rows |
+| after_thin | FAIL | 1 | MC: FAIL (30/39 checks pass) | MC1 ME rows, MC1 ME kept lines, MC1 NH rows, MC1 VT rows, MC2, MC3, MC4 ME rows, MC4 NH rows, MC4 VT rows |
+| source_all | FAIL | 1 | MC: FAIL (35/39 checks pass) | MC3, MC4 ME rows, MC4 NH rows, MC4 VT rows |
+| source_buffer | FAIL | 1 | MC: FAIL (35/39 checks pass) | MC3, MC4 ME rows, MC4 NH rows, MC4 VT rows |
+| train_only | FAIL | 1 | MC: FAIL (29/39 checks pass) | MC1 ME rows, MC1 ME kept lines, MC1 NH rows, MC1 VT rows, MC1 VT kept lines, MC2, MC3, MC4 ME rows, MC4 NH rows, MC4 VT rows |
+| stale_blocks | FAIL | 1 | MC: FAIL (35/39 checks pass) | MC3, MC4 ME rows, MC4 NH rows, MC4 VT rows |
+| del_pos5 | FAIL | 1 | MC: FAIL (36/39 checks pass) | MC1 ME rows, MC4 ME train count, MC4 ME val count |
+| del_neg5 | FAIL | 1 | MC: FAIL (36/39 checks pass) | MC4 ME rows, MC4 ME train count, MC4 ME val count |
+| del_pos_and_neg_matched | FAIL | 1 | MC: FAIL (37/39 checks pass) | MC1 NH rows, MC4 NH rows |
+| dup_pos | FAIL | 1 | MC: FAIL (37/39 checks pass) | MC1 VT rows, MC4 VT train count |
+| edit_kept_pos_evh | FAIL | 1 | MC: FAIL (38/39 checks pass) | MC1 ME kept lines |
+| edit_added_pos_evh | FAIL (R1 catches if MC does not) | 0 | MC: PASS (39/39 checks pass) | - |
+| edit_pos_year | FAIL | 1 | MC: FAIL (37/39 checks pass) | MC1 ME rows, MC1 ME kept lines |
+| edit_neg_weight_N_only | FAIL | 1 | MC: FAIL (38/39 checks pass) | MC4 ME equals C |
+| edit_neg_obs_date | FAIL (documented MC gap; R4 catches) | 0 | MC: PASS (39/39 checks pass) | - |
+| edit_pool_weight | FAIL | 1 | MC: FAIL (38/39 checks pass) | MC3 |
+| pos_order_reversed | FAIL (R1 order catches if MC does not) | 0 | MC: PASS (39/39 checks pass) | - |
+| pool_two_rows_swapped | FAIL | 1 | MC: FAIL (38/39 checks pass) | MC3 |
+| train_file_stale | FAIL | 1 | MC: FAIL (38/39 checks pass) | MC5 train_positives_VT |

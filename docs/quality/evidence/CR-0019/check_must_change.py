@@ -12,6 +12,7 @@ MC0  OLD's 20 digested artifacts equal the CR-0017 live record copy
      preregister.py under review.
 MC1  P per region: NEW thinned_positives_R has exactly the pre-registered
      rows (key, split, block_id, year), no more, no fewer.
+     The file is in canonical (longitude, latitude) order.
      Every row whose key is also in OLD has a line byte-identical to its
      OLD line, except the `split` field for exactly the pre-registered
      split changes (preregister rows whose OLD split differs).
@@ -29,8 +30,10 @@ MC4  N per region: the key set, split and is_nonveg equal preregister_N.csv
 MC5  train_/val_ files (P and N, NEW tree): header + the combined file's
      split == train / val lines, in order.
 MC does not check the N-only columns other than label (obs_date,
-coord_uncertainty_m, gbif_id, common_name): R4's full-row replay does,
-in the same acceptance run.
+coord_uncertainty_m, gbif_id, common_name), nor the columns of the ADDED
+positives other than key, split, block_id and year: R4's and R1's
+full-row replays do, in the same acceptance run (review B-6).
+The four preregister_*.csv files are pinned by sha256 (PRE_SHA).
 
 Exit 0 only if every check passes. Every check is reported.
 
@@ -68,7 +71,17 @@ def lines(root, rel):
         return f.read().splitlines()
 
 
+PRE_SHA = {  # the pre-registration as committed at 95d7463 (review B-7)
+    "preregister_P.csv": "398fc6cb87c0c1871dce5c0e9db01f64fc6e880fd76ec61d1fa124834f0a8214",
+    "preregister_B.csv": "85756e0c11494dd6c7bc8296f2f36512bc99281c8a0c18084905ff049fdb369f",
+    "preregister_C_split.csv": "5415d2e69fa0975f729e4111ec6f4df2751e40c83a5dd928a9ba44b970bad6a9",
+    "preregister_N.csv": "9e95d4b1fa853ff05beaa983a4a266e8bcf69bbd0edc6cc88ce7dde7ae75ca24",
+}
+
+
 def pre(name):
+    if sha(os.path.join(HERE, name)) != PRE_SHA[name]:
+        raise SystemExit(f"{name}: sha256 differs from the pinned pre-registration")
     return pd.read_csv(os.path.join(HERE, name), float_precision="round_trip")
 
 
@@ -148,6 +161,8 @@ def main():
         check(f"MC1 {R} kept lines", nl[0] == ol[0] and probs == 0,
               f"header equal={nl[0] == ol[0]}; {probs} kept rows differ beyond the "
               f"pre-registered split changes ({n_split_changed} split changes)")
+        srt = new.sort_values(["longitude", "latitude"], kind="mergesort")
+        check(f"MC1 {R} order", srt.index.tolist() == list(range(len(new))))
         for s in ("train", "val"):
             relp = f"data/pipeline/{s}_positives_{R}.csv"
             want = [nl[0]] + [nl[i + 1] for i, v in enumerate(new["split"]) if v == s]

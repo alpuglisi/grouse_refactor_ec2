@@ -1,0 +1,35 @@
+== OLD (live, CR-0017): features ['evt', 'evh', 'evc', 'sclass', 'fdist', 'ch', 'cc', 'tcc', 'nlcd', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn']
+  P n=6232 null years=0 years={2016: 269, 2017: 257, 2018: 452, 2019: 459, 2020: 925, 2021: 1052, 2022: 1172, 2023: 705, 2024: 941} <2020=1437
+  N n=6232 null years=0 years={2020: 2379, 2021: 1674, 2022: 1307, 2023: 516, 2024: 356} <2020=0
+  tol 2: dropped P 1437/6232 N 0/6232; val prev 968/2214=0.4372; train prev 3827/8813=0.4342
+   per (R,s) P kept: {('ME', 'train'): 2278, ('ME', 'val'): 568, ('NH', 'train'): 630, ('NH', 'val'): 193, ('VT', 'train'): 919, ('VT', 'val'): 207}
+   per (R,s) N kept: {('ME', 'train'): 2922, ('ME', 'val'): 738, ('NH', 'train'): 840, ('NH', 'val'): 239, ('VT', 'train'): 1224, ('VT', 'val'): 269}
+  tol 1: dropped P 2362/6232 N 2379/6232; val prev 768/1532=0.5013; train prev 3102/6191=0.5010
+  tol 0: dropped P 4355/6232 N 4409/6232; val prev 356/715=0.4979; train prev 1521/2985=0.5095
+  year->label AUC all 0.5061; year>=2020 0.6578
+== NEW (reviewer pipeline run with floor): features ['evt', 'evh', 'evc', 'sclass', 'fdist', 'ch', 'cc', 'tcc', 'nlcd', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn']
+  P n=4809 null years=0 years={2020: 928, 2021: 1057, 2022: 1174, 2023: 708, 2024: 942} <2020=0
+  N n=4809 null years=0 years={2020: 1861, 2021: 1293, 2022: 1010, 2023: 380, 2024: 265} <2020=0
+  tol 2: dropped P 0/4809 N 0/4809; val prev 962/1924=0.5000; train prev 3847/7694=0.5000
+   per (R,s) P kept: {('ME', 'train'): 2291, ('ME', 'val'): 563, ('NH', 'train'): 634, ('NH', 'val'): 193, ('VT', 'train'): 922, ('VT', 'val'): 206}
+   per (R,s) N kept: {('ME', 'train'): 2291, ('ME', 'val'): 563, ('NH', 'train'): 634, ('NH', 'val'): 193, ('VT', 'train'): 922, ('VT', 'val'): 206}
+  tol 1: dropped P 928/4809 N 1861/4809; val prev 763/1355=0.5631; train prev 3118/5474=0.5696
+  tol 0: dropped P 2927/4809 N 3419/4809; val prev 353/630=0.5603; train prev 1529/2642=0.5787
+  year->label AUC all 0.6615; year>=2020 0.6615
+calibration.json val_prevalence 0.43721771240234375
+P kept 4795, removed 1437, added 14
+  removed years: {2016: 269, 2017: 257, 2018: 452, 2019: 459}
+  added: 14 years {2020: 3, 2021: 5, 2022: 2, 2023: 3, 2024: 1} splits {'train': 12, 'val': 2}
+  added: nearest removed pre-2020 positive distance max 23.4 m (MIN_SPACING_M 30); all < spacing: True
+  kept P split moves: {('val', 'train'): 8}
+B 3861 -> 3205; vanished 656, new 0, flips {('val', 'train'): 7}
+  val share of blocks old 0.196581 new 0.196568; val P share old 0.1999 new 0.2000
+C rows 22099 vs 22099; same keys/order True; split changes 501: {('val', 'train'): 294, ('train', 'val'): 207}
+  C year range 2020 2024
+N kept 4808, removed 1424, added 1
+new val N (962) that are live(CR-0017) train N: 48
+new val N that are pre-CR-0017 backup train N (grouse_cr0009.pth's actual training set): 48
+new val P (962) that are live train P: 0
+new val N in blocks holding a live-train positive: 49; new val P in such blocks: 0
+1b shortfalls: [('ME', 'train', 2024, 304, 213, 143, 70), ('ME', 'val', 2024, 81, 57, 34, 23), ('NH', 'val', 2024, 66, 46, 31, 15), ('VT', 'train', 2023, 174, 122, 111, 11), ('VT', 'train', 2024, 268, 188, 111, 77), ('VT', 'val', 2024, 59, 41, 22, 19)] total 215
+  per (R,s) 2023-24 merged: shortfall 155

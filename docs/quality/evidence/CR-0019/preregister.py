@@ -5,7 +5,7 @@ what CR-0019's change must produce, and the numbers the CR quotes.
 The change (CR-0019 section 2):
   positives step 2  keep habitat rows with year >= YEAR_MIN (2020); raise
                     on a null year;
-  pool step 1       raise if any candidate year is null or < YEAR_MIN
+  pool step 1       raise if any non-null candidate year is < YEAR_MIN
                     (a guard; today's candidates are all 2020-2024, so it
                     changes no row - checked and printed below);
   draw              unchanged (1:1 per region and split against the new
@@ -58,9 +58,9 @@ class Floored(A.Replay):
     the pool guard is a no-op on today's candidates, checked below)."""
 
     def habitat_rows(self, df):
+        if df["year"].isna().any():        # any evaluated row, habitat or not
+            raise A.ReplayError("evaluated sighting with no year")
         hab = super().habitat_rows(df)
-        if hab["year"].isna().any():
-            raise A.ReplayError("positive with no year")
         return hab[hab["year"].astype(int) >= YEAR_MIN].copy()
 
 

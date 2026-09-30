@@ -1,6 +1,6 @@
 # CR-0019: One year floor for both classes, applied at selection; the train-time year-gap filter refuses instead of dropping
 
-**Status: PROPOSED (v1), 2026-09-30.** Verdicts and dispositions:
+**Status: PROPOSED (v2), 2026-09-30.** Verdicts and dispositions:
 `CR-0019-review-log.md`. This document states only current intent.
 
 ## Scope
@@ -65,12 +65,15 @@ constant for both, and turns the train-time filter into a check.
 **Constant.** `regions.py` gains `YEAR_MIN = 2020`, with a comment: the
 first year both classes were acquired, and the first year with every
 `FEATURE_SPEC` raster within `train.py`'s default `--max-year-gap` of 2.
-It is the only literal (PA-0025). `get_negatives.py`'s `--years` default
+It is the only literal (PA-0025); `tests/test_shared_constants.py`
+pins the name, but a bare `2020` in a comparison or `range()` is not
+mechanically detectable, so that part is review-only. `get_negatives.py`'s `--years` default
 becomes `range(YEAR_MIN, today + 1)` (same value; single-sourced;
 nothing is fetched).
 
 **Positives step 2, as amended.** Raise `ValueError` if any row of the
-region's evaluated sightings has a null `year`. Keep the rows with
+region's evaluated sightings (habitat or not) has a null `year`; none
+has today (the year comes from the file name). Keep the rows with
 `~nonveg_landcover` **and** `year >= YEAR_MIN`. The manifest count `"2"`
 is the rows after both conditions; the manifest schema is unchanged.
 
@@ -84,10 +87,19 @@ is the rows after both conditions; the manifest schema is unchanged.
   still not evidence of absence) and the envelope metrics and binners
   (pool step 9). `sightings.py`/`ebird.py` keep `START_YEAR = 2016` for
   those two uses.
+- *Envelope weights and PA-0020(i).* The metrics are a sampling weight
+  for negatives, estimated from where grouse were seen; they are not
+  records entering the dataset and carry no label. Refitting them on
+  2020+ only would change the negatives' weights, hence the draw, the
+  pool rows and MC, for a question this CR does not answer (is 2016–2019
+  habitat use different?). Kept as is; deliverable 8's PA-0020 sweep
+  records it as a named, owned item (review log § Proposed bookkeeping),
+  not a silent choice.
 
 **Pool step 1, as amended.** After loading each region's candidates,
-raise `ValueError` if any row has a null `year` or `year < YEAR_MIN`. This
-is a guard, not a filter: all 265,212 raw candidates are 2020–2024 today,
+raise `ValueError` if any row has a **non-null** `year < YEAR_MIN`. A
+null-year candidate keeps its CR-0012 behaviour (dropped at step 7, no
+envelope values). This is a guard, not a filter: all 265,212 raw candidates are 2020–2024 today,
 so no row and no count changes. A later re-fetch with older years then
 fails loudly and forces a reviewed `YEAR_MIN` change, instead of silently
 widening one class.
@@ -126,7 +138,7 @@ equal to what CR-0013 accepted (PA-0029).
 
 ### 3. Acceptance (amends CR-0013; normative for the replay author)
 **Config (`docs/quality/acceptance_split.json`).**
-- `constants.YEAR_MIN`: 2020. E11(c) then requires it in both manifest
+- `constants.YEAR_MIN`: 2020 (an integer). E11(c) then requires it in both manifest
   sections' constants.
 - `regions_py.names.YEAR_MIN`: E11(e) then requires the `regions.py`
   literal to equal it.
@@ -141,14 +153,21 @@ change row for row, and R1/R3's count checks read the new `"2"` count.
 
 | id | set, pooling | predicate |
 |---|---|---|
-| E14 | P combined, N combined; C (full run) | every row's `year` is non-null, integral and `≥ YEAR_MIN` (config) |
+| E14(a) | P combined, N combined; C (full run) | every row of P and N has a non-null, integral `year ≥ YEAR_MIN` (config); every non-null `year` of C is `≥ YEAR_MIN` |
+| E14(b) | P combined vs N combined, pooled over regions and splits | the set of distinct `year` values in P equals the set in N |
 
 - E14 joins the standing subset on P and N (pandas only; `standing_checks`
   runs before every `build_datasets`). C is covered by the record digests,
   as for E3(C).
 - E14 is where PA-0020(ii)'s build-time support comparison lives for the
-  time axis: both classes' supports lie in `[YEAR_MIN, ∞)`, and the
-  train-time refusal (§2) makes that support the one that trains.
+  time axis: (a) bounds both supports below by one constant; (b) makes
+  them equal, so an upper-end divergence (e.g. positives re-acquired to
+  2026 while the negatives stay at 2024) also fails. After the change both
+  sets are {2020, …, 2024} (`preregister.txt`); today (b) fails (P has
+  2016–2019). (b) is pooled, not per (region, split): a small cell can
+  legitimately miss a year in one class by chance, and the pooled set is
+  the support. The train-time refusal (§2) makes that support the one
+  that trains.
 - E9 is unchanged: its per-(region, split) count predicate still holds.
 
 **Attack rows** (CR-0013 § Attacks; `tests/test_acceptance_split.py`,
@@ -157,14 +176,29 @@ asserts they exist, so no attack passes vacuously (PA-0021(a)).
 
 | attack | fixture rows required | must fail |
 |---|---|---|
-| No floor (step 2 unchanged) | ≥ 1 habitat positive with `year < YEAR_MIN` that survives the window and the thin | E14, R1, R2 |
+| No floor (step 2 unchanged) | ≥ 1 habitat positive with `year < YEAR_MIN` that survives the window and the thin, with no negative of that year | E14(a), E14(b), R1, R2 |
 | Floor after thinning | a pair closer than `MIN_SPACING_M`: the `year < YEAR_MIN` member first in thin order, the other `≥ YEAR_MIN` | R1 (E14 passes) |
 | Floor off by one (`year > YEAR_MIN`) | ≥ 1 habitat positive with `year == YEAR_MIN` that survives the thin | R1, R2 |
 | Floor applied to the sightings (source-level cut, so the buffer shrinks) | ≥ 1 candidate within `BUFFER_M` of a `year < YEAR_MIN` sighting only, that survives steps 7–10 and is drawn | R3, R4 |
-| Floor on the train split only | ≥ 1 `year < YEAR_MIN` positive in a validation block | E14, R1, R2 |
+| Floor on the train split only | ≥ 1 `year < YEAR_MIN` positive in a validation block | E14(a), R1, R2 |
+| Positives later than every negative (pipeline right, inputs wrong) | a fixture variant whose sightings include a year above every candidate year | E14(b) |
 
 A unit test also checks that the replay raises on a candidate with
-`year < YEAR_MIN` and on one with a null year.
+`year < YEAR_MIN` and on an evaluated sighting with a null year, and that
+a null-year candidate is still dropped at step 7.
+
+**Existing fixtures (part of deliverables 2 and 3).** Today's fixtures
+contradict the new rules, so they change with this CR:
+- `tests/test_acceptance_split.py`: sighting years `:227` and candidate
+  years `:291`, `:319` move to ≥ `YEAR_MIN` (keeping at least one sighting
+  below it for the attack rows above); the fixture `REGIONS_PY` (`:62`)
+  gains `YEAR_MIN`; the `len(GATE_IDS)` pin (`:1492`) becomes 20.
+- `tests/test_cr0012.py`: candidate years `:593` move to ≥ `YEAR_MIN`;
+  the null-year candidates (`:594`) and the assertion `:835-836` stay
+  (the guard ignores null years).
+- Every existing attack row's fixture-existence assertion (CR-0012,
+  CR-0013, CR-0017 attacks) must still pass after the edits; a row that
+  the floor removes is re-seeded at a year ≥ `YEAR_MIN`, never deleted.
 
 **Must-change gate MC (PA-0021(b); one-off, for this regeneration).**
 `docs/quality/evidence/CR-0019/check_must_change.py --old <pre-CR tree>
@@ -187,8 +221,12 @@ text), not the pipeline, subclassed only at positives step 2. Its
 **control** first requires the unmodified replay to reproduce today's P,
 B, C and N (keys, split, `block_id`), and aborts otherwise; it passed.
 `mc_selftest.py` emits the predicted tree to a scratch directory: MC
-PASSes on it (39/39) and FAILs with the live tree as NEW (a no-op), in
-`mc_selftest.txt`. A reviewer's wrong-tree runs are deliverable 1.
+PASSes on it (42/42) and FAILs with the live tree as NEW (a no-op), in
+`mc_selftest.txt`. The four pre-registration CSVs are pinned by sha256 in
+`check_must_change.py`. Reviewer B's wrong-tree runs (round 1, 23 trees)
+are in `reviewB/mc_wrongtrees.txt`: no no-op, deletion, wrong floor or
+rewritten covered value passes. MC's stated limits (the added positives'
+other columns, the N-only columns) are covered by R1/R4 in the same run.
 
 ### 4. What the change does to the data (pre-registered)
 | region, split | P today | P after | P today after the tol-2 filter | N after |
@@ -226,23 +264,27 @@ of habitat candidates (215 in all; ME train 2024 −70, VT train 2024 −77;
 2023–2024 negative candidates, i.e. a GBIF re-fetch (network,
 outward-facing, a user decision) or a design decision on coarser
 matching. It is a separate defect (distribution, not support) and is
-proposed as its own BUG, owned by a future CR (review log § Proposed
-bookkeeping).
+proposed as its own BUG (BUG-NEW-a; the lead allocates the id), owned
+by a future CR (review log § Proposed bookkeeping).
 
 ### 6. Retrain decision: no retrain under this CR
-- `grouse_cr0009.pth` is not retrained here. A **follow-up CR** (id
-  allocated by the lead; CR-0009's shape) retrains, refits calibration
+- `grouse_cr0009.pth` is not retrained here. The follow-up
+  **CR-0020** (CR-0009's shape) retrains, refits calibration
   and records a new validation baseline on the post-CR-0019 split.
 - CR-0009's baseline (AUC 0.7783, AP 0.6851 at prevalence 0.4372) stops
   being comparable: prevalence moves to 0.5 (AP moves with it by
   construction), and the validation set changes (§4). `CHANGELOG.md` says
   so.
-- **Until that retrain, `calibrate.py` must not be run on
-  `grouse_cr0009.pth`.** 48 of the new 962 validation negatives were its
-  training negatives, and nothing refuses a checkpoint fitted under
-  another split (BUG-0060, open). The existing `calibration.json` and
-  maps stay as they are; `predict.py` reads no split file. `CHANGELOG.md`
-  and the tracker carry the warning.
+- **Until that retrain, `grouse_cr0009.pth` (and every older checkpoint)
+  must not be used with the new split** in any of BUG-0060's entry points
+  (`calibrate.py --model`, `train.py --distill-from`, `--init-from`,
+  `--resume`), nor evaluated on the new validation set by
+  `diagnose_*`/`bench_pipeline.py`. 48 of the new 962 validation
+  negatives were its training negatives, and nothing refuses a checkpoint
+  fitted under another split (BUG-0060, open). CR-0020 trains from
+  scratch (no `--init-from grouse_cr0009.pth`). The existing
+  `calibration.json` and maps stay as they are; `predict.py` reads no
+  split file. `CHANGELOG.md` and the tracker carry the warning.
 
 ## Alternatives considered
 | option | verdict |
@@ -283,8 +325,8 @@ bookkeeping).
   step 1) and CR-0013 (E-table, standing subset, § Attacks): "amended by
   CR-0019". `ARCHITECTURE.md` (the `filter_by_year_gap` sentence) and
   `CHANGELOG.md` are updated.
-- **Coordination:** BUG-0068 and the BUG-0069 site at
-  `acceptance_split.py:2620` are pending fixes in the same file ("after
+- **Coordination:** BUG-0068 and the BUG-0069 site
+  (`acceptance_split.full_run#0`, `:2795` today) are pending fixes in the same file ("after
   CR-0017 merges"). Whichever lands second rebases and re-pins the PA-0027
   lint digests (`tests/test_pa0027_lint.py`).
 
@@ -295,9 +337,11 @@ regeneration and bookkeeping. They cannot land separately:
   record is written and `standing_checks` refuses all training.
 - The replay change without the pipeline change fails E11, E14 and R1–R4
   on today's files (deliverable 2 shows it).
-- The `train.py` refusal without the regeneration refuses every run on
-  today's files (1,437 positives); the regeneration without the refusal
-  leaves a tolerance of 1 or 0 free to recreate the asymmetry (§2).
+- The `train.py` refusal cannot land **before** the regeneration (it
+  refuses every run on today's files, 1,437 positives). It could land
+  after it as its own change (a no-op at tolerance 2); it is bundled
+  because without it a tolerance of 1 or 0 recreates the asymmetry the
+  moment the data lands (§2), and it shares this CR's review and tests.
 - The regeneration is how they land together; bookkeeping closes the BUG.
 
 The retrain is split out (§6), as CR-0009 was from CR-0012. The
@@ -310,7 +354,8 @@ Every training file is regenerated and the validation set changes.
 | risk | mitigation |
 |---|---|
 | The pipeline and the replay disagree | Exact R1–R4 replay; MC pins every output row against an independent pre-registration; either fails loudly, nothing is accepted silently |
-| Floor in the wrong place (after thinning, at the source, off by one, one split only) | Attack rows (§3); MC1/MC2 exact |
+| Floor in the wrong place (after thinning, at the source, off by one, one split only) | Attack rows (§3); MC1/MC2 exact; reviewer B's wrong trees (§3) |
+| Existing fixtures contradict the new rules | Fixture edits are deliverables; existing attack rows' existence checks must still pass (§3) |
 | Habitat pool undersupplied after the change (`RuntimeError`) | Targets only fall (every (region, split) target is lower than today's); the pool is unchanged except 501 split labels. Checked in the scratch run (deliverable 4) |
 | A regenerated split used with the old model (leakage in calibration or evaluation) | §6 warning in `CHANGELOG.md` and the tracker; retrain follow-up CR; BUG-0060 (open) owns the mechanical refusal |
 | A live run that fails part-way | Deliverable 6's order and restore rule |
@@ -333,8 +378,8 @@ Every training file is regenerated and the validation set changes.
     otherwise; `-1` disables.
 - **Acceptance tests (deliverable 2):** E14 unit tests; the five attack
   rows and the replay-raises test; the config pins; the existing suite.
-- **Today's real files, read-only (deliverable 2):** E14 FAILs (P, 1,437
-  rows: ME 814, NH 256, VT 367); E11 FAILs (no `YEAR_MIN` in the
+- **Today's real files, read-only (deliverable 2):** E14 FAILs ((a) P, 1,437
+  rows: ME 814, NH 256, VT 367; (b) P years {2016..2024} vs N {2020..2024}); E11 FAILs (no `YEAR_MIN` in the
   manifest constants); R1–R4 FAIL; every other gate passes.
 - **Scratch-tree real-data run (deliverable 4):** CSVs copied, rasters and
   county zip symlinked, no output path a symlink; run
@@ -369,11 +414,14 @@ Every training file is regenerated and the validation set changes.
       wrong-tree runs of MC, recorded in the evidence directory.
 - [ ] 2. Acceptance changes (§3) on an unmerged CR-0019 branch, by a fresh
       agent that does not also write deliverable 3 (CR-0013 rule 4):
-      `acceptance_split.py`, the config, the tests; suite passes; the
+      `acceptance_split.py`, the config, the tests and the fixture edits
+      (§3); `tests/test_acceptance_split.py` passes (`test_cr0012`'s
+      constants test passes only after deliverable 3); the
       read-only run on today's files gives exactly the expected FAILs
       (evidence `acceptance_prefix.txt`).
-- [ ] 3. Pipeline and `train.py` changes (§2) and `tests/test_cr0019.py`
-      on the same branch; the suites in § Test plan pass.
+- [ ] 3. Pipeline and `train.py` changes (§2), `tests/test_cr0019.py` and
+      the `tests/test_cr0012.py` fixture edit (§3) on the same branch; the
+      suites in § Test plan pass.
 - [ ] 4. Scratch-tree real-data run (§ Test plan); evidence under
       `docs/quality/evidence/CR-0019/scratch/`.
 - [ ] 5. Preconditions, recorded before any write under `data/`: no other
@@ -392,19 +440,21 @@ Every training file is regenerated and the validation set changes.
       OBS file.
 - [ ] 7. Pointer lines in CR-0012 §2 and CR-0013 (§ Impact);
       `ARCHITECTURE.md`; `CHANGELOG.md` entry: the data change, the new
-      prevalence, CR-0009's baseline no longer comparable, and "do not run
-      `calibrate.py` on `grouse_cr0009.pth` against this split" (§6).
+      prevalence, CR-0009's baseline no longer comparable, and the §6
+      warning (no pre-CR-0019 checkpoint in any BUG-0060 entry point
+      against this split).
 - [ ] 8. Bookkeeping (review log § Proposed bookkeeping): BUG-0034
       corrective action and status; `BUG_LOG.md` row; the residual BUG
       (§5) filed; PA-0020 Swept? cell (BUG-0034 live instance fixed, the
       source-axis item it owns resolved, sweep by mechanism for any other
       per-class year selection, incl. `train.sample_background_points`'
-      fixed vintage); tracker: the retrain follow-up CR, the §6 warning,
-      the residual, MEDIUM/LOW review items.
+      fixed vintage, the envelope-metric epoch (§2) and the duplicated
+      `START_YEAR` literal); tracker: CR-0020, the §6 warning, the
+      residual, MEDIUM/LOW review items.
 - [ ] 9. Close-out: every item above ticked; status IMPLEMENTED.
 
 ## Out of scope
-- **The retrain, calibration and new baseline** (§6): a follow-up CR.
+- **The retrain, calibration and new baseline** (§6): CR-0020.
 - **The year-matched draw and any negatives re-fetch** (§5): the residual
   BUG's own CR, after a user decision on network acquisition.
 - **Changing positive acquisition** (`sightings.py`/`ebird.py`

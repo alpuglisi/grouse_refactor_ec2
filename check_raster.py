@@ -17,6 +17,8 @@ import os
 import numpy as np
 import rasterio
 
+from regions import REGIONS
+
 
 def check_one(path):
     print(f"\n{path}")
@@ -68,7 +70,7 @@ def main():
         targets = args.files
     else:
         targets = [f"data/landfire/{region}_2025_{feat}.tif"
-                  for region in ("ME", "NH", "VT")
+                  for region in REGIONS
                   for feat in ("evh", "evt")]
         # Also grab one known-good file (sclass 2024) as a working control
         # for comparison - if it looks structurally different from the

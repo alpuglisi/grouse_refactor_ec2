@@ -24,6 +24,7 @@ import torch
 from torch.utils.data import ConcatDataset, DataLoader
 
 from grouse_data import GrouseData
+from regions import REGIONS
 from models import FEATURE_SPEC, split_features
 from dataset import GrousePatchDataset
 from model_handler import GrouseModelHandler
@@ -32,7 +33,7 @@ from losses import FocalLoss
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--regions", nargs="+", default=["ME", "NH", "VT"])
+    parser.add_argument("--regions", nargs="+", default=list(REGIONS))
     parser.add_argument("--img-size", type=int, default=64)
     args = parser.parse_args()
 

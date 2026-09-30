@@ -55,7 +55,9 @@ from scipy.ndimage import distance_transform_edt
 
 from grouse_data import GrouseData, WETLAND_NLCD_CLASSES
 
-REGIONS_DEFAULT = ["ME", "NH", "VT"]
+from regions import REGIONS
+
+REGIONS_DEFAULT = list(REGIONS)
 OPEN_WATER_CODE = 11
 THRESHOLDS_M = (300, 1000)
 

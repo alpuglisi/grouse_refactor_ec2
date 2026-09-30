@@ -99,8 +99,21 @@ overlapping labels (bounding boxes), so its guarantee holds within one
 region but not across the pooled data.
 
 ## 6. Corrective action
-None yet. Needs a CR (it changes the dataset split, which is a data
-schema and behaviour change). Proposed:
+**Assigned (2026-09-30): membership — CR-0007; split and draw — CR-0012.**
+- *Membership (item 1 below), CR-0007 (implemented 2026-09-30,
+  deliverables 2–5):* records are partitioned by `state`, checked against
+  TIGER county polygons (`regions.verify_partition`, called from
+  `analyze_grouse.check_state_partition`). Each `evaluated_sightings_R`
+  holds only state-R records, and the three files' keys are pairwise
+  disjoint (CR-0007 P1–P3 PASS; before: ME∩NH 1,184, NH∩VT 3,271 shared
+  keys; `docs/quality/evidence/CR-0007-gates.txt`).
+- *Global grid, pooled split and draw (items 2–3), CR-0012.*
+
+Status: **OPEN — fixed when CR-0012 lands; closed after CR-0009's
+retrain** (the split change invalidates every checkpoint).
+
+Original proposal (needs a CR: it changes the dataset split, a data
+schema and behaviour change):
 1. **One partition of records into regions:** by state polygon or
    `stateProvince`, or nearest-region-by-point, never overlapping boxes.
 2. **One global block grid and one assignment across all regions:** a
@@ -114,8 +127,8 @@ Regenerating splits invalidates every checkpoint and every metric
 comparison. Retrain and re-measure after the fix; the validation numbers
 may drop, and a drop would be the real performance, not a regression.
 
-Status: **OPEN**, unconfirmed on real data (the §3 count is the first
-step).
+(Status as originally filed: OPEN, unconfirmed on real data. Superseded
+by the status line at the top of this section.)
 
 ## 7. Recurrence review
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`:

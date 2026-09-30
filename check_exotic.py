@@ -28,7 +28,9 @@ import argparse
 
 import pandas as pd
 
-REGIONS_DEFAULT = ["ME", "NH", "VT"]
+from regions import REGIONS
+
+REGIONS_DEFAULT = list(REGIONS)
 TARGET_PHYS = ["Exotic Tree-Shrub", "Exotic Herbaceous"]
 
 

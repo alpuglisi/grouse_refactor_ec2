@@ -1,0 +1,158 @@
+CR-0007 deliverable 5 — acceptance run of check_partition.py (P1–P8) and observations O1–O4
+Date: 2026-09-30. Host: grouse2 working tree on branch claude/quality-records-cr0006-0009,
+HEAD 2f63be4 at run time (11:42–11:45 UTC) plus the uncommitted CR-0007 deliverables 2–4 (not yet committed; the
+coordinator commits). Backup of the pre-CR files: /home/ec2-user/grouse_backup/CR-0007/
+(manifest docs/quality/evidence/CR-0007-backup-manifest.txt).
+
+Sequence:
+  1. python analyze_grouse.py            exit 0, 46 s (log excerpt below)
+  2. python check_partition.py           exit 1 (acceptance run: no --only, no --assume)
+Not run (CR-0012): prepare_training_data.py, generate_negatives.py.
+
+RESULT: P1 P2 P3 P4 P5 P7 P8 PASS. P6 FAIL — 3 problems, all in git-tracked evidence
+scripts docs/quality/evidence/CR-0007-r7/{build,feats,lib}.py, which were committed in
+f5e5ee4 (CR-0013 deliverables), after CR-0007 v9 was approved at f8fafbc/6619bdd. They are
+not in the §1 re-point table, not in the P6 exemption list, and editing them (or the scan
+set) is a spec change. Every file in the §1 table is clean. See
+docs/quality/evidence/CR-0007-implementer-findings.md, finding F1. CR-0007 therefore does
+NOT yet have a passing acceptance run; an amendment is needed.
+
+------------------------------------------------------------------------
+analyze_grouse.py log excerpt (grep of CR-0007 lines)
+------------------------------------------------------------------------
+3:Partition check: all 43,024 sightings lie inside their own state's county polygons; no key filed under two states.
+9:  Collapsing repeated visits to the same location: 19,891 records -> 8,207 unique locations (58.7% were repeat visits to an already-seen coordinate).
+28:Restricting to ME records: 7,924 of 8,207 KDE-source locations (the rest are other states' records inside the ME box).
+46:    [bg] 20,000 in-state points written to data/pipeline/availability_sample_ME.csv (15,986 used)
+98:  Collapsing repeated visits to the same location: 17,380 records -> 5,000 unique locations (71.2% were repeat visits to an already-seen coordinate).
+117:Restricting to NH records: 2,303 of 4,999 KDE-source locations (the rest are other states' records inside the NH box).
+135:    [bg] 20,000 in-state points written to data/pipeline/availability_sample_NH.csv (16,485 used)
+184:  Collapsing repeated visits to the same location: 21,280 records -> 5,201 unique locations (75.6% were repeat visits to an already-seen coordinate).
+203:Restricting to VT records: 3,725 of 5,201 KDE-source locations (the rest are other states' records inside the VT box).
+220:    [bg] 20,000 in-state points written to data/pipeline/availability_sample_VT.csv (15,353 used)
+262:# SUMMARY (KDE mode: stratified)
+264:  ME: 7,924 unique locations (3,740 vegetated habitat, 4,184 non-veg)
+265:  NH: 2,303 unique locations (1,119 vegetated habitat, 1,184 non-veg)
+266:  VT: 3,725 unique locations (1,552 vegetated habitat, 2,173 non-veg)
+
+------------------------------------------------------------------------
+python check_partition.py   (full output, exit status 1)
+------------------------------------------------------------------------
+P1: PASS
+    evaluated_ME: 0 of 7,924 rows with state or region != ME
+    nonveg_flagged_ME: 0 of 4,184 rows with state or region != ME
+    evaluated_NH: 0 of 2,303 rows with state or region != NH
+    nonveg_flagged_NH: 0 of 1,184 rows with state or region != NH
+    evaluated_VT: 0 of 3,725 rows with state or region != VT
+    nonveg_flagged_VT: 0 of 2,173 rows with state or region != VT
+P2: PASS
+    ME & NH: 0 shared keys
+    ME & VT: 0 shared keys
+    NH & VT: 0 shared keys
+P3: PASS
+    keys filed under two states: 0 (a representative could then be the foreign record; CR-0007 A5)
+    ME: |K_R|=7,924 |E_R|=7,924 evaluated=7,924 extra=0 missing=0 own-state keys outside BOXES[ME]=0 duplicate keys=0 feature mismatches=0 (K_R keys with nodata, correctly absent: 0)
+    NH: |K_R|=2,303 |E_R|=2,303 evaluated=2,303 extra=0 missing=0 own-state keys outside BOXES[NH]=0 duplicate keys=0 feature mismatches=0 (K_R keys with nodata, correctly absent: 0)
+    VT: |K_R|=3,725 |E_R|=3,725 evaluated=3,725 extra=0 missing=0 own-state keys outside BOXES[VT]=0 duplicate keys=0 feature mismatches=0 (K_R keys with nodata, correctly absent: 0)
+P4: PASS
+    0 of 43,024 raw records violate the partition (state not in REGIONS 0, inside no state polygon 0, inside another state's polygon 0)
+P5: PASS
+    ME P5c: 0 envelopes whose Sightings != evaluated habitat value_counts (57 envelope rows)
+    ME P5a: rows 20,000 (BACKGROUND_N 20,000); outside box 0; outside ME polygon 0; used/envelope_id inconsistent 0
+    ME P5b: sum(Avail_N) 15,986 vs used rows 15,986; 0 envelopes whose Avail_N != used value_counts; 0 envelope rows in neither set
+    NH P5c: 0 envelopes whose Sightings != evaluated habitat value_counts (58 envelope rows)
+    NH P5a: rows 20,000 (BACKGROUND_N 20,000); outside box 0; outside NH polygon 0; used/envelope_id inconsistent 0
+    NH P5b: sum(Avail_N) 16,485 vs used rows 16,485; 0 envelopes whose Avail_N != used value_counts; 0 envelope rows in neither set
+    VT P5c: 0 envelopes whose Sightings != evaluated habitat value_counts (57 envelope rows)
+    VT P5a: rows 20,000 (BACKGROUND_N 20,000); outside box 0; outside VT polygon 0; used/envelope_id inconsistent 0
+    VT P5b: sum(Avail_N) 15,353 vs used rows 15,353; 0 envelopes whose Avail_N != used value_counts; 0 envelope rows in neither set
+P6: FAIL
+    3 problem(s)
+    docs/quality/evidence/CR-0007-r7/build.py:14: region-code sequence literal
+    docs/quality/evidence/CR-0007-r7/feats.py:9: region-code sequence literal
+    docs/quality/evidence/CR-0007-r7/lib.py:4: region-code sequence literal
+P7: PASS
+    28 of 28 modules import; 3 guarded copies checked
+P8: PASS
+    ME: KDE source 8,207 rows (own-state 7,924); evaluated rows not in source 0; evt_phys mismatches 0; density mismatches 0; zone mismatches 0
+    NH: KDE source 4,999 rows (own-state 2,303); evaluated rows not in source 0; evt_phys mismatches 0; density mismatches 0; zone mismatches 0
+    VT: KDE source 5,201 rows (own-state 3,725); evaluated rows not in source 0; evt_phys mismatches 0; density mismatches 0; zone mismatches 0
+
+------------------------------------------------------------------------
+Observations (never blocking), computed against the backed-up pre-CR files
+(/home/ec2-user/grouse_backup/CR-0007/pipeline/), keys rounded to
+COORD_ROUND_DECIMALS = 5
+------------------------------------------------------------------------
+O1: symmetric difference, post-CR evaluated_R keys vs pre-CR evaluated_R keys with state == R
+  ME: post 7,924, pre own-state 7,924, post-only 0, pre-only 0, symmetric difference 0
+  NH: post 2,303, pre own-state 2,303, post-only 0, pre-only 0, symmetric difference 0
+  VT: post 3,725, pre own-state 3,725, post-only 0, pre-only 0, symmetric difference 0
+O2: own-state habitat rows (post-CR evaluated_R, nonveg_landcover == False)
+  ME: 3,740
+  NH: 1,119
+  VT: 1,552
+O3: judgeable envelopes (Avail_N >= MIN_AVAIL_BG = 15), pre-CR -> post-CR (envelope rows)
+  ME: 46 of 56 -> 49 of 57
+  NH: 50 of 59 -> 50 of 58
+  VT: 48 of 57 -> 49 of 57
+O4: REQUIRED_FEATURES values differing, pre-CR evaluated_R vs post-CR, on shared own-state keys
+  ME (7,924 shared rows): evt 0, evh 0, evc 0, sclass 0, ch 0, cc 0
+  NH (2,303 shared rows): evt 0, evh 0, evc 0, sclass 0, ch 539, cc 654
+  VT (3,725 shared rows): evt 0, evh 0, evc 0, sclass 0, ch 0, cc 0
+  data/landfire/NH_2022_ch.tif mtime 2026-09-20 11:32
+  data/landfire/NH_2023_ch.tif mtime 2026-09-20 11:32
+  data/landfire/NH_2024_ch.tif mtime 2026-09-20 11:32
+  data/landfire/NH_2025_ch.tif mtime 2026-09-20 11:32
+  data/landfire/NH_2022_cc.tif mtime 2026-09-20 11:32
+  data/landfire/NH_2023_cc.tif mtime 2026-09-20 11:32
+  data/landfire/NH_2024_cc.tif mtime 2026-09-20 11:32
+  data/landfire/NH_2025_cc.tif mtime 2026-09-20 11:32
+
+Reading:
+  O1: 0 in every region, as P3 predicts (the post-CR evaluated files hold exactly the
+      pre-CR own-state keys).
+  O2: 3,740 / 1,119 / 1,552 — equal to the CR's "today" values.
+  O3: judgeable envelopes change with in-state availability: ME 46 -> 49, NH 50 -> 50,
+      VT 48 -> 49.
+  O4: on own-state rows, NH ch 539 / cc 654 values changed (the CR's 1,040 / 1,265 were
+      over all NH-file rows incl. foreign ones); ME and VT 0. The NH ch/cc rasters are
+      dated 2026-09-20 11:32, after the pre-CR file (2026-09-18). The re-run replaces the
+      stale values (P3 feature mismatches 0). Cause still untested (PA-0016); it remains
+      tracked in docs/quality/CR-0007-0008-OPEN-ISSUES.md.
+
+Side effect noted: analyze_grouse.py also rewrote data/maps/grouse_diagnostic_map_*.png.
+data/maps/STALE_SEE_CR-0010.txt was left in place (the maps are still not for publication).
+
+Deliverable 7 (road-file re-points: generate_road_distance.py:116,122,173,
+check_road_dist.py:472; removal of their two P6 exemptions) is NOT done here. It waits
+for CR-0016, which is about to change check_road_dist.py, and then CR-0014's closure.
+
+------------------------------------------------------------------------
+Test-plan item "P1–P3 fail on the backed-up pre-CR files":
+  python check_partition.py --data-root <scratch> --only P1 P2 P3
+  (scratch data/ = symlinks to data/sightings, data/landfire, data/roads, and
+   data/pipeline -> /home/ec2-user/grouse_backup/CR-0007/pipeline). Exit 1.
+------------------------------------------------------------------------
+P1: FAIL
+    evaluated_ME: no 'region' column (8,207 rows)
+    evaluated_ME: 283 of 8,207 rows with state or region != ME
+    nonveg_flagged_ME: no 'region' column (4,332 rows)
+    nonveg_flagged_ME: 148 of 4,332 rows with state or region != ME
+    evaluated_NH: no 'region' column (4,999 rows)
+    evaluated_NH: 2,696 of 4,999 rows with state or region != NH
+    nonveg_flagged_NH: no 'region' column (2,729 rows)
+    nonveg_flagged_NH: 1,545 of 2,729 rows with state or region != NH
+    evaluated_VT: no 'region' column (5,201 rows)
+    evaluated_VT: 1,476 of 5,201 rows with state or region != VT
+    nonveg_flagged_VT: no 'region' column (2,924 rows)
+    nonveg_flagged_VT: 751 of 2,924 rows with state or region != VT
+P2: FAIL
+    ME & NH: 1,184 shared keys
+    ME & VT: 0 shared keys
+    NH & VT: 3,271 shared keys
+P3: FAIL
+    keys filed under two states: 0 (a representative could then be the foreign record; CR-0007 A5)
+    ME: |K_R|=7,924 |E_R|=7,924 evaluated=8,207 extra=283 missing=0 own-state keys outside BOXES[ME]=0 duplicate keys=0 feature mismatches=0 (K_R keys with nodata, correctly absent: 0)
+    NH: |K_R|=2,303 |E_R|=2,303 evaluated=4,999 extra=2,696 missing=0 own-state keys outside BOXES[NH]=0 duplicate keys=0 feature mismatches=2,305 (K_R keys with nodata, correctly absent: 0)
+    VT: |K_R|=3,725 |E_R|=3,725 evaluated=5,201 extra=1,476 missing=0 own-state keys outside BOXES[VT]=0 duplicate keys=0 feature mismatches=0 (K_R keys with nodata, correctly absent: 0)
+NOT AN ACCEPTANCE RUN (--only or --assume used)

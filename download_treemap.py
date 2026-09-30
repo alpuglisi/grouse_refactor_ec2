@@ -107,7 +107,7 @@ from tqdm import tqdm
 _here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _here)
 
-from prepare_training_data import BOXES
+from regions import BOXES
 
 DEFAULT_OUT_DIR = "data/treemap_raw"
 PIXEL_M = 30

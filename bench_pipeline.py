@@ -49,6 +49,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from grouse_data import GrouseData
+from regions import REGIONS
 from train import (build_datasets, discover_features, IMG_SIZE, BATCH_SIZE,
                    WORKERS)
 from model_handler import GrouseModelHandler, _loader_extra
@@ -63,7 +64,7 @@ def sync():
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--regions", nargs="+", default=["ME", "NH", "VT"])
+    ap.add_argument("--regions", nargs="+", default=list(REGIONS))
     ap.add_argument("--batch-size", type=int, default=BATCH_SIZE)
     ap.add_argument("--workers", type=int, default=WORKERS)
     ap.add_argument("--cache-dir", default="data/cache")

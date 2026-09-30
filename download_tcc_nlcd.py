@@ -71,7 +71,7 @@ from tqdm import tqdm
 _here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _here)
 
-from prepare_training_data import BOXES
+from regions import BOXES, REGIONS
 from grouse_data import (GrouseData, DataConfig, YEAR_MATCH_TOLERANCE,
                          grid_mismatch)
 
@@ -457,7 +457,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Download USFS TCC + Annual NLCD from Earth Engine "
                     "into the pipeline's raster directory.")
-    parser.add_argument("--regions", nargs="+", default=["ME", "NH", "VT"],
+    parser.add_argument("--regions", nargs="+", default=list(REGIONS),
                         choices=list(BOXES))
     parser.add_argument("--features", nargs="+", default=["tcc", "nlcd"],
                         choices=list(PRODUCTS))

@@ -8,7 +8,7 @@ from sklearn.neighbors import KernelDensity
 from pyproj import Transformer
 import matplotlib.pyplot as plt
 
-from grouse_data import NODATA_SENTINELS
+from grouse_data import NODATA_SENTINELS, PATH_TEMPLATES
 
 # ==========================================
 # 1. CONFIGURATION
@@ -18,7 +18,9 @@ RASTER_DIR = "data/landfire"   # Output folder created by download.py
 
 # BUG-0001: was a manually-synced duplicate; now a single shared source of
 # truth (still matches BOXES_COORDINATES in download.py, by construction).
-from regions import BOXES
+# CR-0007: BOXES are raster request extents; a record's region is its
+# `state`, checked against the county polygons (verify_partition/in_state).
+from regions import BOXES, REGIONS, verify_partition, in_state
 
 REGIONS_TO_RUN = list(BOXES.keys())
 
@@ -77,6 +79,8 @@ ENVELOPE_SCHEME = [
 # habitat barely exists (landscape-rare), vs envelopes with few sightings
 # despite abundant habitat (genuinely avoided - "rare to see a grouse").
 BACKGROUND_N = 20000        # random background points per region
+MAX_BG_BATCHES = 20         # CR-0007: in-state rejection sampling gives up
+                            # after this many box-sized draws
 MIN_AVAIL_BG = 15           # background hits needed to classify selection
 SELECT_W_HI = 2.0           # w >= this -> 'Selected'
 SELECT_W_LO = 0.5           # w <= this -> 'Avoided'
@@ -192,7 +196,37 @@ def load_all_sightings():
                  "assuming west-hemisphere data and flipping sign.")
             sightings['longitude'] = -sightings['longitude']
 
+    check_state_partition(sightings)
     return sightings
+
+
+def check_state_partition(sightings):
+    """CR-0007: `state` is the only region-membership key. Raise unless
+    every record's state is in REGIONS, no coordinate key (rounded to
+    COORD_ROUND_DECIMALS) is filed under two states, and every record lies
+    inside its own state's county polygons (regions.verify_partition)."""
+    unknown = sorted(set(sightings['state']) - set(REGIONS))
+    if unknown:
+        raise ValueError(f"sighting files for states {unknown} not in "
+                         f"regions.REGIONS {REGIONS}")
+    coords = sightings[['longitude', 'latitude']].round(COORD_ROUND_DECIMALS)
+    key = coords['longitude'].astype(str) + "," + coords['latitude'].astype(str)
+    n_states = sightings.groupby(key)['state'].nunique()
+    multi = n_states[n_states > 1]
+    if len(multi):
+        raise ValueError(f"{len(multi):,} coordinate keys are filed under two "
+                         f"states (e.g. {list(multi.index[:5])}); the "
+                         f"duplicate-location collapse could keep the foreign "
+                         f"record as representative")
+    bad = verify_partition(sightings['longitude'].values,
+                           sightings['latitude'].values,
+                           sightings['state'].values)
+    if len(bad):
+        raise ValueError(f"{len(bad):,} of {len(sightings):,} sightings lie "
+                         f"outside their own state's county polygons:\n"
+                         f"{bad.head(10).to_string()}")
+    print(f"Partition check: all {len(sightings):,} sightings lie inside their "
+          f"own state's county polygons; no key filed under two states.")
 
 
 def clip_to_region(sightings, region):
@@ -321,6 +355,29 @@ def load_evt_crosswalk(raster_dir):
     return {"phys": phys, "group": group, "source": os.path.basename(path)}
 
 
+def in_state_background_points(region, n_samples, seed):
+    """CR-0007: `n_samples` uniform points inside `region`'s state polygons.
+    Box-sized batches are drawn from one generator (lons, then lats, as the
+    box draw always was) and the points inside the state kept, in draw
+    order, until n_samples exist; raise after MAX_BG_BATCHES batches."""
+    rng = np.random.default_rng(seed)
+    min_lon, min_lat, max_lon, max_lat = BOXES[region]
+    lons, lats, have = [], [], 0
+    for _ in range(MAX_BG_BATCHES):
+        blon = rng.uniform(min_lon, max_lon, n_samples)
+        blat = rng.uniform(min_lat, max_lat, n_samples)
+        keep = in_state(blon, blat, region)
+        lons.append(blon[keep])
+        lats.append(blat[keep])
+        have += int(keep.sum())
+        if have >= n_samples:
+            return (np.concatenate(lons)[:n_samples],
+                    np.concatenate(lats)[:n_samples])
+    raise RuntimeError(f"{region}: only {have:,} of {n_samples:,} background "
+                       f"points inside the state after {MAX_BG_BATCHES} "
+                       f"batches of {n_samples:,} box points")
+
+
 def background_nonveg_rate(region, feature_years, evt_xwalk, n_samples=3000, seed=0):
     if not feature_years.get('sclass') or not feature_years.get('evt'):
         return None
@@ -330,10 +387,7 @@ def background_nonveg_rate(region, feature_years, evt_xwalk, n_samples=3000, see
     evt_tif = os.path.join(RASTER_DIR, f"{region}_{evt_yr}_evt.tif")
     if not os.path.exists(sclass_tif) or not os.path.exists(evt_tif):
         return None
-    rng = np.random.default_rng(seed)
-    min_lon, min_lat, max_lon, max_lat = BOXES[region]
-    lons = rng.uniform(min_lon, max_lon, n_samples)
-    lats = rng.uniform(min_lat, max_lat, n_samples)
+    lons, lats = in_state_background_points(region, n_samples, seed)
     sclass_vals = sample_raster(sclass_tif, lons, lats)
     evt_vals = sample_raster(evt_tif, lons, lats)
     both_valid = ~np.isnan(sclass_vals) & ~np.isnan(evt_vals)
@@ -411,12 +465,15 @@ def build_envelope_id(df, scheme, binners=None):
 def background_envelope_sample(region, feature_years, evt_xwalk, binners,
                                n_samples=BACKGROUND_N, seed=1):
     """Estimate landscape AVAILABILITY of each envelope: sample random
-    points across the region's bbox, extract the same feature stack used
+    points inside the region's state polygons (CR-0007; drawn over the
+    box, kept where in_state holds), extract the same feature stack used
     for sightings (most recent raster year per feature), drop nodata and
     non-vegetated SClass cells, and build envelope ids with the SAME
-    scheme and the sightings-fitted bin edges. Returns a value_counts of
-    envelope ids among vegetated background points, or None if required
-    rasters are missing."""
+    scheme and the sightings-fitted bin edges. Writes every in-state point
+    to PATH_TEMPLATES["availability_sample"] with `used` (survived the
+    nodata and non-veg filters) and `envelope_id` (empty unless used).
+    Returns a value_counts of envelope ids among vegetated background
+    points, or None if required rasters are missing."""
     needed = {col for col, _ in ENVELOPE_SCHEME if col not in ("evt_phys", "evt_group")}
     needed |= {"sclass"}                      # for the non-veg filter
     if any(c for c, _ in ENVELOPE_SCHEME if c in ("evt_phys", "evt_group")):
@@ -426,12 +483,10 @@ def background_envelope_sample(region, feature_years, evt_xwalk, binners,
             print(f"    [bg] unavailable: no '{feat}' rasters on disk for {region}.")
             return None
 
-    rng = np.random.default_rng(seed)
-    min_lon, min_lat, max_lon, max_lat = BOXES[region]
-    lons = rng.uniform(min_lon, max_lon, n_samples)
-    lats = rng.uniform(min_lat, max_lat, n_samples)
+    lons, lats = in_state_background_points(region, n_samples, seed)
 
     bg = pd.DataFrame({"longitude": lons, "latitude": lats})
+    points = bg.copy()
     MIN_VALID_FRAC = 0.05   # below this, treat the year as broken, not
                             # just "sparse coverage", and fall back
     for feat in needed:
@@ -487,7 +542,14 @@ def background_envelope_sample(region, feature_years, evt_xwalk, binners,
              f"background points were non-vegetated - implausible "
              f"for a real state; check the sclass/evt rasters.")
         return None
-    return build_envelope_id(bg, ENVELOPE_SCHEME, binners=binners).value_counts()
+    env_ids = build_envelope_id(bg, ENVELOPE_SCHEME, binners=binners)
+    points['used'] = points.index.isin(bg.index)
+    points['envelope_id'] = env_ids.reindex(points.index)
+    out = PATH_TEMPLATES["availability_sample"].format(region=region)
+    points.to_csv(out, index=False)
+    print(f"    [bg] {len(points):,} in-state points written to {out} "
+          f"({int(points['used'].sum()):,} used)")
+    return env_ids.value_counts()
 
 
 # ==========================================
@@ -735,6 +797,40 @@ def analyze_region(region, sightings_all, evt_xwalk):
              f"download_attribute_tables.py first. Macro classes set to "
              f"'Unmapped'; stratified KDE will degrade to a single stratum.")
 
+
+    # --- KDE stage (mode-dependent) ------------------------------------
+    bw = KDE_BANDWIDTH_M.get(region, 1000)
+    print(f"\nKDE stage: mode='{KDE_MODE}', bandwidth={bw} m, on "
+          f"{len(valid):,} unique locations...")
+    print("  [methods note] Repeat visits were collapsed upstream. "
+         "Remaining known bias: observer effort grew over 2016-2024, so "
+         "more DISTINCT locations get reported in recent years regardless "
+         "of grouse density - 'well-covered by observers' still inflates "
+         "apparent density.")
+    if KDE_MODE == "spatial":
+        valid['spatial_density'], valid['spatial_zone'] = kde_spatial(valid, bw)
+    elif KDE_MODE == "joint":
+        valid['spatial_density'], valid['spatial_zone'] = kde_joint(valid, bw)
+    elif KDE_MODE == "stratified":
+        valid['spatial_density'], valid['spatial_zone'] = kde_stratified(valid, bw)
+    else:
+        raise ValueError(f"Unknown KDE_MODE '{KDE_MODE}'")
+
+    # --- Region membership (CR-0007) -----------------------------------
+    # The KDE above ran on every box record of any state (PA-0018: a
+    # neighbourhood computation sees all data within its extent), so
+    # stratified percentiles are over the box source. Every later stage
+    # uses only this state's records.
+    kde_source = valid
+    valid = valid[valid['state'] == region].copy()
+    valid['region'] = region
+    print(f"\nRestricting to {region} records: {len(valid):,} of "
+          f"{len(kde_source):,} KDE-source locations (the rest are other "
+          f"states' records inside the {region} box).")
+    if len(valid) == 0:
+        print(f"  [!] No {region} records survived extraction. Skipping.\n")
+        return None
+
     # --- Non-vegetated landcover flagging ------------------------------
     sclass_nonveg = valid['sclass'].isin(NON_VEG_SCLASS_CODES)
     phys_nonveg = is_evt_phys_nonveg(valid['evt_phys'])
@@ -775,24 +871,6 @@ def analyze_region(region, sightings_all, evt_xwalk):
                   f"landscape baseline rate{verdict}")
     valid.loc[valid['nonveg_landcover']].to_csv(
         f"data/pipeline/nonveg_flagged_{region}.csv", index=False)
-
-    # --- KDE stage (mode-dependent) ------------------------------------
-    bw = KDE_BANDWIDTH_M.get(region, 1000)
-    print(f"\nKDE stage: mode='{KDE_MODE}', bandwidth={bw} m, on "
-          f"{len(valid):,} unique locations...")
-    print("  [methods note] Repeat visits were collapsed upstream. "
-         "Remaining known bias: observer effort grew over 2016-2024, so "
-         "more DISTINCT locations get reported in recent years regardless "
-         "of grouse density - 'well-covered by observers' still inflates "
-         "apparent density.")
-    if KDE_MODE == "spatial":
-        valid['spatial_density'], valid['spatial_zone'] = kde_spatial(valid, bw)
-    elif KDE_MODE == "joint":
-        valid['spatial_density'], valid['spatial_zone'] = kde_joint(valid, bw)
-    elif KDE_MODE == "stratified":
-        valid['spatial_density'], valid['spatial_zone'] = kde_stratified(valid, bw)
-    else:
-        raise ValueError(f"Unknown KDE_MODE '{KDE_MODE}'")
 
     # --- Envelope binning (habitat records only) ------------------------
     habitat = valid[~valid['nonveg_landcover']].copy()
@@ -936,7 +1014,7 @@ def analyze_region(region, sightings_all, evt_xwalk):
 
     # 1. KDE density gradient rendered as percentile rank (0-100), 50%
     #    opacity - see visualization_density_surface docstring.
-    lon2d, lat2d, dsurf = visualization_density_surface(valid, BOXES[region], bw)
+    lon2d, lat2d, dsurf = visualization_density_surface(kde_source, BOXES[region], bw)
     mesh = ax.pcolormesh(lon2d, lat2d, dsurf, cmap='viridis', vmin=0, vmax=100,
                          alpha=MAP_SURFACE_ALPHA, shading='auto', zorder=1)
     cbar = fig.colorbar(mesh, ax=ax, shrink=0.6, pad=0.02)

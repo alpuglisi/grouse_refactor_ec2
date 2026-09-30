@@ -1,6 +1,6 @@
 # CR-0007: Partition sighting records by state and centralise the shared spatial constants
 
-**Status: APPROVED (v9), 2026-09-30 — both round-9 reviewers signed off; author sign-off by user. Not yet implemented.** History, verdicts, dispositions and the v8 split:
+**Status: APPROVED (v9), 2026-09-30 — both round-9 reviewers signed off; author sign-off by user. IMPLEMENTATION BLOCKED AT P6 (2026-09-30):** deliverables 0, 1, 3, 4, 6 done; 2 done except removing the `expectedFailure` marker; 5 run with P1–P5, P7, P8 PASS and P6 FAIL, because three evidence scripts committed after approval are in the P6 scan set (implementer finding F1, `docs/quality/evidence/CR-0007-implementer-findings.md`; needs an amendment); 7 pending CR-0016/CR-0014. Implementation record: `CR-0007-review-log.md`. History, verdicts, dispositions and the v8 split:
 `CR-0007-review-log.md`. This document states only current intent.
 
 ## Scope
@@ -222,20 +222,26 @@ deliverable 2 removes the marker, then must pass); the guards fire.
 county file (specified, not exercised).
 
 ## Deliverables (in execution order)
-- [ ] 0. **Pre-approval (round 9):** commit `check_partition.py`, both test
+- [x] 0. **Pre-approval (round 9):** commit `check_partition.py`, both test
       files, `docs/quality/evidence/CR-0007-check-today.txt`, and the
       untracked drafts deliverable 6 promotes from (`DRAFT_BUG-0034-…md`,
       `res_qms_PA-0019-0020-0021-draft-rows.md`).
-- [ ] 1. Back up `data/pipeline/`, `data/negatives/` (24 + 27 MB) to
+- [x] 1. Back up `data/pipeline/`, `data/negatives/` (24 + 27 MB) to
       `/home/ec2-user/grouse_backup/CR-0007/` with a sha256 manifest.
 - [ ] 2. §1 (all but deliverable 7's re-points); remove the
-      `expectedFailure` marker.
-- [ ] 3. §2.
-- [ ] 4. §3.
+      `expectedFailure` marker. *(2026-09-30: §1 done; the marker is kept
+      because of implementer finding F1.)*
+- [x] 3. §2.
+- [x] 4. §3.
 - [ ] 5. Run `analyze_grouse.py`, then `check_partition.py` (acceptance
       run): P1–P8 pass; record O1–O4. Do **not** run
       `prepare_training_data.py` or `generate_negatives.py` (CR-0012).
-- [ ] 6. Bookkeeping (BUG ids: next free at filing):
+      *(2026-09-30: run; P1–P5, P7, P8 PASS, P6 FAIL (F1); O1–O4
+      recorded in `docs/quality/evidence/CR-0007-gates.txt`.)*
+- [x] 6. Bookkeeping (BUG ids: next free at filing): *(2026-09-30:
+      BUG-0043..0047 + PA-0025; BUG-0031 + PA-0026, sweep BUG-0048;
+      BUG-0029, BUG-0034 promoted; PA-0020 filed; see the review log's
+      Implementation record.)*
       - **Constants BUG** (literals outside `regions.py`, incl. the
         `TIGER_YEAR` drift); recurrence review against BUG-0001/PA-0001
         with prior-PA failure analysis (sweep covered `BOXES` only; no

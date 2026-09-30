@@ -24,7 +24,9 @@ import os
 import argparse
 import pandas as pd
 
-REGIONS_DEFAULT = ["ME", "NH", "VT"]
+from regions import REGIONS
+
+REGIONS_DEFAULT = list(REGIONS)
 
 
 def duplicate_summary(df, round_decimals, label):

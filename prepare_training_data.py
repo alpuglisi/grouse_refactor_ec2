@@ -39,17 +39,17 @@ import pandas as pd
 from pyproj import Transformer
 from scipy.spatial import cKDTree
 
-REGIONS_DEFAULT = ["ME", "NH", "VT"]
-
 # BUG-0001: was a manually-"kept in sync" duplicate that drifted from its
 # siblings (and was, until this fix, the stale value gen_negs.py /
 # generate_negatives.py imported for block-ID computation); now a single
-# shared source of truth.
-from regions import BOXES
-MIN_SPACING_M_DEFAULT = 30
-#MIN_SPACING_M_DEFAULT = 250     # ~grouse home-range scale; use 30 for
-                                 # "guaranteed no shared raster pixel" instead
-BLOCK_SIZE_M_DEFAULT = 3000     # matches KDE_BANDWIDTH_M in analyze_grouse.py
+# shared source of truth. CR-0007: the defaults below are bound to it too.
+from regions import BOXES, BLOCK_SIZE_M, MIN_SPACING_M, REGIONS
+
+REGIONS_DEFAULT = list(REGIONS)
+MIN_SPACING_M_DEFAULT = MIN_SPACING_M
+# (250 m ~ grouse home-range scale; 30 m = "guaranteed no shared raster
+# pixel" - see regions.MIN_SPACING_M)
+BLOCK_SIZE_M_DEFAULT = BLOCK_SIZE_M   # matches KDE_BANDWIDTH_M in analyze_grouse.py
 VAL_FRACTION_DEFAULT = 0.2
 RANDOM_SEED_DEFAULT = 42
 

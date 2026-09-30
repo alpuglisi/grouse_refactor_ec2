@@ -42,7 +42,8 @@ import requests
 GBIF_API = "https://api.gbif.org/v1"
 EOD_DATASET_KEY = "4fa7b334-ce0d-4e88-aaae-2e0c138d049e"
 
-STATES = {"ME": "Maine", "NH": "New Hampshire", "VT": "Vermont"}
+# Region code -> GBIF stateProvince name (regions.STATE_NAMES).
+from regions import STATE_NAMES as STATES
 
 TARGET_SPECIES = {
     # Mature-upland-forest guild (original set).

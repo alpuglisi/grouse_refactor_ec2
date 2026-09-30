@@ -57,7 +57,8 @@ from scipy.spatial import cKDTree
 # Single-source imports: boxes + thinning from the positives pipeline,
 # envelope machinery from the analysis pipeline, raster access from the
 # data layer - so this script can't drift out of sync with any of them.
-from prepare_training_data import BOXES, BLOCK_SIZE_M_DEFAULT, thin_by_min_distance
+from prepare_training_data import thin_by_min_distance
+from regions import BOXES, BLOCK_SIZE_M, BUFFER_M, MIN_SPACING_M
 from analyze_grouse import (ENVELOPE_SCHEME, build_envelope_id,
                             fit_scheme_binners, load_evt_crosswalk,
                             sample_raster, NON_VEG_SCLASS_CODES,
@@ -67,8 +68,8 @@ from grouse_data import GrouseData
 # ==========================================
 # CONFIGURATION
 # ==========================================
-BUFFER_M = 300                  # exclusion radius around every grouse location
-MIN_SPACING_M = 30              # same candidate thinning as positives
+# BUFFER_M (exclusion radius around every grouse location) and
+# MIN_SPACING_M (same candidate thinning as positives): regions.py.
 MAX_COORD_UNCERTAINTY_M = 1000  # drop GBIF records vaguer than this (NaN kept)
 NEG_RATIO = 1.0                 # negatives per positive, per split
 
@@ -238,7 +239,7 @@ def process_region(region, data, evt_xwalk, seed):
         print(f"    {basis}: {n:,}")
 
     # ---- block-consistent split ------------------------------------------
-    cand['block_id'] = compute_block_ids(cand, BOXES[region], BLOCK_SIZE_M_DEFAULT)
+    cand['block_id'] = compute_block_ids(cand, BOXES[region], BLOCK_SIZE_M)
     block_split = dict(zip(blocks['block_id'], blocks['split']))
     val_fraction = (blocks['split'] == 'val').mean()
     cand['split'] = [

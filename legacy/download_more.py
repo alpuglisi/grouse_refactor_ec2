@@ -1,3 +1,4 @@
+raise SystemExit("legacy/download_more.py is a stale copy of download_rev.py (BUG-0031); use download_rev.py")  # CR-0007 section 3, PA-0002
 import os
 import re
 import time

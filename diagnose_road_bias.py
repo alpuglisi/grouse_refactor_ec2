@@ -65,11 +65,9 @@ import urllib.request
 import numpy as np
 import pandas as pd
 
-from prepare_training_data import BOXES
+from regions import BOXES, STATE_FIPS, TIGER_YEAR
 
 DATA_DIR = "data/roads"
-STATE_FIPS = {"ME": "23", "NH": "33", "VT": "50"}
-TIGER_YEAR = 2023
 # Same radius generate_negatives.py excludes candidate negatives within
 # of any known grouse location - reused here so "% within threshold" is
 # directly comparable to that filter's own footprint.

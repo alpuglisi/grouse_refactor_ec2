@@ -4,6 +4,8 @@ import zipfile
 import requests
 import pandas as pd
 
+from regions import STATE_NAMES
+
 # ==========================================
 # GBIF CREDENTIALS & SETTINGS
 # ==========================================
@@ -120,11 +122,7 @@ def process_and_split_data(zip_path):
         return
         
     # Standardize our prefix mapping
-    state_mapping = {
-        "Maine": "me",
-        "New Hampshire": "nh",
-        "Vermont": "vt"
-    }
+    state_mapping = {n: c.lower() for c, n in STATE_NAMES.items()}
     
     files_created = 0
     

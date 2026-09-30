@@ -37,7 +37,9 @@ import itertools
 import numpy as np
 import pandas as pd
 
-REGIONS_DEFAULT = ["ME", "NH", "VT"]
+from regions import REGIONS
+
+REGIONS_DEFAULT = list(REGIONS)
 MIN_PTS_PER_ENVELOPE_DEFAULT = 30
 
 

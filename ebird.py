@@ -4,6 +4,8 @@ import time
 import requests
 from datetime import date, timedelta
 
+from regions import REGIONS
+
 # ==========================================
 # API KEY
 # ==========================================
@@ -13,11 +15,7 @@ API_KEY = os.environ.get("EBIRD_API_KEY")
 SPECIES_CODE = "rufgro"
 
 # eBird region codes for the states requested
-STATES = {
-    "me": "US-ME",
-    "nh": "US-NH",
-    "vt": "US-VT"
-}
+STATES = {r.lower(): f"US-{r}" for r in REGIONS}
 
 START_YEAR = 2016
 

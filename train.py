@@ -63,6 +63,7 @@ if not os.path.exists(os.path.join(_here, "grouse_data.py")):
 from torch.utils.data import ConcatDataset
 
 from grouse_data import GrouseData
+from regions import REGIONS
 from models import FEATURE_SPEC, split_features
 from dataset import GrousePatchDataset
 from model_handler import GrouseModelHandler
@@ -391,7 +392,7 @@ def score_ensemble(members, features, val_ds, args):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--regions", nargs="+", default=["ME", "NH", "VT"])
+    parser.add_argument("--regions", nargs="+", default=list(REGIONS))
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--img-size", type=int, default=IMG_SIZE)
     parser.add_argument("--batch-size", type=int, default=BATCH_SIZE)

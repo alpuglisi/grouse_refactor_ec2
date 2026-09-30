@@ -69,6 +69,7 @@ _here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _here)
 
 from grouse_data import GrouseData, refuse_legacy_checkpoint_on_repaired
+from regions import REGIONS
 from models import (GrouseResNet, FEATURE_SPEC, split_features,
                     config_to_model_kwargs, spec_with_checkpoint_vocab,
                     checkpoint_vocab_notes)
@@ -307,7 +308,7 @@ def main():
         description="Reliability analysis + Platt scaling for the "
                     "trained grouse model.")
     parser.add_argument("--model", default="grouse_single_best.pth")
-    parser.add_argument("--regions", nargs="+", default=["ME", "NH", "VT"])
+    parser.add_argument("--regions", nargs="+", default=list(REGIONS))
     parser.add_argument("--img-size", type=int, default=64)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--workers", type=int,

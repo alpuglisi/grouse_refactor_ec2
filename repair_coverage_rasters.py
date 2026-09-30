@@ -41,6 +41,7 @@ from rasterio.vrt import WarpedVRT
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from grouse_data import NODATA_SENTINELS, REPAIR_TAG
+from regions import REGIONS
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PINS = os.path.join(HERE, "docs/quality/cr0010_pins.json")
@@ -50,7 +51,6 @@ MANIFEST_OTHER = os.path.join(EVIDENCE, "CR-0010-manifest-other.tsv")
 DEFAULT_ROOT = os.path.join(HERE, "data/landfire")
 DEFAULT_DIST = os.path.join(HERE, "data/disturbance")
 DEFAULT_BACKUP = "/home/ec2-user/grouse_backup/CR-0010"
-REGIONS = ("ME", "NH", "VT")
 TMP_SUFFIX = ".cr0010tmp"
 DIST_RE = re.compile(r"Dist(\d{2})", re.IGNORECASE)
 

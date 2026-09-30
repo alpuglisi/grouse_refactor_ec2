@@ -1,7 +1,10 @@
-# BUG-0029 (DRAFT — not committed): negative candidates are clipped to a state, positives to a box, so each region's out-of-state positives have no negatives
+# BUG-0029: negative candidates are clipped to a state, positives to a box, so each region's out-of-state positives have no negatives
 
-> Draft for review. Not in `docs/quality/bugs/`; `BUG_LOG.md` and
-> `PREVENTIVE_ACTIONS.md` are untouched.
+> Promoted from `DRAFT_BUG-0029-…md` (committed at `f8fafbc`) by CR-0007
+> deliverable 6, 2026-09-30. §§1–5 and 7 are the investigation as drafted.
+> §6 records the corrective action as assigned. §8 was rewritten to cite
+> PA-0020 as filed (the draft's narrower geographic-only wording is
+> superseded; see `res_qms_PA-0019-0020-0021-draft-rows.md`).
 
 ## 1. Description
 Positive records are assigned to a region by **bounding box**
@@ -134,10 +137,23 @@ from a state polygon — so the dataset's positive support and negative
 support do not coincide, and no check compares them.
 
 ## 6. Corrective action
-None implemented. This changes the training data, so per `CLAUDE.md` §1
-it needs a CR and independent review first.
+**Assigned: membership — CR-0007; split and draw — CR-0012.**
+- *Membership (the positive half), CR-0007 (implemented 2026-09-30,
+  deliverables 2–5):* `state` is the only region-membership key for
+  sighting records. `analyze_grouse.load_all_sightings` raises unless every
+  record lies in its own state's county polygons
+  (`analyze_grouse.check_state_partition`, `regions.verify_partition`).
+  `evaluated_sightings_R` holds only state-R records (CR-0007 P1–P3 PASS,
+  `docs/quality/evidence/CR-0007-gates.txt`). Positives are now assigned by
+  state, the same definition the negatives' `stateProvince` query uses
+  (option 1(a) below).
+- *Split and draw, CR-0012:* the pooled split and the negative draw over
+  the same partition. CR-0012's rebuild regenerates the splits and
+  negatives.
 
-Proposed, for the CR to evaluate:
+Status: **OPEN — fixed when CR-0012 lands; closed after CR-0009's retrain.**
+
+Original proposal (kept for the record):
 1. **Make both classes use one definition of a region.** Either is
    defensible, but it must be the same one:
    - if regions become a true partition (the fix BUG-0027 needs
@@ -204,42 +220,27 @@ right rule and it did not catch this. Why:
   used.
 
 ## 8. Preventive action
-**PA-0020 (proposed; extends PA-0018 from spatial computations to the
-acquisition of the data they consume).**
+**PA-0020** (filed by CR-0007 deliverable 6, 2026-09-30; extends PA-0018
+from spatial computations to the **acquisition and selection** of the data
+they consume, on **every** axis). The operative rule is the row in
+`docs/quality/PREVENTIVE_ACTIONS.md`. In summary: any parameter that
+decides which records enter a dataset is part of the computation
+downstream of it. Where classes are acquired separately, their supports
+must be compared on every axis such a parameter acts on. Equal counts are
+not evidence of matching support.
 
-> PA-0018's "never a per-state or per-region subset chosen by label"
-> applies to how data is **acquired**, not only to how it is computed
-> on: any filter that bounds a dataset geographically — a remote API
-> query parameter (`stateProvince`, `country`, an admin code), a
-> download bounding box, a file-per-state naming convention — is part
-> of the spatial computation downstream of it, and must use the same
-> extent as everything it will be combined with. Where one dataset has
-> classes or strata acquired separately (positives and negatives,
-> different sources, different years), their **spatial supports must
-> be compared explicitly and must match**; equal *counts* are not
-> evidence of matching support. When sweeping for PA-0017/PA-0018
-> instances, trace each input back to its acquisition query, not only
-> to the file it is read from. Extends PA-0018 (BUG-0026), which missed
-> BUG-0029 by stopping at the consuming computation.
+This bug is PA-0020's geographic instance. BUG-0034 is its temporal
+instance and the only live evidence for clauses (ii)–(iv). The draft of
+this section proposed a geographic-only rule. That wording is superseded
+by the filed row and must not be used.
 
-**Sweep (§3.5) — required before this is closed, and NOT yet run.**
-Scope it by the mechanism: every geographic filter at acquisition time.
-Candidates, to be confirmed:
-`get_negatives.py` (`stateProvince`, this bug), `ebird.py`,
-`sightings.py`, `download_rev.py` (LANDFIRE per-region request
-rectangles), `download_tcc_nlcd.py` / `download_treemap.py`
-(Earth Engine `region_grid` `Rectangle` exports),
-`download_treemap.py`'s TreeMap fetch, `generate_road_distance.py`
-(already fixed by `bf8d31a` — it is the model of what the rule wants),
-and `download_attribute_tables.py`. For each: what extent does the
-query use, what extent will the result be combined with, and do they
-match?
+**Sweep (§3.5).** Recorded in PA-0020's Swept? cell (read-only pass,
+2026-09-30): the live instances are this bug and BUG-0034;
+`MAX_COORD_UNCERTAINTY_M` is inert (0 of 265,212 candidate rows carry the
+field); the source-axis asymmetry (two positive sources, one negative) is
+owned by BUG-0034.
 
-**Mechanical enforcement (§3.4).** Feasible: the §6.2 support check —
-compare the positive and negative classes' occupied spatial blocks at
-dataset-build time and fail on divergence — catches this whole class at
-the point the dataset is assembled, regardless of which acquisition
-query caused it. It pairs naturally with BUG-0027 §6.3's proposed
-pooled train/val disjointness check; both are dataset-build assertions
-and should go in the same CR. No CI exists yet, so it runs as a
-build-time assertion rather than a CI gate.
+**Mechanical enforcement (§3.4).** A dataset-build support check (compare
+the classes' occupied spatial blocks and year histograms; fail on
+divergence) is feasible and belongs with CR-0012's pooled-split checks. Not
+yet implemented. No CI exists, so it would run as a build-time assertion.

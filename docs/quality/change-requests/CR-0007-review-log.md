@@ -772,3 +772,93 @@ Round 9: reviewer A APPROVE, reviewer B APPROVE WITH FOLLOW-UPS (v9,
 `f8fafbc`; test fix A-R9-1 applied after). Author: **signed off** — user
 approved 2026-09-30. **CR-0007 v9 APPROVED.**
 
+
+## Implementation record (deliverables 2–6, 2026-09-30)
+Implementer: an agent session separate from the author's; deliverables 0
+and 1 were done by the coordinator (`f8fafbc`; backup manifest
+`docs/quality/evidence/CR-0007-backup-manifest.txt`). Nothing committed by
+the implementer.
+
+**Code (deliverables 2–4), `git diff --stat` lines:**
+- `regions.py` (+114): the §1 constants, `BOXES` docstring (extents, not
+  membership), `verify_partition`, `in_state` (pyogrio `where` filter on
+  `STATEFP`, dissolve, EPSG:4269→4326, `within`; polygons cached in
+  `_STATE_POLYGONS`; geopandas and `grouse_data` imported inside).
+- `grouse_data.py` (+4): `PATH_TEMPLATES["availability_sample"]`,
+  `["tiger_county"]`.
+- `analyze_grouse.py` (+146/−): `check_state_partition` called at the end of
+  `load_all_sightings`; `in_state_background_points` (box-sized batches,
+  `MAX_BG_BATCHES = 20`), used by `background_envelope_sample` (which writes
+  `availability_sample_{region}.csv`) and by `background_nonveg_rate`;
+  `valid` restricted to `state == region` with a `region` column
+  immediately after the KDE stage; the non-veg block (flag, report, write)
+  moved after it; the map's density surface fit on `kde_source`.
+- Re-points (§1 table, excluding deliverable 7's row): `predict.py`,
+  `download_treemap.py`, `download_tcc_nlcd.py`, `diagnose_road_bias.py`,
+  `generate_negatives.py`, `prepare_training_data.py`,
+  `repair_coverage_rasters.py`, `check_exotic.py`, `diagnose_water_bias.py`,
+  `dupe_check.py`, `tune.py`, `tune_bins.py`, `bench_pipeline.py`,
+  `calibrate.py`, `diagnose_training.py`, `diagnose_wetland.py`,
+  `pretrain.py`, `train.py`, `check_raster.py`, `get_negatives.py`,
+  `sightings.py`, `ebird.py` (2–16 lines each). No value or CLI default
+  changed.
+- Guards (§3): line 1 of `legacy/audit.py`, `legacy/download.py`,
+  `legacy/download_more.py`.
+- Not done: deliverable 7 (waits for CR-0016, then CR-0014). The
+  `expectedFailure` marker in `tests/test_shared_constants.py` was kept
+  (F1).
+
+**Validation.**
+- `python analyze_grouse.py`: exit 0, 46 s. `python check_partition.py`
+  (acceptance run): **P1, P2, P3, P4, P5, P7, P8 PASS; P6 FAIL** on 3 lines,
+  all in `docs/quality/evidence/CR-0007-r7/*.py` (F1). Full output and O1–O4:
+  `docs/quality/evidence/CR-0007-gates.txt`. O1 = 0 in every region;
+  O2 = 3,740 / 1,119 / 1,552; O3 judgeable envelopes ME 46→49, NH 50→50,
+  VT 48→49; O4 NH own-state `ch` 539 / `cc` 654 values replaced.
+- Test plan "P1–P3 fail on the backed-up pre-CR files": confirmed
+  (`--data-root` pointing at the backup; same file).
+- `python -m unittest tests.test_check_partition tests.test_shared_constants
+  tests.test_cr0008 tests.test_cr0010 tests.test_cr0014
+  tests.test_check_road_dist`: 60 tests OK (1 expected failure, F1).
+- `py_compile` of every touched file; `train.py`, `calibrate.py`,
+  `pretrain.py`, `predict.py --help` all parse.
+- Guards fire: `python legacy/audit.py` exits 1 naming BUG-0031 (P7).
+
+**Bookkeeping (deliverable 6)** — ids checked immediately before filing;
+BUG-0042 is reserved by CR-0015, so the next free id was BUG-0043.
+
+| item (deliverable 6) | disposition | operative location |
+|---|---|---|
+| Constants BUG + new PA extending PA-0001 | Filed BUG-0043; PA-0025 (rule text as specified) | `docs/quality/bugs/BUG-0043-…md`; `PREVENTIVE_ACTIONS.md` row PA-0025; PA-0001 Swept? cell annotated |
+| §3.5 sweep (a) region-code sequences | BUG-0044, FIXED by deliverable 2 | `BUG-0044-…md` |
+| (b) state-name / eBird maps | BUG-0045, FIXED by deliverable 2 | `BUG-0045-…md` |
+| (c) county path built twice | BUG-0046, PARTLY FIXED (template); generator re-point = deliverable 7 | `BUG-0046-…md`; `grouse_data.py` `PATH_TEMPLATES["tiger_county"]` |
+| (d) analysis CRS | BUG-0047, OPEN, deferred, owner CR-0007's author | `BUG-0047-…md`; tracker "Analysis-CRS constant" |
+| BUG-0031 + new PA extending PA-0002/0012 | Filed BUG-0031; PA-0026; sweep by output path; PA-0002 and PA-0014 Swept? cells corrected | `BUG-0031-…md` §8; `PREVENTIVE_ACTIONS.md` rows PA-0002, PA-0014, PA-0026 |
+| PA-0026 sweep findings | `legacy/download_landfire*.py` → BUG-0048 (OPEN, not remediated: outside §3, F5); `tune.py` → existing BUG-0016 (open) | `BUG-0048-…md`; tracker |
+| Promote DRAFT_BUG-0034 | Moved to `docs/quality/bugs/`; status "OPEN; fix owned by a future CR" (the draft's "DECIDED: fixed in CR-0007" corrected) | `BUG-0034-…md` header, §6, §8; `BUG_LOG.md` |
+| Promote DRAFT_BUG-0029 | Moved; §8 rewritten to cite PA-0020 as filed; `BUG_LOG.md` row | `BUG-0029-…md` §6, §8 |
+| File PA-0020 from the draft row | Filed (Rule has no `coord_uncertainty_m` example; Swept? keeps the inert `MAX_COORD_UNCERTAINTY_M` finding). The draft's unowned "source-axis asymmetry, undiagnosed" item was given owner BUG-0034 to satisfy PA-0022 | `PREVENTIVE_ACTIONS.md` row PA-0020 |
+| PA-0018 Swept? cell | KDE source box-sourced, checked by P8 (plus P1–P5 notes) | `PREVENTIVE_ACTIONS.md` row PA-0018 |
+| BUG-0027, BUG-0029 corrective action | "membership: CR-0007; split and draw: CR-0012"; fixed when CR-0012 lands, closed after CR-0009 | `BUG-0027-…md` §6; `BUG-0029-…md` §6; `BUG_LOG.md` rows |
+
+**Implementer findings** (`docs/quality/evidence/CR-0007-implementer-findings.md`):
+- **F1 (blocking P6):** the nine `docs/quality/evidence/CR-0007-r7/*.py`
+  became git-tracked in `f5e5ee4`, after approval; three of them match P6
+  rule (ii). Every remedy (exclude `docs/` from the scan, exempt them, or
+  edit frozen evidence) is a spec change → **amendment needed**. Until then
+  P6 fails and the `expectedFailure` marker stays.
+- F2: the spec's "21 files" is 20 (24 lines correct).
+- F3: choices left open by the spec (batch size, `verify_partition` return
+  type, non-veg report moved with its write; `nonveg_flagged_*` now carries
+  `spatial_density`/`spatial_zone`/`region`).
+- F4: `generate_negatives.py`, `prepare_training_data.py`,
+  `repair_coverage_rasters.py` edited because the §1 table names them.
+- F5: BUG-0048 not remediated (outside §3's scope).
+- F6: tracker item (CR-0015 R1 B8) asks for a different BUG-0029 closure
+  rule. CR-0015 is unapproved, so the approved v9 wording was used; the
+  item stays open.
+
+**Deliverable status:** 0, 1, 3, 4, 6 done; 2 done except the marker; 5
+run, P6 fails (F1); 7 pending CR-0016/CR-0014. CR-0007 is **not**
+IMPLEMENTED until an amendment resolves F1 and P6 passes.

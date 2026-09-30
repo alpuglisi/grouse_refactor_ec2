@@ -58,6 +58,7 @@ from torch.utils.data import ConcatDataset, DataLoader
 from tqdm import tqdm
 
 from grouse_data import GrouseData
+from regions import REGIONS
 from models import GrouseResNet, split_features
 from dataset import SSLPairDataset
 from train import discover_features, sample_background_points, WORKERS
@@ -115,7 +116,7 @@ def main():
         description="SimSiam self-supervised pretraining on unlabeled "
                     "LANDFIRE tiles; produces a backbone checkpoint for "
                     "train.py --init-from.")
-    parser.add_argument("--regions", nargs="+", default=["ME", "NH", "VT"])
+    parser.add_argument("--regions", nargs="+", default=list(REGIONS))
     parser.add_argument("--tiles", type=int, default=10000,
                         help="Unlabeled tiles sampled per region "
                              "(uniform over the raster, valid-data "

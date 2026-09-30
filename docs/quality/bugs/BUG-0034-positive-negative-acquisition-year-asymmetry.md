@@ -1,8 +1,11 @@
-# BUG-0034 (DRAFT — not committed): positives and negatives are acquired over different year ranges, silently breaking the 1:1 class balance and leaving a vintage→label signal
+# BUG-0034: positives and negatives are acquired over different year ranges, silently breaking the 1:1 class balance and leaving a vintage→label signal
 
-> Draft for review. Not yet in `docs/quality/bugs/`; `BUG_LOG.md` and
-> `PREVENTIVE_ACTIONS.md` are untouched. Promotion is a CR deliverable,
-> alongside DRAFT_BUG-0029 (see §6).
+> Promoted from `DRAFT_BUG-0034-…md` (committed at `f8fafbc`) by CR-0007
+> deliverable 6, 2026-09-30, because PA-0020 cites it as its only live
+> evidence. The investigation text (§§1–5, 7) is unchanged. §6's status
+> and §8's filing note were updated at promotion. References to "CR-0007
+> §6" and "gate (d)" are to CR-0007 v5/v6, which were superseded.
+> **Status: OPEN; fix owned by a future CR.**
 
 ## 1. Description
 The two label classes of one dataset are fetched from the **same GBIF
@@ -200,10 +203,11 @@ counts, produced by construction, mask the difference at every point
 where a check exists.
 
 ## 6. Corrective action
-**DECIDED (2026-09-30): fixed in CR-0007**, by restricting positives to
-2020+ at selection and year-matching the negative draw. The decision and
-its consequences are recorded in CR-0007 §6. Status below remains OPEN
-until that CR lands.
+**At promotion (2026-09-30): not fixed in CR-0007.** A decision recorded
+in CR-0007 v6 had put the fix in CR-0007. CR-0007 v6 later descoped it, and
+v9 (approved) contains no BUG-0034 fix (CR-0007 v9 "Out of scope":
+"BUG-0034's fix"). The fix is **owned by a future CR** (not yet opened).
+The recommendation below stands as that CR's starting point.
 
 The fix changes the training data, so per `CLAUDE.md` §1 it
 needs a CR. **CR-0007 is the natural home** — it already rebuilds every
@@ -241,7 +245,7 @@ thing the filter exists to prevent); backfilling LANDFIRE (blocked —
 `download_rev.py:51-58` records that LF2020 non-topo products were
 retired from LFPS in Dec 2025).
 
-Status: **OPEN**, confirmed on real data, unfixed.
+Status: **OPEN**, confirmed on real data, unfixed; fix owned by a future CR.
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 Searched `BUG_LOG.md` (all 27 rows), `PREVENTIVE_ACTIONS.md`
@@ -290,7 +294,7 @@ caught it and could not:
   because the reader was looking for geography.
 
 ## 8. Preventive action
-**No new rule — provided PA-0020 lands as CR-0007 re-scopes it**, from
+**No new rule: PA-0020 was filed (CR-0007 deliverable 6) as re-scoped**, from
 *geographic* acquisition filters to **any per-class dataset-defining
 filter**. This bug is that broadening's evidence base and should be
 cited in it.

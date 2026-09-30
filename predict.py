@@ -89,7 +89,7 @@ from models import (GrouseResNet, FEATURE_SPEC, split_features,
                     config_to_model_kwargs, d4_tta_logits,
                     spec_with_checkpoint_vocab, checkpoint_vocab_notes)
 from losses import loss_logit_bias
-from prepare_training_data import BOXES
+from regions import BOXES
 
 IMG_SIZE = 64
 STRIP_TARGET_ROWS = 2048        # rows of raster processed per tile

@@ -1,3 +1,4 @@
+raise SystemExit("legacy/audit.py is a stale copy of analyze_grouse.py (BUG-0031); use analyze_grouse.py")  # CR-0007 section 3, PA-0002
 import os
 import re
 import glob

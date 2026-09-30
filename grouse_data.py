@@ -122,6 +122,10 @@ PATH_TEMPLATES = {
     "block_assignments": "data/pipeline/block_assignments_{region}.csv",
     "bin_tuning":        "data/pipeline/bin_tuning_{region}.csv",
     "diagnostic_map":    "data/maps/grouse_diagnostic_map_{region}.png",
+    # CR-0007: in-state background points behind envelope_metrics' Avail_N.
+    "availability_sample": "data/pipeline/availability_sample_{region}.csv",
+    # CR-0007: TIGER county polygons (region membership; regions.py).
+    "tiger_county":      "data/roads/tl_{year}_us_county.zip",
 }
 
 RASTER_FEATURES = ["evt", "evh", "evc", "sclass", "fdist", "ch", "cc",

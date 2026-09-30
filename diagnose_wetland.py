@@ -50,6 +50,7 @@ sys.path.insert(0, _here)
 from grouse_data import (GrouseData, NLCD_NAMES, WETLAND_NLCD_CLASSES,
                          MISSING_CODE)
 from models import FEATURE_SPEC
+from regions import REGIONS
 from dataset import GrousePatchDataset
 
 WETLAND = WETLAND_NLCD_CLASSES
@@ -135,7 +136,7 @@ def score_points(model, ds, device, nlcd_idx=None, batch_size=256,
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", default="data/models/grouse_single_best.pth")
-    parser.add_argument("--regions", nargs="+", default=["ME", "NH", "VT"])
+    parser.add_argument("--regions", nargs="+", default=list(REGIONS))
     parser.add_argument("--max-points", type=int, default=None,
                         help="Cap val points per region/class for a "
                              "quick pass.")

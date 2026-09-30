@@ -366,3 +366,9 @@ both reviewers' approval is sign-off. CR-0013 APPROVED (v2.3 + code at
 `float_rel_tol`), A-R3-2, B-R3-1, B-R3-2 are assigned to the replay author
 as deliverable 5b, to land before CR-0012's data run (deliverable 6).
 
+
+## Deliverable 5b closed (2026-09-30)
+A-R3-1, A-R3-2, B-R3-1, B-R3-2 and G2 addressed by the replay author
+(a969037d4098fb0c1); 90 tests OK, re-run by the lead. A-R3-1 went beyond
+the requested test pin: `load_config` refuses any `float_rel_tol` other
+than 1e-12. Accepted (stricter, same intent). B-R3-3 stays tracked on CR-0012.

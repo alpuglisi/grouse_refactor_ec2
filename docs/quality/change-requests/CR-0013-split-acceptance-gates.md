@@ -470,13 +470,23 @@ A z-score is reported only for rows that have a null. Rows marked
       - E3, E7, E9 and E10 fail because C is missing (named FAIL); their
         N parts are clean.
       - Done at `8501b51` (`docs/quality/evidence/CR-0013-first-run.txt`).
-- [ ] 5a. v2.3 follow-ups, by the replay author:
+- [x] 5a. v2.3 follow-ups, by the replay author:
       - config: `pins.cr0007` → `6619bdd`; the `regions_py` extra name
         `COUNTY_POLYGONS` → `COUNTY_POLYGONS_YEAR`, with the county path
         from `PATH_TEMPLATES["tiger_county"]`; the environment additions;
       - code: E11(e) names; the canonical-order check in R1–R4, promoted
         from `NOTE` to GATE;
       - tests for both. Re-run deliverable 5.
+      - Done at `3230262` (84 tests; re-run 1/18 gates pass, E1p, as expected).
+- [x] 5b. Round-3 follow-ups, by the replay author: `float_rel_tol` fixed
+      at 1e-12 in code (`REQUIRED_FLOAT_REL_TOL`; any other value is refused
+      by `load_config`, CLI exit 2); per-section sha256 pins of the
+      gate-affecting config (`TestConfigPin`); attack tests assert the
+      failure reason; `manifest_schema` wording for inputs (rejected
+      fallback rasters), `hash_spec` (verbatim) and environment (every key
+      but `op_rule`). 90 tests OK. The deliverable-5 evidence header's
+      config sha256 refers to the 5a config; deliverable 6 records the
+      current one.
 
 **After approval:**
 - [ ] 6. Inside CR-0012 deliverable 6: the full run passes. Then run

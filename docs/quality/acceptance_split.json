@@ -337,9 +337,9 @@
   "manifest_schema": {
     "_comment": "CR-0012 section 2 lists the manifest's content but not its keys; this is the schema E11/E12/R1/R3/R4 read. Each section (positives, negatives) is an object with these keys.",
     "constants": "object: the constants the run ACTUALLY USED (read from regions.py and the script at run time), one key per config constant; E11 requires equality with this config's constants",
-    "hash_spec": "object equal to this config's hash_spec",
-    "environment": "object: the environment the run ACTUALLY USED, measured at run time, with exactly this config's environment keys (op_rule optional); E11 requires equality",
-    "inputs": "object {repo-relative path, formed exactly as paths/raster.template form it: sha256 hex} for every input read, rasters included",
+    "hash_spec": "object equal to this config's hash_spec, copied verbatim (every key and every descriptive string, character for character); E11 compares it as a whole object",
+    "environment": "object: the environment the run ACTUALLY USED, measured at run time, with exactly this config's environment keys; E11 compares every key except op_rule (op_rule is descriptive and may be present or absent); a missing, extra or different key fails",
+    "inputs": "object {repo-relative path, formed exactly as paths/raster.template form it: sha256 hex} for every input read, rasters included. 'Every raster read' includes every raster that raster_path's content validation opens, INCLUDING rejected fallback candidates (e.g. an on-disk vintage that fails validation, such as today's 12 *_2025_{cc,ch,evc,fdist}.tif placeholders, whenever a lookup resolves to it), as well as every raster whose header or values are read (window predicate, extraction). E11(a)/(b) fail if any such file is not listed.",
     "outputs": "object {relative path: sha256 hex} for every output written (positives: 9 positive CSVs + block_assignments.csv; negatives: 9 negative CSVs + candidate_pool.csv)",
     "counts": "object {region: {step number as string: rows of that region remaining after the step}}; positives steps 1-6, negatives (pool) steps 1-11",
     "draw": "negatives section only: object {region: {split: {n, n_nv, n_hab}}}",
@@ -363,7 +363,8 @@
   },
   "comparison": {
     "float_rel_tol": 1e-12,
-    "rule": "full-row: every column, rows matched on the 5 dp (longitude, latitude) key (block_id for block_assignments); numeric values compared to relative float_rel_tol (NaN == NaN), everything else exact"
+    "rule": "full-row: every column, rows matched on the 5 dp (longitude, latitude) key (block_id for block_assignments); numeric values compared to relative float_rel_tol (NaN == NaN), everything else exact",
+    "float_rel_tol_rule": "must be exactly 1e-12: acceptance_split.load_config refuses any other value (design rule 3), and tests/test_acceptance_split.py pins the digest of every gate-affecting config section"
   },
   "standing": {
     "img_size_default": 64,

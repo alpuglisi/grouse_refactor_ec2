@@ -73,11 +73,23 @@ class MissingInput(Exception):
 # ==========================================================================
 # Config, paths, digests
 # ==========================================================================
+REQUIRED_FLOAT_REL_TOL = 1e-12   # CR-0013 "floats to relative 1e-12"; not configurable (rule 3)
+
+
+class ConfigError(ValueError):
+    """A config that would downgrade a GATE (CR-0013 design rule 3)."""
+
+
 def load_config(path=None):
     path = os.path.abspath(path or DEFAULT_CONFIG)
     with open(path, "rb") as f:
         raw = f.read()
     cfg = json.loads(raw.decode("utf-8"))
+    tol = cfg.get("comparison", {}).get("float_rel_tol")
+    if tol != REQUIRED_FLOAT_REL_TOL:
+        raise ConfigError(f"{path}: comparison.float_rel_tol is {tol!r}; CR-0013 requires "
+                          f"exactly {REQUIRED_FLOAT_REL_TOL!r} (design rule 3: no config key "
+                          f"may downgrade a GATE)")
     cfg["_path"] = path
     cfg["_sha256"] = hashlib.sha256(raw).hexdigest()
     return cfg
@@ -2641,7 +2653,11 @@ def main(argv=None):
     ap.add_argument("--calibrate", action="store_true")
     ap.add_argument("--standing", action="store_true")
     a = ap.parse_args(argv)
-    cfg = load_config(a.config)
+    try:
+        cfg = load_config(a.config)
+    except ConfigError as e:
+        print(f"config refused: {e}")
+        return 2
     if a.standing:
         s = cfg["standing"]
         try:

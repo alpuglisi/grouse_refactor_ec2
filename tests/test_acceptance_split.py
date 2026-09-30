@@ -627,6 +627,13 @@ class BuildWeightChanged(A.Replay):
         return cand
 
 
+class WeightScale(A.Replay):
+    def post_annotate(self, cand):
+        cand = cand.copy()
+        cand["weight"] = cand["weight"] * 1.005
+        return cand
+
+
 class NoBuffer(A.Replay):
     def buffer_drop(self, cand):
         return cand
@@ -789,11 +796,15 @@ class TestReference(unittest.TestCase):
 class TestAttacks(unittest.TestCase):
     """CR-0013 section Attacks: each row must fail its named gate(s)."""
 
-    def assertFails(self, root, names, cfg=None):
-        res = gates(root, only=set(names), cfg=cfg)
-        for g in names:
-            self.assertEqual(res[g]["status"], "FAIL",
-                             f"{g} passed under the attack: {res[g]}")
+    def assertFails(self, root, reasons, cfg=None):
+        """reasons: {gate: substring that must appear in one of its problems}.
+        Checks the gate FAILs for the intended reason (review follow-up A-R3-2)."""
+        res = gates(root, only=set(reasons), cfg=cfg)
+        for g, why in reasons.items():
+            self.assertEqual(res[g]["status"], "FAIL", f"{g} passed under the attack: {res[g]}")
+            self.assertTrue(any(why in x for x in res[g]["problems"]),
+                            f"{g} failed, but not for {why!r}: {res[g]['problems'][:4]} "
+                            f"missing={res[g]['missing']}")
         return res
 
     # --- membership ---------------------------------------------------------
@@ -808,7 +819,8 @@ class TestAttacks(unittest.TestCase):
         me = A.sort_canonical(me, ["longitude", "latitude"])
         write_set(root, A.P_KINDS, "ME", me)
         refresh_manifest(root)
-        self.assertFails(root, ["E1", "E4", "E5"])
+        self.assertFails(root, {"E1": "rows with state != ME", "E4": "keys in both train and val",
+                               "E5": "hold both train and val records"})
 
     def test_train_rows_copied_into_val(self):
         root = fresh()
@@ -816,7 +828,7 @@ class TestAttacks(unittest.TestCase):
         va = pd.concat([read(root, "val_positives", "ME"), tr], ignore_index=True)
         va.to_csv(os.path.join(root, A.rpath(CFG, "val_positives", "ME")), index=False)
         refresh_manifest(root)
-        self.assertFails(root, ["E1p"])
+        self.assertFails(root, {"E1p": "'val' rows of"})
 
     def test_val_positive_year_nan(self):
         root = fresh()
@@ -826,7 +838,7 @@ class TestAttacks(unittest.TestCase):
         me.loc[idx, "year"] = np.nan
         write_set(root, A.P_KINDS, "ME", me)
         refresh_manifest(root)
-        self.assertFails(root, ["R1"])
+        self.assertFails(root, {"R1": "column 'year' differs"})
 
     def test_positive_weight_02(self):
         root = fresh()
@@ -835,154 +847,155 @@ class TestAttacks(unittest.TestCase):
         me.loc[me.index[0], "weight"] = 0.2
         write_set(root, A.P_KINDS, "ME", me)
         refresh_manifest(root)
-        self.assertFails(root, ["R1"])
+        self.assertFails(root, {"R1": "!= replay"})
 
     def test_column_dropped(self):
         root = fresh()
         for R in ("ME", "NH", "VT"):
             write_set(root, A.P_KINDS, R, read(root, "thinned_positives", R).drop(columns=["evt_group"]))
         refresh_manifest(root)
-        self.assertFails(root, ["E0"])
+        self.assertFails(root, {"E0": "missing ['evt_group']"})
 
     def test_column_added(self):
         root = fresh()
         for R in ("ME", "NH", "VT"):
             write_set(root, A.N_KINDS, R, read(root, "negatives", R).assign(foo=1))
         refresh_manifest(root)
-        self.assertFails(root, ["E0"])
+        self.assertFails(root, {"E0": "unexpected ['foo']"})
 
     # --- thinning -------------------------------------------------------------
     def test_per_region_thin_then_pool(self):
         root = fresh()
         emit_attack(root, PerRegionThin)
-        self.assertFails(root, ["E2", "R1"])
+        self.assertFails(root, {"E2": "positive pairs closer than 30 m", "R1": "rows not in the replay"})
 
     def test_thin_at_60m(self):
         root = fresh()
         emit_attack(root, A.Replay, constants={"MIN_SPACING_M": 60})
-        self.assertFails(root, ["R1", "E11"])
+        self.assertFails(root, {"R1": "replay rows absent", "E11": "MIN_SPACING_M"})
 
     def test_order_dependent_thinner(self):
         root = fresh()
         emit_attack(root, FileOrderThin)
-        self.assertFails(root, ["R1"])
+        self.assertFails(root, {"R1": "not in the replay"})
 
     # --- block draw -------------------------------------------------------------
     def test_order_dependent_block_draw(self):
         root = fresh()
         emit_attack(root, FileOrderBlocks)
-        self.assertFails(root, ["R2"])
+        self.assertFails(root, {"R2": "column 'split' differs"})
 
     def test_dropped_shuffle(self):
         root = fresh()
         emit_attack(root, SortedBlocks)
-        self.assertFails(root, ["R2"])
+        self.assertFails(root, {"R2": "column 'split' differs"})
 
     def test_eastern_half_val_draw(self):
         root = fresh()
         emit_attack(root, EasternBlocks)
-        self.assertFails(root, ["R2"])
+        self.assertFails(root, {"R2": "column 'split' differs"})
 
     def test_dense_first_val_draw(self):
         root = fresh()
         emit_attack(root, DenseFirstBlocks)
-        self.assertFails(root, ["R2"])
+        self.assertFails(root, {"R2": "column 'split' differs"})
 
     def test_neighbour_preferring_draw(self):
         root = fresh()
         emit_attack(root, NeighbourBlocks)
-        self.assertFails(root, ["R2"])
+        self.assertFails(root, {"R2": "column 'split' differs"})
 
     def test_two_origins_ids_from_column(self):
         root = fresh()
         emit_attack(root, TwoOrigins)
-        self.assertFails(root, ["E5", "E6"])
+        self.assertFails(root, {"E5": "hold both train and val records",
+                               "E6": "block_id differs from the recomputed id"})
 
     # --- negative draw ------------------------------------------------------------
     def test_southern_half_draw(self):
         root = fresh()
         emit_attack(root, SouthernHalfDraw)
-        self.assertFails(root, ["R4"])
+        self.assertFails(root, {"R4": "rows not in the replay"})
 
     def test_nh_only_skew_break1(self):
         root = fresh()
         emit_attack(root, NHOnlySkew)
-        self.assertFails(root, ["R4"])
+        self.assertFails(root, {"R4": "rows not in the replay"})
 
     def test_sorted_id_positive_free_split_break2(self):
         root = fresh()
         emit_attack(root, SortedIdSplit)
-        self.assertFails(root, ["R3"])
+        self.assertFails(root, {"R3": "column 'split' differs"})
 
     def test_inter_region_skew_10A(self):
         root = fresh()
         emit_attack(root, InterRegionSkew)
-        self.assertFails(root, ["R4"])
+        self.assertFails(root, {"R4": "rows not in the replay"})
 
     def test_feature_extremum_split_10B(self):
         root = fresh()
         emit_attack(root, FeatureExtremumSplit)
-        self.assertFails(root, ["R3"])
+        self.assertFails(root, {"R3": "column 'split' differs"})
 
     def test_northern_candidates_dropped_by_pipeline_10A2(self):
         root = fresh()
         emit_attack(root, NorthDropped)
-        self.assertFails(root, ["R3"])
+        self.assertFails(root, {"R3": "replay rows absent"})
 
     def test_nonveg_top_up_10C(self):
         root = fresh()
         emit_attack(root, NonVegTopUp)
-        self.assertFails(root, ["E9", "R4"])
+        self.assertFails(root, {"E9": "NonVeg negatives > cap", "R4": "rows not in the replay"})
 
     def test_pool_strip(self):
         root = fresh()
         emit_attack(root, PoolStrip)
-        self.assertFails(root, ["R3"])
+        self.assertFails(root, {"R3": "replay rows absent"})
 
     def test_weight_collapse(self):
         root = fresh()
         emit_attack(root, WeightCollapse)
-        self.assertFails(root, ["E10", "R4"])
+        self.assertFails(root, {"E10": "'weight' differs from the recomputed", "R4": "rows not in the replay"})
 
     def test_species_monoculture(self):
         root = fresh()
         emit_attack(root, SpeciesMonoculture)
-        self.assertFails(root, ["E10", "R4"])
+        self.assertFails(root, {"E10": "'weight' differs from the recomputed", "R4": "rows not in the replay"})
 
     def test_nonveg_monoculture(self):
         root = fresh()
         emit_attack(root, NonVegMonoculture)
-        self.assertFails(root, ["E10", "R4"])
+        self.assertFails(root, {"E10": "'weight' differs from the recomputed", "R4": "rows not in the replay"})
 
     def test_pool_weight_suppression(self):
         root = fresh()
         emit_attack(root, PoolWeightSuppression)
-        self.assertFails(root, ["E10"])
+        self.assertFails(root, {"E10": "'weight' differs from the recomputed"})
 
     def test_build_weight_changed(self):
         root = fresh()
         emit_attack(root, BuildWeightChanged)
-        self.assertFails(root, ["E10"])
+        self.assertFails(root, {"E10": "'weight' differs from the recomputed"})
 
     def test_no_300m_buffer(self):
         root = fresh()
         emit_attack(root, NoBuffer)
-        self.assertFails(root, ["E7", "R3"])
+        self.assertFails(root, {"E7": "within 300 m of a sighting", "R3": "rows not in the replay"})
 
     def test_with_replacement(self):
         root = fresh()
         emit_attack(root, WithReplacement)
-        self.assertFails(root, ["E3", "R4"])
+        self.assertFails(root, {"E3": "duplicate keys", "R4": "duplicate keys"})
 
     def test_x20_near_grouse(self):
         root = fresh()
         emit_attack(root, NearGrouseX20)
-        self.assertFails(root, ["E3", "R4"])
+        self.assertFails(root, {"E3": "duplicate keys", "R4": "duplicate keys"})
 
     def test_val_candidates_near_val_positives_thinned(self):
         root = fresh()
         emit_attack(root, ValNearValThinned)
-        self.assertFails(root, ["R3"])
+        self.assertFails(root, {"R3": "replay rows absent"})
 
     def test_duplicate_negatives(self):
         root = fresh()
@@ -996,7 +1009,7 @@ class TestAttacks(unittest.TestCase):
             n = A.sort_canonical(n, ["longitude", "latitude"])
             write_set(root, A.N_KINDS, R, n)
         refresh_manifest(root)
-        self.assertFails(root, ["E3", "R4"])
+        self.assertFails(root, {"E3": "duplicate keys", "R4": "duplicate keys"})
 
     # --- partition, inputs, regions, windows --------------------------------
     def test_partition_exception_kept(self):
@@ -1005,7 +1018,7 @@ class TestAttacks(unittest.TestCase):
         c = rep.pool_full
         self.assertTrue(((np.round(c["longitude"], 5) == NH_IN_ME[0]) & (c["state"] == "NH")).any(),
                         "fixture: the NH-filed record did not survive to the pool")
-        self.assertFails(root, ["E12"])
+        self.assertFails(root, {"E12": "verify_partition returns"})
 
     def test_dropped_list_edited(self):
         root = fresh()
@@ -1015,7 +1028,7 @@ class TestAttacks(unittest.TestCase):
         m["negatives"]["dropped"] = m["negatives"]["dropped"][1:]
         with open(mp, "w") as f:
             json.dump(m, f)
-        self.assertFails(root, ["E12"])
+        self.assertFails(root, {"E12": "dropped list"})
 
     def test_input_edited_after_manifest(self):
         root = fresh()
@@ -1023,17 +1036,17 @@ class TestAttacks(unittest.TestCase):
         m = pd.read_csv(p)
         m.loc[0, "Selection_Ratio"] = 3.21
         m.to_csv(p, index=False)
-        self.assertFails(root, ["E11"])
+        self.assertFails(root, {"E11": "changed after the manifest"})
 
     def test_regions_subset(self):
         root = fresh()
         emit_attack(root, A.Replay, regions=["ME"])
-        self.assertFails(root, ["E1", "E11"])
+        self.assertFails(root, {"E1": "regions present ['ME']", "E11": "REGIONS"})
 
     def test_windowless_record_kept(self):
         root = fresh()
         emit_attack(root, WindowlessKept)
-        self.assertFails(root, ["E8"])
+        self.assertFails(root, {"E8": "fail the 64 px window predicate"})
 
     def test_config_constant_edit_without_regions_py(self):
         """A config edit not mirrored in regions.py fails E11."""
@@ -1148,6 +1161,96 @@ class TestShuffle(unittest.TestCase):
         for rel in A.digested_paths(CFG):
             with open(os.path.join(BASE, rel), "rb") as a, open(os.path.join(root, rel), "rb") as b:
                 self.assertEqual(a.read(), b.read(), rel)
+
+
+# CR-0013 design rule 3, enforced mechanically (review follow-up A-R3-1).
+# Every top-level config section that changes what a GATE checks is pinned
+# by sha256 of its canonical JSON. Only OBS-only sections are unpinned.
+# Editing a pinned section fails TestConfigPin until this table is updated
+# in the same, reviewed change.
+OBS_ONLY_SECTIONS = {"_comment", "obs", "continuous_features"}
+GATE_SECTION_SHA256 = {
+    "NODATA_SENTINELS": "68c6d78d4fb31975bbb2690e3b756bff3c672f8a9bcaf7f43e791fea739dee1a",
+    "block_id": "1d9284b22bd75dc1206e5ef865fbd0ca260988c69c5340ee9630173ad78f2402",
+    "columns": "a2ad2a0c13194c6a17f0a4e845b343f7c205f6f62fa49c50725f1a44e1d46e73",
+    "comparison": "84998a87573c00d01683c92413b58c3d848ca6a684e4fe7fb2006c1882999296",
+    "constants": "b4b8c08fdb74f04dd72594ffe42ef3c5f038d9e1cb5f71c896cbfa301ed233e5",
+    "dedup": "1dd8c5068b95ed5e7bdebcdfae84bf6930d389a93225a372938573d185ccb8a0",
+    "distance": "942007efe795b0e9d5725a24582819cdf481eb807e8c4a4c2a7367ee36f02375",
+    "envelope": "184dffd4e3a4e7a489db2ecf8de86c0d2a45c56becf1ab7c064a6223d9df0502",
+    "environment": "af840e02d1d7d6612a7c1ab4a3d49968db23362cbc16846d58e52c894d548249",
+    "feature_spec_keys": "6a19f9b03a49f704a8cb59f2a7bb77f85d3f8e06af56087a14c38f9a1b2e7e43",
+    "hash_spec": "b23ed261b2a27647b9cd4dccf71c9638448efc2338d0d2889013807ab44f82e1",
+    "manifest_schema": "652b8c0262fec0070c7216e8ceeb9053445c5deef3bb8cd98692e7c8732d3e2a",
+    "parsing": "4acb340c20cf9c16404cefd22555a3a626a799808d6d1eee1283e2aa929129b8",
+    "paths": "78a8ad79fddaa53e07e4ae8b7204ef4ca688bd4fb89f5a4a5fda2547ff7f8c29",
+    "pins": "9957bf9f9161c6a2d61d9573b91d952e5e4e77db26e9f0158adad3725354f0d9",
+    "raster": "f05264dd8932f962a54552e8db3a77264158357b5744c4c4029f1aa70173dca8",
+    "regions_py": "71890049878a8ce76dea88baf1a901f8ee7d3b7c02684f45e3c648ef4c9a1d00",
+    "rounding": "63aa62dd917e18ec81b13f0ecbf4539db5f3a884d7fe22ee0d366cc79d01e120",
+    "row_order": "add25a56f55a254fca815b698cfa3598997e946ec6627b13a70538c0959b91f6",
+    "schema_version": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+    "split_for_unassigned": "4ad4b874fdcfadff6d3e35749a3bd1ec950e3a978c73d7ca66f9b17c50f6947c",
+    "standing": "6cde434a29ca6d7ee4a13ecbc86ad96440f37d68d041ea525a79ad54cbd2be4a",
+    "window_predicate": "476b7df2ea8928ebada86f2c215b6e2f662146a906ec9a4d60e033bf9f1c1e16",
+    "year_fill_feature": "3870d70b65acaccfbe5b59b7fa0195da75711bc6b2888974a1ad9d4aadde5d4d",
+}
+
+
+def _section_sha(v):
+    return hashlib.sha256(json.dumps(v, sort_keys=True, separators=(",", ":"),
+                                     ensure_ascii=False).encode()).hexdigest()
+
+
+class TestConfigPin(unittest.TestCase):
+    def setUp(self):
+        with open(PROD_CONFIG, encoding="utf-8") as f:
+            self.cfg = json.load(f)
+
+    def test_float_rel_tol_is_1e12(self):
+        self.assertEqual(self.cfg["comparison"]["float_rel_tol"], 1e-12)
+        self.assertEqual(A.REQUIRED_FLOAT_REL_TOL, 1e-12)
+
+    def test_every_section_is_pinned_or_obs_only(self):
+        self.assertEqual(set(self.cfg) - OBS_ONLY_SECTIONS, set(GATE_SECTION_SHA256),
+                         "a config section was added or removed: classify and pin it")
+
+    def test_gate_affecting_sections_unchanged(self):
+        changed = sorted(k for k, h in GATE_SECTION_SHA256.items()
+                         if k in self.cfg and _section_sha(self.cfg[k]) != h)
+        self.assertEqual(changed, [], "gate-affecting config sections edited; a reviewed "
+                                      "change must update GATE_SECTION_SHA256")
+
+    def test_pin_covers_the_named_keys(self):
+        for k in ("columns", "row_order", "regions_py", "comparison", "hash_spec",
+                  "manifest_schema", "constants", "environment", "paths"):
+            self.assertIn(k, GATE_SECTION_SHA256)
+        self.assertIn("split_manifest_sections", self.cfg["columns"])
+        self.assertIn("names", self.cfg["regions_py"])
+
+    def test_loose_tolerance_config_is_rejected(self):
+        c = copy.deepcopy(self.cfg)
+        c["comparison"]["float_rel_tol"] = 1e-2
+        p = os.path.join(TMP, "loose_tol.json")
+        with open(p, "w") as f:
+            json.dump(c, f)
+        with self.assertRaises(A.ConfigError):
+            A.load_config(p)
+        self.assertNotEqual(_section_sha(c["comparison"]), GATE_SECTION_SHA256["comparison"])
+        out = subprocess.run([sys.executable, os.path.join(REPO, "acceptance_split.py"),
+                              "--config", p, "--data-root", BASE], capture_output=True, text=True)
+        self.assertEqual(out.returncode, 2)
+        self.assertIn("config refused", out.stdout)
+        with self.assertRaises(A.ConfigError):
+            A.standing_checks(64, 0, False, data_root=BASE, config=p)
+
+    def test_loose_tolerance_would_let_an_attack_through(self):
+        """Why the pin matters: a 1.005x weight scaling fails E10 at 1e-12."""
+        root = fresh()
+        emit_attack(root, WeightScale)
+        res = gates(root, only={"E10"})
+        self.assertEqual(res["E10"]["status"], "FAIL")
+        self.assertTrue(any("'weight' differs" in x for x in res["E10"]["problems"]))
 
 
 class TestUnits(unittest.TestCase):

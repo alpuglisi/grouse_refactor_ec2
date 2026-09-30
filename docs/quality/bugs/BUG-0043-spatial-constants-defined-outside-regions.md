@@ -100,12 +100,9 @@ CR-0007 deliverable 2 (§1):
 The fix addresses the root cause: there is now one definition per constant
 and a test that fails when a literal copy appears.
 
-Status: **FIXED in code (CR-0007 deliverable 2)**, with one open part:
-`generate_road_distance.py:116,122` (CR-0007 deliverable 7). The
-repository-tree test is still marked `expectedFailure` because of
-CR-0007 implementer finding F1
-(`docs/quality/evidence/CR-0007-implementer-findings.md`). That finding is
-about evidence scripts, not the lines above.
+Status: **FIXED** — constants in `regions.py` (CR-0007 deliverable 2);
+the road generator re-pointed by deliverable 7 (`fbd4e4c`); the
+repository-tree P6 test passes (v9.1, `fab0795`).
 
 ## 7. Recurrence review
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`:

@@ -1,7 +1,7 @@
 # CR-0007: Partition sighting records by state and centralise the shared spatial constants
 
-**Status: APPROVED (v9; v9.1 approved with follow-ups; v9.2 amendment pending bounded re-review), 2026-09-30 — IMPLEMENTED (all deliverables):** `check_partition.py` P1–P8 all PASS after deliverable 7 (`docs/quality/evidence/CR-0007-gates-d7.txt`) and after v9.2 (`docs/quality/evidence/CR-0007-gates-v9.2.txt`). History, verdicts, dispositions and the v8 split:
-`CR-0007-review-log.md`. This document states only current intent.
+**Status: CLOSED (v9.2), 2026-09-30 — implemented, all deliverables complete, bookkeeping complete; `check_partition.py` P1–P8 PASS (`docs/quality/evidence/CR-0007-gates-v9.2.txt`).** History and dispositions: `CR-0007-review-log.md`.
+This document states only current intent.
 
 ## Scope
 Make `state` the only region-membership key for sighting records in
@@ -175,8 +175,12 @@ as in `sample_raster` (`:276-295`). *E_R*: the own-state rows of S_R.
 as pipeline code; excluded by v9.1 after CR-0013 committed evidence copies
 there). Exempt by name, nothing else: `regions.py`; `clean.py` and
 `legacy/gen_negs.py` (CR-0012 §6 guards); `legacy/audit.py`,
-`legacy/download.py`, `legacy/download_more.py` (§3);
-`generate_road_distance.py` and `check_road_dist.py` until deliverable 7.
+`legacy/download.py`, `legacy/download_more.py` (§3). (The road files'
+exemption ended with deliverable 7.) Known limit of P7's docs-import
+check: it matches `docs` written literally in an import, a `sys.path`
+call or a path loader's arguments; a path assembled in a variable, or
+`import_module`/`exec`, is not detected — the evidence exclusion's safety
+there rests on review.
 A violation is (i) an assignment, at any depth, to a §1 name, `BOXES`, or
 their `_DEFAULT` alias whose value contains a literal; (ii) a list, tuple
 or set of string literals equal to `REGIONS`, case-folded; (iii) a dict of

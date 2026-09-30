@@ -923,3 +923,25 @@ message. Nothing committed.
 
 **Sign-off:** author (implementer) signs v9.2. Reviewers A and B: pending
 bounded re-review.
+
+## v9.2 bounded review
+| reviewer | verdict |
+|---|---|
+| A — correctness | **APPROVE WITH FOLLOW-UPS** — docs-import check closes every direct form, no false positives; four indirect forms (variable path, `import_module`/`__import__`, `exec`, `from sys import path`) not detected (LOW) |
+| B — implementability | **APPROVE WITH FOLLOW-UPS** — code and text correct; five stale bookkeeping records after v9.1/deliverable 7 |
+
+Follow-ups applied (v9.2.1, text and bookkeeping only):
+- P6 scan paragraph no longer lists the road files as exempt; the
+  docs-import check's known limit is stated (§ P6 scan).
+- PA-0025 Swept? cell: road generator re-pointed; repository-tree test
+  passes.
+- BUG-0046 → FIXED (doc § Status and its `BUG_LOG.md` row).
+- BUG-0043 → FIXED (doc § Status and its `BUG_LOG.md` row).
+- Tracker: the P6/F1 item ticked; A's LOW extension of the docs-import
+  check tracked.
+
+## Quorum (v9.2)
+Reviewer A: APPROVE WITH FOLLOW-UPS. Reviewer B: APPROVE WITH FOLLOW-UPS.
+**CR-0007 is implemented and its bookkeeping complete; CLOSED** (the P7
+extension is a tracked LOW improvement, not a CR-0007 deliverable).
+

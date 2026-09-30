@@ -54,8 +54,10 @@ exists ("that should describe the same location as an existing
   verifier and resolves its inputs from its own pins (CR-0007 §1). This is
   justified, not a remediation.
 
-Status: **PARTLY FIXED** — template added and used by the new reader; the
-generator re-point is open, owned by CR-0007 deliverable 7.
+Status: **FIXED** — `PATH_TEMPLATES["tiger_county"]` is read by
+`regions.verify_partition` (CR-0007 §1) and by
+`generate_road_distance.load_counties` (CR-0007 deliverable 7, `fbd4e4c`);
+`check_road_dist.py` keeps its own pinned path (justified above).
 
 ## 7. Recurrence review
 - **BUG-0020 / PA-0003** (path templates duplicated across 13 files): same

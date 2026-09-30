@@ -90,14 +90,11 @@ class Bug0066FetchTileRetry(TmpDir):
         image = mock.Mock()
         image.getDownloadURL.side_effect = exc
         err = io.StringIO()
-        with mock.patch.object(mod.time, "sleep"), redirect_stderr(err):
-            try:
-                mod.fetch_tile(fake_ee(), image, (0, 0, 30, 30),
-                               os.path.join(self.d, "t.tif"),
-                               retries=retries)
-            except BaseException as e:      # returned for inspection
-                return e, image.getDownloadURL.call_count, err.getvalue()
-        self.fail("fetch_tile did not raise")
+        with mock.patch.object(mod.time, "sleep"), redirect_stderr(err), \
+                self.assertRaises(Exception) as cm:   # type checked by caller
+            mod.fetch_tile(fake_ee(), image, (0, 0, 30, 30),
+                           os.path.join(self.d, "t.tif"), retries=retries)
+        return cm.exception, image.getDownloadURL.call_count, err.getvalue()
 
     def test_programming_error_not_retried(self):
         for mod in self.MODULES:

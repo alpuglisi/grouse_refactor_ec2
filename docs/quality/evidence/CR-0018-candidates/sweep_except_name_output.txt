@@ -4,7 +4,7 @@ download_treemap.py:168 ee_init: reads except-target 'persistent_err' outside it
 72 files scanned at 666474c; 2 hit(s)
 
 # sweep at working tree (after BUG-0067 fix)
-72 files scanned at working tree; 0 hit(s)
+73 files scanned at working tree; 0 hit(s)
 
 # controls
 python 3.12.9

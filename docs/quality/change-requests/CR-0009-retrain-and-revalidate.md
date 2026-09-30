@@ -354,13 +354,13 @@ epochs.
 - [x] 2. Baseline capture (§ Baselines), before approval; `SHA256SUMS`
       verified and committed. R passes against the evidence copies; S0 = S1 byte-identical (`docs/quality/evidence/CR-0009/baseline/`).
 - [x] 3. Round-5 review; approval by the author and both reviewers.
-- [ ] 4. Confirm CR-0012 deliverable 6 passed, with `acceptance_record.json`
-      written; CR-0014 landed.
+- [x] 4. Confirm CR-0012 deliverable 6 passed, with `acceptance_record.json`
+      written; CR-0014 landed. Real run `1bc2df6` (18/18 GATEs; record `66d63e1d…`); CR-0014 IMPLEMENTED (v3).
 - [x] 5. Backups (§ Disk): 23 files, 1.3 GB, verified; manifest `docs/quality/evidence/CR-0009/backup_SHA256SUMS`.
 - [x] 6. Retrain (§ The change 1); record the evidence it lists. Saved checkpoint = epoch 3 (rank 0.7317); `docs/quality/evidence/CR-0009/retrain/retrain_summary.txt`.
 - [x] 7. Refit calibration; confirm `model_path`. `model_path` = /home/ec2-user/grouse2/grouse_cr0009.pth; scale 1.2035, bias -0.5154, ECE 0.0323 (cross-fitted 0.0294); `docs/quality/evidence/CR-0009/calibration/`.
-- [ ] 8. Record the new validation baseline, with the not-comparable
-      note and BUG-0034.
+- [x] 8. Record the new validation baseline, with the not-comparable
+      note and BUG-0034. `docs/quality/evidence/CR-0009/validation_baseline.md`.
 - [ ] 9. Maps (§ Symptom acceptance, § Stale markers); run
       `symptom_check.py`; record every number in the evidence directory
       and summarise it in BUG-0022.

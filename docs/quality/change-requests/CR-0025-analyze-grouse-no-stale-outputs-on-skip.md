@@ -1,6 +1,6 @@
 # CR-0025: `analyze_grouse.py` leaves no stale or partial region outputs on any exit and exits non-zero on a skip
 
-**Status: v3, 2026-09-30 — APPROVED by agent quorum (CLAUDE.md §1.4; round 2: reviewers A and B both APPROVE WITH FOLLOW-UPS; the one MEDIUM text fix, the write position relative to the `env_zone` join, is met in v3 §2). Nothing has been implemented; implementation waits for the lead's go-ahead and a data host.** Review log: `CR-0025-review-log.md`.
+**Status: v3, 2026-09-30 — APPROVED by agent quorum and signed off by the lead on 2026-09-30 (CLAUDE.md §1.4; round 2: reviewers A and B both APPROVE WITH FOLLOW-UPS; the one MEDIUM text fix, the write position relative to the `env_zone` join, is met in v3 §2). Nothing has been implemented; the lead has signed off; implementation may begin (deliverables that need the data host wait for one).** Review log: `CR-0025-review-log.md`.
 
 ## Scope
 Remove a region's five previous outputs when its analysis starts, so that every skip and every exception leaves nothing of a previous run; make the all-non-vegetated case a full skip; make the run exit non-zero naming the skipped regions; write the four CSVs atomically and the two final ones after the `env_zone` join and before the diagnostic map (BUG-0081; PA-0038, PA-0036(a)).

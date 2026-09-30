@@ -179,6 +179,14 @@ compatible with every caller; `.tmp` invisible to every raster glob.
 | C-N3-5 | LOW | **Accept** — cites corrected; §3 `filter_by_year_gap` bullet distinguishes the two `SystemExit`s |
 | C-N3-6 | LOW | **Accept** — §2 ordering rule: copy sites compare shape to the source |
 
+## Approval
+| party | verdict | date |
+|---|---|---|
+| reviewer quorum (CLAUDE.md §1.4, agent-only) | APPROVE WITH FOLLOW-UPS (see Rounds) | 2026-09-30 |
+| lead | APPROVE ("if the CR has passed the review process, I approve"; recorded by the author from the session) | 2026-09-30 |
+| author | sign-off | 2026-09-30 |
+Open MEDIUM/LOW follow-ups above go to the tracker at close-out.
+
 ## Versions
 | version | change |
 |---|---|

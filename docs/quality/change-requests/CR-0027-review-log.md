@@ -78,6 +78,14 @@ No BLOCKING or MAJOR.
 | B-N4 | LOW | **Accept** — § Why now |
 | B-N6 | LOW | **Accept** — § Impact landing-order bullet; CR-0026 v3 mirrors it |
 
+## Approval
+| party | verdict | date |
+|---|---|---|
+| reviewer quorum (CLAUDE.md §1.4, agent-only) | APPROVE WITH FOLLOW-UPS (see Rounds) | 2026-09-30 |
+| lead | APPROVE ("if the CR has passed the review process, I approve"; recorded by the author from the session) | 2026-09-30 |
+| author | sign-off | 2026-09-30 |
+Open MEDIUM/LOW follow-ups above go to the tracker at close-out.
+
 ## Versions
 | version | change |
 |---|---|

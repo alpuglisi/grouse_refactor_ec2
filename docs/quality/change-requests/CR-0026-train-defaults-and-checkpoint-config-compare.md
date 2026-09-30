@@ -1,6 +1,6 @@
 # CR-0026: One `TRAIN_DEFAULTS` for every handler construction, a checkpoint config check that compares every geometry key, and `diagnose_training.py` sections 2 and 3 through the shared loader and scorer
 
-**Status: v3, 2026-09-30 — APPROVED by agent quorum (CLAUDE.md §1.4; round 2: reviewers A and B both APPROVE WITH FOLLOW-UPS, conditional on the §2 compare-direction wording, met in v3). Nothing has been implemented; implementation waits for the lead's go-ahead and a data host.** Review log: `CR-0026-review-log.md`.
+**Status: v3, 2026-09-30 — APPROVED by agent quorum and signed off by the lead on 2026-09-30 (CLAUDE.md §1.4; round 2: reviewers A and B both APPROVE WITH FOLLOW-UPS, conditional on the §2 compare-direction wording, met in v3). Nothing has been implemented; the lead has signed off; implementation may begin (deliverables that need the data host wait for one).** Review log: `CR-0026-review-log.md`.
 
 ## Scope
 Define `train.py`'s recipe defaults once, build every non-`train.py` handler from them, make `check_checkpoint_config` compare every geometry key the checkpoint writes, and rebuild `diagnose_training.py` sections 2 and 3 on the shared loader and scorer (BUG-0083, BUG-0085; PA-0040, PA-0041).

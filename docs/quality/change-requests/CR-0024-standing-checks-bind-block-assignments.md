@@ -1,6 +1,6 @@
 # CR-0024: `standing_checks` binds `block_assignments.csv`; the standing file list is code-owned and checked at run time against every CSV path `build_datasets` resolved
 
-**Status: v4, 2026-09-30 — APPROVED by agent quorum (CLAUDE.md §1.4; round 2: reviewer B2 APPROVE WITH FOLLOW-UPS; round 3: reviewer C APPROVE WITH FOLLOW-UPS). Nothing has been implemented; implementation waits for the lead's go-ahead and a data host.** Review log: `CR-0024-review-log.md`.
+**Status: v4, 2026-09-30 — APPROVED by agent quorum and signed off by the lead on 2026-09-30 (CLAUDE.md §1.4; round 2: reviewer B2 APPROVE WITH FOLLOW-UPS; round 3: reviewer C APPROVE WITH FOLLOW-UPS). Nothing has been implemented; the lead has signed off; implementation may begin (deliverables that need the data host wait for one).** Review log: `CR-0024-review-log.md`.
 
 ## Scope
 Add the block table to the standing acceptance subset (digest, E0 and E6 with `include_B=True`), derive the standing file list from one code-owned constant in `acceptance_split.py`, and make `train.build_datasets` refuse a run that resolved a CSV path outside that list (BUG-0080; PA-0037).

@@ -1,6 +1,6 @@
 # CR-0020: Fit the negatives' envelope weights on training-block sightings only, so the validation negatives are drawn independently of the validation positives
 
-**Status: v3, 2026-09-30 — APPROVED by agent quorum (CLAUDE.md §1.4; round 2: reviewers A and B both APPROVE WITH FOLLOW-UPS, conditional on the input binding and the availability-value check being in the operative text; met in v3 §2 Step 0/Manifest and §3 E15b). Nothing has been implemented; no data has been touched; implementation waits for the lead's go-ahead and a data host.** Review log: `CR-0020-review-log.md`.
+**Status: v3, 2026-09-30 — APPROVED by agent quorum and signed off by the lead on 2026-09-30 (CLAUDE.md §1.4; round 2: reviewers A and B both APPROVE WITH FOLLOW-UPS, conditional on the input binding and the availability-value check being in the operative text; met in v3 §2 Step 0/Manifest and §3 E15b). Nothing has been implemented; no data has been touched; the lead has signed off; implementation may begin (deliverables that need the data host wait for one).** Review log: `CR-0020-review-log.md`.
 
 ## Scope
 Compute `Selection_Ratio` and the envelope binners from habitat sightings in **training** blocks only, use those weights for both draws, record the rule in the manifest, and gate it by exact replay (BUG-0076; tracker D3).

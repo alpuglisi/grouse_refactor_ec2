@@ -1,6 +1,6 @@
 # CR-0029: Draw the availability background sample uniform in area (EPSG:5070), not in degrees
 
-**Status: v3, 2026-09-30 — APPROVED by agent quorum (CLAUDE.md §1.4; round 2: reviewers A and B both APPROVE WITH FOLLOW-UPS, conditional on removing the new `EPSG:5070` literal; met in v3 §2/§3). Nothing has been implemented; implementation waits for the lead's go-ahead and a data host.** Review log: `CR-0029-review-log.md`.
+**Status: v3, 2026-09-30 — APPROVED by agent quorum and signed off by the lead on 2026-09-30 (CLAUDE.md §1.4; round 2: reviewers A and B both APPROVE WITH FOLLOW-UPS, conditional on removing the new `EPSG:5070` literal; met in v3 §2/§3). Nothing has been implemented; the lead has signed off; implementation may begin (deliverables that need the data host wait for one).** Review log: `CR-0029-review-log.md`.
 
 ## Scope
 Change `analyze_grouse.in_state_background_points` to draw uniformly over the projected box and transform back to lon/lat, replay the draw exactly in `check_partition.py`, and regenerate everything downstream of the availability sample (BUG-0090; PA-0046).

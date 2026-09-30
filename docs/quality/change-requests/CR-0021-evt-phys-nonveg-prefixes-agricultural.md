@@ -1,6 +1,6 @@
 # CR-0021: `EVT_PHYS_NONVEG_PREFIXES`: match LANDFIRE's "Agricultural", drop the dead "Barren", and pin the list to the attribute table
 
-**Status: v3, 2026-09-30 — APPROVED by agent quorum (CLAUDE.md §1.4; round 2: reviewers A and B both APPROVE WITH FOLLOW-UPS, conditional on the control's config and the fixture's Agricultural rows being in the operative text; met in v3 §4 and §5). Nothing has been implemented; no data has been touched; implementation waits for the lead's go-ahead and a data host.** Review log: `CR-0021-review-log.md`.
+**Status: v3, 2026-09-30 — APPROVED by agent quorum and signed off by the lead on 2026-09-30 (CLAUDE.md §1.4; round 2: reviewers A and B both APPROVE WITH FOLLOW-UPS, conditional on the control's config and the fixture's Agricultural rows being in the operative text; met in v3 §4 and §5). Nothing has been implemented; no data has been touched; the lead has signed off; implementation may begin (deliverables that need the data host wait for one).** Review log: `CR-0021-review-log.md`.
 
 ## Scope
 Change the physiognomy non-vegetated prefix list so it matches LANDFIRE's EVT_PHYS class strings, verify it against the attribute table by a test, update the acceptance pin and fixture, measure how many records change, and rebuild the split files if any do (BUG-0078).

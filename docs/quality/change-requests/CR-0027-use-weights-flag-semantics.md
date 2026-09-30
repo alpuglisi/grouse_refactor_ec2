@@ -1,6 +1,6 @@
 # CR-0027: Remove the loss-side envelope weighting behind `--use-weights`
 
-**Status: v3, 2026-09-30 — APPROVED by agent quorum (CLAUDE.md §1.4; round 2: reviewers A and B both APPROVE WITH FOLLOW-UPS). Nothing has been implemented; implementation waits for the lead's go-ahead and a data host.** Review log: `CR-0027-review-log.md`.
+**Status: v3, 2026-09-30 — APPROVED by agent quorum and signed off by the lead on 2026-09-30 (CLAUDE.md §1.4; round 2: reviewers A and B both APPROVE WITH FOLLOW-UPS). Nothing has been implemented; the lead has signed off; implementation may begin (deliverables that need the data host wait for one).** Review log: `CR-0027-review-log.md`.
 
 ## Scope
 Remove the per-sample loss weighting (`use_sample_weights`) and make `--use-weights` refuse with an explanation, so the negatives' envelope weight is applied once, by the draw (BUG-0086; PA-0042).

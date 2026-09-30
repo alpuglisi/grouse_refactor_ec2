@@ -152,6 +152,14 @@ Same RESOLVED table.
 | B-N3 | MEDIUM | **Accept** — deliverables 5–7 reordered: live `analyze_grouse.py` with S check, then pre-registration, then `generate_negatives.py` |
 | B-N8 | LOW | **Accept** — §3 O13 id caveat; § One change per CR: `digested_paths` derived, composes with CR-0024; E10 dependence stated |
 
+## Approval
+| party | verdict | date |
+|---|---|---|
+| reviewer quorum (CLAUDE.md §1.4, agent-only) | APPROVE WITH FOLLOW-UPS (see Rounds) | 2026-09-30 |
+| lead | APPROVE ("if the CR has passed the review process, I approve"; recorded by the author from the session) | 2026-09-30 |
+| author | sign-off | 2026-09-30 |
+Open MEDIUM/LOW follow-ups above go to the tracker at close-out.
+
 ## Versions
 | version | change |
 |---|---|

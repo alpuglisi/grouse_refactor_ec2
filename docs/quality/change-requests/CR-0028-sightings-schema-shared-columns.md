@@ -1,6 +1,6 @@
 # CR-0028: One sightings schema for both acquisition scripts; readers select coordinate columns by exact name
 
-**Status: v3, 2026-09-30 — APPROVED by agent quorum (CLAUDE.md §1.4; round 2: reviewers A and B both APPROVE WITH FOLLOW-UPS, conditional on the `check_partition` fixture and the PA-0027 lint re-pin being in the operative text; met in v3 §2/§3 and deliverables 1–2). Nothing has been implemented; implementation waits for the lead's go-ahead.** Review log: `CR-0028-review-log.md`.
+**Status: v3, 2026-09-30 — APPROVED by agent quorum and signed off by the lead on 2026-09-30 (CLAUDE.md §1.4; round 2: reviewers A and B both APPROVE WITH FOLLOW-UPS, conditional on the `check_partition` fixture and the PA-0027 lint re-pin being in the operative text; met in v3 §2/§3 and deliverables 1–2). Nothing has been implemented; the lead has signed off; implementation may begin (deliverables that need the data host wait for one).** Review log: `CR-0028-review-log.md`.
 
 ## Scope
 Define, once, the columns every file at `PATH_TEMPLATES["sightings"]` must carry; make `ebird.py` write them with the values, make `sightings.py` refuse a download that lacks them, and make both readers select them by exact name and fail closed (BUG-0089; PA-0045). Latent defect (every raw row today is GBIF); no data change.

@@ -169,6 +169,14 @@ Same RESOLVED table (A1/B2, A2, A3/B6, A4, A5/B4/B5, A6/B3, B1), with
 | B-N10 | LOW | **Accept** — §2 smoke `--epochs` default 4 |
 | B-N11 | LOW | **Accept** — deliverable 5: tracker row for BUG-0021, owner lead |
 
+## Approval
+| party | verdict | date |
+|---|---|---|
+| reviewer quorum (CLAUDE.md §1.4, agent-only) | APPROVE WITH FOLLOW-UPS (see Rounds) | 2026-09-30 |
+| lead | APPROVE ("if the CR has passed the review process, I approve"; recorded by the author from the session) | 2026-09-30 |
+| author | sign-off | 2026-09-30 |
+Open MEDIUM/LOW follow-ups above go to the tracker at close-out.
+
 ## Versions
 | version | change |
 |---|---|

@@ -1,6 +1,6 @@
 # CR-0023: Atomic raster writes in the generators, and the training and calibration read path refuses any content-validation fallback
 
-**Status: v4, 2026-09-30 — APPROVED by agent quorum (CLAUDE.md §1.4; round 2: reviewer B2 APPROVE WITH FOLLOW-UPS; round 3: reviewer C APPROVE WITH FOLLOW-UPS, conditional on the G4 injection wording, met in v4 § 4). Nothing has been implemented; implementation waits for the lead's go-ahead and a data host.** Review log: `CR-0023-review-log.md`.
+**Status: v4, 2026-09-30 — APPROVED by agent quorum and signed off by the lead on 2026-09-30 (CLAUDE.md §1.4; round 2: reviewer B2 APPROVE WITH FOLLOW-UPS; round 3: reviewer C APPROVE WITH FOLLOW-UPS, conditional on the G4 injection wording, met in v4 § 4). Nothing has been implemented; the lead has signed off; implementation may begin (deliverables that need the data host wait for one).** Review log: `CR-0023-review-log.md`.
 
 ## Scope
 (a) Every raster generator that writes a final path directly writes a temporary path, validates it and `os.replace`s it after the handles are closed (PA-0036(a)); (b) on the training and calibration read path, `raster_path`'s most-recent-valid-year fallback is refused unconditionally, and `train.filter_by_year_gap` judges each year by the file actually resolved (PA-0036(b)) (BUG-0079).

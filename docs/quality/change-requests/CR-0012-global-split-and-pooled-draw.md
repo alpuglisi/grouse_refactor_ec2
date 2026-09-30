@@ -1,6 +1,6 @@
 # CR-0012: One global block grid, one pooled train/val split, one pooled negative draw
 
-**Status: REVISED (v2), 2026-09-30 — awaiting round-2 review. All deliverables pending.**
+**Status: TEXT APPROVED (v2.1, commit `29f388b`), 2026-09-30.** Implementation waits for CR-0007 and CR-0013 (landing order).
 History, verdicts and dispositions: `CR-0012-review-log.md`. Split from
 CR-0007 v7 (`bb170ea`). This document states only current intent.
 

@@ -47,8 +47,8 @@ artifact row-for-row.
    disables or downgrades a GATE. Pre-CR data fails.
 4. **Separate authorship** (user decision).
    - A fresh agent writes `acceptance_split.py`, given only this CR, CR-0012
-     **at the commit where CR-0012 is approved** (recorded here when it
-     is), and the code at commit `05d788d`. CR-0013 is re-pinned whenever
+     **at the commit where CR-0012 is approved — `29f388b` (CR-0012 v2.1,
+     text approved 2026-09-30)**, and the code at commit `05d788d`. CR-0013 is re-pinned whenever
      CR-0012 is revised; the replay is written only after CR-0012's text
      is approved.
    - A different fresh agent implements CR-0012.

@@ -218,6 +218,9 @@ Follow-ups applied in **v2.1** (text-only):
 
 ## Quorum (§1.4)
 Reviewer A: APPROVE WITH FOLLOW-UPS (v2). Reviewer B: APPROVE WITH
-FOLLOW-UPS (v2). Author: pending user. Implementation also waits for
+FOLLOW-UPS (v2). Author: **signed off** — user approved CR-0012's text
+2026-09-30. **CR-0012 v2.1 TEXT APPROVED at commit `29f388b`** (the CR
+file is unchanged since). This is the version CR-0013's replay
+implements (CR-0013 rule 4). Implementation also waits for
 CR-0007 and CR-0013 (acceptance) per the landing order.
 

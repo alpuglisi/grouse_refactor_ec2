@@ -1,0 +1,90 @@
+CR-0019 deliverable 2: acceptance_split.py GATEs on today's real files (read-only)
+data root : /home/ec2-user/grouse2
+config    : docs/quality/acceptance_split.json (sha256 07e417f2870210b9d03c0823793e0496a9fe4bcda99d62ca5e191298003c9c41)
+code      : 65b246991e7e3dd1bd195ced88255f13eaadf8e5 + working tree (acceptance_split.py sha256 3376f0aa3e6e46602242f0fd94012e549923228871fa0c1b7d234f7a35ce3626)
+regions.py: /home/ec2-user/grouse2/.claude/worktrees/agent-a5dea5ab62d85b225/regions.py (YEAR_MIN defined: False)
+started   : 2026-09-30T17:11:27.387786+00:00
+driver    : run_gates() only; OBS not computed; no record written
+live record sha256 9d5ad0a9f92c4278e752cb1207f76decd63972d7159933f0ce8d8b41d18c5aba; its config_sha256 cd4b9b487a0076dac7a8f27858f682c51e5fcca5a174467a957f82282585f6e7
+today's 20 digested artifacts equal the live record's digests: True
+
+GATES (exact)
+E0   PASS
+E1   PASS
+E1p  PASS
+E2   PASS
+E3   PASS
+E4   PASS
+E5   PASS
+E6   PASS
+E7   PASS
+E8   PASS
+E9   PASS
+E10  PASS
+E11  FAIL
+       - regions.py: YEAR_MIN not defined (config YEAR_MIN = 2020)
+       - manifest[positives].constants differs from the config (['YEAR_MIN'])
+       - manifest[negatives].constants differs from the config (['YEAR_MIN'])
+E12  PASS
+E13  PASS
+E14  FAIL
+       - P (combined, pooled): 1437 rows without an integral year >= YEAR_MIN 2020 (ME 814, NH 256, VT 367; year < YEAR_MIN 1437, null 0, non-integral 0, unparsable 0), e.g. ME (-71.04102, 45.065674) year=2018
+       - distinct years differ (P vs N, pooled over regions and splits): P {2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024} vs N {2020, 2021, 2022, 2023, 2024}; only in P {2016, 2017, 2018, 2019}, only in N {}
+R1   FAIL
+       - data/pipeline/thinned_positives_ME.csv: 814 rows not in the replay, e.g. [(-71.04102, 45.06567), (-71.02734, 44.81703), (-71.0194, 44.71478)]
+       - data/pipeline/thinned_positives_ME.csv: 8 replay rows absent, e.g. [(-70.79131, 44.95045), (-70.10473, 43.91382), (-68.72835, 44.8627)]
+       - data/pipeline/thinned_positives_ME.csv: column 'split' differs on 7 rows, e.g. key (-70.4002, 43.45823): 'val' vs replay 'train'
+       - data/pipeline/train_positives_ME.csv: 644 rows not in the replay, e.g. [(-71.04102, 45.06567), (-71.02734, 44.81703), (-71.0194, 44.71478)]
+       - data/pipeline/train_positives_ME.csv: 13 replay rows absent, e.g. [(-70.79131, 44.95045), (-70.4002, 43.45823), (-70.31286, 44.26463)]
+       - data/pipeline/val_positives_ME.csv: 177 rows not in the replay, e.g. [(-71.01271, 44.88593), (-71.00786, 44.8693), (-70.9861, 44.12321)]
+       - data/pipeline/val_positives_ME.csv: 2 replay rows absent, e.g. [(-70.10473, 43.91382), (-67.17097, 44.84498)]
+       - data/pipeline/thinned_positives_NH.csv: 256 rows not in the replay, e.g. [(-72.51402, 42.79301), (-72.41323, 43.07716), (-72.40774, 43.08069)]
+       - data/pipeline/thinned_positives_NH.csv: 4 replay rows absent, e.g. [(-72.1561, 43.81929), (-72.01587, 43.86878), (-71.82487, 44.22436)]
+       - data/pipeline/train_positives_NH.csv: 210 rows not in the replay, e.g. [(-72.51402, 42.79301), (-72.41323, 43.07716), (-72.40774, 43.08069)]
+       - data/pipeline/train_positives_NH.csv: 4 replay rows absent, e.g. [(-72.1561, 43.81929), (-72.01587, 43.86878), (-71.82487, 44.22436)]
+       - data/pipeline/val_positives_NH.csv: 46 rows not in the replay, e.g. [(-72.301, 42.85507), (-72.17172, 43.17904), (-72.14935, 43.08665)]
+       ... 7 more
+R2   FAIL
+       - data/pipeline/block_assignments.csv: 656 rows not in the replay, e.g. ['591_873', '591_881', '596_850']
+       - data/pipeline/block_assignments.csv: column 'split' differs on 7 rows, e.g. key 628_856: 'val' vs replay 'train'
+       - data/pipeline/block_assignments.csv: column 'n' differs on 517 rows, e.g. key 594_884: np.int64(2) vs replay np.int64(1)
+R3   FAIL
+       - data/negatives/candidate_pool.csv: column 'split' differs on 501 rows, e.g. key (-70.9876, 44.84668): 'val' vs replay 'train'
+R4   FAIL
+       - data/negatives/negatives_ME.csv: 806 rows not in the replay, e.g. [(-71.03098, 45.1357), (-71.02448, 44.54916), (-71.01223, 45.20426)]
+       - data/negatives/negatives_ME.csv: column 'split' differs on 68 rows, e.g. key (-70.9876, 44.84668): 'val' vs replay 'train'
+       - data/negatives/train_negatives_ME.csv: 667 rows not in the replay, e.g. [(-71.03098, 45.1357), (-71.02448, 44.54916), (-71.01223, 45.20426)]
+       - data/negatives/train_negatives_ME.csv: 36 replay rows absent, e.g. [(-70.9876, 44.84668), (-70.97363, 44.83429), (-70.79385, 44.54419)]
+       - data/negatives/val_negatives_ME.csv: 207 rows not in the replay, e.g. [(-70.9876, 44.84668), (-70.97996, 44.0211), (-70.97556, 43.71059)]
+       - data/negatives/val_negatives_ME.csv: 32 replay rows absent, e.g. [(-70.7979, 44.42318), (-70.42943, 44.41883), (-70.31158, 43.88778)]
+       - data/negatives/negatives_NH.csv: 253 rows not in the replay, e.g. [(-72.44331, 43.04092), (-72.43917, 43.07406), (-72.43858, 43.032)]
+       - data/negatives/negatives_NH.csv: 1 replay rows absent, e.g. [(-71.0438, 43.8621)]
+       - data/negatives/negatives_NH.csv: column 'split' differs on 19 rows, e.g. key (-72.29803, 42.85277): 'val' vs replay 'train'
+       - data/negatives/train_negatives_NH.csv: 218 rows not in the replay, e.g. [(-72.43858, 43.032), (-72.43169, 43.0682), (-72.41222, 43.10226)]
+       - data/negatives/train_negatives_NH.csv: 12 replay rows absent, e.g. [(-72.29803, 42.85277), (-72.0462, 43.369), (-71.98006, 43.703)]
+       - data/negatives/val_negatives_NH.csv: 54 rows not in the replay, e.g. [(-72.44331, 43.04092), (-72.43917, 43.07406), (-72.43296, 43.09076)]
+       ... 8 more
+
+SUMMARY: 14/20 GATEs pass; FAIL: E11, E14, R1, R2, R3, R4
+runtime: 33.9 s
+live record unchanged: True
+
+DETAIL 1: expected FAIL set (CR-0019 test plan)
+  FAIL set ['E11', 'E14', 'R1', 'R2', 'R3', 'R4'] == expected ['E11', 'E14', 'R1', 'R2', 'R3', 'R4']: True
+  E11 problems naming YEAR_MIN: 3 of 3; every E11 problem names YEAR_MIN: True
+DETAIL 2: E14 counts recomputed here with pandas from the files
+  P year < 2020: 1437 (ME 814, NH 256, VT 367); null 0
+  N year < 2020: 0; null 0
+  C non-null year < 2020: 0; null 0
+  P years [2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024]
+  N years [2020, 2021, 2022, 2023, 2024]
+DETAIL 3: the replay's outputs (CR-0019 floor) vs the pre-registration
+  replay stage errors: {}
+  P (region, key, split, block_id, year): replay 4809 rows, pre-registered 4809; equal: True
+  N (region, key, split, year, is_nonveg): replay 4809 rows, pre-registered 4809; equal: True
+  B (block_id, split, n): replay 3205 rows, pre-registered 3205; equal: True
+  C: same key set as live: True; split changes 501 == pre-registered 501: True
+  draw counts: {"ME": {"train": {"n": 2291, "n_hab": 1604, "n_nv": 687}, "val": {"n": 563, "n_hab": 394, "n_nv": 169}}, "NH": {"train": {"n": 634, "n_hab": 444, "n_nv": 190}, "val": {"n": 193, "n_hab": 135, "n_nv": 58}}, "VT": {"train": {"n": 922, "n_hab": 645, "n_nv": 277}, "val": {"n": 206, "n_hab": 144, "n_nv": 62}}}
+  positives counts step 2: {"ME": 2909, "NH": 856, "VT": 1174}
+  pool counts step 1: {"ME": 91917, "NH": 69219, "VT": 104076}
+live record unchanged at end: True

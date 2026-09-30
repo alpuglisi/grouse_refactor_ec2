@@ -87,13 +87,18 @@ def main():
             GrousePatchDataset(tr_neg.head(args.n_train), rd, cat_f, cont_f,
                                img_size=args.img_size,
                                expand_rotations=False, label=0.0)])
+        # BUG-0057: validation stores EVERY point, both classes, as its 4
+        # consecutive fixed rotations (as train.py does). evaluate()
+        # averages logits in groups of 4 for TTA, so an unrotated class
+        # either skips the TTA metrics (length not a multiple of 4) or
+        # silently averages 4 different points together.
         val_ds = ConcatDataset([
             GrousePatchDataset(va_pos.head(args.n_val), rd, cat_f, cont_f,
                                img_size=args.img_size,
                                expand_rotations=True, label=1.0),
             GrousePatchDataset(va_neg.head(args.n_val), rd, cat_f, cont_f,
                                img_size=args.img_size,
-                               expand_rotations=False, label=0.0)])
+                               expand_rotations=True, label=0.0)])
         cat_x, cont_x, y, w = train_ds[0]
         print(f"    train={len(train_ds)} samples, val={len(val_ds)} samples")
         print(f"    sample shapes: cat_x={tuple(cat_x.shape)} "

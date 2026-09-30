@@ -1,8 +1,6 @@
 # CR-0007: Partition sighting records by state and centralise the shared spatial constants
 
-**Status: REVISED (v9), 2026-09-30 — awaiting round-9 review (bounded,
-§1.2). Deliverable 0 is pre-approval and is reviewed in round 9; the rest
-are pending.** History, verdicts, dispositions and the v8 split:
+**Status: APPROVED (v9), 2026-09-30 — both round-9 reviewers signed off; author sign-off by user. Not yet implemented.** History, verdicts, dispositions and the v8 split:
 `CR-0007-review-log.md`. This document states only current intent.
 
 ## Scope

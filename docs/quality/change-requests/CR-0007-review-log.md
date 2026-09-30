@@ -769,5 +769,6 @@ repository-tree P6 test, by design until deliverable 2).
 
 ## Quorum (§1.4)
 Round 9: reviewer A APPROVE, reviewer B APPROVE WITH FOLLOW-UPS (v9,
-`f8fafbc`; test fix A-R9-1 applied after). Author: pending user.
+`f8fafbc`; test fix A-R9-1 applied after). Author: **signed off** — user
+approved 2026-09-30. **CR-0007 v9 APPROVED.**
 

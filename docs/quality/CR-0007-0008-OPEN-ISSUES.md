@@ -153,3 +153,8 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 - [ ] Items above addressed by CR-0009 v5, to tick on round-5 confirmation: "update the expected positive count to 6,232" (cited from CR-0012 § Impact), BUG-0039 (rows OBS with PA-0021(f) fields), "`:64` says when CR-0007/CR-0012 land" (§ Baselines: CR-0012 only; verified the point files are byte-identical to CR-0007's backup) — owner: CR-0009's author
 - [ ] `data/maps/STALE_SEE_CR-0010.txt`: the directory holds `analyze_grouse.py` sightings diagnostics (PNGs rewritten 2026-09-30 11:42, after the marker) and an input download, no model outputs; CR-0009 does not regenerate them. Decide whether the marker still applies — owner: CR-0010's author
 - [ ] `old_road_dist/` ownership (item above): CR-0009 v5 no longer reads it (the reproduction uses current rasters; +4,255 m is quoted, not re-measured) — owner unchanged (CR-0014 or user)
+
+## CR-0012 code (20a52c1) — lead notes
+- [ ] LOW (owner: CR-0013 replay author): CR-0013's table "I other inputs" does not name the county file `data/roads/tl_2023_us_county.zip`, though `acceptance_split.py:976,1833` requires it as an input. Add it to the table's wording.
+- [ ] LOW (owner: CR-0012 implementer): `P7_GUARDED` in `check_partition.py` does not include the `clean.py` / `legacy/gen_negs.py` guards (they are tested in `test_cr0012`).
+- [ ] LOW (owner: lead): regenerate `PROJECT_TREE.md` after CR-0012 deliverable 6.

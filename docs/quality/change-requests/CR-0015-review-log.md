@@ -197,6 +197,8 @@ v2.2 (text only): "top-level" `inv_*`/`res_*`; no pinned count; 63 files
 at `05d4ce5`; deliverable 3 marked committed.
 
 ## Quorum (§1.4)
-Reviewer A: APPROVE (conditional met). Reviewer B: APPROVE WITH FOLLOW-UPS
-(conditional met). Author: pending user.
+Reviewer A: APPROVE WITH FOLLOW-UPS at `05d4ce5`. Reviewer B: APPROVE WITH
+FOLLOW-UPS at `05d4ce5`. Both LOW follow-ups applied: stale "60 files" text
+(v2.2) and the exclusion assertion now checks raw `git ls-files` output
+against the scanned set. Author: pending user.
 

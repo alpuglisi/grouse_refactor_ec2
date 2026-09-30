@@ -215,7 +215,11 @@ class TestRepository(unittest.TestCase):
     def test_file_set_scope(self):
         fs = set(file_set())
         self.assertTrue(MUST_SCAN <= fs, MUST_SCAN - fs)
-        self.assertFalse([f for f in fs if EXCLUDE.match(f)])
+        raw = subprocess.check_output(["git", "ls-files", "*.py"], cwd=REPO,
+                                      text=True).split()
+        excluded = [f for f in raw if EXCLUDE.match(f)]
+        self.assertTrue(excluded)                  # e.g. tracked inv_*.py
+        self.assertFalse(set(excluded) & fs)       # and none is scanned
         self.assertGreaterEqual(len(fs), 60)   # 60 when written; grows
 
     def test_no_unclassified_match(self):

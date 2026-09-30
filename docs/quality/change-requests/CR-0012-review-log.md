@@ -254,5 +254,8 @@ Follow-ups applied in **v2.2.1** (text only):
 
 ## Quorum (v2.2)
 Reviewer A: APPROVE WITH FOLLOW-UPS. Reviewer B: APPROVE WITH FOLLOW-UPS.
-Author: pending user.
+Author: **signed off** — user approved 2026-09-30. **CR-0012 v2.2.1 TEXT
+APPROVED at commit `cec1542`** (the CR file is unchanged since). This is the
+version CR-0013's replay implements (rule 4). The approval commit changed
+only the status block.
 

@@ -53,9 +53,8 @@ artifact row-for-row.
 4. **Separate authorship** (user decision).
    - A fresh agent writes `acceptance_split.py`. Its only sources are:
      - this CR;
-     - **CR-0012 at the commit where CR-0012 v2.2 is approved** (to be
-       filled in after its bounded re-review). v2.1 at `29f388b` was the
-       source for `8501b51`.
+     - **CR-0012 at `cec1542`** (v2.2.1, text approved 2026-09-30). v2.1
+       at `29f388b` was the source for `8501b51`.
      - **CR-0007 at `6619bdd`** (v9, approved), for its §1 table,
        `verify_partition` and its §2 `region` column;
      - the code at `05d788d`.

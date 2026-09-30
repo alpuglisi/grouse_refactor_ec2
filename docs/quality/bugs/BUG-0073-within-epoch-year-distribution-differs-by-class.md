@@ -173,3 +173,11 @@ single vintage) and BUG-0075 (duplicated `START_YEAR`).
 ## Cross-references
 BUG-0034 (parent; fixed by CR-0019), CR-0019 §5, PA-0020, PA-0016,
 PA-0022, PA-0024(b).
+
+## Update 2026-09-30 (static code review)
+The "`get_negatives.py` acquisition order" candidate in §5 now has a
+concrete mechanism: **BUG-0077** (the rollover loop at
+`get_negatives.py:311-333` hands each species' whole unmet quota to the
+first non-exhausted year in ascending order, so 2020 absorbs the
+shortfall). Still a candidate under PA-0016 until the fix CR re-measures;
+PA-0034 (extends PA-0020) records the rule.

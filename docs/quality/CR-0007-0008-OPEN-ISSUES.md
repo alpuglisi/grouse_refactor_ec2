@@ -237,8 +237,8 @@ Review follow-ups:
 ## CR-0015 bookkeeping design questions (2026-09-30), owner: lead
 - [ ] **D1:** validation data drives model selection, the divergence guard, `--dynamic-dropout` (`model_handler.py:1306`) and Platt calibration. There is no third holdout, so reported validation metrics carry selection bias. Decision needed: accept and document, or add a test holdout.
 - [ ] **D2:** `calibrate.cross_fitted_probs` (`calibrate.py:229-239`) uses random folds, not block folds, so `ece_cross_fitted` and `nll_cross_fitted` are slightly optimistic. Reported numbers only.
-- [ ] **D3:** training-negative weights (`Selection_Ratio` over every sighting, validation included) and the 300 m buffer depend on validation positives (`generate_negatives.attach_weights`). No CR-0013 gate asks this.
-- [ ] **D4:** there is no buffer between training and validation blocks. The 64 px window is about 1.9 km and the blocks are 3 km, so features leak across block edges. Labels do not.
+- [ ] **D3:** training-negative weights (`Selection_Ratio` over every sighting, validation included) and the 300 m buffer depend on validation positives (`generate_negatives.attach_weights`). No CR-0013 gate asks this. — **filed as BUG-0076** (2026-09-30 static review; PA-0033); the buffer half is recorded there as removing, not steering.
+- [ ] **D4** (still a design question, no BUG; noted by the 2026-09-30 static review): there is no buffer between training and validation blocks. The 64 px window is about 1.9 km and the blocks are 3 km, so features leak across block edges. Labels do not.
 - [ ] The `train.py:246` comment "Covers every caller" omits `smoke_test_training.py` and `diagnose_training.py`, which build datasets without `standing_checks` (no model is kept). Doc fix.
 - [ ] The `find_tsd_contrast_points.py` docstring (about lines 40-44) says `read_window_stack` "zeroes NODATA_SENTINELS to 0". That has been stale since `51a4ad0`. Doc fix.
 
@@ -272,3 +272,17 @@ Reviews: `docs/quality/evidence/CR-0019/code-review/`; dispositions in `CR-0019-
 - [ ] LOW (B F6): `docs/quality/evidence/CR-0019/combined/standing_check.py:1-4` and `RUN.txt` step 7 say "no augment"; train.py's default is `--augment` on (equivalent, jitter 0 → pad 0). Evidence wording only; correct if the evidence is ever re-run
 - [x] MEDIUM (B F1): E14(b) mirror test (a year only in N) — **fixed** `b8e96cf` (mutant P⊆N now killed)
 - [x] LOW (A-3): deliverable-4 evidence called `filter_by_year_gap` directly, not `build_datasets` — resolved on the combined scratch tree (`3cd1ea9`): `combined/standing_check.py` shows the check `build_datasets` runs first passes, `yeargap_check_run*.txt` makes the four `filter_by_year_gap` calls `build_datasets` makes (tol 2: 0 dropped; tol 1: refuses), and `combined/RUN.txt` step 7 records why `build_datasets` itself was not called (reviewer A's second option)
+
+## Static code review 2026-09-30 (whole pipeline at `3b3e7d1`, no data, no execution), owner: lead
+Filed as BUG-0076..BUG-0092 (`docs/quality/bugs/`, `BUG_LOG.md`), rules PA-0033..PA-0047 (PA-0040 supersedes PA-0009). All OPEN, none fixed. In priority order:
+- [ ] BUG-0076 validation negatives drawn with holdout-fitted envelope weights (was D3) — CR (generator + rebuild + gate)
+- [ ] BUG-0077 `get_negatives.py` rollover greedy in ascending year (candidate cause of BUG-0073) — with BUG-0073's CR
+- [ ] BUG-0078 `EVT_PHYS_NONVEG_PREFIXES` "Agriculture" never matches LANDFIRE "Agricultural" — measure, then CR (rebuild)
+- [ ] BUG-0079 non-atomic multi-year raster writes + `raster_path` fallback + filename-only year check (tsd future leakage, latent) — small CR
+- [ ] BUG-0080 `standing_checks` does not bind `block_assignments.csv` (latent, `--an-background`) — small CR
+- [ ] BUG-0081 `analyze_grouse.py` skip paths leave stale outputs, exit 0 — trivial fixes / small CR
+- [ ] BUG-0082, BUG-0083, BUG-0085 `diagnose_training.py`, `smoke_test_training.py`, `bench_pipeline.py` restate `train.py` defaults/rules by hand — `TRAIN_DEFAULTS` CR
+- [ ] BUG-0084 `diagnose_wetland.py` mean-of-sigmoids scorer — trivial fix
+- [ ] BUG-0086 `--use-weights` double weighting (latent) — lead decision
+- [ ] BUG-0087, BUG-0088, BUG-0089, BUG-0090, BUG-0091, BUG-0092 (low) — trivial fixes
+- Candidates not filed (unverified here, need one check each): Earth Engine exports requested on a lattice half a pixel off the NLCD/TCC/TreeMap native grid (`download_tcc_nlcd.py:310-313`, `download_treemap.py:234-237`; fixed ~15 m shift before the template warp — confirm native origins, then file); GBIF negatives taken as an index-order prefix rather than a sample (`get_negatives.py:269-272`; folded into BUG-0073/BUG-0077's CR as a question).

@@ -1,6 +1,6 @@
 # CR-0009: Retrain once on the rebuilt data, and prove the Errol map is still right
 
-**Status: APPROVED (v5.1), 2026-09-30** — author and both reviewers (round 5); user pre-authorised. The user
+**Status: APPROVED (v5.2), 2026-09-30** — author and both reviewers (round 5); user pre-authorised. The user
 pre-authorised the full cycle (review, approval by the author and two
 reviewers, implementation) on 2026-09-30; the retrain runs on this machine
 (NVIDIA L40S, 46 GB). History, verdicts and dispositions:
@@ -257,7 +257,7 @@ untracked `inv_state_split.py`, `inv_matched_pairs.py`,
   sha256 recorded before it is read, or it is scored in-process through
   `predict.py`'s own functions. Either way a spot check re-scores ≥ 20
   map cells with `--model` and `--calibration` and refuses (exit 2) if any
-  differs by more than 1e-4 — an input guard, not an acceptance row.
+  differs by more than 1e-3 (fp16 autocast jitter measured up to 8.6e-5; another model differs by ~0.43) — an input guard, not an acceptance row.
 - **Frozen pairs:** the 8 pairs of `inv_matched_pairs.csv` (copied to the
   evidence directory with sha256), mapped to NH-grid cells by lon/lat. The
   script also re-runs `inv_matched_pairs.py`'s matching on the current NH
@@ -349,7 +349,7 @@ ground truth); stability across seeds (one seed); the effect of 10 vs 50
 epochs.
 
 ## Deliverables (in execution order)
-- [ ] 1. `symptom_check.py` and `tests/test_symptom_check.py`, committed
+- [x] 1. `symptom_check.py` and `tests/test_symptom_check.py`, committed
       before approval (§1.1 A3).
 - [ ] 2. Baseline capture (§ Baselines), before approval; `SHA256SUMS`
       verified and committed. R passes.

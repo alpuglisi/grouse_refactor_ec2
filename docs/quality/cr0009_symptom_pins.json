@@ -1,0 +1,123 @@
+{
+ "_about": "CR-0009 v5 \u00a7 Symptom acceptance / \u00a7 symptom_check.py: constants read by symptom_check.py. 'reference' = each OBS row's 'investigate if' value (uncalibrated, BUG-0039; never pass/fail). 'baselines' and 'auc_baselines' = INVESTIGATION_REPORT_errol_map.md (\u00a7 'road_dist no-retrain check', step 7). 'reproduction' = R, the exact-reproduction GATE on the instrument: published strings, compared at their printed precision. The frozen pairs are not here: they are the --pairs CSV (inv_matched_pairs.csv or its evidence copy).",
+ "box": [
+  -71.25,
+  44.7,
+  -70.95,
+  44.9
+ ],
+ "map_region": "NH",
+ "reference": {
+  "1a_band": [
+   0.44,
+   0.56
+  ],
+  "1b_max_pp": 15.0,
+  "2a_max_abs_m": 600.0,
+  "2b_max": 0.2,
+  "3_nh_auc": 0.6918
+ },
+ "baselines": {
+  "gap3.pth": {
+   "before": {
+    "me_mean": 0.7949,
+    "nh_mean": 0.6289,
+    "p_me_gt_nh": 0.8513,
+    "me_ge08_pct": 67.93,
+    "nh_ge08_pct": 5.05
+   },
+   "after": {
+    "me_mean": 0.6333,
+    "nh_mean": 0.6277,
+    "p_me_gt_nh": 0.54,
+    "me_ge08_pct": 10.24,
+    "nh_ge08_pct": 4.88
+   }
+  },
+  "bce.pth": {
+   "before": {
+    "me_mean": 0.6887,
+    "nh_mean": 0.4228,
+    "p_me_gt_nh": 0.8235,
+    "me_ge08_pct": 45.68,
+    "nh_ge08_pct": 0.11
+   },
+   "after": {
+    "me_mean": 0.4217,
+    "nh_mean": 0.422,
+    "p_me_gt_nh": 0.5089,
+    "me_ge08_pct": 0.18,
+    "nh_ge08_pct": 0.1
+   }
+  },
+  "calibration_note": "both rows used data/calibration/calibration.json, fitted on gap3.pth (so the bce.pth rows carry gap3's calibration)"
+ },
+ "auc_baselines": {
+  "map": "bce.pth, calibration on (inv_before/before_cal.tif, inv_after/after_cal.tif)",
+  "point_set": "GrouseData()['NH'] positives('all') + negatives('all') inside the box (66 points: 55 positives, 11 negatives; NH side 41/11, ME side 14/0)",
+  "before": {
+   "all": 0.757,
+   "NH": 0.6918
+  },
+  "after": {
+   "all": 0.7273,
+   "NH": 0.6918
+  },
+  "counts": {
+   "all": {
+    "n": 66,
+    "pos": 55
+   },
+   "NH": {
+    "n": 52,
+    "pos": 41
+   }
+  }
+ },
+ "reproduction": {
+  "maps": {
+   "gap3.pth": {
+    "p_me_gt_nh": "0.5400",
+    "gap08_pp": "5.36",
+    "me_mean": "0.6333",
+    "nh_mean": "0.6277"
+   },
+   "bce.pth": {
+    "p_me_gt_nh": "0.5089",
+    "me_mean": "0.4217",
+    "nh_mean": "0.4220",
+    "mean_diff_prob_recorded": "+0.1078",
+    "diff_prob_recorded_3dp": [
+     -0.119,
+     0.204,
+     0.168,
+     -0.056,
+     0.197,
+     -0.018,
+     0.119,
+     0.367
+    ],
+    "auc_all": "0.7273",
+    "auc_NH": "0.6918"
+   }
+  },
+  "pairs": {
+   "model": "bce.pth",
+   "mean_diff_road_m": "+202.75",
+   "diff_road_m": [
+    -549,
+    -185,
+    490,
+    1154,
+    203,
+    -155,
+    835,
+    -171
+   ]
+  },
+  "investigation_maps": {
+   "gap3.pth": "inv_after/after_gap3_cal.tif",
+   "bce.pth": "inv_after/after_cal.tif"
+  }
+ }
+}

@@ -254,3 +254,20 @@ MEDIUM/LOW items are also listed in `docs/quality/CR-0007-0008-OPEN-ISSUES.md`
 
 All v5.1 edits are confined to the lines named above; no bounded re-review
 is needed (no BLOCKING/MAJOR raised; A1).
+
+## v5.2 amendment (lead, 2026-09-30) — from deliverable 1's implementer
+- Spot-check tolerance 1e-4 -> 1e-3 (§ symptom_check.py spec, map
+  provenance). Measured fp16 autocast jitter reached 8.6e-5 over 600 cells
+  (bce), leaving no margin at 1e-4; a map from the other model differs by
+  ~0.43, so 1e-3 still separates by >400x. Input guard only, not an
+  acceptance row; no bounded re-review needed (A1: no BLOCKING/MAJOR change).
+- Noted, no text change: the union of today's region files has 33
+  duplicate in-box records (the BUG-0027 leak), so check mode refuses it;
+  deliverable 2 captures the NH region-file point set for `--points`, as
+  § Baselines already says. R checks the >=0.8 gap, not the shares
+  themselves (shares match at 2 dp). Item 4's ME baseline (≈36 min per
+  model in-process) depends only on rasters and checkpoints, so it is
+  captured after CR-0012, not in deliverable 2.
+- Deliverable 1: R reproduced every published value exactly (see
+  `docs/quality/evidence/CR-0009/symptom_check-R-deliverable1-run.txt`);
+  23 unit tests OK; `data/predictions/` md5 unchanged.

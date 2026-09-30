@@ -1,0 +1,52 @@
+HEAD 01e0605 + staged tests/test_pa0027_lint.py, 2026-09-30T14:28:15Z
+test_prefix_code_flagged_and_unclassified (tests.test_pa0027_lint.TestHistoricalDefects.test_prefix_code_flagged_and_unclassified) ... ok
+test_edit_to_classified_handler_detected (tests.test_pa0027_lint.TestMutations.test_edit_to_classified_handler_detected) ... ok
+test_reraise_to_skip_flagged (tests.test_pa0027_lint.TestMutations.test_reraise_to_skip_flagged) ... ok
+test_classified_sets_disjoint (tests.test_pa0027_lint.TestRepository.test_classified_sets_disjoint) ... ok
+test_file_set_scope (tests.test_pa0027_lint.TestRepository.test_file_set_scope) ... ok
+test_no_unclassified_violation (tests.test_pa0027_lint.TestRepository.test_no_unclassified_violation) ... PA-0027 ALLOW acceptance_split.py:454 Rasters.is_valid#0 21aa48dc4ce9
+PA-0027 ALLOW acceptance_split.py:852 Replay.run#0 8e7d784f7860
+PA-0027 ALLOW acceptance_split.py:2370 compute_obs#0 a02a77f11663
+PA-0027 ALLOW acceptance_split.py:2376 compute_obs#1 57d659e339ea
+PA-0027 ALLOW acceptance_split.py:2382 compute_obs#2 2b8de495f45d
+PA-0027 ALLOW acceptance_split.py:2067 evaluate#0 30b79a19b4f5
+PA-0027 ALLOW acceptance_split.py:2620 full_run#0 6345b0706c5d
+PA-0027 ALLOW acceptance_split.py:2625 full_run#1 cc057f7aa7dd
+PA-0027 ALLOW acceptance_split.py:1417 gate_E0#0 32390b8090ca
+PA-0027 ALLOW acceptance_split.py:1749 gate_E10#0 956cfe5d5200
+PA-0027 ALLOW acceptance_split.py:1928 gate_E12#0 0059962f0b9e
+PA-0027 ALLOW acceptance_split.py:1675 gate_E8#0 bd75afdc4d41
+PA-0027 ALLOW acceptance_split.py:152 git_commit#0 8297606919db
+PA-0027 ALLOW acceptance_split.py:1782 parse_regions_py#0 d85c3794cdfe
+PA-0027 ALLOW analyze_grouse.py:658 load_state_boundaries#0 fd40acd39eba
+PA-0027 ALLOW analyze_grouse.py:671 load_state_boundaries#1 dacab7e3d694
+PA-0027 ALLOW check_exotic.py:71 check_sclass_meaning#0 ed8c86fd5ce8
+PA-0027 ALLOW check_raster.py:57 check_one#0 e8d60ea711e8
+PA-0027 ALLOW check_road_dist.py:480 cmd_check#0 ed46275d90ab
+PA-0027 ALLOW dataset.py:208 GrousePatchDataset._close_handles#0 0913e0a61f66
+PA-0027 ALLOW diagnose_training.py:52 main#0 f4a5b4663eec
+PA-0027 ALLOW diagnose_water_bias.py:115 process_region#0 f2d3b562a8c1
+PA-0027 OPEN  download_rev.py:222 download_one#0 c804ad76b079
+PA-0027 OPEN  download_rev.py:238 download_one#1 974b31cdb0bb
+PA-0027 CAND  download_rev.py:149 published_products#0 1397258c47ee
+PA-0027 ALLOW download_tcc_nlcd.py:209 collection_years#0 0913e0a61f66
+PA-0027 ALLOW download_tcc_nlcd.py:146 ee_init#0 7568c1000e29
+PA-0027 CAND  download_tcc_nlcd.py:338 fetch_tile#0 7f26ce72185e
+PA-0027 ALLOW download_tcc_nlcd.py:189 resolve_collection#0 ba06144c4333
+PA-0027 ALLOW download_treemap.py:152 ee_init#0 7568c1000e29
+PA-0027 CAND  download_treemap.py:263 fetch_tile#0 7f26ce72185e
+PA-0027 ALLOW download_treemap.py:194 resolve_vintage_image#0 0913e0a61f66
+PA-0027 OPEN  ebird.py:106 main#0 05e9710dec8f
+PA-0027 ALLOW generate_treemap_features.py:179 _source_is_valid#0 4d64e7bcb844
+PA-0027 ALLOW grouse_data.py:327 RegionData._is_valid_raster#0 21aa48dc4ce9
+PA-0027 ALLOW symptom_check.py:663 region_point_frames#0 48fd5ad71386
+ok
+test_digest_changes_with_body (tests.test_pa0027_lint.TestRuleControls.test_digest_changes_with_body) ... ok
+test_key_is_scope_and_ordinal_not_line (tests.test_pa0027_lint.TestRuleControls.test_key_is_scope_and_ordinal_not_line) ... ok
+test_negative_controls_pass (tests.test_pa0027_lint.TestRuleControls.test_negative_controls_pass) ... ok
+test_positive_controls_flagged (tests.test_pa0027_lint.TestRuleControls.test_positive_controls_flagged) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.795s
+
+OK

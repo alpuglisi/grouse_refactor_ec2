@@ -11,8 +11,12 @@ functions that use them, so `standing_checks` pulls in only numpy, pandas
 and scipy. The normative functions CR-0013 lists (pinned at 05d788d) are
 re-implemented here from their source; regions.py is parsed, not imported.
 
-Gates (GATE, exact): E0-E12 (incl. E1p) on the pipeline's files and R1-R4,
+Gates (GATE, exact): E0-E13 (incl. E1p) on the pipeline's files and R1-R4,
 which replay CR-0012 section 2 from the inputs and compare full rows.
+CR-0017 section 3 adds E13 (no N or C row within BUFFER_M of the
+sightings' acquisition-domain edge) and rule (b) of pool step 6 to the
+replay's buffer_drop; the domain is built here from the county file, never
+from regions or generate_negatives (CR-0013 design rule 1).
 Observations (OBS, never blocking): O1-O10.
 
 Usage:
@@ -50,7 +54,7 @@ ENV_KEYS = ("pandas", "numpy", "scipy", "pyproj", "PROJ", "rasterio", "GDAL", "g
             "shapely", "pyogrio", "op_4326_5070")
 ENV_DESCRIPTIVE = ("op_rule",)     # config-only text, not a measured value
 GATE_IDS = ("E0", "E1", "E1p", "E2", "E3", "E4", "E5", "E6", "E7", "E8",
-            "E9", "E10", "E11", "E12", "R1", "R2", "R3", "R4")
+            "E9", "E10", "E11", "E12", "E13", "R1", "R2", "R3", "R4")
 OBS_IDS = tuple(f"O{i}" for i in range(1, 11))
 
 
@@ -74,6 +78,8 @@ class MissingInput(Exception):
 # Config, paths, digests
 # ==========================================================================
 REQUIRED_FLOAT_REL_TOL = 1e-12   # CR-0013 "floats to relative 1e-12"; not configurable (rule 3)
+REQUIRED_DOMAIN_EDGE = {"source": "paths.county_polygons",   # CR-0017 section 3; not configurable
+                        "edge_crs": "EPSG:5070"}
 
 
 class ConfigError(ValueError):
@@ -90,6 +96,13 @@ def load_config(path=None):
         raise ConfigError(f"{path}: comparison.float_rel_tol is {tol!r}; CR-0013 requires "
                           f"exactly {REQUIRED_FLOAT_REL_TOL!r} (design rule 3: no config key "
                           f"may downgrade a GATE)")
+    de = cfg.get("paths", {}).get("domain_edge")
+    for k, want in REQUIRED_DOMAIN_EDGE.items():
+        got = de.get(k) if isinstance(de, dict) else None
+        if got != want:
+            raise ConfigError(f"{path}: paths.domain_edge.{k} is {got!r}; CR-0017 requires exactly "
+                              f"{want!r} (the domain-edge rule of E13/R3 cannot be removed, "
+                              f"re-pointed or re-projected by config)")
     cfg["_path"] = path
     cfg["_sha256"] = hashlib.sha256(raw).hexdigest()
     return cfg
@@ -739,7 +752,14 @@ def county_rel(cfg):
     return rel
 
 
-def county_states(root, cfg):
+_DISSOLVED_CACHE = {}
+
+
+def county_dissolved(root, cfg):
+    """The pinned county file, filtered by `where` and dissolved by
+    `dissolve_by`, in the file's own CRS (`source_crs`). The one read shared
+    by verify_partition (projected to target_crs) and the acquisition domain
+    (projected to domain_edge.edge_crs)."""
     cp = cfg["paths"]["county_polygons"]
     county_rel(cfg)
     full = os.path.join(root, cp["path"])
@@ -749,12 +769,20 @@ def county_states(root, cfg):
     if got != cp["sha256"]:
         raise ReplayError(f"{cp['path']} sha256 {got[:12]}... differs from the config pin")
     fk = _file_key(full)
-    if fk not in _POLY_CACHE:
+    if fk not in _DISSOLVED_CACHE:
         import geopandas as gpd
         g = gpd.read_file(full, where=cp["where"], engine="pyogrio")
         if g.crs is None or g.crs.to_string() != cp["source_crs"]:
             raise ReplayError(f"{cp['path']} CRS {g.crs} is not {cp['source_crs']}")
-        g = g.dissolve(by=cp["dissolve_by"]).reset_index()
+        _DISSOLVED_CACHE[fk] = g.dissolve(by=cp["dissolve_by"]).reset_index()
+    return _DISSOLVED_CACHE[fk]
+
+
+def county_states(root, cfg):
+    cp = cfg["paths"]["county_polygons"]
+    g = county_dissolved(root, cfg)
+    fk = _file_key(os.path.join(root, cp["path"]))
+    if fk not in _POLY_CACHE:
         g = g.to_crs(cp["target_crs"])
         _POLY_CACHE[fk] = g[[cp["dissolve_by"], "geometry"]]
     return _POLY_CACHE[fk]
@@ -784,6 +812,103 @@ def verify_partition(lons, lats, states, root, cfg):
             s.add(fips_to_state.get(fp, f"FIPS{fp}"))
     states = [str(s) for s in states]
     return np.array([matched.get(i, set()) != {states[i]} for i in range(n)], dtype=bool)
+
+
+# ==========================================================================
+# Acquisition-domain edge (CR-0017 section 3), re-implemented from the CR
+# text; no regions/generate_negatives helper is used (design rule 1).
+# ==========================================================================
+_DOMAIN_CACHE = {}
+
+
+def acquisition_domain(root, cfg):
+    """D: the union of the dissolved county polygons (paths.domain_edge.source
+    = paths.county_polygons), projected from the file CRS straight to
+    edge_crs. A one-row GeoSeries."""
+    import geopandas as gpd
+    de = cfg["paths"]["domain_edge"]
+    cp = cfg["paths"]["county_polygons"]
+    g = county_dissolved(root, cfg)
+    fk = (_file_key(os.path.join(root, cp["path"])), de["edge_crs"])
+    if fk not in _DOMAIN_CACHE:
+        proj = g.to_crs(de["edge_crs"])
+        _DOMAIN_CACHE[fk] = gpd.GeoSeries([proj.geometry.union_all()], crs=de["edge_crs"])
+    return _DOMAIN_CACHE[fk]
+
+
+def _boundary_segments(domain, max_len):
+    """Every boundary segment of every polygon in `domain` (exterior and
+    interior rings), as arrays (ax, ay, bx, by). Segments longer than
+    `max_len` are cut into collinear pieces (the union of the pieces is the
+    segment, so point distances are unchanged)."""
+    import numpy as np
+    b = domain.boundary.explode(index_parts=False).reset_index(drop=True)
+    xy = b.get_coordinates(index_parts=False)
+    part = xy.index.to_numpy()
+    cx = xy["x"].to_numpy(dtype=float)
+    cy = xy["y"].to_numpy(dtype=float)
+    same = part[1:] == part[:-1]
+    ax, ay = cx[:-1][same], cy[:-1][same]
+    bx, by = cx[1:][same], cy[1:][same]
+    k = np.maximum(1, np.ceil(np.hypot(bx - ax, by - ay) / float(max_len))).astype(np.int64)
+    idx = np.repeat(np.arange(len(ax)), k)
+    start = np.repeat(np.cumsum(k) - k, k)
+    i = np.arange(len(idx)) - start
+    kk = k[idx].astype(float)
+    t0, t1 = i / kk, (i + 1) / kk
+    dx, dy = bx[idx] - ax[idx], by[idx] - ay[idx]
+    last = i + 1 == k[idx]
+    return (ax[idx] + t0 * dx, ay[idx] + t0 * dy,
+            np.where(last, bx[idx], ax[idx] + t1 * dx),
+            np.where(last, by[idx], ay[idx] + t1 * dy))
+
+
+def domain_edge_within(x, y, domain, radius):
+    """edge_m (CR-0017 sections 2-3) for points x, y in the domain's CRS,
+    exact wherever edge_m <= radius and +inf wherever edge_m > radius:
+    0.0 for a point inside no polygon of `domain` (or on its boundary),
+    else the float64 Euclidean distance to the nearest boundary segment of
+    any polygon of `domain`. With the unioned domain (one polygon row) the
+    lines between states are not boundaries."""
+    import geopandas as gpd
+    import numpy as np
+    from scipy.spatial import cKDTree
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    n = len(x)
+    out = np.full(n, np.inf)
+    if n == 0:
+        return out
+    radius = float(radius)
+    pts = gpd.GeoDataFrame({"_i": np.arange(n)}, geometry=gpd.points_from_xy(x, y),
+                           crs=domain.crs)
+    polys = gpd.GeoDataFrame(geometry=gpd.GeoSeries(list(domain), crs=domain.crs))
+    j = gpd.sjoin(pts, polys, predicate="within", how="inner")
+    inside = np.zeros(n, dtype=bool)
+    inside[j["_i"].to_numpy()] = True
+    seg_len = max(radius, 1.0)
+    ax, ay, bx, by = _boundary_segments(domain, seg_len)
+    if len(ax):
+        tree = cKDTree(np.column_stack([(ax + bx) / 2, (ay + by) / 2]))
+        reach = radius + seg_len / 2 + radius * 1e-9 + 1e-6
+        q = np.nonzero(inside)[0]
+        lists = tree.query_ball_point(np.column_stack([x[q], y[q]]), r=reach)
+        for qi, lst in zip(q, lists):
+            if not lst:
+                continue
+            s = np.asarray(lst)
+            sx, sy = bx[s] - ax[s], by[s] - ay[s]
+            l2 = sx * sx + sy * sy
+            with np.errstate(invalid="ignore", divide="ignore"):
+                t = np.where(l2 > 0, ((x[qi] - ax[s]) * sx + (y[qi] - ay[s]) * sy) / l2, 0.0)
+            t = np.clip(t, 0.0, 1.0)
+            ex = x[qi] - (ax[s] + t * sx)
+            ey = y[qi] - (ay[s] + t * sy)
+            d = float(np.sqrt((ex * ex + ey * ey).min()))
+            if d <= radius:
+                out[qi] = d
+    out[~inside] = 0.0
+    return out
 
 
 # ==========================================================================
@@ -1000,11 +1125,29 @@ class Replay:
             ys.append(y)
         return np.concatenate(xs), np.concatenate(ys)
 
-    def buffer_drop(self, cand):
+    def sighting_buffer_mask(self, cand):
+        """Pool step 6 rule (a): squared distance to any sightings row <= BUFFER_M**2."""
         sx, sy = self.all_sightings_xy()
         b = float(self.C["BUFFER_M"])
         d2 = min_d2_within(cand["x_5070"].to_numpy(), cand["y_5070"].to_numpy(), sx, sy, b)
-        return cand[~(d2 <= b * b)].copy()
+        return d2 <= b * b
+
+    def domain(self):
+        return acquisition_domain(self.root, self.cfg)
+
+    def domain_edge_mask(self, cand):
+        """Pool step 6 rule (b) (CR-0017): edge_m <= BUFFER_M. x_5070/y_5070
+        here are the replay's own transform of lon/lat (step 5)."""
+        b = float(self.C["BUFFER_M"])
+        e = domain_edge_within(cand["x_5070"].to_numpy(), cand["y_5070"].to_numpy(),
+                               self.domain(), b)
+        return e <= b
+
+    def buffer_drop(self, cand):
+        """Pool step 6 (CR-0012, amended by CR-0017): drop (a) | (b), both
+        row filters on the same step-5 pool."""
+        drop = self.sighting_buffer_mask(cand) | self.domain_edge_mask(cand)
+        return cand[~drop].copy()
 
     def extract(self, R, sub):
         import numpy as np
@@ -1652,6 +1795,38 @@ def gate_E7(ctx):
     return problems, missing
 
 
+def gate_E13(ctx):
+    """CR-0017: edge_m > BUFFER_M for every row of N (combined, pooled) and
+    C, with edge_m recomputed from lon/lat against the replay's own D."""
+    problems, missing = [], []
+    b = float(ctx.C["BUFFER_M"])
+    targets = []
+    N = ctx.pooled("negatives", missing)
+    if N is not None:
+        targets.append(("N (pooled)", N))
+    c = ctx.try_csv(rpath(ctx.cfg, "candidate_pool"), missing)
+    if c is not None:
+        targets.append(("C", c))
+    if not targets:
+        return problems, missing
+    try:
+        D = acquisition_domain(ctx.root, ctx.cfg)
+    except MissingInput as e:
+        missing.append(e.relpath)
+        return problems, missing
+    for label, df in targets:
+        x, y = ctx.xy(df)
+        e = domain_edge_within(x, y, D, b)
+        bad = e <= b
+        if bad.any():
+            i = int(bad.nonzero()[0][0])
+            where = f"{df['_R'].iloc[i]} " if "_R" in df else ""
+            problems.append(f"{label}: {int(bad.sum())} rows within {ctx.C['BUFFER_M']} m of the "
+                            f"sightings' acquisition-domain edge (edge_m <= BUFFER_M), e.g. {where}"
+                            f"({df['longitude'].iloc[i]}, {df['latitude'].iloc[i]}) edge_m={e[i]:.3f}")
+    return problems, missing
+
+
 def gate_E8(ctx):
     problems, missing = [], []
     targets = []
@@ -2056,7 +2231,7 @@ def gate_R4(ctx):
 GATES = [("E0", gate_E0), ("E1", gate_E1), ("E1p", gate_E1p), ("E2", gate_E2), ("E3", gate_E3),
          ("E4", gate_E4), ("E5", gate_E5), ("E6", gate_E6), ("E7", gate_E7), ("E8", gate_E8),
          ("E9", gate_E9), ("E10", gate_E10), ("R1", gate_R1), ("R2", gate_R2), ("R3", gate_R3),
-         ("R4", gate_R4), ("E11", gate_E11), ("E12", gate_E12)]
+         ("R4", gate_R4), ("E11", gate_E11), ("E12", gate_E12), ("E13", gate_E13)]
 
 
 def evaluate(fn, ctx, **kw):

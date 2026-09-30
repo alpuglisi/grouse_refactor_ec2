@@ -1,0 +1,4 @@
+record keys differing run1 vs run2: ['created_utc']
+  created_utc: '2026-09-30T15:03:13.486725+00:00' vs '2026-09-30T15:06:38.195642+00:00'
+record equal except created_utc: True
+record commit: b059624333ce125e6b305abae4e3f360793456db dirty: False config_sha256: cd4b9b487a0076dac7a8f27858f682c51e5fcca5a174467a957f82282585f6e7

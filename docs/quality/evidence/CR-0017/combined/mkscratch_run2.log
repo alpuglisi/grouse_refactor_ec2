@@ -1,0 +1,2 @@
+output-path check: PASS (10 generator outputs + split_manifest.json + acceptance_record.json regular files; written dirs not symlinks; no symlink in copied dirs; no symlinked dir)
+symlinked files: 3543; regular files: 44

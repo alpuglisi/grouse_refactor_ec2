@@ -16,8 +16,8 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 - [x] Reconcile I17 / G5 hand-off — moved to CR-0010: 0 positive centre values change, so I17 is unaffected; X3 reports window exposure (0008 R7-5, R7-6)
 - [x] **I17 WILL change under CR-0014** (140 ME / 717 VT positives' `road_dist` values): CR-0012/CR-0013 must take I17 after CR-0014 lands, and say so (CR-0014 B6) — CR-0013 O8/E8 taken after CR-0014 or repeated; CR-0012 landing order
 - [ ] Reconcile PA-0021 clause text: one version, cited consistently (0008 R7-12) — CR-0013 deliverable 0 files one text (draft + clause (f))
-- [ ] Decide: quorum for CR-0007 v8 / CR-0012 / CR-0013 — author proposes fresh first reviews of each, with the v8 disposition table as the no-drop record (prior agents cannot be resumed) (CR-0007-review-log § v8)
-- [ ] Decide: CR-0013 replaces v7's statistical gates with exact predicates + independent replay; statistics become OBS. Confirm this direction before review (CR-0013 design rule 2)
+- [x] Decided (user): fresh first review for each. Quorum for CR-0007 v8 / CR-0012 / CR-0013 — author proposes fresh first reviews of each, with the v8 disposition table as the no-drop record (prior agents cannot be resumed) (CR-0007-review-log § v8)
+- [x] Decided (user): exact replay. CR-0013 replaces v7's statistical gates with exact predicates + independent replay; statistics become OBS. Confirm this direction before review (CR-0013 design rule 2)
 
 ## CR-0007
 - [x] B-1 Recover rounds 3–6 verdicts from prior-session transcripts; rebuild round table; disposition all concerns; list every reviewer for quorum — review log reconstructed; all 100 open rows dispositioned; v8 quorum → Shared (see CR-0007-review-log.md § v8 dispositions)
@@ -102,3 +102,14 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 - [x] Evidence: **commit only the scripts CR-0013's attack table cites**, under docs/quality/evidence/CR-0007-r7/ where copied; other inv_/res_ files stay untracked
 - [x] Bookkeeping batch (PA-0021, BUG-0033): **filed by CR-0013's author before CR-0013's approval**; new BUGs take the next free id at filing
 - [x] Replay author ≠ CR-0012 implementer: workable (separate agents)
+- [ ] **CR-0015** (not yet written): `sample_background_points` in-state partition (BUG-0029 remainder) and the 0/nodata conflation (file BUG-0032). The function is live (`pretrain.py:63,179`; `sweep/launch.sh --an-background 1.0`). Moved out of CR-0012 v2 (CR-0012 R1 B-2, B-7)
+- [x] (duplicate of the item below) Runtime guards for `legacy/download.py` and `legacy/download_more.py` (diverged copies; BUG-0031 sweep). Moved out of CR-0012 v2 → **CR-0007 v9** (user decision) (CR-0012 R1 B-7)
+- [ ] CR-0009: update the expected positive count to 6,232 (CR-0012 v2 hash-ordered specification) and commit CR-0009 v4 before CR-0012 deliverable 0 (CR-0012 R1 B-5, B-12)
+- [ ] PA-0021 sweep (owner of PA-0021's Swept? cell once CR-0013 deliverable 0 files it): acceptance tables of CR-0007..0013 plus live-code thresholds (CR-0013 R1 B-C6)
+
+
+## Decisions (user, 2026-09-30, continued)
+- [x] `sample_background_points` / BUG-0029 remainder / BUG-0032 → **separate CR-0015** (not yet written). CR-0015 must also restrict AN-background points to **training blocks**, not just the state (CR-0012 A1: ~20 % land in val blocks today)
+- [x] `legacy/download.py` and `download_more.py` deprecation guards → **CR-0007 v9** (same mechanism as BUG-0031)
+- [x] `acceptance_split.py` authorship: **a fresh agent given only CR-0013 + the pinned commit**, never CR-0012's implementation; CR-0012 implemented by a different fresh agent; both transcript ids recorded in the review logs
+- [ ] BUG-0034 scope must include `filter_by_year_gap` running after the split (drops 23.1 % of positives, effective neg:pos ≈ 1.3) and the thin-order interaction (CR-0012 A9)

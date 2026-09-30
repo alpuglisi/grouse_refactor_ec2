@@ -678,3 +678,41 @@ which the user must confirm:
 | version | date | change |
 |---|---|---|
 | v8 | 2026-09-30 | Split three ways. CR-0007 keeps membership and constants, with exact checks P1–P7 only. The split and draw go to CR-0012; the acceptance gates to CR-0013 (exact predicates and replay; statistics as OBS). No escape mode. `TIGER_YEAR` value owned by CR-0014. |
+
+## Round 8 (v8, fresh first review, 2026-09-30) — dispositions pending
+| reviewer | verdict | blocking |
+|---|---|---|
+| A — correctness | REJECT | 1 |
+| B — implementability + §1 | REJECT | 1 |
+
+Both BLOCKING findings are the same: **P6 cannot pass** at deliverable 6 —
+unguarded literal constants remain in `clean.py:47,50`,
+`legacy/gen_negs.py:77-78` (guarded only by CR-0012) and
+`repair_coverage_rasters.py:53` (`REGIONS`); "live module" undefined;
+the "8" count is wrong (13 tracked non-evidence). Fix: enumerate the
+scanned set (git-tracked, excluding `inv_*`/`res_*`), exempt `clean.py` and
+`legacy/gen_negs.py` until CR-0012, re-point or exempt
+`repair_coverage_rasters.py`.
+
+Other findings (to disposition in v9):
+- A2 MAJOR: `envelope_metrics` used/available half unchecked (two wrong
+  constructions pass P1–P7); P5 ambiguous (pre- vs post-filter points).
+- A3 MEDIUM: KDE-source decision unchecked; map surface contradicts it.
+- A4 MEDIUM: P7 vs the `legacy/audit.py` import-time guard; P7 scope.
+- A5–A7 LOW: collapse before restriction (0 cases today); P3 must match
+  `sample_raster` exactly; §1 omits `generate_negatives` constant imports.
+- B2 MAJOR: **false disposition E-1** — BUG-0033 §2.4 statement is not in
+  CR-0013 deliverable 0 (§1.3 drop).
+- B3 MAJOR: `check_partition.py` and `tests/test_shared_constants.py` do
+  not exist; must be committed and reviewed before approval; deliverable
+  order.
+- B4–B6 MEDIUM: checker inputs/constants source, independent polygon
+  check; P5 wording; enumerate import re-points and P7 list.
+- B7 MEDIUM: bookkeeping — BUG-0031 needs a named PA (§4.3); PA-0001
+  sweep for `"EPSG:5070"` literals (10 files) and county-path
+  duplication; untracked drafts it promotes from.
+- B8 MEDIUM: A5 justification (constants, partition, unrelated
+  promotions bundled). B9: quorum (now decided by user: fresh review).
+- B10 LOW: `PATH_TEMPLATES` for `availability_sample`; `:778-780` not
+  `:787`; `verify_partition` after the longitude flip; cache county
+  file; A4 duplicates; sibling references to "CR-0007's I17".

@@ -93,3 +93,129 @@ whose resolution lives in this CR.
 | version | date | change |
 |---|---|---|
 | v1 | 2026-09-30 | Split from CR-0007 v7; exact-replay design |
+
+## Round 1 (fresh first review, 2026-09-30) — dispositions pending
+| reviewer | verdict | blocking |
+|---|---|---|
+| A — attack power | REJECT | 3 |
+| B — implementability + §1 | REJECT | 1 |
+
+Reviewer A findings:
+- **BLOCKING 1:** gates never check the files training reads
+  (`train_/val_positives_R`, `train_/val_negatives_R`); copying train rows
+  into `val_positives_ME.csv` passes. Fix: add the six split files; gate
+  split file == combined file filtered on `split`; name `standing_checks`'
+  files.
+- **BLOCKING 2:** R1/R4 compare record sets, not contents — `year`, a
+  positive `weight`, `split` unchecked (NaN val `year` or `weight=0.2`
+  passes). Fix: full row equality + schema gate.
+- **BLOCKING 3:** "identical under shuffled input order" is impossible:
+  CR-0012's dedup keeps the first row in file order and 6,492 keys carry
+  >1 `year`. Fix: shuffle files/regions only, or an order-free dedup rule
+  in CR-0012 (e.g. min `gbif_id`).
+- MAJOR: `split_for_unassigned` md5 hash missing from the config spec;
+  10A″ overclaims (input-borne nodata passes R3 → stated limit);
+  inputs not bound (manifest input digests unchecked, record lacks them);
+  spec defined by line refs into code CR-0012 rewrites (pin commit, name
+  the shared-definition blind spot).
+- MEDIUM: "full window" undefined; coordinated config+regions edit passes;
+  evidence scripts depend on scratch fixtures; train-time year-gap filter
+  after acceptance.
+- LOW: O7/O9/O10 null "none" yet reported as z; E7 boundary; record
+  writable; copy R7-A scripts early.
+- Confirmed failing as claimed: Break 1, Break 2, 10A, 10B, 10C, 300 m
+  buffer, duplicates, with-replacement, I18-class leaks, `--regions`
+  subset, windowless (subject to fixes).
+
+Reviewer B findings:
+- **BLOCKING C1:** same as A's BLOCKING 1 — record sets omit the
+  train/val files training reads; also "the per-region negative files"
+  read as all three makes E3 fail every correct run (`negatives_R` is the
+  union). Fix: name every path; gate train ∪ val == combined, by `split`;
+  enumerate digested artifacts; train/val files in the standing subset.
+- MAJOR C2: replay not implementable from the spec alone — needs
+  `fit_scheme_binners`, `build_envelope_id`, `sample_raster`,
+  `load_evt_crosswalk`, `build_weight` strings, `split_for_unassigned`
+  md5 + seed, feature lists (models.py `FEATURE_SPEC`), crosswalk path/sha;
+  "full window" undefined — **decides whether CR-0014's Canada nodata drops
+  positives** (CR-0014's "records not affected" holds only under the
+  in-bounds reading). Fix: pin a commit, list normative functions, put the
+  lists/specs in the config, define the window predicate.
+- MAJOR C3: deliverable 5 not executable (missing artifacts, E6/R1/R2 also
+  fail, data-root option, CLI).
+- MAJOR C4: A3 half-used — deliverables 2–5 should be pre-approval and
+  reviewed in round 2; record the separate-author requirement.
+- MAJOR C5: no attack exercises E12 or `standing_checks`.
+- MAJOR C6: deliverable 0 drops E-1 and E-PAa; no BUG-0033 text exists;
+  id collisions; Swept? cell conflict; out-of-order PA filing.
+- MAJOR C7: review log omits 12 CR-0007 items resolved here and the
+  tracker's "Reconcile PA-0021 clause text".
+- MEDIUM C8–C11: undefined O5–O8 terms; E1 on the pooled file;
+  `--calibrate` changes the config sha; evidence depends on scratch data.
+- LOW C12: `dataset.py:98-102`; name the `res_supply_*` files; cite
+  `bb170ea`; lazy imports in `standing_checks`; history in "Why now".
+
+
+## v2 dispositions (author, 2026-09-30)
+All round-1 findings were checked against the code and data before
+acceptance. Checks performed:
+- `gbif_id` is non-null and unique across all 265,212 raw candidates.
+- 6,492 keys carry more than one `year`.
+- The window math in `dataset._read_patch` is `src.index` with floor and
+  `r0 = row − n//2`.
+- The year fill is at `dataset.py:98-102`.
+
+| id | sev | disposition |
+|---|---|---|
+| A-B1 / B-C1 | BLOCKING | Accept. § Artifacts names every path. E1p requires the train and val files to partition the combined file row for row, by `split`. E3 runs on the combined `negatives_R` only; parts are never pooled with it. "Digested artifacts" is enumerated (20 files). The standing subset covers the 18 CSVs. |
+| A-B2 | BLOCKING | Accept. R1–R4 require full-row equality (every column; floats to relative 1e-12). E0 is the schema gate. Two attack rows added (NaN `year`, positive `weight`). |
+| A-B3 | BLOCKING | Accept, taking the order-free option. Dedup keeps the smallest `gbif_id` per key (verified non-null and unique), so the shuffle test permutes every input row and `REGIONS`. The CR-0012 side is under "Pending for v2" in `CR-0012-review-log.md`. |
+| A-M `split_for_unassigned` | MAJOR | Accept. The spec (format, modulus, seed = `SPLIT_SEED`, `vf` formula) is in § Normative definitions and the config. |
+| A-M 10A″ overclaim | MAJOR | Accept. Split in two: the pipeline-borne variant fails R3; the input-borne variant is stated limit 1. |
+| A-M inputs not bound | MAJOR | Accept. E11 checks the manifest's input digests against S, I and every raster read, including `road_dist` after CR-0014. The record stores them. `standing_checks` compares raster `(path, size, mtime_ns)` fingerprints. |
+| A-M spec by line refs into rewritten code | MAJOR | Accept. Normative functions are pinned at `05d788d` and listed; the shared-definition blind spot is named (stated limit 2). |
+| A-MED full window undefined | MEDIUM | Accept. The in-bounds predicate is defined exactly. Nodata is deliberately not considered, which keeps CR-0014's "records not affected" true. |
+| A-MED coordinated config + `regions` edit | MEDIUM | Accept as stated limit 4. Config edits are reviewed, and the record carries the config sha256. |
+| A-MED evidence depends on scratch fixtures | MEDIUM | Accept. Deliverable 1 commits the data-producing scripts; outputs are labelled provenance-only. |
+| A-MED year-gap filter after acceptance | MEDIUM | Accept as stated limit 5. E2–E5 hold under removal; O9 reports support. |
+| A-L O7/O9/O10 "none" yet z | LOW | Accept. Those rows report value and change from the previous run, with no z. |
+| A-L E7 boundary | LOW | Accept. Squared distance `> BUFFER_M²`, matching CR-0012 §2 (keep if `d > BUFFER_M`). |
+| A-L record writable | LOW | Accept as stated limit 6. The record's sha256 goes into committed evidence, and `standing_checks` re-runs the coordinate gates. |
+| A-L copy R7-A scripts early | LOW | Accept. Deliverable 1 is pre-approval. |
+| B-C2 | MAJOR | Accept. Pinned commit and function list. Feature and envelope lists, crosswalk path and sha, and the md5 spec are in the config. Raster resolution is re-implemented. The window predicate is defined. |
+| B-C3 | MAJOR | Accept. § CLI and report: `--data-root` (backup path named), missing artifact → named FAIL, every gate reported, exit code. Deliverable 5 lists the expected FAILs (E0, E1, E4–E6, E11, E12, R1–R4). |
+| B-C4 | MAJOR | Accept. Deliverables 0–5 are pre-approval and reviewed in round 2. Separate authorship is rule 4, verified by the transcript ids recorded in this log. |
+| B-C5 | MAJOR | Accept. Attack rows added for E12 (exception kept; dropped list edited), E11 (input edited) and `standing_checks` (val file edited, pre-CR file swapped, raster touched, `--jitter 8`). |
+| B-C6 | MAJOR | Accept. Deliverable 0: <br>• the §2.4 statement (E-1) and the E-PAa clause text; <br>• the BUG-0033 source (CR-0007 v7 deliverable at `bb170ea`, plus the break history); <br>• the calibration BUG takes the next free id at filing (BUG-0036/0037 taken); <br>• the Swept? cell follows PA-0022 with a named owner; <br>• the out-of-order PA filing is recorded under the tracker's PA-numbering item. |
+| B-C7 | MAJOR | Accept. The table below adds the 15 CR-0007 rows resolved here but missing from v1's table, including the 12 the reviewer named. The tracker's "Reconcile PA-0021 clause text" is resolved by deliverable 0 (one text). |
+| B-C8 | MEDIUM | Accept. § Observations defines RF, TV, KS, SMD, `d`, Exc, S, Sws_val, Excws_val, SUP-O and SUP-R. |
+| B-C9 | MEDIUM | Accept. E1 covers the pooled `candidate_pool.csv` (`region ∈ REGIONS`, `state == region`). |
+| B-C10 | MEDIUM | Accept. OBS references move to `acceptance_split_obs.json`, so `--calibrate` never changes the gate config's sha. |
+| B-C11 | MEDIUM | Accept. Same as A-MED evidence. |
+| B-C12 | LOW | Accept: <br>• `:98-102`; <br>• `res_supply_1…8.py` named; <br>• `bb170ea` cited; <br>• `standing_checks` imports numpy/pandas/scipy at call time; <br>• history removed from "Why now". |
+| CR-0012-R1 B BLOCKING 1 (`region` missing in negative files) | BLOCKING | CR-0013 keeps E1 strict. CR-0012 v2 adds `region` to the negative outputs (pending list). |
+| CR-0012-R1 B MAJOR 4 (window) | MAJOR | Same predicate as the reviewer proposed (in-bounds, floor, nodata ignored). |
+| CR-0012-R1 B MEDIUM 8 (constant lists) | MEDIUM | The config constant list must equal CR-0012's manifest list one for one (pending for CR-0012 v2). |
+
+**CR-0007 rows resolved here, missing from the v1 table:**
+| id | where in CR-0013 v2 |
+|---|---|
+| D1-14 | R1/R3/R4 full-row replay; E9 |
+| F2-C5 | E11: seed and val fraction from the config |
+| F2-C13 | R1/R3 fix the kept set; implementation free |
+| F3-D5 | GATE/OBS explicit throughout; clean document |
+| E-12 | Deliverable 5 ("before" run on pre-CR files) |
+| E-13 | Review is not a deliverable; pre-approval items labelled |
+| E-16 | Design rule 3 (no escape) |
+| E-17 | Deliverable 0 names this CR's filer; the batch owner is Tracked |
+| C7-8 | E8 covers positives |
+| F4-Q3 | N/A: clean document |
+| FA-Q4 | O9 reports per-class year support until the BUG-0034 CR |
+| A-14 | Citations re-verified (`dataset.py:98-102`, `:127` replaced by the pinned `raster_path` definition) |
+| A-15 | E1/E11 against config `REGIONS` |
+| B-7 | Negative `verify_partition` → E12; windowless → E8 |
+| B-12 | Window predicate defined; `WINDOW_PX` in config; `standing_checks` refuses larger `img_size + 2·jitter` |
+
+| version | date | change |
+|---|---|---|
+| v2 | 2026-09-30 | Round-1 fixes: <br>• named artifacts, E0/E1p, full-row replay; <br>• order-free dedup; normative definitions pinned at `05d788d`; window predicate; <br>• input binding; CLI; <br>• pre-approval deliverables 0–5; <br>• new attacks; OBS file split out. |

@@ -16,6 +16,45 @@ the diff.
 
 ---
 
+## Negatives: no candidate within 300 m of the sightings' domain edge (CR-0017, 2026-09-30)
+
+**Defects (BUG-0050, BUG-0064).** Pool step 6 promised "no negative
+within `BUFFER_M` (300 m) of a known grouse", but tested that only
+against sightings acquired in ME, NH and VT. A candidate near the edge of
+that domain had part of its 300 m neighbourhood in Canada (BUG-0050), New
+York or Massachusetts (BUG-0064), where no sighting was ever acquired.
+BUG-0050's own evidence had drawn the boundary at the national border,
+treating the NY and MA state lines as interior; the data border is the
+acquisition query's keys, not the country. Nobody knows whether any
+affected row truly had a grouse within 300 m; the guarantee was
+unverified, not observed wrong.
+
+**Change.** Pool step 6 also drops every candidate whose EPSG:5070
+distance to the boundary of D (the union of the ME, NH and VT county
+polygons, projected straight from the file CRS) is `≤ BUFFER_M`
+(`regions.domain_edge_m`, `generate_negatives.domain_edge_drop_mask`).
+Dropped, never relabelled (PA-0023's nodata option). CR-0013's
+acceptance gained exact gate E13, rule (b) in R3's replay and five attack
+rows; CR-0012 §2 step 6 and CR-0013 carry pointer lines.
+
+**Live run (merge `4080f74`, evidence `6342f2a`,
+`docs/quality/evidence/CR-0017/live/`).** Must-change gate PASS against
+the backup `/home/ec2-user/grouse_backup/CR-0017`: exactly the 88
+pre-registered pool candidates (22,187 → 22,099) and 23 selected
+negatives (ME 9, NH 1, VT 13; 18 train, 5 val) removed and replaced in
+the same (region, split, NonVeg) cells; positives and block assignments
+byte-identical. Acceptance 19/19 GATEs; OBS references recalibrated;
+record `9d5ad0a9…`.
+
+**Consequence.** `grouse_cr0009.pth` and every earlier model were trained
+on **pre-CR-0017 negatives**, 23 of which lie within 300 m of the domain
+edge. No retrain under CR-0017 (bounded: at most 5/1,246 validation
+negatives, AUC shift ≤ 0.0040 for a fixed model). The next retrain, under
+whichever CR requires one, picks up the new negatives automatically,
+because `standing_checks` binds training to the new record.
+`analyze_grouse.py`'s KDE has the same blind edges (BUG-0051) and is
+left to its own CR.
+
 ## Retrain on the leak-free split; Maine-side map symptom gone (CR-0009, 2026-09-30)
 
 **What:** `grouse_cr0009.pth` retrained from scratch on the CR-0012 global

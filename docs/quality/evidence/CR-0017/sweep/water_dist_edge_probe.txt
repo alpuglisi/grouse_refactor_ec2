@@ -1,0 +1,10 @@
+HEAD 6342f2aba510a6368fed232b38383e672a56c11e
+ME ME_2025_nlcd.tif nodata -9999.0 no-data px 96215819 of 203622432 values {-9999: 96215819}
+  positives (n, nearer grid-edge-or-nodata than water, nearer nodata than water): (3660, 28, 28, 'lon -70.853..-67.795, lat 45.221..47.455')
+  negatives: (3660, 8, 8, 'lon -70.856..-67.796, lat 45.216..47.445')
+NH NH_2025_nlcd.tif nodata -9999.0 no-data px 5659263 of 57043456 values {-9999: 5659263}
+  positives (n, nearer grid-edge-or-nodata than water, nearer nodata than water): (1079, 2, 2, 'lon -71.479..-71.360, lat 45.073..45.153')
+  negatives: (1079, 1, 1, 'lon -71.099..-71.099, lat 45.266..45.266')
+VT VT_2025_nlcd.tif nodata -9999.0 no-data px 2100649 of 52551345 values {-9999: 2100649}
+  positives (n, nearer grid-edge-or-nodata than water, nearer nodata than water): (1493, 3, 3, 'lon -72.487..-72.474, lat 45.000..45.008')
+  negatives: (1493, 2, 2, 'lon -73.280..-71.748, lat 44.998..45.000')

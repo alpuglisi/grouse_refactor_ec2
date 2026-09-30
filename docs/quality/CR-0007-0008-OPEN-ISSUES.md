@@ -163,8 +163,8 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 
 
 ## CR-0012 deliverable 8 bookkeeping (2026-09-30)
-- [ ] **BUG-0050** (needs a CR): negatives' 300 m buffer blind across the Canadian border; 12 of 6,232 selected negatives, 39 pool candidates within 300 m (`docs/quality/evidence/CR-0012-d8/canada_buffer.txt`). Options: Canadian sightings as a buffer-only source, or drop candidates within `BUFFER_M` of land outside US counties. Changes CR-0012 §2 step 6, CR-0013 E7/R3; re-run acceptance; interacts with the CR-0009 retrain — owner: lead (new CR), user decision on timing vs the retrain — **written as CR-0017** (`docs/quality/change-requests/CR-0017-negatives-buffer-domain-edge.md`): drop candidates within `BUFFER_M` of the sightings' acquisition-domain edge (ME∪NH∪VT, so NY/MA lines too: 88 pool / 23 selected); live run after CR-0009 closes; no retrain (CR-0017 §4) — owner: CR-0017
-- [ ] **BUG-0051** (needs a CR, low; same CR as BUG-0050): `analyze_grouse.py` KDE blind across the Canadian border; diagnostic columns only — owner: lead — **re-owned:** out of CR-0017's scope (CR-0011 A5; changes S, re-runs CR-0012/0013 from positives); needs its own CR. Note: the KDE is also blind at the NY/MA state lines (same acquisition domain, CR-0017 review log) — owner: lead (own CR)
+- [x] **BUG-0050** (needs a CR): negatives' 300 m buffer blind across the Canadian border; 12 of 6,232 selected negatives, 39 pool candidates within 300 m (`docs/quality/evidence/CR-0012-d8/canada_buffer.txt`). Options: Canadian sightings as a buffer-only source, or drop candidates within `BUFFER_M` of land outside US counties. Changes CR-0012 §2 step 6, CR-0013 E7/R3; re-run acceptance; interacts with the CR-0009 retrain — owner: lead (new CR), user decision on timing vs the retrain — **written as CR-0017** (`docs/quality/change-requests/CR-0017-negatives-buffer-domain-edge.md`): drop candidates within `BUFFER_M` of the sightings' acquisition-domain edge (ME∪NH∪VT, so NY/MA lines too: 88 pool / 23 selected); live run after CR-0009 closes; no retrain (CR-0017 §4) — owner: CR-0017 — **FIXED by CR-0017** (live run `6342f2a`: MC PASS 88/23, 19/19 GATEs, record `9d5ad0a9…`; BUG_LOG updated by deliverable 8)
+- [ ] **BUG-0051** (needs its own CR, low; formerly "same CR as BUG-0050"): `analyze_grouse.py` KDE blind across the Canadian border; diagnostic columns only — owner: lead — **re-owned:** out of CR-0017's scope (CR-0011 A5; changes S, re-runs CR-0012/0013 from positives); needs its own CR. Note: the KDE is also blind at the NY/MA state lines (same acquisition domain, CR-0017 review log) — owner: lead (own CR). **CR-0017 deliverable 8:** owner confirmed as its own CR; NY/MA edges and `check_partition.py` P8 recorded in BUG-0051 §6; the fix must use CR-0017's domain D (PA-0032), not "outside US counties"
 - [x] **BUG-0052** trivial fix (one function; BUG required, no CR): `download_rev._raster_valid_fraction` return invalid on rasterio/OS errors, re-raise others — **FIXED `4683e3c`** (returns 0.0 and logs on `RasterioIOError`/`OSError`; `tests/test_pa0027_fixes.py`)
 - [x] **BUG-0053** trivial fix: `analyze_grouse.load_evt_crosswalk` let read errors propagate — **FIXED `4683e3c`**. Design question settled by the lead (2026-09-30): the crosswalk is required, so missing, unreadable and malformed (no `VALUE`/`EVT_PHYS`) all raise; never returns `None`
 - [x] **BUG-0054** trivial fix: `download_tcc_nlcd.sighting_years` catch `MissingDataError` only, print the skip — **FIXED `4683e3c`**
@@ -176,20 +176,22 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 
 ## CR-0017 round 1 (2026-09-30)
 MAJOR items (A1=B1, B2) and most MEDIUM/LOW items were revised into CR-0017 v2 (review log). Open follow-ups:
-- [ ] LOW (A2): optional OBS row for the edge-band support asymmetry (positives within `BUFFER_M` of the domain edge per class: train 10 / 4,986, val 0 / 1,246 today; recorded in CR-0017 §3, not gated) — owner: CR-0017 deliverable 2 (replay author), decide and record
-- [ ] LOW (CR-0017 §4, retrain follow-up): `grouse_cr0009.pth` and earlier models were trained on pre-CR-0017 negatives (23 within 300 m of the domain edge); the next CR that retrains must train on the post-CR-0017 record and say so — owner: author of the next retrain CR
-- [ ] MEDIUM (A3=B4, process): CR-0017 deliverables 2–4 stay on an unmerged branch until deliverable 6; whoever merges branches must not merge it early (config sha change refuses all training until the new record) — owner: lead
-- [ ] BUG-0064 (NY/MA sibling of BUG-0050) and the proposed PA extending PA-0023 (review log § Proposed bookkeeping rows): allocate the BUG id — owner: lead; filing — owner: CR-0017 deliverable 8
+- [ ] LOW (A2): optional OBS row for the edge-band support asymmetry (positives within `BUFFER_M` of the domain edge per class: train 10 / 4,986, val 0 / 1,246 today; recorded in CR-0017 §3, not gated) — owner: CR-0017 deliverable 2 (replay author), decide and record — **re-owned at CR-0017 close-out:** deliverable 2 landed without it (O1–O10 unchanged); owner: lead, decide with the next change to `acceptance_split.py`'s OBS set
+- [ ] LOW (CR-0017 §4, retrain follow-up): `grouse_cr0009.pth` and earlier models were trained on pre-CR-0017 negatives (23 within 300 m of the domain edge); the next CR that retrains must train on the post-CR-0017 record and say so (live record since CR-0017 deliverable 6: `9d5ad0a9…`; `CHANGELOG.md` CR-0017 entry) — owner: author of the next retrain CR
+- [x] MEDIUM (A3=B4, process): CR-0017 deliverables 2–4 stay on an unmerged branch until deliverable 6; whoever merges branches must not merge it early (config sha change refuses all training until the new record) — owner: lead — **done:** merged at deliverable 6 step 1 (`4080f74`), record written in the same run (`6342f2a`)
+- [x] BUG-0064 (NY/MA sibling of BUG-0050) and the proposed PA extending PA-0023 (review log § Proposed bookkeeping rows): allocate the BUG id — owner: lead; filing — owner: CR-0017 deliverable 8 — **filed:** BUG-0064 (FIXED by CR-0017), PA-0032 (extends PA-0023), sweep in BUG-0064 §8
 
 ## CR-0017 round 2 (2026-09-30)
 Round 2 approved v3. A8, B11 and B12 were applied in v3; there are no
 open round-2 items beyond the CR-0017 round-1 list above.
-- [ ] LOW (B11 residual, stated limit): MC does not check the N-only
+- [x] LOW (B11 residual, stated limit): MC does not check the N-only
       columns of added rows other than `label` (`obs_date`,
       `coord_uncertainty_m`), nor the identity of the replacements. R4
       checks both in the same run. If MC is ever run without R4, extend
       MC4 to compare them with `gbif_negatives_R` by `gbif_id` — owner:
-      CR-0017 deliverable 6 executor.
+      CR-0017 deliverable 6 executor. — **Not triggered:** MC was a
+      one-off for this regeneration and R4 ran and passed in the same
+      deliverable (`docs/quality/evidence/CR-0017/live/acceptance.log`).
 
 ## BUG-0056 bookkeeping / PA-0030 sweep (2026-09-30)
 - [ ] **BUG-0062** (needs a CR): `evaluate()` / `calibrate.collect_val_logits()` check the TTA grouping contract from the dataset (every leaf `GrousePatchDataset.expand_rotations`, sequential loader) and raise when `tta_group > 0`; drop `collect_val_logits`' per-rotation fallback. CR outline in BUG-0062 §6 — owner: lead
@@ -245,3 +247,6 @@ Review follow-ups:
 - [ ] B-1 (LOW, reviewer B): pipeline (`regions.domain_edge_m`, GEOS distance) and replay (`acceptance_split.domain_edge_within`, segment split) agree to ~1e-10 m, not bit-exactly, at `edge_m == BUFFER_M` on long diagonal edges (3 of 20,000 synthetic points at 300 ± 1e-7 m). Any disagreement FAILs R3/R4 (loud). Real-data margin is 1.802 m and the real D is identical in both. No code change; recorded here.
 - [ ] B-2 (LOW, reviewer B): the pipeline projects each county then unions in 5070; the replay dissolves by state in the file CRS then projects. On non-noded inputs (T-joins) they differ (synthetic: 33.6 km² sliver). Identical on the pinned TIGER file. If the county file or year changes (the config sha pin forces a re-review), re-check D equality between the two constructions, or make the pipeline dissolve by `STATEFP` before projecting.
 - [ ] B-5 (LOW/INFO, reviewer B): a county file with no CRS is assumed EPSG:4269 by the pipeline (`regions.py:91`), and a WKT NAD83 CRS without an EPSG id is accepted; the replay (`acceptance_split.py:775`) refuses anything whose `to_string()` is not `EPSG:4269` (loud `ReplayError`). The file is sha-pinned; no action unless the file changes.
+
+## CR-0017 deliverable 8 bookkeeping (2026-09-30)
+- [ ] **BUG-0072** (LOW, diagnostic only): `diagnose_water_bias.build_distance_raster` reads NLCD nodata (Canada) as "no water"; 28/8 (ME), 2/1 (NH), 3/2 (VT) positives/negatives nearer nodata than water (`docs/quality/evidence/CR-0017/sweep/water_dist_edge_probe.txt`). Fix: NaN where nodata is nearer than water, summaries drop and count them (two functions, prints change) — owner: next change to `diagnose_water_bias.py` (with BUG-0070's VERDICT item)

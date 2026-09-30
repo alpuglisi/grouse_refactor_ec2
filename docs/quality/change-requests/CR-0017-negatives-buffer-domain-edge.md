@@ -1,7 +1,7 @@
 # CR-0017: Drop candidate negatives within BUFFER_M of the sightings' acquisition-domain edge
 
-**Status: APPROVED (v3), 2026-09-30.** Author and reviewers approved;
-user pre-authorised (2026-09-30). Verdicts and dispositions:
+**Status: IMPLEMENTED, 2026-09-30** (approved v3). Author and reviewers
+approved; user pre-authorised (2026-09-30). Verdicts and dispositions:
 `CR-0017-review-log.md`. This document states only current intent.
 
 ## Scope
@@ -391,7 +391,7 @@ regeneration and bookkeeping. They cannot land separately:
 - [x] 4. Scratch-tree real-data run (§ Test plan). Evidence goes to
       `docs/quality/evidence/CR-0017/scratch/` (pipeline side) and
       `docs/quality/evidence/CR-0017/combined/` (combined code).
-- [ ] 5. Preconditions, recorded in the evidence before any write under
+- [x] 5. Preconditions, recorded in the evidence before any write under
       `data/`:
       - CR-0009 is CLOSED;
       - CR-0015 B1 has passed;
@@ -401,7 +401,11 @@ regeneration and bookkeeping. They cannot land separately:
       the record and the OBS file to `/home/ec2-user/grouse_backup/CR-0017/`,
       mirroring the `data/...` layout, sha256 verified. MC0 must pass with
       `--old` = the backup.
-- [ ] 6. Live run, in this order:
+      Done: `docs/quality/evidence/CR-0017/live/preconditions.txt`
+      (CR-0009 IMPLEMENTED; CR-0015 B1 20/20 byte-identical; live record
+      `66d63e1d…`), `live_before.sha256`, `mc0_backup.txt` (MC0 PASS on
+      the backup `/home/ec2-user/grouse_backup/CR-0017`, sha256 verified).
+- [x] 6. Live run, in this order:
       1. Merge the CR-0017 branch.
       2. Run `generate_negatives.py`.
       3. Run MC with old = the backup and new = live. It must PASS.
@@ -417,13 +421,23 @@ regeneration and bookkeeping. They cannot land separately:
       - stop.
 
       On success, commit the evidence, the record copy and the OBS file.
-- [ ] 7. Pointer lines in CR-0012 §2 step 6 and in CR-0013 (§ Impact).
+
+      Done (merge `4080f74`, evidence `6342f2a`,
+      `docs/quality/evidence/CR-0017/live/`): `generate_negatives.py`
+      exit 0 (pool 22,099); MC PASS vs the backup (88 C, 23 N: ME 9,
+      NH 1, VT 13; `mc_live.txt`); acceptance 19/19 GATEs
+      (`acceptance.log`); `--calibrate` 19/19, OBS file rewritten, final
+      record `9d5ad0a9…` (`calibrate.log`, `live_after.sha256`).
+- [x] 7. Pointer lines in CR-0012 §2 step 6 and in CR-0013 (§ Impact).
       `CHANGELOG.md` entry covering:
       - the negatives change;
       - the fact that `grouse_cr0009.pth` and every earlier model were
         trained on pre-CR-0017 negatives (23 rows within 300 m of the
         domain edge).
-- [ ] 8. Bookkeeping:
+
+      Done: CR-0012 §2 step 6 pointer; CR-0013 E-table and § Attacks
+      pointers (added with deliverable 2); `CHANGELOG.md` CR-0017 entry.
+- [x] 8. Bookkeeping:
       - **BUG-0050:** corrective action "CR-0017"; status FIXED;
         `BUG_LOG.md` row updated.
       - **BUG-0064** (placeholder; id allocated by the lead): the buffer is blind at the NY and MA
@@ -442,7 +456,13 @@ regeneration and bookkeeping. They cannot land separately:
         - BUG-0051 re-owned to its own CR;
         - the retrain follow-up (§4);
         - MEDIUM and LOW review items.
-- [ ] 9. Close-out: every item above is ticked; status IMPLEMENTED.
+
+      Done: BUG-0050 FIXED (doc and `BUG_LOG.md`); BUG-0064 filed,
+      FIXED; PA-0032 (extends PA-0023) filed; PA-0023 Swept? cell
+      updated; sweep in BUG-0064 §8 (BUG-0051 widened to NY/MA and
+      `check_partition.py` P8; BUG-0026 known; new BUG-0072, open, low);
+      tracker (`CR-0007-0008-OPEN-ISSUES.md`) updated.
+- [x] 9. Close-out: every item above is ticked; status IMPLEMENTED.
 
 ## Out of scope
 - **BUG-0051**, the `analyze_grouse.py` KDE. It is a different

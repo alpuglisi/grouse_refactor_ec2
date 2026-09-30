@@ -87,8 +87,28 @@ CR-0012 and CR-0013. There are two options under PA-0023:
   outside the US counties.
 
 The rebuild would change S's digest, so CR-0012 and CR-0013 would need
-to be re-run. Owner: the same new CR as BUG-0050 (tracker). Priority is
-low, because no model input is affected.
+to be re-run. Priority is low, because no model input is affected.
+
+**Owner: its own CR** (re-owned by CR-0017 deliverable 8, 2026-09-30;
+tracker). It was first assigned to "the same new CR as BUG-0050", but
+CR-0017 (which fixed BUG-0050) excluded it under CR-0011 A5: it is a
+different computation, and it changes S, which re-runs CR-0012 and
+CR-0013 from the positives.
+
+**Scope widened by the CR-0017 sweep (BUG-0064 §8, 2026-09-30).** The
+KDE's source is the records acquired for ME, NH and VT, so its data
+domain is ME ∪ NH ∪ VT (PA-0032), not the United States. The KDE is
+therefore blind at the **NY and MA state lines** as well as at the
+Canadian border, like the negatives' buffer was (BUG-0064). The sweep
+located the affected code at `6342f2a`:
+- `analyze_grouse.py:560-601` (`kde_spatial`, `kde_joint`,
+  `kde_stratified`), applied at `:816-820`; the diagnostic map surfaces
+  at `:698` and `:725` use the same source;
+- `check_partition.py:516` (`kde_density`) and `:575` (P8), which
+  reproduces the same KDE and so shares the blind edges.
+The fix's CR must use the domain D of CR-0017 (the three states' county
+union), not "land outside the US counties" as the nodata option above
+says. No separate BUG is filed for the NY/MA edges.
 
 Status: **OPEN** (low priority; diagnostics only).
 

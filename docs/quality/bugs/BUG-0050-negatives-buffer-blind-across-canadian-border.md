@@ -91,7 +91,29 @@ border; the source does not.
 a gate that reads the same source.
 
 ## 6. Corrective action
-**None yet. It needs a CR.** Either option changes pipeline behaviour,
+**CR-0017** (`docs/quality/change-requests/CR-0017-negatives-buffer-domain-edge.md`;
+APPROVED, merged `4080f74`, live run `6342f2a`). Option (b), with the
+domain taken from the acquisition query: pool step 6 also drops every
+candidate whose EPSG:5070 distance to the boundary of D, the union of the
+ME, NH and VT county polygons, is `≤ BUFFER_M`
+(`regions.domain_edge_m`, `generate_negatives.domain_edge_drop_mask`).
+CR-0013 gained exact gate E13 and rule (b) in R3. The domain is the three
+states, not the United States: the text of option (b) below ("land
+outside the US counties") would have missed the NY and MA state lines,
+filed as **BUG-0064**.
+
+**Verified:** must-change gate PASS against the pre-CR backup: exactly
+the pre-registered 88 pool candidates (this bug's 39 plus BUG-0064's 49)
+and 23 selected negatives (this bug's 12 plus BUG-0064's 11) removed and
+replaced in the same cells, every other row byte-identical; acceptance
+19/19 GATEs including E13; final record `9d5ad0a9…`
+(`docs/quality/evidence/CR-0017/live/`). The fix removes the rows whose
+neighbourhood the source cannot see, which is the root cause, rather than
+adding a caveat.
+
+Status: **FIXED** (CR-0017 deliverable 6, `6342f2a`).
+
+*Original text (the options as first written):* Either option changes pipeline behaviour,
 CR-0012 §2 pool step 6, and CR-0013's replay (R3) and E7:
 - **(a)** Acquire Canadian ruffed grouse sightings within `BUFFER_M` of
   the border (GBIF `countryCode` CA, Québec and New Brunswick) as a
@@ -105,8 +127,6 @@ Either option changes the selected negatives, so CR-0013's acceptance
 must be re-run, and it interacts with the CR-0009 retrain. Owner: a new
 CR, not yet written, tracked in `docs/quality/CR-0007-0008-OPEN-ISSUES.md`.
 Scale for the risk assessment: 12 selected negatives, 0.19 %.
-
-Status: **OPEN**.
 
 ## 7. Recurrence review
 **Searched:** `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`, for "Canad",
@@ -136,3 +156,8 @@ where a source was chosen by region label.
 cover the deferral to a gate that could not fail, and PA-0024(a) worked
 here. PA-0023's Swept? cell now records this instance, with BUG-0050 as
 the owner.
+
+**Later (CR-0017 deliverable 8):** this investigation took the national
+border as the data border, contrary to PA-0020(v); the NY and MA state
+lines were missed (BUG-0064). That recurrence produced **PA-0032**
+(extends PA-0023: derive the domain from the acquisition query's keys).

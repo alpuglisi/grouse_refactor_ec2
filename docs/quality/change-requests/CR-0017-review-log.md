@@ -170,3 +170,4 @@ analysis box.
 - KDE: BUG-0051 (Canada, NY and MA edges), owned by its own CR.
 
 - 2026-09-30 lead: placeholder BUG-NEW-a allocated as **BUG-0064** (BUG-0063 is CR-0015's test-harness PA-0027 finding). The BUG-0064 investigation doc and its BUG_LOG/PA rows are produced with CR-0017's bookkeeping deliverable.
+- 2026-09-30 deliverable 8: filed as proposed. BUG-0064 (FIXED by CR-0017); the proposed PA is **PA-0032** (PA-0031 was taken), with a sweep-method clause (b) from BUG-0072, found by the sweep (`diagnose_water_bias.py`, open, low); PA-0023 Swept? cell updated as above; sweep recorded in BUG-0064 §8.

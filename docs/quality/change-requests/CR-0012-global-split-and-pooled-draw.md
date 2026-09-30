@@ -114,6 +114,9 @@ Conventions:
 5. Thin, as in positives step 4.
 6. Drop candidates whose squared distance to any row of any
    `evaluated_sightings_R` is `≤ BUFFER_M²`. Record the count.
+   **Amended by CR-0017:** step 6 also drops every candidate within
+   `BUFFER_M` of the edge of the sightings' acquisition domain
+   (ME ∪ NH ∪ VT counties), rule (b) of CR-0017 §2.
 7. Extract the envelope features on the region's grid with
    `rd.raster_path(feat, year)` (`:198-205`). Drop rows with nodata
    (`:207`).

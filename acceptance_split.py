@@ -11,12 +11,19 @@ functions that use them, so `standing_checks` pulls in only numpy, pandas
 and scipy. The normative functions CR-0013 lists (pinned at 05d788d) are
 re-implemented here from their source; regions.py is parsed, not imported.
 
-Gates (GATE, exact): E0-E13 (incl. E1p) on the pipeline's files and R1-R4,
+Gates (GATE, exact): E0-E14 (incl. E1p) on the pipeline's files and R1-R4,
 which replay CR-0012 section 2 from the inputs and compare full rows.
 CR-0017 section 3 adds E13 (no N or C row within BUFFER_M of the
 sightings' acquisition-domain edge) and rule (b) of pool step 6 to the
 replay's buffer_drop; the domain is built here from the county file, never
 from regions or generate_negatives (CR-0013 design rule 1).
+CR-0019 section 3 adds E14 (every P and N year is an integer >= YEAR_MIN,
+every non-null C year >= YEAR_MIN; the pooled P and N year sets are equal)
+and the year floor to the replay: positives step 2 keeps habitat rows with
+year >= YEAR_MIN (before thinning; a null evaluated-sighting year raises)
+and pool step 1 drops candidates with a non-null year < YEAR_MIN. YEAR_MIN
+is the config constant; E11 checks the regions.py literal (parsed, not
+imported).
 Observations (OBS, never blocking): O1-O10.
 
 Usage:
@@ -54,7 +61,7 @@ ENV_KEYS = ("pandas", "numpy", "scipy", "pyproj", "PROJ", "rasterio", "GDAL", "g
             "shapely", "pyogrio", "op_4326_5070")
 ENV_DESCRIPTIVE = ("op_rule",)     # config-only text, not a measured value
 GATE_IDS = ("E0", "E1", "E1p", "E2", "E3", "E4", "E5", "E6", "E7", "E8",
-            "E9", "E10", "E11", "E12", "E13", "R1", "R2", "R3", "R4")
+            "E9", "E10", "E11", "E12", "E13", "E14", "R1", "R2", "R3", "R4")
 OBS_IDS = tuple(f"O{i}" for i in range(1, 11))
 
 
@@ -993,6 +1000,27 @@ class Replay:
     def habitat_rows(self, df):
         return df[~df["nonveg_landcover"].astype(bool)].copy()
 
+    def check_years(self, R, df):
+        """CR-0019 positives step 2: every evaluated sighting of the region
+        (habitat or not) has a non-null year, else the pipeline raises."""
+        if "year" not in df.columns:
+            raise ReplayError(f"{rpath(self.cfg, 'sightings', R)} has no 'year' column")
+        n = int(df["year"].isna().sum())
+        if n:
+            raise ReplayError(f"{rpath(self.cfg, 'sightings', R)}: {n} rows with a null year "
+                              f"(CR-0019 positives step 2)")
+
+    def year_floor(self, df):
+        """CR-0019 positives step 2: True where year >= YEAR_MIN."""
+        return (df["year"] >= self.C["YEAR_MIN"]).to_numpy()
+
+    def pool_year_floor(self, cand):
+        """CR-0019 pool step 1: drop every row with a non-null year < YEAR_MIN;
+        a null-year row is kept here (dropped at step 7, as in CR-0012)."""
+        y = cand["year"]
+        drop = (y.notna() & (y < self.C["YEAR_MIN"])).to_numpy()
+        return cand[~drop].copy()
+
     def window_filter(self, R, df):
         return df[window_mask(df, R, self.rasters, self.cfg)].copy()
 
@@ -1023,9 +1051,11 @@ class Replay:
         for R in self.regions:
             df = self.sightings(R, "positives")
             self.check_sightings(R, df)
+            self.check_years(R, df)
             cnt = self.counts["positives"].setdefault(R, {})
             cnt["1"] = len(df)
             hab = self.habitat_rows(df)
+            hab = hab[self.year_floor(hab)].copy()      # CR-0019: before thinning (step 4)
             cnt["2"] = len(hab)
             hab = self.window_filter(R, hab)
             for rel in self.rasters.read:
@@ -1076,6 +1106,7 @@ class Replay:
             g["region"] = R
             frames.append(g)
         cand = pd.concat(frames, ignore_index=True)
+        cand = self.pool_year_floor(cand)                # CR-0019 pool step 1
         self._count("negatives", cand, 1)
         return cand
 
@@ -1827,6 +1858,76 @@ def gate_E13(ctx):
     return problems, missing
 
 
+def _year_values(df):
+    """(numeric years, non-null-but-unparsable mask) of df['year']."""
+    import pandas as pd
+    y = pd.to_numeric(df["year"], errors="coerce")
+    return y, (df["year"].notna() & y.isna()).to_numpy()
+
+
+def _year_set_text(ys):
+    return "{" + ", ".join(str(int(v)) if float(v).is_integer() else repr(float(v))
+                           for v in sorted(ys)) + "}"
+
+
+def gate_E14(ctx, include_C=True):
+    """CR-0019 section 3. (a) every row of P and N (combined, pooled) has a
+    non-null, integral year >= YEAR_MIN; every non-null year of C is >=
+    YEAR_MIN. (b) the set of distinct years in P equals the set in N, pooled
+    over regions and splits. pandas/numpy only (standing subset)."""
+    import numpy as np
+    problems, missing = [], []
+    ymin = ctx.C["YEAR_MIN"]
+    years = {}
+    for cls, kind in (("P", "thinned_positives"), ("N", "negatives")):
+        df = ctx.pooled(kind, missing)
+        if df is None:
+            continue
+        if "year" not in df:
+            problems.append(f"{cls}: no 'year' column")
+            continue
+        y, unparsable = _year_values(df)
+        v = y.to_numpy(dtype=float)
+        with np.errstate(invalid="ignore"):
+            bad = np.isnan(v) | (v != np.floor(v)) | (v < ymin)
+        if bad.any():
+            by_r = {R: int((bad & (df["_R"] == R).to_numpy()).sum()) for R in ctx.regions}
+            n_null = int((np.isnan(v) & ~unparsable).sum())
+            n_frac = int((~np.isnan(v) & (v != np.floor(v))).sum())
+            n_low = int((~np.isnan(v) & (v < ymin)).sum())
+            i = int(bad.nonzero()[0][0])
+            problems.append(f"{cls} (combined, pooled): {int(bad.sum())} rows without an integral "
+                            f"year >= YEAR_MIN {ymin} ({', '.join(f'{R} {n}' for R, n in by_r.items() if n)}; "
+                            f"year < YEAR_MIN {n_low}, null {n_null}, non-integral {n_frac}, "
+                            f"unparsable {int(unparsable.sum())}), e.g. {df['_R'].iloc[i]} "
+                            f"({df['longitude'].iloc[i]}, {df['latitude'].iloc[i]}) "
+                            f"year={df['year'].iloc[i]}")
+        years[cls] = set(float(t) for t in v[~np.isnan(v)])
+    if include_C:
+        rel = rpath(ctx.cfg, "candidate_pool")
+        c = ctx.try_csv(rel, missing)
+        if c is not None:
+            if "year" not in c:
+                problems.append(f"C: {rel} has no 'year' column")
+            else:
+                y, unparsable = _year_values(c)
+                v = y.to_numpy(dtype=float)
+                with np.errstate(invalid="ignore"):
+                    bad = unparsable | (v < ymin)
+                if bad.any():
+                    i = int(bad.nonzero()[0][0])
+                    problems.append(f"C: {int(bad.sum())} rows with a non-null year < YEAR_MIN {ymin} "
+                                    f"(unparsable {int(unparsable.sum())}), e.g. "
+                                    f"({c['longitude'].iloc[i]}, {c['latitude'].iloc[i]}) "
+                                    f"year={c['year'].iloc[i]}")
+    if "P" in years and "N" in years and years["P"] != years["N"]:
+        problems.append(f"distinct years differ (P vs N, pooled over regions and splits): "
+                        f"P {_year_set_text(years['P'])} vs N {_year_set_text(years['N'])}; "
+                        f"only in P {_year_set_text(years['P'] - years['N'])}, "
+                        f"only in N {_year_set_text(years['N'] - years['P'])}")
+    return problems, missing
+
+
 def gate_E8(ctx):
     problems, missing = [], []
     targets = []
@@ -2231,7 +2332,8 @@ def gate_R4(ctx):
 GATES = [("E0", gate_E0), ("E1", gate_E1), ("E1p", gate_E1p), ("E2", gate_E2), ("E3", gate_E3),
          ("E4", gate_E4), ("E5", gate_E5), ("E6", gate_E6), ("E7", gate_E7), ("E8", gate_E8),
          ("E9", gate_E9), ("E10", gate_E10), ("R1", gate_R1), ("R2", gate_R2), ("R3", gate_R3),
-         ("R4", gate_R4), ("E11", gate_E11), ("E12", gate_E12), ("E13", gate_E13)]
+         ("R4", gate_R4), ("E11", gate_E11), ("E12", gate_E12), ("E13", gate_E13),
+         ("E14", gate_E14)]
 
 
 def evaluate(fn, ctx, **kw):
@@ -2735,7 +2837,8 @@ def standing_checks(img_size, jitter, augment, *, data_root=None, config=None):
     for gid, fn, kw in (("E0", gate_E0, {"sets": ("P", "N")}), ("E1", gate_E1, {"include_C": False}),
                         ("E1p", gate_E1p, {}), ("E3", gate_E3, {"include_C": False}),
                         ("E4", gate_E4, {}), ("E5", gate_E5, {}),
-                        ("E6", gate_E6, {"include_C": False, "include_B": False})):
+                        ("E6", gate_E6, {"include_C": False, "include_B": False}),
+                        ("E14", gate_E14, {"include_C": False})):
         status, problems, missing = evaluate(fn, ctx, **kw)
         if status != "PASS":
             failures.extend(f"{gid}: missing {m}" for m in missing)

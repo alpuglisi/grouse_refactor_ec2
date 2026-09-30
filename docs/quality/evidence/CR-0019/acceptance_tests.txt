@@ -1,0 +1,5 @@
+CR-0019 deliverable 2: python -m unittest tests.test_acceptance_split at 65b246991e7e3dd1bd195ced88255f13eaadf8e5
+----------------------------------------------------------------------
+Ran 128 tests in 103.043s
+
+OK

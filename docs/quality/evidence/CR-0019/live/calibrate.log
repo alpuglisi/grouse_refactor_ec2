@@ -1,0 +1,46 @@
+CR-0013 acceptance_split.py report
+data root : /home/ec2-user/grouse2
+config    : /home/ec2-user/grouse2/docs/quality/acceptance_split.json (sha256 07e417f2870210b9d03c0823793e0496a9fe4bcda99d62ca5e191298003c9c41)
+commit    : b8e96cf87c141b87d8658bfa194723739e98efaa (dirty tracked .py: False)
+started   : 2026-09-30T17:52:29.072025+00:00
+
+GATES (exact)
+E0   PASS
+E1   PASS
+E1p  PASS
+E2   PASS
+E3   PASS
+E4   PASS
+E5   PASS
+E6   PASS
+E7   PASS
+E8   PASS
+E9   PASS
+E10  PASS
+E11  PASS
+E12  PASS
+E13  PASS
+E14  PASS
+R1   PASS
+R2   PASS
+R3   PASS
+R4   PASS
+
+OBSERVATIONS (reported, never blocking)
+OBS references: references stale (footing changed); flags |z| > 4: 0
+O1   OBS   median_m=2820 (delta=+0)
+O2   OBS   records_per_val_block=1.527 (delta=+0); share_gap=0.003474 (delta=+0)
+O3   OBS   moran_k4.positive_blocks=-0.00374 (z=-0.28); moran_k8.positive_blocks=-0.00232 (z=-0.23)
+O4   OBS   moran_k4.pool_blocks=0.00502 (z=+0.68); moran_k4.selected-record_blocks=-0.0007828 (z=-0.03); moran_k8.pool_blocks=0.0007391 (z=+0.18); moran_k8.selected-record_blocks=0.0007478 (z=+0.16)
+O5   OBS   Exc.ME=1.437 (delta=+0); Exc.NH=1.607 (delta=+0); Exc.VT=0.8467 (delta=+0); Excws_val.ME=4.45 (delta=+0); Excws_val.NH=4.418 (delta=+0); Excws_val.VT=3.236 (delta=+0); S.ME=0.59 (delta=+0); S.NH=0.6167 (delta=+0); S.VT=0.4991 (delta=+0); Sws_val.ME=0.675 (delta=+0); Sws_val.NH=0.6218 (delta=+0); Sws_val.VT=0.6456 (delta=+0)
+O6   OBS   basis_tv_sel_vs_wpool.ME=0.6493 (delta=+0); basis_tv_sel_vs_wpool.NH=0.6432 (delta=+0); basis_tv_sel_vs_wpool.VT=0.6539 (delta=+0); basis_tv_train_val.ME=0.004315 (delta=+0); basis_tv_train_val.NH=0.02986 (delta=+0); basis_tv_train_val.VT=0.01649 (delta=+0); evtphys_tv_nonveg.ME=0.02166 (delta=+0); evtphys_tv_nonveg.NH=0.06388 (delta=+0); evtphys_tv_nonveg.VT=0.0464 (delta=+0); hab_weight_sel_over_pool.ME=1.125 (delta=+0); hab_weight_sel_over_pool.NH=1.233 (delta=+0); hab_weight_sel_over_pool.VT=1.17 (delta=+0); nonveg_val_minus_train.ME=0.0003086 (delta=+0); nonveg_val_minus_train.NH=0.0008336 (delta=+0); nonveg_val_minus_train.VT=0.000537 (delta=+0); species_tv.ME=0.04598 (delta=+0); species_tv.NH=0.06905 (delta=+0); species_tv.VT=0.1145 (delta=+0)
+O7   OBS   SUP_O.ME=2 (delta=+0); SUP_O.NH=0 (delta=+0); SUP_O.VT=0 (delta=+0); SUP_R.ME=4.16 (delta=+0); SUP_R.NH=2.407 (delta=+0); SUP_R.VT=3.766 (delta=+0); hab_pool_over_target_worst.ME=2.006 (delta=+0); hab_pool_over_target_worst.NH=2.741 (delta=+0); hab_pool_over_target_worst.VT=2.105 (delta=+0); pool_over_target.ME=3.986 (delta=+0); pool_over_target.NH=6.288 (delta=+0); pool_over_target.VT=4.895 (delta=+0)
+O8   OBS   neg_ks.ME=0.03865 (delta=+0); neg_ks.NH=0.09832 (delta=+0); neg_ks.VT=0.1041 (delta=+0); neg_ks.pooled=0.03155 (delta=+0); neg_smd.ME=0.07465 (delta=+0); neg_smd.NH=0.1655 (delta=+0); neg_smd.VT=0.1869 (delta=+0); neg_smd.pooled=0.08798 (delta=+0); neghab_ks.ME=0.04616 (delta=+0); neghab_ks.NH=0.1079 (delta=+0); neghab_ks.VT=0.1277 (delta=+0); neghab_ks.pooled=0.04253 (delta=+0); pos_ks.ME=0.05376 (delta=+0); pos_ks.NH=0.1346 (delta=+0); pos_ks.VT=0.1043 (delta=+0); pos_ks.pooled=0.04404 (delta=+0); pos_smd.ME=0.04855 (delta=+0); pos_smd.NH=0.2545 (delta=+0); pos_smd.VT=0.1888 (delta=+0); pos_smd.pooled=0.04115 (delta=+0)
+O9   OBS   year_hist.neg.ME={"2020":1217,"2021":715,"2022":601,"2023":206,"2024":115}; year_hist.neg.NH={"2020":282,"2021":233,"2022":157,"2023":83,"2024":72}; year_hist.neg.VT={"2020":362,"2021":345,"2022":252,"2023":91,"2024":78}; year_hist.pos.ME={"2020":601,"2021":729,"2022":794,"2023":345,"2024":385}; year_hist.pos.NH={"2020":132,"2021":147,"2022":167,"2023":151,"2024":230}; year_hist.pos.VT={"2020":195,"2021":181,"2022":213,"2023":212,"2024":327}
+O10  OBS   val_fraction.neg.ME=0.1973 (delta=+0); val_fraction.neg.NH=0.2334 (delta=+0); val_fraction.neg.VT=0.1826 (delta=+0); val_fraction.pos.ME=0.1973 (delta=+0); val_fraction.pos.NH=0.2334 (delta=+0); val_fraction.pos.VT=0.1826 (delta=+0)
+
+SUMMARY: 20/20 GATEs pass; FAIL: none
+calibration written: /home/ec2-user/grouse2/docs/quality/acceptance_split_obs.json
+ACCEPTED. record written: /home/ec2-user/grouse2/data/pipeline/acceptance_record.json
+record sha256: ed27583beb8b9f95b23ce3c51d18817ee1d9a1a42043b0c773138b028da9c42a
+runtime: 169.2 s

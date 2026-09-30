@@ -1,0 +1,6 @@
+CR-0019 deliverable 5 preconditions, 2026-09-30T17:38:37Z
+main HEAD: 140a73edf979b25052aec1ce5e634a1ee50ed40b  cr0019-combined: 3cd1ea969d4dab086181e671884e8a0d3d613b68
+no other CR mid-data-write: CR-0017 IMPLEMENTED (5f5ec84); no agent writing data/
+live acceptance_record.json: 9d5ad0a9f92c4278e752cb1207f76decd63972d7159933f0ce8d8b41d18c5aba (CR-0017 live record 9d5ad0a9...)
+backup: /home/ec2-user/grouse_backup/CR-0019 sha256 verified
+Live run 2026-09-30T17:55:26Z on branch cr0019-combined (b8e96cf): prepare_training_data + generate_negatives exit 0 (P 4,809 = N 4,809); MC 42/42 vs backup; acceptance 20/20 GATEs incl. E14; --calibrate 20/20, OBS rewritten; record ed27583b...

@@ -1,0 +1,43 @@
+MC0: PASS record copy sha ok=True; 20 artifacts; mismatched []
+MC1 ME rows: FAIL new 3660, pre-registered 2854, missing 8, extra 814, differing 7
+MC1 ME kept lines: FAIL header equal=True; 7 kept rows differ beyond the pre-registered split changes (7 split changes)
+MC1 ME order: PASS
+MC5 train_positives_ME: PASS
+MC5 val_positives_ME: PASS
+MC1 NH rows: FAIL new 1079, pre-registered 827, missing 4, extra 256, differing 0
+MC1 NH kept lines: PASS header equal=True; 0 kept rows differ beyond the pre-registered split changes (0 split changes)
+MC1 NH order: PASS
+MC5 train_positives_NH: PASS
+MC5 val_positives_NH: PASS
+MC1 VT rows: FAIL new 1493, pre-registered 1128, missing 2, extra 367, differing 1
+MC1 VT kept lines: FAIL header equal=True; 1 kept rows differ beyond the pre-registered split changes (1 split changes)
+MC1 VT order: PASS
+MC5 train_positives_VT: PASS
+MC5 val_positives_VT: PASS
+MC2: FAIL new 3861 rows, pre-registered 3205
+MC3: FAIL header/rows equal length=True; 501/501 pre-registered split changes found; 501 rows differ otherwise
+MC4 ME rows: FAIL new 3660, pre-registered 2854, missing 0, extra 806
+MC4 ME equals C: PASS 0 rows not equal to their NEW C row on 19 shared columns
+MC4 ME label: PASS
+MC4 ME order: PASS
+MC4 ME train count: PASS P 2922, N 2922
+MC4 ME val count: PASS P 738, N 738
+MC5 train_negatives_ME: PASS
+MC5 val_negatives_ME: PASS
+MC4 NH rows: FAIL new 1079, pre-registered 827, missing 1, extra 253
+MC4 NH equals C: PASS 0 rows not equal to their NEW C row on 19 shared columns
+MC4 NH label: PASS
+MC4 NH order: PASS
+MC4 NH train count: PASS P 840, N 840
+MC4 NH val count: PASS P 239, N 239
+MC5 train_negatives_NH: PASS
+MC5 val_negatives_NH: PASS
+MC4 VT rows: FAIL new 1493, pre-registered 1128, missing 0, extra 365
+MC4 VT equals C: PASS 0 rows not equal to their NEW C row on 19 shared columns
+MC4 VT label: PASS
+MC4 VT order: PASS
+MC4 VT train count: PASS P 1224, N 1224
+MC4 VT val count: PASS P 269, N 269
+MC5 train_negatives_VT: PASS
+MC5 val_negatives_VT: PASS
+MC: FAIL (32/42 checks pass)

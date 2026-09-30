@@ -181,18 +181,66 @@ class U2TrainBlocks(Base):
             train_blocks_only=True, assignments=self.assign,
             in_state=lambda lon, lat, r: np.ones(len(lon), bool), **kw)
 
+    def violations(self, df):
+        """The U2 conditions a sample breaks (empty = U2 passes)."""
+        counts = self.kinds(df).value_counts()
+        bad = [f"{k}>0" for k in ("i", "iii", "listed-other")
+               if int(counts.get(k, 0)) > 0]
+        bad += [f"{k}==0" for k in ("ii", "iv", "v")
+                if int(counts.get(k, 0)) == 0]
+        if len(df) != self.N:
+            bad.append(f"n={len(df)}")
+        return bad, counts
+
     def test_kinds(self):
-        counts = self.kinds(self.draw()).value_counts()
-        self.assertEqual(int(counts.get("i", 0)), 0, counts)
-        self.assertEqual(int(counts.get("iii", 0)), 0, counts)
-        for kind in ("ii", "iv", "v"):
-            self.assertGreaterEqual(int(counts.get(kind, 0)), 1, (kind, counts))
-        self.assertEqual(int(counts.get("listed-other", 0)), 0, counts)
-        self.assertEqual(int(counts.sum()), self.N)
+        bad, counts = self.violations(self.draw())
+        self.assertEqual(bad, [], counts)
+
+    def test_wrong_samplers_fail_u2(self):
+        """PA-0021(a): U2 fails on the constructed wrong samplers the CR's
+        table assigns to it (tests/cr0015_wrong_samplers.py, built by an
+        independent agent)."""
+        sys.path.insert(0, os.path.join(ROOT, "tests"))
+        import cr0015_wrong_samplers as W
+        for name in ("todays_sampler", "unassigned_excluded",
+                     "unassigned_train", "val_fraction_constant",
+                     "native_xy"):
+            try:
+                df = W.WRONG_SAMPLERS[name](
+                    self.rd, ["evt"], self.N, seed=3, region="AA",
+                    train_blocks_only=True, assignments=self.assign,
+                    in_state=lambda lon, lat, r: np.ones(len(lon), bool))
+            except SystemExit as e:        # cannot deliver n: U2/U4 fail
+                bad = [f"shortfall: {e.code}"]
+            else:
+                bad, counts = self.violations(df)
+            print(f"U2 on {name}: violations {bad}")
+            self.assertNotEqual(bad, [], name)
+        # The over-excluding sampler at a size it can deliver: U2 still
+        # fails, on kinds (iv) and (v) (the CR's "U2 (iv)"); n = 50 so it can deliver.
+        df = W.WRONG_SAMPLERS["unassigned_excluded"](
+            self.rd, ["evt"], 50, seed=3, region="AA",
+            train_blocks_only=True, assignments=self.assign,
+            in_state=lambda lon, lat, r: np.ones(len(lon), bool))
+        counts = self.kinds(df).value_counts()
+        print(f"U2 on unassigned_excluded, n=50: {counts.to_dict()}")
+        self.assertEqual(int(counts.get("iv", 0)), 0)
+        self.assertEqual(int(counts.get("v", 0)), 0)
 
     def test_kind_v_exists_under_this_vf(self):
         self.assertIn("v", set(self.kind_of.values()))
         self.assertLess(self.vf, VAL_FRACTION)
+
+
+class U1OnWrongSampler(Base):
+    def test_todays_sampler_fails_u1(self):
+        sys.path.insert(0, os.path.join(ROOT, "tests"))
+        import cr0015_wrong_samplers as W
+        rd = self.lonlat_raster("u1w.tif", np.full((100, 100), 7, np.int16))
+        df = W.WRONG_SAMPLERS["todays_sampler"](
+            rd, ["evt"], 500, seed=1, region="AA", train_blocks_only=False,
+            in_state=lambda lon, lat, r: np.asarray(lon) < -70.5)
+        self.assertFalse((df["longitude"] < -70.5).all())
 
 
 class U3Validity(Base):

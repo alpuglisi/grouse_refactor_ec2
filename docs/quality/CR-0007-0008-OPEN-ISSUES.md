@@ -8,11 +8,12 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 
 ## Shared / decisions needed
 - [ ] Land bookkeeping batch: PA-0019/0020/0021, BUG-0030/0033/0035; name an owner (0007 B-8, 0008 R7-2)
-- [ ] Decide: pre-landing baselines vs defined `gate_obs_only` mode; fix CR-0009 to match (0007 B-2)
-- [ ] Decide: `TIGER_YEAR` value (2023 vs 2025, commit a995898); align both CRs (0007 B-9)
-- [ ] Decide: TreeMap coverage boundary (pinned G0 `nlcd` mask?) (0008 R7-1, R7-3)
-- [ ] Decide: Canadian-border road distance — nodata or accepted residual (0008 R7-4)
-- [ ] Reconcile I17 / G5 hand-off between CRs; give it an owner in CR-0007 or CR-0009 (0008 R7-5, R7-6)
+- [x] Decide: pre-landing baselines vs `gate_obs_only` — **baselines first, no escape mode** (user, 2026-09-30). CR-0009 still to be updated to match (0007 B-2)
+- [x] Decide: CR-0007 structure — **split into 3** (user, 2026-09-30): CR-0007 partition + constants; CR-0012 global split + pooled draw; CR-0013 acceptance gates as a committed script
+- [x] Decide: `TIGER_YEAR` — **2023** (user, 2026-09-30); set by CR-0014, centralised by CR-0007 (0007 B-9)
+- [x] Decide: TreeMap coverage boundary — NLCD (CR-0010 repair, CR-0008 v9 generator) (0008 R7-1, R7-3)
+- [x] Decide: Canadian-border road distance — **nodata where Canadian land is nearer than the nearest TIGER road** (user, 2026-09-30); CR-0014 (0008 R7-4)
+- [x] Reconcile I17 / G5 hand-off — moved to CR-0010: 0 positive centre values change, so I17 is unaffected; X3 reports window exposure (0008 R7-5, R7-6)
 - [ ] Reconcile PA-0021 clause text: one version, cited consistently (0008 R7-12)
 
 ## CR-0007
@@ -79,5 +80,8 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 - [ ] CR-0006: drop BUG-0030 creation (CR-0008 v8 done) — CR-0010 owns it (CR-0010 B3)
 
 ## New CR to write
-- [ ] `road_dist` ME/VT CR (split from CR-0008 v8): regeneration, `_download` atomicity, `TIGER_YEAR`, Canadian-border decision (R7-4), G7 incl. all 10 year-copies (R7-10), RD1–RD5
-- [ ] After first real `download_tcc_nlcd.py` run: check with `check_raster_repair.py` G2 against NLCD pin (CR-0008 v8 deliverable 9)
+- [x] ~~`road_dist` ME/VT CR~~ — written as **CR-0014** (see its review log for the carried items). Was: `road_dist` ME/VT CR (split from CR-0008): regeneration, `_download` atomicity, densified footprint reprojection, `TIGER_YEAR`, Canadian-border decision (R7-4), G7/RD1–RD5 with truth from all TIGER counties intersecting grid+pad (PA-0018) and excluded-point count gated at 0, all 10 year-copies byte-identical (R7-10), G6 for regenerated files, BUG-0023 §6 retroactive-review ruling for `bf8d31a`
+- [x] ~~After first real `download_tcc_nlcd.py` run: G2 check~~ — replaced by CR-0008 v9 in-code post-download check
+- [ ] CR-0009: "CR-0008 owns the raster backup (9.75 GB)" is wrong — CR-0010 owns it, 9.46 GB (9,458,119,704 B)
+- [ ] PA numbering: PA-0022 was filed while PA-0019–0021 are only drafts (res_qms file). Either file 0019–0021 or record the reservation as a deliberate exception to creation-order numbering (CR-0008 B14)
+- [ ] If CR-0008's post-download `tcc` check (U5) ever refuses a real download, switch it to masking `tcc` by the region NLCD footprint (as CR-0010 does) instead of refusing (CR-0008 A7)

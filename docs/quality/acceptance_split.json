@@ -2,15 +2,24 @@
   "_comment": "CR-0013 gate config (deliverable 2). Constants, specs, environment and paths only; OBS references live in acceptance_split_obs.json, which only --calibrate writes. Any edit here is a reviewed change (CR-0013 design rule 3, stated limit 4). Implementer's choices where CR-0012/CR-0013 are silent are listed in docs/quality/evidence/CR-0013-implementer-findings.md.",
   "schema_version": 1,
   "pins": {
-    "cr0012_text_commit": "29f388b",
-    "normative_code_commit": "05d788d",
-    "cr0007_text_consulted_at": "ba240fb (HEAD at authoring; for REGIONS/STATE_FIPS/COUNTY_POLYGONS/verify_partition only, which CR-0012/0013 use but do not define)"
+    "cr0012_text_commit": "cec1542",
+    "cr0012_text_status": "v2.2.1, approved (text pinned at cec1542; CR-0013 rule 4)",
+    "cr0007_text_commit": "6619bdd",
+    "cr0007_text_status": "v9, approved (section 1: REGIONS, STATE_FIPS, COUNTY_POLYGONS_YEAR, PATH_TEMPLATES['tiger_county'], verify_partition)",
+    "normative_code_commit": "05d788d"
   },
   "constants": {
-    "REGIONS": ["ME", "NH", "VT"],
+    "REGIONS": [
+      "ME",
+      "NH",
+      "VT"
+    ],
     "MIN_SPACING_M": 30,
     "BLOCK_SIZE_M": 3000,
-    "BLOCK_ORIGIN_5070": [0.0, 0.0],
+    "BLOCK_ORIGIN_5070": [
+      0.0,
+      0.0
+    ],
     "BUFFER_M": 300,
     "VAL_FRACTION": 0.2,
     "SPLIT_SEED": 42,
@@ -67,29 +76,111 @@
   },
   "rounding": "Python built-in round() on the float64 product (half to even): int(round(VAL_FRACTION * N)), int(round(n_pos * NEG_RATIO)), int(round(n * NONVEG_MAX_FRAC))",
   "parsing": {
-    "read_csv": {"float_precision": "round_trip"},
+    "read_csv": {
+      "float_precision": "round_trip"
+    },
     "write_csv": "pandas DataFrame.to_csv(index=False), default float repr"
   },
   "row_order": {
-    "positives": ["longitude", "latitude"],
-    "negatives": ["longitude", "latitude"],
-    "pool": ["region", "longitude", "latitude"],
-    "block_assignments": ["block_id"],
-    "sort": "stable (mergesort / lexsort); train/val files keep the combined file's order"
+    "positives": [
+      "longitude",
+      "latitude"
+    ],
+    "negatives": [
+      "longitude",
+      "latitude"
+    ],
+    "pool": [
+      "region",
+      "longitude",
+      "latitude"
+    ],
+    "block_assignments": [
+      "block_id"
+    ],
+    "sort": "stable (mergesort / lexsort); train/val files keep the combined file's order",
+    "gate": "GATE inside R1-R4 (CR-0013 v2.3): each shipped file's rows must be unchanged by a stable sort on its row_order columns"
   },
-  "feature_spec_keys": ["evt", "evh", "evc", "sclass", "fdist", "ch", "cc", "tcc", "nlcd", "road_dist", "tsd", "balive", "tpa_live", "qmd", "carbon_dwn"],
-  "continuous_features": ["ch", "cc", "tcc", "road_dist", "tsd", "balive", "tpa_live", "qmd", "carbon_dwn"],
+  "feature_spec_keys": [
+    "evt",
+    "evh",
+    "evc",
+    "sclass",
+    "fdist",
+    "ch",
+    "cc",
+    "tcc",
+    "nlcd",
+    "road_dist",
+    "tsd",
+    "balive",
+    "tpa_live",
+    "qmd",
+    "carbon_dwn"
+  ],
+  "continuous_features": [
+    "ch",
+    "cc",
+    "tcc",
+    "road_dist",
+    "tsd",
+    "balive",
+    "tpa_live",
+    "qmd",
+    "carbon_dwn"
+  ],
   "year_fill_feature": "evt",
   "envelope": {
-    "ENVELOPE_SCHEME": [["evt_phys", "raw"], ["sclass", "raw"], ["evh", "q2"]],
-    "envelope_features": ["evh", "evt", "sclass"],
+    "ENVELOPE_SCHEME": [
+      [
+        "evt_phys",
+        "raw"
+      ],
+      [
+        "sclass",
+        "raw"
+      ],
+      [
+        "evh",
+        "q2"
+      ]
+    ],
+    "envelope_features": [
+      "evh",
+      "evt",
+      "sclass"
+    ],
     "envelope_features_rule": "sorted({c for c, _ in ENVELOPE_SCHEME if c not in ('evt_phys', 'evt_group')} | {'sclass', 'evt'}) (generate_negatives.py:198-199 at 05d788d)",
-    "NON_VEG_SCLASS_CODES": [111, 112, 120, 132, 180],
-    "EVT_PHYS_NONVEG_PREFIXES": ["Developed", "Open Water", "Barren", "Agriculture", "Quarries", "Snow", "Ice"],
-    "weight_basis_strings": ["NonVeg (hard negative)", "Unknown envelope (neutral)", "Landscape-Rare (neutral)", "Selected (ratio undefined, min weight)"],
+    "NON_VEG_SCLASS_CODES": [
+      111,
+      112,
+      120,
+      132,
+      180
+    ],
+    "EVT_PHYS_NONVEG_PREFIXES": [
+      "Developed",
+      "Open Water",
+      "Barren",
+      "Agriculture",
+      "Quarries",
+      "Snow",
+      "Ice"
+    ],
+    "weight_basis_strings": [
+      "NonVeg (hard negative)",
+      "Unknown envelope (neutral)",
+      "Landscape-Rare (neutral)",
+      "Selected (ratio undefined, min weight)"
+    ],
     "binners_fitted_on": "the region's evaluated_sightings rows with ~nonveg_landcover.astype(bool)"
   },
-  "NODATA_SENTINELS": [-9999, -32768, 32767, -1111],
+  "NODATA_SENTINELS": [
+    -9999,
+    -32768,
+    32767,
+    -1111
+  ],
   "raster": {
     "raster_dir": "data/landfire",
     "template": "{raster_dir}/{region}_{year}_{feature}.tif",
@@ -119,15 +210,24 @@
       "rule": "load_evt_crosswalk at 05d788d: newest by lexicographic sort; the glob result must equal path and its sha256 must equal sha256"
     },
     "county_polygons": {
+      "template": "data/roads/tl_{year}_us_county.zip",
+      "template_source": "grouse_data.PATH_TEMPLATES['tiger_county'] (CR-0007 v9 section 1)",
+      "year": 2023,
+      "year_source": "regions.COUNTY_POLYGONS_YEAR (CR-0007 v9 section 1)",
       "path": "data/roads/tl_2023_us_county.zip",
+      "path_rule": "template.format(year=year); must equal path",
       "sha256": "692e12c30c83adcaabdbac0d3954fafa55e1c89a24b36d95e72e02dff938652e",
       "where": "STATEFP IN ('23','33','50')",
       "dissolve_by": "STATEFP",
       "source_crs": "EPSG:4269",
       "target_crs": "EPSG:4326",
       "predicate": "within",
-      "STATE_FIPS": {"ME": "23", "NH": "33", "VT": "50"},
-      "rule": "verify_partition(lon, lat, state) returns the records whose county-polygon state differs from state or that fall inside no polygon (CR-0007 v8 section 1)"
+      "STATE_FIPS": {
+        "ME": "23",
+        "NH": "33",
+        "VT": "50"
+      },
+      "rule": "verify_partition(lon, lat, state) returns the records whose county-polygon state differs from state or that lie in no polygon; pyogrio where STATEFP IN (<STATE_FIPS values>), dissolve by STATEFP, EPSG:4269 -> EPSG:4326, within (CR-0007 v9 section 1)"
     }
   },
   "regions_py": {
@@ -143,23 +243,103 @@
       "SPLIT_SEED": "SPLIT_SEED",
       "WINDOW_PX": "WINDOW_PX"
     },
-    "extra": {"COUNTY_POLYGONS": "paths.county_polygons.path", "STATE_FIPS": "paths.county_polygons.STATE_FIPS"}
+    "extra": {
+      "COUNTY_POLYGONS_YEAR": "paths.county_polygons.year",
+      "STATE_FIPS": "paths.county_polygons.STATE_FIPS"
+    }
   },
   "columns": {
-    "positives": ["longitude", "latitude", "state", "year", "n_visits", "first_year", "last_year", "x_5070", "y_5070", "evt", "evh", "evc", "sclass", "fdist", "ch", "cc", "evt_phys", "evt_group", "nonveg_landcover", "spatial_density", "spatial_zone", "env_zone", "envelope_id", "region", "block_id", "split"],
+    "positives": [
+      "longitude",
+      "latitude",
+      "state",
+      "year",
+      "n_visits",
+      "first_year",
+      "last_year",
+      "x_5070",
+      "y_5070",
+      "evt",
+      "evh",
+      "evc",
+      "sclass",
+      "fdist",
+      "ch",
+      "cc",
+      "evt_phys",
+      "evt_group",
+      "nonveg_landcover",
+      "spatial_density",
+      "spatial_zone",
+      "env_zone",
+      "envelope_id",
+      "region",
+      "block_id",
+      "split"
+    ],
     "positives_derivation": "evaluated_sightings columns written by analyze_grouse.py at 05d788d (load_all_sightings :177-178, collapse_duplicate_locations :233-237, :678-680, COLUMN_FOR_FEATURE, :717-718, :729, :788-795, :929-931), then region, block_id, split (CR-0012 positives step 6)",
-    "negatives": ["longitude", "latitude", "common_name", "obs_date", "year", "state", "gbif_id", "coord_uncertainty_m", "evh", "evt", "sclass", "evt_phys", "envelope_id", "is_nonveg", "weight", "weight_basis", "block_id", "split", "label", "x_5070", "y_5070", "region"],
+    "negatives": [
+      "longitude",
+      "latitude",
+      "common_name",
+      "obs_date",
+      "year",
+      "state",
+      "gbif_id",
+      "coord_uncertainty_m",
+      "evh",
+      "evt",
+      "sclass",
+      "evt_phys",
+      "envelope_id",
+      "is_nonveg",
+      "weight",
+      "weight_basis",
+      "block_id",
+      "split",
+      "label",
+      "x_5070",
+      "y_5070",
+      "region"
+    ],
     "negatives_derivation": "CSV_KEEP + envelope_features + [evt_phys, envelope_id, is_nonveg, weight, weight_basis, block_id, split, label, x_5070, y_5070] (generate_negatives.py:304-309 at 05d788d), then region",
-    "pool": ["longitude", "latitude", "x_5070", "y_5070", "state", "region", "year", "common_name", "gbif_id", "evh", "evt", "sclass", "evt_phys", "envelope_id", "is_nonveg", "weight", "weight_basis", "block_id", "split"],
-    "block_assignments": ["block_id", "split", "n"],
-    "split_manifest_sections": ["positives", "negatives"]
+    "pool": [
+      "longitude",
+      "latitude",
+      "x_5070",
+      "y_5070",
+      "state",
+      "region",
+      "year",
+      "common_name",
+      "gbif_id",
+      "evh",
+      "evt",
+      "sclass",
+      "evt_phys",
+      "envelope_id",
+      "is_nonveg",
+      "weight",
+      "weight_basis",
+      "block_id",
+      "split"
+    ],
+    "block_assignments": [
+      "block_id",
+      "split",
+      "n"
+    ],
+    "split_manifest_sections": [
+      "positives",
+      "negatives"
+    ]
   },
   "manifest_schema": {
     "_comment": "CR-0012 section 2 lists the manifest's content but not its keys; this is the schema E11/E12/R1/R3/R4 read. Each section (positives, negatives) is an object with these keys.",
-    "constants": "object equal to this config's constants",
+    "constants": "object: the constants the run ACTUALLY USED (read from regions.py and the script at run time), one key per config constant; E11 requires equality with this config's constants",
     "hash_spec": "object equal to this config's hash_spec",
-    "environment": "object equal to this config's environment",
-    "inputs": "object {relative path under the data root: sha256 hex} for every input read, rasters included",
+    "environment": "object: the environment the run ACTUALLY USED, measured at run time, with exactly this config's environment keys (op_rule optional); E11 requires equality",
+    "inputs": "object {repo-relative path, formed exactly as paths/raster.template form it: sha256 hex} for every input read, rasters included",
     "outputs": "object {relative path: sha256 hex} for every output written (positives: 9 positive CSVs + block_assignments.csv; negatives: 9 negative CSVs + candidate_pool.csv)",
     "counts": "object {region: {step number as string: rows of that region remaining after the step}}; positives steps 1-6, negatives (pool) steps 1-11",
     "draw": "negatives section only: object {region: {split: {n, n_nv, n_hab}}}",
@@ -173,8 +353,13 @@
     "scipy": "1.18.0",
     "pyproj": "3.7.2",
     "PROJ": "9.5.1",
+    "rasterio": "1.5.1",
+    "GDAL": "3.12.4",
+    "geopandas": "1.1.4",
+    "shapely": "2.1.2",
+    "pyogrio": "0.13.0",
     "op_4326_5070": "proj=pipeline step proj=unitconvert xy_in=deg xy_out=rad step proj=aea lat_0=23 lon_0=-96 lat_1=29.5 lat_2=45.5 x_0=0 y_0=0 ellps=GRS80",
-    "op_rule": "pyproj.Transformer.from_crs('EPSG:4326', 'EPSG:5070', always_xy=True).definition"
+    "op_rule": "pyproj.Transformer.from_crs('EPSG:4326', 'EPSG:5070', always_xy=True).definition; op_rule itself is descriptive and is ignored when comparing (a manifest may omit it)"
   },
   "comparison": {
     "float_rel_tol": 1e-12,
@@ -195,7 +380,10 @@
     "n_perm": 1000,
     "null_seed_base": 100000,
     "perm_seed": 42,
-    "moran_k": [4, 8],
+    "moran_k": [
+      4,
+      8
+    ],
     "sup_cell_m": 10000,
     "sup_min_positives": 5,
     "sup_factor": 10

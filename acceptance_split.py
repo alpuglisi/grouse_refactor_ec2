@@ -46,7 +46,9 @@ DEFAULT_CONFIG = os.path.join(REPO_ROOT, "docs", "quality", "acceptance_split.js
 SPLITS = ("train", "val")
 P_KINDS = ("thinned_positives", "train_positives", "val_positives")
 N_KINDS = ("negatives", "train_negatives", "val_negatives")
-ENV_KEYS = ("pandas", "numpy", "scipy", "pyproj", "PROJ", "op_4326_5070")
+ENV_KEYS = ("pandas", "numpy", "scipy", "pyproj", "PROJ", "rasterio", "GDAL", "geopandas",
+            "shapely", "pyogrio", "op_4326_5070")
+ENV_DESCRIPTIVE = ("op_rule",)     # config-only text, not a measured value
 GATE_IDS = ("E0", "E1", "E1p", "E2", "E3", "E4", "E5", "E6", "E7", "E8",
             "E9", "E10", "E11", "E12", "R1", "R2", "R3", "R4")
 OBS_IDS = tuple(f"O{i}" for i in range(1, 11))
@@ -140,9 +142,13 @@ def git_commit():
 
 
 def current_environment():
+    """The environment measured at run time, in the config's shape."""
+    from importlib.metadata import version   # shapely/pyogrio: versions only, never imported
+    import geopandas
     import numpy
     import pandas
     import pyproj
+    import rasterio
     import scipy
     from pyproj import Transformer
     return {
@@ -151,6 +157,11 @@ def current_environment():
         "scipy": scipy.__version__,
         "pyproj": pyproj.__version__,
         "PROJ": pyproj.proj_version_str,
+        "rasterio": rasterio.__version__,
+        "GDAL": rasterio.__gdal_version__,
+        "geopandas": geopandas.__version__,
+        "shapely": version("shapely"),
+        "pyogrio": version("pyogrio"),
         "op_4326_5070": Transformer.from_crs(
             "EPSG:4326", "EPSG:5070", always_xy=True).definition,
     }
@@ -699,13 +710,26 @@ def annotate(df, sightings, metrics, phys, cfg, C):
 
 
 # ==========================================================================
-# verify_partition (CR-0007 v8 section 1), re-implemented
+# verify_partition (CR-0007 v9 section 1, 6619bdd), re-implemented
 # ==========================================================================
 _POLY_CACHE = {}
 
 
+def county_rel(cfg):
+    """PATH_TEMPLATES["tiger_county"] at COUNTY_POLYGONS_YEAR (CR-0007 v9 section 1)."""
+    cp = cfg["paths"]["county_polygons"]
+    rel = cp["template"].format(year=cp["year"])
+    if rel != cp["path"]:
+        raise ReplayError(f"config: county template gives {rel}, path says {cp['path']}")
+    where = "STATEFP IN (" + ",".join(f"'{v}'" for v in cp["STATE_FIPS"].values()) + ")"
+    if where != cp["where"]:
+        raise ReplayError(f"config: county filter {cp['where']!r} != {where!r} from STATE_FIPS")
+    return rel
+
+
 def county_states(root, cfg):
     cp = cfg["paths"]["county_polygons"]
+    county_rel(cfg)
     full = os.path.join(root, cp["path"])
     if not os.path.exists(full):
         raise MissingInput(cp["path"])
@@ -937,7 +961,7 @@ class Replay:
         return tmp.drop(columns=["_klon", "_klat"])
 
     def partition_drop(self, cand):
-        self.inputs["negatives"].add(self.cfg["paths"]["county_polygons"]["path"])
+        self.inputs["negatives"].add(county_rel(self.cfg))
         bad = verify_partition(cand["longitude"].to_numpy(), cand["latitude"].to_numpy(),
                                cand["state"].astype(str).tolist(), self.root, self.cfg)
         self.dropped = sorted([float(a), float(b)] for a, b in
@@ -1200,7 +1224,7 @@ def mismatch_mask(a, b, tol):
     return ~((an & bn) | (~an & ~bn & (sa == sb)))
 
 
-def compare_frames(actual, expected, key, tol, label, decimals=5, limit=3):
+def compare_frames(actual, expected, key, tol, label, decimals=5, limit=3, order_cols=None):
     """Full-row equality with rows matched on `key` ('coord' or a column)."""
     import numpy as np
     problems = []
@@ -1240,10 +1264,24 @@ def compare_frames(actual, expected, key, tol, label, decimals=5, limit=3):
                 i = int(np.argmax(mm))
                 problems.append(f"{label}: column '{c}' differs on {int(mm.sum())} rows, e.g. "
                                 f"key {common[i]}: {a.iloc[i]!r} vs replay {b.iloc[i]!r}")
-    if not problems and ka != ke:
-        problems.append(f"NOTE: {label}: rows match the replay but are not in its canonical "
-                        f"order (non-blocking: no GATE checks canonical order)")
+    if order_cols is not None:
+        problems.extend(canonical_order_problems(actual, order_cols, label))
     return problems
+
+
+def canonical_order_problems(df, cols, label):
+    """GATE (CR-0013 v2.3, R1-R4): the shipped rows are in CR-0012's
+    canonical order, i.e. a stable sort by `cols` leaves them in place."""
+    import numpy as np
+    lack = [c for c in cols if c not in df.columns]
+    if lack:
+        return [f"{label}: canonical order not checkable (columns {lack} absent)"]
+    order = df.sort_values(list(cols), kind="mergesort").index.to_numpy()
+    if (order != df.index.to_numpy()).any():
+        first = int(np.argmax(order != df.index.to_numpy()))
+        return [f"{label}: rows are not in canonical order (stable sort by {list(cols)}); "
+                f"first out-of-place data row {first}"]
+    return []
 
 
 # ==========================================================================
@@ -1780,7 +1818,7 @@ def gate_E11(ctx):
         for k in ("sightings", "envelope_metrics", "gbif_candidates"):
             required.add(rpath(cfg, k, R))
     required.add(cfg["paths"]["crosswalk"]["path"])
-    required.add(cfg["paths"]["county_polygons"]["path"])
+    required.add(county_rel(cfg))
     rep = ctx.replay()
     rasters = set(rep.rasters.read) | (set(ctx.rasters.read) if ctx.rasters else set())
     required |= rasters
@@ -1808,9 +1846,11 @@ def gate_E11(ctx):
                 diff = sorted(k for k in set(got) | set(want)
                               if _norm_json(got.get(k)) != _norm_json(want.get(k)))
                 problems.append(f"manifest[{sec}].{fld} differs from the config ({diff})")
-        senv = s.get("environment") or {}
-        if {k: senv.get(k) for k in ENV_KEYS} != cenv:
-            problems.append(f"manifest[{sec}].environment differs from the config")
+        senv = {k: v for k, v in (s.get("environment") or {}).items() if k not in ENV_DESCRIPTIVE}
+        if senv != cenv:
+            diff = {k: (senv.get(k), cenv.get(k)) for k in sorted(set(senv) | set(cenv))
+                    if senv.get(k) != cenv.get(k)}
+            problems.append(f"manifest[{sec}].environment (as used) differs from the config: {diff}")
         m_in.update(s.get("inputs") or {})
         for rel, h in (s.get("outputs") or {}).items():
             m_out[rel] = h
@@ -1925,8 +1965,9 @@ def _compare_region_files(ctx, kinds, frames_by_R, problems, missing):
                 exp = exp_all[exp_all["split"] == "val"]
             else:
                 exp = exp_all
+            order = ctx.cfg["row_order"]["positives" if kind in P_KINDS else "negatives"]
             problems.extend(compare_frames(act, csv_roundtrip(exp), "coord", ctx.tol, rel,
-                                           ctx.C["KEY_DECIMALS"]))
+                                           ctx.C["KEY_DECIMALS"], order_cols=order))
 
 
 def gate_R1(ctx):
@@ -1959,7 +2000,8 @@ def gate_R2(ctx):
     rel = rpath(ctx.cfg, "block_assignments")
     act = ctx.try_csv(rel, missing)
     if act is not None:
-        problems.extend(compare_frames(act, csv_roundtrip(rep.B), "block_id", ctx.tol, rel))
+        problems.extend(compare_frames(act, csv_roundtrip(rep.B), "block_id", ctx.tol, rel,
+                                       order_cols=ctx.cfg["row_order"]["block_assignments"]))
     return problems, missing
 
 
@@ -1978,7 +2020,7 @@ def gate_R3(ctx):
     act = ctx.try_csv(rel, missing)
     if act is not None:
         problems.extend(compare_frames(act, csv_roundtrip(rep.pool), "coord", ctx.tol, rel,
-                                       ctx.C["KEY_DECIMALS"]))
+                                       ctx.C["KEY_DECIMALS"], order_cols=ctx.cfg["row_order"]["pool"]))
     _check_counts(ctx, M, "negatives", rep.counts["negatives"], "pool steps 1-11", problems)
     return problems, missing
 

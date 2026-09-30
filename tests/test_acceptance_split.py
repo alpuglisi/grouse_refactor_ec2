@@ -65,7 +65,7 @@ STATE_FIPS = {"ME": "23", "NH": "33", "VT": "50"}
 MIN_SPACING_M = 30
 BLOCK_SIZE_M = 3000
 BUFFER_M = 300
-COUNTY_POLYGONS = "data/roads/tl_2023_us_county.zip"
+COUNTY_POLYGONS_YEAR = 2023
 BLOCK_ORIGIN_5070 = (0.0, 0.0)
 VAL_FRACTION = 0.2
 SPLIT_SEED = 42
@@ -1327,17 +1327,105 @@ class TestUnits(unittest.TestCase):
         df.iloc[::-1].to_csv(p, index=False)
         self.assertEqual(gates(root, only={"E1p"})["E1p"]["status"], "FAIL")
 
-    def test_noncanonical_order_is_a_visible_nonblocking_note(self):
-        """R gates match rows on key (CR-0013); a non-canonical row order is
-        reported as a NOTE, not a FAIL (see implementer findings)."""
+    def test_noncanonical_order_fails_R4(self):
+        """CR-0013 v2.3 (user decision): canonical row order is a GATE in
+        R1-R4. Correct rows, consistent parts (E1p passes), reversed order."""
         root = fresh()
         n = read(root, "negatives", "ME")
         write_set(root, A.N_KINDS, "ME", n.iloc[::-1])
         refresh_manifest(root)
         res = gates(root, only={"R4", "E1p"})
-        self.assertEqual(res["R4"]["status"], "PASS")
         self.assertEqual(res["E1p"]["status"], "PASS")
-        self.assertTrue(any("canonical" in x for x in res["R4"]["notes"]))
+        self.assertEqual(res["R4"]["status"], "FAIL")
+        self.assertTrue(any("canonical order" in x for x in res["R4"]["problems"]))
+        self.assertFalse(any("rows not in the replay" in x or "differs" in x
+                             for x in res["R4"]["problems"]))
+
+    def test_noncanonical_order_fails_R1_R2_R3(self):
+        root = fresh()
+        p = read(root, "thinned_positives", "VT")
+        # swap the first two rows: same content, one inversion
+        p = pd.concat([p.iloc[[1, 0]], p.iloc[2:]], ignore_index=True)
+        write_set(root, A.P_KINDS, "VT", p)
+        b = read(root, "block_assignments")
+        b.iloc[::-1].to_csv(os.path.join(root, A.rpath(CFG, "block_assignments")), index=False)
+        c = read(root, "candidate_pool")
+        c.sort_values(["longitude", "latitude"], kind="mergesort").to_csv(   # region not first
+            os.path.join(root, A.rpath(CFG, "candidate_pool")), index=False)
+        refresh_manifest(root)
+        res = gates(root, only={"R1", "R2", "R3"})
+        for g in ("R1", "R2", "R3"):
+            self.assertEqual(res[g]["status"], "FAIL", g)
+            self.assertTrue(all("canonical order" in x for x in res[g]["problems"]), res[g])
+
+    def test_canonical_order_helper(self):
+        df = pd.DataFrame({"region": ["ME", "ME", "NH"], "longitude": [1.0, 2.0, 0.0],
+                           "latitude": [0.0, 0.0, 0.0]})
+        self.assertEqual(A.canonical_order_problems(df, ["region", "longitude", "latitude"], "t"), [])
+        self.assertTrue(A.canonical_order_problems(df, ["longitude", "latitude"], "t"))
+
+    def test_manifest_environment_differs_from_config(self):
+        """CR-0012 v2.2.1: the manifest records the environment actually
+        used; E11 fails on any difference from the config."""
+        for mutate in (lambda e: e.update(numpy="1.0.0"), lambda e: e.pop("GDAL"),
+                       lambda e: e.update(extra_lib="9")):
+            root = fresh()
+            mp = os.path.join(root, A.rpath(CFG, "split_manifest"))
+            with open(mp) as f:
+                m = json.load(f)
+            mutate(m["negatives"]["environment"])
+            with open(mp, "w") as f:
+                json.dump(m, f)
+            res = gates(root, only={"E11"})
+            self.assertEqual(res["E11"]["status"], "FAIL")
+            self.assertTrue(any("environment (as used)" in x for x in res["E11"]["problems"]))
+
+    def test_manifest_constants_as_used_differ(self):
+        root = fresh()
+        mp = os.path.join(root, A.rpath(CFG, "split_manifest"))
+        with open(mp) as f:
+            m = json.load(f)
+        m["positives"]["constants"]["VAL_FRACTION"] = 0.25
+        with open(mp, "w") as f:
+            json.dump(m, f)
+        res = gates(root, only={"E11"})
+        self.assertEqual(res["E11"]["status"], "FAIL")
+        self.assertTrue(any("VAL_FRACTION" in x for x in res["E11"]["problems"]))
+
+    def test_manifest_environment_matches_measured(self):
+        with open(os.path.join(BASE, A.rpath(CFG, "split_manifest"))) as f:
+            m = json.load(f)
+        self.assertEqual(m["positives"]["environment"], A.current_environment())
+        self.assertEqual(set(A.current_environment()),
+                         set(CFG["environment"]) - set(A.ENV_DESCRIPTIVE))
+        for k in ("rasterio", "GDAL", "geopandas", "shapely", "pyogrio"):
+            self.assertIn(k, CFG["environment"])
+
+    def test_regions_py_county_year_checked(self):
+        root = fresh()
+        rp = os.path.join(TMP, f"regions_{_N[0]}.py")
+        with open(rp, "w") as f:
+            f.write(REGIONS_PY.replace("COUNTY_POLYGONS_YEAR = 2023", "COUNTY_POLYGONS_YEAR = 2025"))
+        with open(CFG_PATH) as f:
+            c = json.load(f)
+        c["regions_py"]["path"] = rp
+        p = os.path.join(TMP, "cy.json")
+        with open(p, "w") as f:
+            json.dump(c, f)
+        res = gates(root, only={"E11"}, cfg=A.load_config(p))
+        self.assertEqual(res["E11"]["status"], "FAIL")
+        self.assertTrue(any("COUNTY_POLYGONS_YEAR" in x for x in res["E11"]["problems"]))
+
+    def test_county_path_from_template(self):
+        self.assertEqual(A.county_rel(CFG), "data/roads/tl_2023_us_county.zip")
+        c = copy.deepcopy(CFG)
+        c["paths"]["county_polygons"]["year"] = 2024
+        with self.assertRaises(A.ReplayError):
+            A.county_rel(c)
+        c = copy.deepcopy(CFG)
+        c["paths"]["county_polygons"]["where"] = "STATEFP IN ('23','33')"
+        with self.assertRaises(A.ReplayError):
+            A.county_rel(c)
 
     def test_manifest_counts_checked(self):
         root = fresh()

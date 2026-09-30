@@ -352,3 +352,103 @@ but not E3.
 - **`raster_path` content validation** streams band 1 in 512-row windows and
   stops once the valid fraction reaches 0.01. That gives the same decision as
   a full read, in bounded memory.
+
+---
+
+## 5a. Follow-ups for CR-0013 v2.3 (2026-09-30)
+
+**Sources for 5a:**
+- CR-0013 v2.3 at `HEAD`: § Deliverables 5a, plus the config, gate and
+  E11 sections.
+- CR-0012 v2.2.1 at `cec1542`, which the user has approved.
+- CR-0007 v9 at `6619bdd`: §1 only.
+
+No CR-0012 implementation was read.
+
+**Changes made:**
+- Config pins:
+  - `pins.cr0012_text_commit` is `cec1542`, approved.
+  - `pins.cr0007_text_commit` is `6619bdd`, v9, approved.
+  - The `pins.cr0007_text_consulted_at` entry (`ba240fb`) is removed.
+- County file:
+  - The path is now formed from `paths.county_polygons.template`
+    (`PATH_TEMPLATES["tiger_county"]`) and `year` (`COUNTY_POLYGONS_YEAR`
+    2023). It must equal the pinned `path`.
+  - E11(e) checks `COUNTY_POLYGONS_YEAR` in place of `COUNTY_POLYGONS`.
+- The environment adds rasterio, GDAL, geopandas, shapely and pyogrio.
+- Canonical row order is a GATE inside R1–R4.
+- E11 compares the manifest's recorded (as-used) environment with the config
+  key for key. A missing, extra or different key fails. Constants were
+  already compared as a whole object.
+
+The JSON was re-serialised with 2-space indentation. Beyond the items above,
+the only content changes are clarifying text in `manifest_schema` and in
+`row_order.gate`.
+
+### G1. shapely and pyogrio versions are read without importing them (no amendment)
+
+Design rule 1 limits the dependencies to numpy, pandas, scipy, pyproj,
+rasterio and geopandas. The versions of shapely and pyogrio are therefore
+read with `importlib.metadata.version()`, which is in the standard library.
+GDAL's version comes from `rasterio.__gdal_version__`. The independence test,
+which checks imports against rule 1's list, still passes.
+
+### G2. `environment.op_rule` is descriptive text, not a measured value (amend CR-0012 wording, minor)
+
+CR-0012 v2.2.1 asks for the environment "in the shape of the config's
+`environment` object". That object includes `op_rule`, a sentence describing
+how `op_4326_5070` is produced, not a value a run can measure.
+
+**Choice.** E11 ignores `op_rule` in the manifest; it may be present or
+absent. E11 requires every other key to match exactly.
+
+**Amendment.** CR-0012 should say "every `environment` key except `op_rule`".
+Alternatively, `op_rule` could move out of `environment` in the config.
+
+### G3. What "in canonical order" means as a gate (no amendment; stated for review)
+
+A file passes when a stable sort by its `row_order` columns
+(`longitude, latitude`; the pool `region, longitude, latitude`; B
+`block_id`) leaves every row where it is. Rows with equal keys may appear in
+any order. None exist, because spacing and dedup make the keys unique. The
+check reads the file's parsed values, so string columns such as `region` and
+`block_id` sort lexicographically.
+
+The parts are checked with the same columns as their combined file. E1p
+already ties them to it.
+
+Tests cover all four gates:
+- R4: a reversed negatives file whose parts are consistent (so E1p passes)
+  now fails, and only on order.
+- R1: one swapped pair of positives fails.
+- R2: a reversed B fails.
+- R3: a pool sorted without `region` first fails.
+
+### G4. The new order gate is not reached on the pre-CR files (no amendment)
+
+On the backup, R1–R4 fail before their comparisons: the replay raises at
+positives step 1, because the pre-CR S has no `region` column. The 5a re-run
+therefore exercises the order gate only through the test suite. The first
+real exercise will be CR-0012 deliverable 6.
+
+### G5. The county `where` clause is now checked against `STATE_FIPS` (no amendment)
+
+CR-0007 v9 derives the filter from `STATE_FIPS`. The config keeps the literal
+filter for readability, and the code checks that it equals
+`STATEFP IN (<STATE_FIPS values>)`. A test covers a mismatch.
+
+### G6. Re-running deliverable 5
+
+**Inputs.** The live `data/pipeline/` is now post-CR-0007. The backup
+(unchanged; 36 sha256 values re-verified) is still the only pre-CR input.
+
+**Results.** The gate outcomes are the same as in the first run, and
+`--standing` exits 1 as before.
+
+- 1/18 gates pass: E1p.
+- The report text changed in one place only. E11 no longer reports
+  `COUNTY_POLYGONS`, because the repository's `regions.py` now defines
+  `COUNTY_POLYGONS_YEAR = 2023`, equal to the config.
+- E11 still reports that `regions.py` lacks CR-0012's `BLOCK_ORIGIN_5070`,
+  `VAL_FRACTION`, `SPLIT_SEED` and `WINDOW_PX`. That is expected until
+  CR-0012 is implemented.

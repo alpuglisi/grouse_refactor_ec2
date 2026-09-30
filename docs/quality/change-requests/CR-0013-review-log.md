@@ -255,8 +255,10 @@ pre-approval under §1.1 and must be written and reviewed first; deliverable
   `a969037d4098fb0c1`, launched 2026-09-30 with only CR-0013 (HEAD),
   CR-0012 at `29f388b` and the code at `05d788d`. No CR-0012
   implementation existed at launch.
-- CR-0012 implementer: not yet launched; must be a different fresh agent,
-  id to be recorded here.
+- CR-0012 implementer: fresh agent, transcript id `aee090313522fc4b9`,
+  launched 2026-09-30 in an isolated git worktree with CR-0012 at
+  `cec1542` and the config; instructed not to read `acceptance_split.py`
+  internals or its tests (it may call `standing_checks` by signature).
 
 
 ## Deliverables 0, 1, 2a done (author, 2026-09-30; not yet reviewed, nothing committed)

@@ -56,3 +56,10 @@ with thresholds from one or two observed runs or an 8-pair bootstrap and
 no retrain-seed null. **User decision: demoted to OBS.** Promotion needs
 ≥ 50 retrain seeds and a CR.
 
+## Hold lifted (2026-09-30)
+The user pre-authorised carrying every CR through review and
+implementation (author + two reviewer approvals count as sign-off). This
+machine has an NVIDIA L40S (46 GB), so the retrain runs here rather than
+manually. v4 committed at `6bb2e2d` for its first review; symptom_check.py
+(deliverable 1) being written in parallel.
+

@@ -78,3 +78,19 @@ Round 2 follow-ups (reviewer B):
 ## Quorum (§1.4)
 Reviewer A: APPROVE (v3). Reviewer B: APPROVE WITH FOLLOW-UPS (v3).
 Author: **signed off** — user instructed implementation 2026-09-30. **CR-0010 APPROVED (v3).**
+
+## Implementation record (2026-09-30)
+- Rehearsal (VT_2025_tsd, scratch): all gates pass; restore reproduces the
+  original hash. `docs/quality/evidence/CR-0010-rehearsal.txt`.
+- Manifests of 174 originals + 168 other rasters committed before any data
+  change (`ec1470a`); backup verified on separate inodes.
+- Repair: 174/174 files; every region's masks matched the pins first.
+- Full check: 1,145 rows, 0 gate failures; then G8.1 after the purge (207
+  `patches_*` removed) and G8.3 stale markers.
+- **Correction found by X3:** v3's Impact said "0 positives have a centre
+  pixel outside any in-scope mask". On the *current* record set 1 NH
+  training positive's centre is outside the `tsd` (disturbance∩) mask; the
+  "0" was a round-7 measurement on CR-0007's post-partition record set.
+  Impact corrected in place; no gate affected.
+- CR-0008 G4 independently regenerated 15 of the repaired files with the
+  fixed generators: pixel-identical.

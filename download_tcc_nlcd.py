@@ -58,6 +58,7 @@ import sys
 import time
 import math
 import argparse
+import shutil
 import tempfile
 
 import numpy as np
@@ -72,7 +73,7 @@ sys.path.insert(0, _here)
 
 from prepare_training_data import BOXES
 from grouse_data import (GrouseData, DataConfig, YEAR_MATCH_TOLERANCE,
-                         grid_mismatch, refuse_if_repaired)
+                         grid_mismatch)
 
 NODATA = -9999
 PIXEL_M = 30
@@ -226,7 +227,31 @@ def year_image(ee, cid, band_prefs, year):
         raise RuntimeError(f"{cid} has no images for {year}")
     bands = sub.first().bandNames().getInfo()
     band = next((b for b in band_prefs if b in bands), bands[0])
-    return sub.select(band).mosaic(), band
+    # Earth Engine exports masked pixels (outside the product) as 0,
+    # which is a real tcc reading (0 % canopy - BUG-0030) and rejected
+    # for nlcd only because its codes start at 11 (BUG-0035). Unmask to
+    # -1, outside BOTH valid ranges, so mask_to_valid turns it into
+    # NODATA by design. toInt16 first: both bands are unsigned 8-bit,
+    # where -1 is not representable.
+    return sub.select(band).mosaic().toInt16().unmask(-1), band
+
+
+def mask_to_valid(arr, lo, hi):
+    """Values outside [lo, hi] (incl. the -1 unmask marker) -> NODATA."""
+    arr = np.asarray(arr, dtype=np.float64)
+    return np.where((arr >= lo) & (arr <= hi), arr,
+                    NODATA).astype(np.int16)
+
+
+def coverage_violations(path, coverage_path):
+    """Pixels of `path` holding a value where `coverage_path` (the
+    region's NLCD raster) is nodata; None when the two are not on the
+    same grid and extent, so the check cannot be made."""
+    with rasterio.open(path) as a, rasterio.open(coverage_path) as c:
+        if a.shape != c.shape or a.transform != c.transform or \
+                a.crs != c.crs:
+            return None
+        return int(((a.read(1) != NODATA) & (c.read(1) == NODATA)).sum())
 
 
 def sighting_years(rd):
@@ -344,8 +369,25 @@ def template_raster(rd):
     return rd.latest_raster_path("evt")
 
 
+def _check_coverage(feature, staged, coverage_path, out_path):
+    """tcc must be nodata wherever NLCD is (tcc IS NLCD Tree Canopy
+    Cover): refuse to replace out_path otherwise. The existing file is
+    left untouched on failure."""
+    if feature != "tcc":
+        return
+    bad = (coverage_violations(staged, coverage_path)
+           if coverage_path else None)
+    if bad is None:
+        print(f"   [warn] {os.path.basename(out_path)}: no NLCD raster on "
+              f"the same grid - coverage check skipped")
+    elif bad:
+        raise RuntimeError(
+            f"{out_path}: {bad:,} px carry a value outside NLCD coverage - "
+            f"Earth Engine's mask was not exported as nodata. Not written.")
+
+
 def build_raster(ee, feature, spec, cid, year, bounds_lonlat, out_path,
-                 tile_m, workers=8, template=None):
+                 tile_m, workers=8, template=None, coverage_path=None):
     image, band = year_image(ee, cid, spec["bands"], year)
     x0, y0, x1, y1 = region_grid(bounds_lonlat)
     tile_list = list(tiles(x0, y0, x1, y1, tile_m))
@@ -362,9 +404,7 @@ def build_raster(ee, feature, spec, cid, year, bounds_lonlat, out_path,
         finally:
             for s in srcs:
                 s.close()
-        arr = mosaic[0].astype(np.float64)
-        out = np.where((arr >= lo) & (arr <= hi), arr,
-                       NODATA).astype(np.int16)
+        out = mask_to_valid(mosaic[0], lo, hi)
         valid_frac = float((out != NODATA).mean())
         if valid_frac < 0.01:
             raise RuntimeError(
@@ -388,17 +428,22 @@ def build_raster(ee, feature, spec, cid, year, bounds_lonlat, out_path,
             dst.write(out, 1)
         if template is not None:
             from realign_rasters import warp_to_grid
-            warp_to_grid(merged, template, out_path)
-            with rasterio.open(out_path) as chk, \
+            staged = os.path.join(td, "staged.tif")
+            warp_to_grid(merged, template, staged)
+            with rasterio.open(staged) as chk, \
                     rasterio.open(template) as ref:
                 why = grid_mismatch(chk, ref)
                 shape = (chk.width, chk.height)
             if why:
                 raise RuntimeError(f"{out_path}: still not on the "
                                    f"template grid after warping: {why}")
+            _check_coverage(feature, staged, coverage_path, out_path)
+            with rasterio.open(staged, "r+") as dst:
+                dst.update_tags(GROUSE_COVERAGE="ee-mask")
+            shutil.copyfile(staged, out_path + ".tmp")
+            os.replace(out_path + ".tmp", out_path)
             grid_note = f"on template grid {os.path.basename(template)}"
         else:
-            import shutil
             shutil.copyfile(merged, out_path)
             shape = (out.shape[1], out.shape[0])
             grid_note = ("EPSG:5070 - NO LANDFIRE template yet; run "
@@ -442,11 +487,6 @@ def main():
                              "standard data/landfire.")
     parser.add_argument("--force", action="store_true",
                         help="Re-download files that already exist.")
-    parser.add_argument("--overwrite-repaired", action="store_true",
-                        help="With --force, allow overwriting rasters "
-                             "repaired by CR-0010. This script still "
-                             "writes 0 outside coverage for tcc until "
-                             "CR-0008 lands.")
     args = parser.parse_args()
 
     ee = ee_init(args.project)
@@ -483,12 +523,9 @@ def main():
                       f"yet - output stays in EPSG:5070 and must be "
                       f"realigned (realign_rasters.py --apply) before "
                       f"training; dataset.py refuses mixed grids.")
-            # CR-0010: check every year's target before the first
-            # download. Only --force overwrites an existing file.
-            if args.force:
-                refuse_if_repaired(
-                    [os.path.join(out_dir, f"{region}_{y}_{feature}.tif")
-                     for y in years], allow=args.overwrite_repaired)
+            rd = data[region]
+            coverage = (rd.latest_raster_path("nlcd")
+                        if rd.raster_years("nlcd") else None)
             for year in years:
                 out_path = os.path.join(out_dir,
                                         f"{region}_{year}_{feature}.tif")
@@ -498,7 +535,7 @@ def main():
                     continue
                 build_raster(ee, feature, spec, cid, year, BOXES[region],
                              out_path, args.tile_m, workers=args.workers,
-                             template=template)
+                             template=template, coverage_path=coverage)
 
     print("\nDone. grouse_data.py discovers the new rasters "
           "automatically:\n  - train.py will list tcc/nlcd under "

@@ -90,7 +90,7 @@ from rasterio.vrt import WarpedVRT
 from rasterio.enums import Resampling
 from rasterio.windows import Window
 
-from grouse_data import GrouseData, refuse_if_repaired
+from grouse_data import GrouseData, NODATA_SENTINELS
 from models import TSD_MAX_YEARS, tsd_encode
 
 CACHE_DIR = "data/disturbance"
@@ -246,7 +246,7 @@ def _report_codes(path):
 
 
 def process_region(region, data, dist_paths, block_rows,
-                   overwrite_repaired=False):
+                   out_dir=None, only_years=None):
     print(f"\n{'=' * 60}\n{region}\n{'=' * 60}")
     rd = data[region]
     others = [f for f in rd.available_features() if f != "tsd"]
@@ -258,6 +258,11 @@ def process_region(region, data, dist_paths, block_rows,
     # nlcd/tcc reach back further than evt/evh/evc, and a sighting year
     # that resolves for those should resolve for tsd too.
     years = sorted({y for f in others for y in rd.raster_years(f)})
+    if only_years:
+        years = [y for y in years if y in set(only_years)]
+        if not years:
+            print(f"   [!] none of {sorted(only_years)} on disk - skipping.")
+            return
     print(f"   template grid: {os.path.basename(template)}")
     print(f"   years to write: {years}")
 
@@ -275,11 +280,8 @@ def process_region(region, data, dist_paths, block_rows,
         height, width = ref.height, ref.width
         ref_crs, ref_transform = ref.crs, ref.transform
 
-    raster_dir = data.config.resolve(data.config.raster_dir)
-    # CR-0010: every year's output is opened "w" (truncated) together
-    # below, so check all of them before any is opened.
-    refuse_if_repaired([os.path.join(raster_dir, f"{region}_{y}_tsd.tif")
-                        for y in years], allow=overwrite_repaired)
+    raster_dir = out_dir or data.config.resolve(data.config.raster_dir)
+    os.makedirs(raster_dir, exist_ok=True)
     # TreeMap and the disturbance bundle are on the LANDFIRE CONUS grid;
     # these regions are LFPS clips in a per-request LOCAL Albers (see
     # dataset.py's CRS note). WarpedVRT does the reprojection lazily so
@@ -298,6 +300,7 @@ def process_region(region, data, dist_paths, block_rows,
         for y in years:
             path = os.path.join(raster_dir, f"{region}_{y}_tsd.tif")
             outs[y] = rasterio.open(path, "w", **profile)
+            outs[y].update_tags(GROUSE_COVERAGE="disturbance-intersection")
 
         stats = {y: [] for y in years}
         for r0 in range(0, height, block_rows):
@@ -305,22 +308,30 @@ def process_region(region, data, dist_paths, block_rows,
             win = Window(0, r0, width, nrows)
             # -1 = never disturbed within the record.
             last = np.full((nrows, width), -1, dtype=np.int16)
+            # Covered by every vintage folded so far. Year Y is emitted
+            # before any vintage d > Y is folded, so at emit time this is
+            # the intersection over vintages <= Y - that year's coverage.
+            cov = np.ones((nrows, width), dtype=bool)
             ti = 0
             targets = years
             for d in sorted(vrts):
                 while ti < len(targets) and targets[ti] < d:
                     stats[targets[ti]].append(
-                        _emit(outs[targets[ti]], targets[ti], last, win))
+                        _emit(outs[targets[ti]], targets[ti], last, cov,
+                              win))
                     ti += 1
                 v = vrts[d]
                 arr = v.read(1, window=win)
-                hit = arr > 0
-                if v.nodata is not None:
-                    hit &= arr != v.nodata
+                # Raw 0 is the VAT "Background" class: covered, not
+                # disturbed. Every sentinel is outside coverage - not just
+                # the file's declared nodata tag, which differs by vintage.
+                sentinel = np.isin(arr, NODATA_SENTINELS)
+                cov &= ~sentinel
+                hit = (arr > 0) & ~sentinel
                 last[hit] = d
             while ti < len(targets):
                 stats[targets[ti]].append(
-                    _emit(outs[targets[ti]], targets[ti], last, win))
+                    _emit(outs[targets[ti]], targets[ti], last, cov, win))
                 ti += 1
     finally:
         for o in outs.values():
@@ -338,11 +349,15 @@ def process_region(region, data, dist_paths, block_rows,
               f"disturbance within {TSD_MAX_YEARS}y of {y}")
 
 
-def _emit(dst, year, last, win):
-    """Write one stripe of one vintage. Returns (pixels, disturbed_frac)
-    so the caller can report coverage without a second pass."""
+def _emit(dst, year, last, cov, win):
+    """Write one stripe of one vintage. Pixels no vintage <= year covers
+    are nodata - not "undisturbed for TSD_MAX_YEARS" (BUG-0024). Returns
+    (pixels, disturbed_frac) so the caller can report coverage without a
+    second pass."""
     years_since = np.where(last >= 0, year - last, TSD_MAX_YEARS)
-    dst.write(tsd_encode(years_since), 1, window=win)
+    enc = tsd_encode(years_since)
+    enc[~cov] = -9999
+    dst.write(enc, 1, window=win)
     known = last >= 0
     return years_since.size, float(known.mean())
 
@@ -362,10 +377,11 @@ def main():
                          "roughly block_rows * width * 2 bytes per open "
                          "disturbance year; lower it if a large state "
                          "runs out. Default: %(default)s")
-    ap.add_argument("--overwrite-repaired", action="store_true",
-                    help="Allow overwriting rasters repaired by CR-0010. "
-                         "This generator still writes fabricated values "
-                         "outside coverage until CR-0008 lands.")
+    ap.add_argument("--out-dir", default=None,
+                    help="Write here instead of the pipeline raster dir.")
+    ap.add_argument("--years", nargs="+", type=int, default=None,
+                    help="Only these output years. Default: every year "
+                         "any other feature has on disk.")
     args = ap.parse_args()
 
     print("Fetching LANDFIRE Annual Disturbance ...")
@@ -376,7 +392,7 @@ def main():
     regions = args.regions or data.discover_regions()
     for region in regions:
         process_region(region, data, dist_paths, args.block_rows,
-                       args.overwrite_repaired)
+                       args.out_dir, args.years)
     print("\nDone. Remember: a new feature is a GEOMETRY change - "
           "train.py needs a cold start, and --resume/--init-from are "
           "invalid against any older checkpoint.")

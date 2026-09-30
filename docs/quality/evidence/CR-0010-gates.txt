@@ -1,0 +1,1149 @@
+F1    GATE PASS file set                         value=174 present, missing=[], extra=[]  required=== manifest (174)
+F1    GATE PASS stray temp files                 value=0  required=0
+B0    GATE PASS backup (174 files)               value=all match  required=all match
+F2    GATE PASS other rasters (168)              value=all unchanged  required=all unchanged
+G0    GATE PASS ME nlcd year-invariant           value=10 years same=True  required=True
+G0    GATE PASS ME nlcd                          value=(107406613, '59a7639b5fb0389d0955eb61e45ad3fc')  required=(107406613, '59a7639b5fb0389d0955eb61e45ad3fc')
+G0    GATE PASS ME disturbance                   value=(107321500, '9006374548fa58f4a59e3ff14c24130d')  required=(107321500, '9006374548fa58f4a59e3ff14c24130d')
+X1    OBS       ME nlcd-vs-disturbance           value=nlcd_only=0.04791% dist_only=0.00611%  required=report
+G1    GATE PASS ME_2016_balive.tif               value=0  required=0
+G2    GATE PASS ME_2016_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2016_balive.tif               value=96215819  required=96215819
+G6    GATE PASS ME_2016_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2016_balive.tif               value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2016_balive.tif               value=1790762724573129646  required=!= 1789827018784418800
+G1    GATE PASS ME_2016_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS ME_2016_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2016_carbon_dwn.tif           value=96215819  required=96215819
+G6    GATE PASS ME_2016_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2016_carbon_dwn.tif           value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2016_carbon_dwn.tif           value=1790762724733136834  required=!= 1789827018784418800
+G1    GATE PASS ME_2016_qmd.tif                  value=0  required=0
+G2    GATE PASS ME_2016_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2016_qmd.tif                  value=96215819  required=96215819
+G6    GATE PASS ME_2016_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2016_qmd.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2016_qmd.tif                  value=1790762722713046065  required=!= 1789827018784418800
+G1    GATE PASS ME_2016_tcc.tif                  value=0  required=0
+G2    GATE PASS ME_2016_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2016_tcc.tif                  value=95946265  required=95946265
+G6    GATE PASS ME_2016_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2016_tcc.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2016_tcc.tif                  value=1790762731803454526  required=!= 1789903704759817632
+G1    GATE PASS ME_2016_tpa_live.tif             value=0  required=0
+G2    GATE PASS ME_2016_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2016_tpa_live.tif             value=96215819  required=96215819
+G6    GATE PASS ME_2016_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2016_tpa_live.tif             value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2016_tpa_live.tif             value=1790762732243474296  required=!= 1789827018784418800
+G1    GATE PASS ME_2016_tsd.tif                  value=0  required=0
+G2    GATE PASS ME_2016_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2016_tsd.tif                  value=96300932  required=96300932
+G6    GATE PASS ME_2016_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2016_tsd.tif                  value=9006374548fa58f4a59e3ff14c24130d  required=9006374548fa58f4a59e3ff14c24130d
+G8.2  GATE PASS ME_2016_tsd.tif                  value=1790762728983327810  required=!= 1789821035103487796
+X4    OBS       ME_2016_tsd.tif before           value=zero=989423 max=95787259  required=unchanged
+X4    OBS       ME_2016_tsd.tif after            value=zero=989423 max=95787259  required=unchanged
+G1    GATE PASS ME_2017_balive.tif               value=0  required=0
+G2    GATE PASS ME_2017_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2017_balive.tif               value=96215819  required=96215819
+G6    GATE PASS ME_2017_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2017_balive.tif               value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2017_balive.tif               value=1790762736733676264  required=!= 1789827018784418800
+G1    GATE PASS ME_2017_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS ME_2017_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2017_carbon_dwn.tif           value=96215819  required=96215819
+G6    GATE PASS ME_2017_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2017_carbon_dwn.tif           value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2017_carbon_dwn.tif           value=1790762737583714550  required=!= 1789827018784418800
+G1    GATE PASS ME_2017_qmd.tif                  value=0  required=0
+G2    GATE PASS ME_2017_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2017_qmd.tif                  value=96215819  required=96215819
+G6    GATE PASS ME_2017_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2017_qmd.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2017_qmd.tif                  value=1790762740033824901  required=!= 1789827018784418800
+G1    GATE PASS ME_2017_tcc.tif                  value=0  required=0
+G2    GATE PASS ME_2017_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2017_tcc.tif                  value=95946265  required=95946265
+G6    GATE PASS ME_2017_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2017_tcc.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2017_tcc.tif                  value=1790762748784219021  required=!= 1789903725950251031
+G1    GATE PASS ME_2017_tpa_live.tif             value=0  required=0
+G2    GATE PASS ME_2017_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2017_tpa_live.tif             value=96215819  required=96215819
+G6    GATE PASS ME_2017_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2017_tpa_live.tif             value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2017_tpa_live.tif             value=1790762743293971740  required=!= 1789827018784418800
+G1    GATE PASS ME_2017_tsd.tif                  value=0  required=0
+G2    GATE PASS ME_2017_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2017_tsd.tif                  value=96300932  required=96300932
+G6    GATE PASS ME_2017_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2017_tsd.tif                  value=9006374548fa58f4a59e3ff14c24130d  required=9006374548fa58f4a59e3ff14c24130d
+G8.2  GATE PASS ME_2017_tsd.tif                  value=1790762744244014530  required=!= 1789821035103487796
+X4    OBS       ME_2017_tsd.tif before           value=zero=1518635 max=94369777  required=unchanged
+X4    OBS       ME_2017_tsd.tif after            value=zero=1518635 max=94369777  required=unchanged
+G1    GATE PASS ME_2018_balive.tif               value=0  required=0
+G2    GATE PASS ME_2018_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2018_balive.tif               value=96215819  required=96215819
+G6    GATE PASS ME_2018_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2018_balive.tif               value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2018_balive.tif               value=1790762750174281630  required=!= 1789827018784418800
+G1    GATE PASS ME_2018_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS ME_2018_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2018_carbon_dwn.tif           value=96215819  required=96215819
+G6    GATE PASS ME_2018_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2018_carbon_dwn.tif           value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2018_carbon_dwn.tif           value=1790762751974362938  required=!= 1789827018784418800
+G1    GATE PASS ME_2018_qmd.tif                  value=0  required=0
+G2    GATE PASS ME_2018_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2018_qmd.tif                  value=96215819  required=96215819
+G6    GATE PASS ME_2018_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2018_qmd.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2018_qmd.tif                  value=1790762756504568143  required=!= 1789827018784418800
+G1    GATE PASS ME_2018_tcc.tif                  value=0  required=0
+G2    GATE PASS ME_2018_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2018_tcc.tif                  value=95946265  required=95946265
+G6    GATE PASS ME_2018_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2018_tcc.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2018_tcc.tif                  value=1790762759224691358  required=!= 1789903746710675855
+G1    GATE PASS ME_2018_tpa_live.tif             value=0  required=0
+G2    GATE PASS ME_2018_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2018_tpa_live.tif             value=96215819  required=96215819
+G6    GATE PASS ME_2018_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2018_tpa_live.tif             value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2018_tpa_live.tif             value=1790762759594708119  required=!= 1789827018784418800
+G1    GATE PASS ME_2018_tsd.tif                  value=0  required=0
+G2    GATE PASS ME_2018_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2018_tsd.tif                  value=96300932  required=96300932
+G6    GATE PASS ME_2018_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2018_tsd.tif                  value=9006374548fa58f4a59e3ff14c24130d  required=9006374548fa58f4a59e3ff14c24130d
+G8.2  GATE PASS ME_2018_tsd.tif                  value=1790762760884766556  required=!= 1789821035103487796
+X4    OBS       ME_2018_tsd.tif before           value=zero=2027953 max=92582913  required=unchanged
+X4    OBS       ME_2018_tsd.tif after            value=zero=2027953 max=92582913  required=unchanged
+G1    GATE PASS ME_2019_balive.tif               value=0  required=0
+G2    GATE PASS ME_2019_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2019_balive.tif               value=96215819  required=96215819
+G6    GATE PASS ME_2019_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2019_balive.tif               value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2019_balive.tif               value=1790762766335013439  required=!= 1789827022324491449
+G1    GATE PASS ME_2019_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS ME_2019_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2019_carbon_dwn.tif           value=96215819  required=96215819
+G6    GATE PASS ME_2019_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2019_carbon_dwn.tif           value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2019_carbon_dwn.tif           value=1790762767315057834  required=!= 1789827022324491449
+G1    GATE PASS ME_2019_qmd.tif                  value=0  required=0
+G2    GATE PASS ME_2019_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2019_qmd.tif                  value=96215819  required=96215819
+G6    GATE PASS ME_2019_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2019_qmd.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2019_qmd.tif                  value=1790762766795034277  required=!= 1789827022324491449
+G1    GATE PASS ME_2019_tcc.tif                  value=0  required=0
+G2    GATE PASS ME_2019_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2019_tcc.tif                  value=95946265  required=95946265
+G6    GATE PASS ME_2019_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2019_tcc.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2019_tcc.tif                  value=1790762778145550417  required=!= 1789903767371097524
+G1    GATE PASS ME_2019_tpa_live.tif             value=0  required=0
+G2    GATE PASS ME_2019_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2019_tpa_live.tif             value=96215819  required=96215819
+G6    GATE PASS ME_2019_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2019_tpa_live.tif             value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2019_tpa_live.tif             value=1790762774115367115  required=!= 1789827022324491449
+G1    GATE PASS ME_2019_tsd.tif                  value=0  required=0
+G2    GATE PASS ME_2019_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2019_tsd.tif                  value=96300932  required=96300932
+G6    GATE PASS ME_2019_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2019_tsd.tif                  value=9006374548fa58f4a59e3ff14c24130d  required=9006374548fa58f4a59e3ff14c24130d
+G8.2  GATE PASS ME_2019_tsd.tif                  value=1790762770485202005  required=!= 1789821035103487796
+X4    OBS       ME_2019_tsd.tif before           value=zero=1339532 max=91360863  required=unchanged
+X4    OBS       ME_2019_tsd.tif after            value=zero=1339532 max=91360863  required=unchanged
+G1    GATE PASS ME_2020_balive.tif               value=0  required=0
+G2    GATE PASS ME_2020_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2020_balive.tif               value=96215819  required=96215819
+G6    GATE PASS ME_2020_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2020_balive.tif               value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2020_balive.tif               value=1790762776285465815  required=!= 1789827022324491449
+G1    GATE PASS ME_2020_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS ME_2020_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2020_carbon_dwn.tif           value=96215819  required=96215819
+G6    GATE PASS ME_2020_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2020_carbon_dwn.tif           value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2020_carbon_dwn.tif           value=1790762781765714115  required=!= 1789827022324491449
+G1    GATE PASS ME_2020_qmd.tif                  value=0  required=0
+G2    GATE PASS ME_2020_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2020_qmd.tif                  value=96215819  required=96215819
+G6    GATE PASS ME_2020_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2020_qmd.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2020_qmd.tif                  value=1790762782205733955  required=!= 1789827022324491449
+G1    GATE PASS ME_2020_tcc.tif                  value=0  required=0
+G2    GATE PASS ME_2020_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2020_tcc.tif                  value=95946265  required=95946265
+G6    GATE PASS ME_2020_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2020_tcc.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2020_tcc.tif                  value=1790762789796076994  required=!= 1789903788431529458
+G1    GATE PASS ME_2020_tpa_live.tif             value=0  required=0
+G2    GATE PASS ME_2020_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2020_tpa_live.tif             value=96215819  required=96215819
+G6    GATE PASS ME_2020_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2020_tpa_live.tif             value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2020_tpa_live.tif             value=1790762789156048056  required=!= 1789827022324491449
+G1    GATE PASS ME_2020_tsd.tif                  value=0  required=0
+G2    GATE PASS ME_2020_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2020_tsd.tif                  value=96300932  required=96300932
+G6    GATE PASS ME_2020_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2020_tsd.tif                  value=9006374548fa58f4a59e3ff14c24130d  required=9006374548fa58f4a59e3ff14c24130d
+G8.2  GATE PASS ME_2020_tsd.tif                  value=1790762785515883462  required=!= 1789821035103487796
+X4    OBS       ME_2020_tsd.tif before           value=zero=1115520 max=90375854  required=unchanged
+X4    OBS       ME_2020_tsd.tif after            value=zero=1115520 max=90375854  required=unchanged
+G1    GATE PASS ME_2021_balive.tif               value=0  required=0
+G2    GATE PASS ME_2021_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2021_balive.tif               value=96215819  required=96215819
+G6    GATE PASS ME_2021_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2021_balive.tif               value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2021_balive.tif               value=1790762791266143466  required=!= 1789827022324491449
+G1    GATE PASS ME_2021_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS ME_2021_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2021_carbon_dwn.tif           value=96215819  required=96215819
+G6    GATE PASS ME_2021_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2021_carbon_dwn.tif           value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2021_carbon_dwn.tif           value=1790762796966401208  required=!= 1789827022324491449
+G1    GATE PASS ME_2021_qmd.tif                  value=0  required=0
+G2    GATE PASS ME_2021_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2021_qmd.tif                  value=96215819  required=96215819
+G6    GATE PASS ME_2021_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2021_qmd.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2021_qmd.tif                  value=1790762797456423366  required=!= 1789827022324491449
+G1    GATE PASS ME_2021_tcc.tif                  value=0  required=0
+G2    GATE PASS ME_2021_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2021_tcc.tif                  value=95946265  required=95946265
+G6    GATE PASS ME_2021_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2021_tcc.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2021_tcc.tif                  value=1790762800376555642  required=!= 1789903808951949671
+G1    GATE PASS ME_2021_tpa_live.tif             value=0  required=0
+G2    GATE PASS ME_2021_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2021_tpa_live.tif             value=96215819  required=96215819
+G6    GATE PASS ME_2021_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2021_tpa_live.tif             value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2021_tpa_live.tif             value=1790762804616749162  required=!= 1789827022324491449
+G1    GATE PASS ME_2021_tsd.tif                  value=0  required=0
+G2    GATE PASS ME_2021_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2021_tsd.tif                  value=96300932  required=96300932
+G6    GATE PASS ME_2021_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2021_tsd.tif                  value=9006374548fa58f4a59e3ff14c24130d  required=9006374548fa58f4a59e3ff14c24130d
+G8.2  GATE PASS ME_2021_tsd.tif                  value=1790762802016630493  required=!= 1789821035103487796
+X4    OBS       ME_2021_tsd.tif before           value=zero=1907456 max=88725430  required=unchanged
+X4    OBS       ME_2021_tsd.tif after            value=zero=1907456 max=88725430  required=unchanged
+G1    GATE PASS ME_2022_balive.tif               value=0  required=0
+G2    GATE PASS ME_2022_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2022_balive.tif               value=96215819  required=96215819
+G6    GATE PASS ME_2022_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2022_balive.tif               value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2022_balive.tif               value=1790762806296825839  required=!= 1789827019014423519
+G1    GATE PASS ME_2022_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS ME_2022_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2022_carbon_dwn.tif           value=96215819  required=96215819
+G6    GATE PASS ME_2022_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2022_carbon_dwn.tif           value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2022_carbon_dwn.tif           value=1790762809766984215  required=!= 1789827019014423519
+G1    GATE PASS ME_2022_qmd.tif                  value=0  required=0
+G2    GATE PASS ME_2022_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2022_qmd.tif                  value=96215819  required=96215819
+G6    GATE PASS ME_2022_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2022_qmd.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2022_qmd.tif                  value=1790762812327100110  required=!= 1789827019014423519
+G1    GATE PASS ME_2022_tcc.tif                  value=0  required=0
+G2    GATE PASS ME_2022_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2022_tcc.tif                  value=95946265  required=95946265
+G6    GATE PASS ME_2022_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2022_tcc.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2022_tcc.tif                  value=1790762817007311890  required=!= 1789903829512371687
+G1    GATE PASS ME_2022_tpa_live.tif             value=0  required=0
+G2    GATE PASS ME_2022_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2022_tpa_live.tif             value=96215819  required=96215819
+G6    GATE PASS ME_2022_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2022_tpa_live.tif             value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2022_tpa_live.tif             value=1790762815657250737  required=!= 1789827019014423519
+G1    GATE PASS ME_2022_tsd.tif                  value=0  required=0
+G2    GATE PASS ME_2022_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2022_tsd.tif                  value=96300932  required=96300932
+G6    GATE PASS ME_2022_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2022_tsd.tif                  value=9006374548fa58f4a59e3ff14c24130d  required=9006374548fa58f4a59e3ff14c24130d
+G8.2  GATE PASS ME_2022_tsd.tif                  value=1790762816757300561  required=!= 1789821035103487796
+X4    OBS       ME_2022_tsd.tif before           value=zero=1459591 max=87683794  required=unchanged
+X4    OBS       ME_2022_tsd.tif after            value=zero=1459591 max=87683794  required=unchanged
+G1    GATE PASS ME_2023_balive.tif               value=0  required=0
+G2    GATE PASS ME_2023_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2023_balive.tif               value=96215819  required=96215819
+G6    GATE PASS ME_2023_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2023_balive.tif               value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2023_balive.tif               value=1790762821517516275  required=!= 1789827019014423519
+G1    GATE PASS ME_2023_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS ME_2023_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2023_carbon_dwn.tif           value=96215819  required=96215819
+G6    GATE PASS ME_2023_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2023_carbon_dwn.tif           value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2023_carbon_dwn.tif           value=1790762824467649962  required=!= 1789827019014423519
+G1    GATE PASS ME_2023_qmd.tif                  value=0  required=0
+G2    GATE PASS ME_2023_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2023_qmd.tif                  value=96215819  required=96215819
+G6    GATE PASS ME_2023_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2023_qmd.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2023_qmd.tif                  value=1790762824817665824  required=!= 1789827019014423519
+G1    GATE PASS ME_2023_tcc.tif                  value=0  required=0
+G2    GATE PASS ME_2023_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2023_tcc.tif                  value=95946265  required=95946265
+G6    GATE PASS ME_2023_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2023_tcc.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2023_tcc.tif                  value=1790762830377917792  required=!= 1789903850102798289
+G1    GATE PASS ME_2023_tpa_live.tif             value=0  required=0
+G2    GATE PASS ME_2023_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2023_tpa_live.tif             value=96215819  required=96215819
+G6    GATE PASS ME_2023_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2023_tpa_live.tif             value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2023_tpa_live.tif             value=1790762832037993019  required=!= 1789827019014423519
+G1    GATE PASS ME_2023_tsd.tif                  value=0  required=0
+G2    GATE PASS ME_2023_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2023_tsd.tif                  value=96300932  required=96300932
+G6    GATE PASS ME_2023_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2023_tsd.tif                  value=9006374548fa58f4a59e3ff14c24130d  required=9006374548fa58f4a59e3ff14c24130d
+G8.2  GATE PASS ME_2023_tsd.tif                  value=1790762829397873380  required=!= 1789821035103487796
+X4    OBS       ME_2023_tsd.tif before           value=zero=1158631 max=86717973  required=unchanged
+X4    OBS       ME_2023_tsd.tif after            value=zero=1158631 max=86717973  required=unchanged
+G1    GATE PASS ME_2024_balive.tif               value=0  required=0
+G2    GATE PASS ME_2024_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2024_balive.tif               value=96215819  required=96215819
+G6    GATE PASS ME_2024_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2024_balive.tif               value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2024_balive.tif               value=1790762837208229953  required=!= 1789827019014423519
+G1    GATE PASS ME_2024_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS ME_2024_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2024_carbon_dwn.tif           value=96215819  required=96215819
+G6    GATE PASS ME_2024_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2024_carbon_dwn.tif           value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2024_carbon_dwn.tif           value=1790762836538199244  required=!= 1789827019014423519
+G1    GATE PASS ME_2024_qmd.tif                  value=0  required=0
+G2    GATE PASS ME_2024_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2024_qmd.tif                  value=96215819  required=96215819
+G6    GATE PASS ME_2024_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2024_qmd.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2024_qmd.tif                  value=1790762838478288163  required=!= 1789827019014423519
+G1    GATE PASS ME_2024_tpa_live.tif             value=0  required=0
+G2    GATE PASS ME_2024_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2024_tpa_live.tif             value=96215819  required=96215819
+G6    GATE PASS ME_2024_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2024_tpa_live.tif             value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2024_tpa_live.tif             value=1790762844258551167  required=!= 1789827019014423519
+G1    GATE PASS ME_2024_tsd.tif                  value=0  required=0
+G2    GATE PASS ME_2024_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2024_tsd.tif                  value=96300932  required=96300932
+G6    GATE PASS ME_2024_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2024_tsd.tif                  value=9006374548fa58f4a59e3ff14c24130d  required=9006374548fa58f4a59e3ff14c24130d
+G8.2  GATE PASS ME_2024_tsd.tif                  value=1790762841898444222  required=!= 1789821035103487796
+X4    OBS       ME_2024_tsd.tif before           value=zero=1096155 max=85813230  required=unchanged
+X4    OBS       ME_2024_tsd.tif after            value=zero=1096155 max=85813230  required=unchanged
+G1    GATE PASS ME_2025_balive.tif               value=0  required=0
+G2    GATE PASS ME_2025_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2025_balive.tif               value=96215819  required=96215819
+G6    GATE PASS ME_2025_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2025_balive.tif               value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2025_balive.tif               value=1790762844308553433  required=!= 1789827019014423519
+G1    GATE PASS ME_2025_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS ME_2025_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2025_carbon_dwn.tif           value=96215819  required=96215819
+G6    GATE PASS ME_2025_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2025_carbon_dwn.tif           value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2025_carbon_dwn.tif           value=1790762849688797847  required=!= 1789827019014423519
+G1    GATE PASS ME_2025_qmd.tif                  value=0  required=0
+G2    GATE PASS ME_2025_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2025_qmd.tif                  value=96215819  required=96215819
+G6    GATE PASS ME_2025_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2025_qmd.tif                  value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2025_qmd.tif                  value=1790762851448878405  required=!= 1789827019014423519
+G1    GATE PASS ME_2025_tpa_live.tif             value=0  required=0
+G2    GATE PASS ME_2025_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2025_tpa_live.tif             value=96215819  required=96215819
+G6    GATE PASS ME_2025_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2025_tpa_live.tif             value=59a7639b5fb0389d0955eb61e45ad3fc  required=59a7639b5fb0389d0955eb61e45ad3fc
+G8.2  GATE PASS ME_2025_tpa_live.tif             value=1790762850008812494  required=!= 1789827019014423519
+G1    GATE PASS ME_2025_tsd.tif                  value=0  required=0
+G2    GATE PASS ME_2025_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS ME_2025_tsd.tif                  value=96300932  required=96300932
+G6    GATE PASS ME_2025_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS ME_2025_tsd.tif                  value=9006374548fa58f4a59e3ff14c24130d  required=9006374548fa58f4a59e3ff14c24130d
+G8.2  GATE PASS ME_2025_tsd.tif                  value=1790762853028950726  required=!= 1789821035103487796
+X4    OBS       ME_2025_tsd.tif before           value=zero=0 max=85813230  required=unchanged
+X4    OBS       ME_2025_tsd.tif after            value=zero=0 max=85813230  required=unchanged
+X3    OBS       ME positives/train nlcd          value=window=16 centre=0 of 3088  required=report
+X3    OBS       ME positives/train disturbance   value=window=16 centre=0 of 3088  required=report
+X3    OBS       ME positives/val nlcd            value=window=1 centre=0 of 772  required=report
+X3    OBS       ME positives/val disturbance     value=window=1 centre=0 of 772  required=report
+X3    OBS       ME negatives/train nlcd          value=window=23 centre=0 of 3088  required=report
+X3    OBS       ME negatives/train disturbance   value=window=23 centre=0 of 3088  required=report
+X3    OBS       ME negatives/val nlcd            value=window=4 centre=1 of 772  required=report
+X3    OBS       ME negatives/val disturbance     value=window=4 centre=1 of 772  required=report
+G0    GATE PASS NH nlcd year-invariant           value=10 years same=True  required=True
+G0    GATE PASS NH nlcd                          value=(51384193, '15375b62cca9ab85ec4c23869218a6d7')  required=(51384193, '15375b62cca9ab85ec4c23869218a6d7')
+G0    GATE PASS NH disturbance                   value=(51379852, 'c10c46f12978de0e68fd1ded93b65a84')  required=(51379852, 'c10c46f12978de0e68fd1ded93b65a84')
+X1    OBS       NH nlcd-vs-disturbance           value=nlcd_only=0.00932% dist_only=0.00171%  required=report
+G1    GATE PASS NH_2016_balive.tif               value=0  required=0
+G2    GATE PASS NH_2016_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2016_balive.tif               value=5659263  required=5659263
+G6    GATE PASS NH_2016_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2016_balive.tif               value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2016_balive.tif               value=1790762885380418781  required=!= 1789826991723869199
+G1    GATE PASS NH_2016_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS NH_2016_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2016_carbon_dwn.tif           value=5659263  required=5659263
+G6    GATE PASS NH_2016_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2016_carbon_dwn.tif           value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2016_carbon_dwn.tif           value=1790762886120451992  required=!= 1789826991733869406
+G1    GATE PASS NH_2016_qmd.tif                  value=0  required=0
+G2    GATE PASS NH_2016_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2016_qmd.tif                  value=5659263  required=5659263
+G6    GATE PASS NH_2016_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2016_qmd.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2016_qmd.tif                  value=1790762886210456031  required=!= 1789826991733869406
+G1    GATE PASS NH_2016_tcc.tif                  value=0  required=0
+G2    GATE PASS NH_2016_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2016_tcc.tif                  value=5653164  required=5653164
+G6    GATE PASS NH_2016_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2016_tcc.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2016_tcc.tif                  value=1790762889450601441  required=!= 1789903877513366737
+G1    GATE PASS NH_2016_tpa_live.tif             value=0  required=0
+G2    GATE PASS NH_2016_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2016_tpa_live.tif             value=5659263  required=5659263
+G6    GATE PASS NH_2016_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2016_tpa_live.tif             value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2016_tpa_live.tif             value=1790762889040583041  required=!= 1789826991723869199
+G1    GATE PASS NH_2016_tsd.tif                  value=0  required=0
+G2    GATE PASS NH_2016_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2016_tsd.tif                  value=5663604  required=5663604
+G6    GATE PASS NH_2016_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2016_tsd.tif                  value=c10c46f12978de0e68fd1ded93b65a84  required=c10c46f12978de0e68fd1ded93b65a84
+G8.2  GATE PASS NH_2016_tsd.tif                  value=1790762887440511233  required=!= 1789821075004293663
+X4    OBS       NH_2016_tsd.tif before           value=zero=344485 max=48286497  required=unchanged
+X4    OBS       NH_2016_tsd.tif after            value=zero=344485 max=48286497  required=unchanged
+G1    GATE PASS NH_2017_balive.tif               value=0  required=0
+G2    GATE PASS NH_2017_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2017_balive.tif               value=5659263  required=5659263
+G6    GATE PASS NH_2017_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2017_balive.tif               value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2017_balive.tif               value=1790762890440645872  required=!= 1789826991723869199
+G1    GATE PASS NH_2017_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS NH_2017_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2017_carbon_dwn.tif           value=5659263  required=5659263
+G6    GATE PASS NH_2017_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2017_carbon_dwn.tif           value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2017_carbon_dwn.tif           value=1790762892080719475  required=!= 1789826991733869406
+G1    GATE PASS NH_2017_qmd.tif                  value=0  required=0
+G2    GATE PASS NH_2017_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2017_qmd.tif                  value=5659263  required=5659263
+G6    GATE PASS NH_2017_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2017_qmd.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2017_qmd.tif                  value=1790762891770705563  required=!= 1789826991733869406
+G1    GATE PASS NH_2017_tcc.tif                  value=0  required=0
+G2    GATE PASS NH_2017_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2017_tcc.tif                  value=5653164  required=5653164
+G6    GATE PASS NH_2017_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2017_tcc.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2017_tcc.tif                  value=1790762895660881505  required=!= 1789903886063543841
+G1    GATE PASS NH_2017_tpa_live.tif             value=0  required=0
+G2    GATE PASS NH_2017_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2017_tpa_live.tif             value=5659263  required=5659263
+G6    GATE PASS NH_2017_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2017_tpa_live.tif             value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2017_tpa_live.tif             value=1790762894210815733  required=!= 1789826991723869199
+G1    GATE PASS NH_2017_tsd.tif                  value=0  required=0
+G2    GATE PASS NH_2017_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2017_tsd.tif                  value=5663604  required=5663604
+G6    GATE PASS NH_2017_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2017_tsd.tif                  value=c10c46f12978de0e68fd1ded93b65a84  required=c10c46f12978de0e68fd1ded93b65a84
+G8.2  GATE PASS NH_2017_tsd.tif                  value=1790762893360777175  required=!= 1789821075004293663
+X4    OBS       NH_2017_tsd.tif before           value=zero=1234715 max=47104368  required=unchanged
+X4    OBS       NH_2017_tsd.tif after            value=zero=1234715 max=47104368  required=unchanged
+G1    GATE PASS NH_2018_balive.tif               value=0  required=0
+G2    GATE PASS NH_2018_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2018_balive.tif               value=5659263  required=5659263
+G6    GATE PASS NH_2018_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2018_balive.tif               value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2018_balive.tif               value=1790762896350912804  required=!= 1789826991723869199
+G1    GATE PASS NH_2018_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS NH_2018_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2018_carbon_dwn.tif           value=5659263  required=5659263
+G6    GATE PASS NH_2018_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2018_carbon_dwn.tif           value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2018_carbon_dwn.tif           value=1790762896560922330  required=!= 1789826991733869406
+G1    GATE PASS NH_2018_qmd.tif                  value=0  required=0
+G2    GATE PASS NH_2018_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2018_qmd.tif                  value=5659263  required=5659263
+G6    GATE PASS NH_2018_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2018_qmd.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2018_qmd.tif                  value=1790762898661017540  required=!= 1789826991733869406
+G1    GATE PASS NH_2018_tcc.tif                  value=0  required=0
+G2    GATE PASS NH_2018_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2018_tcc.tif                  value=5653164  required=5653164
+G6    GATE PASS NH_2018_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2018_tcc.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2018_tcc.tif                  value=1790762901681154457  required=!= 1789903894613720824
+G1    GATE PASS NH_2018_tpa_live.tif             value=0  required=0
+G2    GATE PASS NH_2018_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2018_tpa_live.tif             value=5659263  required=5659263
+G6    GATE PASS NH_2018_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2018_tpa_live.tif             value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2018_tpa_live.tif             value=1790762898791023434  required=!= 1789826991723869199
+G1    GATE PASS NH_2018_tsd.tif                  value=0  required=0
+G2    GATE PASS NH_2018_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2018_tsd.tif                  value=5663604  required=5663604
+G6    GATE PASS NH_2018_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2018_tsd.tif                  value=c10c46f12978de0e68fd1ded93b65a84  required=c10c46f12978de0e68fd1ded93b65a84
+G8.2  GATE PASS NH_2018_tsd.tif                  value=1790762899711065144  required=!= 1789821075004293663
+X4    OBS       NH_2018_tsd.tif before           value=zero=936272 max=46370582  required=unchanged
+X4    OBS       NH_2018_tsd.tif after            value=zero=936272 max=46370582  required=unchanged
+G1    GATE PASS NH_2019_balive.tif               value=0  required=0
+G2    GATE PASS NH_2019_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2019_balive.tif               value=5659263  required=5659263
+G6    GATE PASS NH_2019_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2019_balive.tif               value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2019_balive.tif               value=1790762901181131788  required=!= 1789826991973874368
+G1    GATE PASS NH_2019_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS NH_2019_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2019_carbon_dwn.tif           value=5659263  required=5659263
+G6    GATE PASS NH_2019_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2019_carbon_dwn.tif           value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2019_carbon_dwn.tif           value=1790762902711201154  required=!= 1789826991973874368
+G1    GATE PASS NH_2019_qmd.tif                  value=0  required=0
+G2    GATE PASS NH_2019_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2019_qmd.tif                  value=5659263  required=5659263
+G6    GATE PASS NH_2019_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2019_qmd.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2019_qmd.tif                  value=1790762903541238782  required=!= 1789826991973874368
+G1    GATE PASS NH_2019_tcc.tif                  value=0  required=0
+G2    GATE PASS NH_2019_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2019_tcc.tif                  value=5653164  required=5653164
+G6    GATE PASS NH_2019_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2019_tcc.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2019_tcc.tif                  value=1790762906901391113  required=!= 1789903903153898729
+G1    GATE PASS NH_2019_tpa_live.tif             value=0  required=0
+G2    GATE PASS NH_2019_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2019_tpa_live.tif             value=5659263  required=5659263
+G6    GATE PASS NH_2019_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2019_tpa_live.tif             value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2019_tpa_live.tif             value=1790762905611332629  required=!= 1789826991973874368
+G1    GATE PASS NH_2019_tsd.tif                  value=0  required=0
+G2    GATE PASS NH_2019_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2019_tsd.tif                  value=5663604  required=5663604
+G6    GATE PASS NH_2019_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2019_tsd.tif                  value=c10c46f12978de0e68fd1ded93b65a84  required=c10c46f12978de0e68fd1ded93b65a84
+G8.2  GATE PASS NH_2019_tsd.tif                  value=1790762904441279585  required=!= 1789821075014293866
+X4    OBS       NH_2019_tsd.tif before           value=zero=582000 max=45848021  required=unchanged
+X4    OBS       NH_2019_tsd.tif after            value=zero=582000 max=45848021  required=unchanged
+G1    GATE PASS NH_2020_balive.tif               value=0  required=0
+G2    GATE PASS NH_2020_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2020_balive.tif               value=5659263  required=5659263
+G6    GATE PASS NH_2020_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2020_balive.tif               value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2020_balive.tif               value=1790762906701382045  required=!= 1789826991973874368
+G1    GATE PASS NH_2020_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS NH_2020_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2020_carbon_dwn.tif           value=5659263  required=5659263
+G6    GATE PASS NH_2020_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2020_carbon_dwn.tif           value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2020_carbon_dwn.tif           value=1790762908651470451  required=!= 1789826991973874368
+G1    GATE PASS NH_2020_qmd.tif                  value=0  required=0
+G2    GATE PASS NH_2020_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2020_qmd.tif                  value=5659263  required=5659263
+G6    GATE PASS NH_2020_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2020_qmd.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2020_qmd.tif                  value=1790762909701518055  required=!= 1789826991973874368
+G1    GATE PASS NH_2020_tcc.tif                  value=0  required=0
+G2    GATE PASS NH_2020_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2020_tcc.tif                  value=5653164  required=5653164
+G6    GATE PASS NH_2020_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2020_tcc.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2020_tcc.tif                  value=1790762912181630489  required=!= 1789903911754084742
+G1    GATE PASS NH_2020_tpa_live.tif             value=0  required=0
+G2    GATE PASS NH_2020_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2020_tpa_live.tif             value=5659263  required=5659263
+G6    GATE PASS NH_2020_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2020_tpa_live.tif             value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2020_tpa_live.tif             value=1790762911711609181  required=!= 1789826991973874368
+G1    GATE PASS NH_2020_tsd.tif                  value=0  required=0
+G2    GATE PASS NH_2020_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2020_tsd.tif                  value=5663604  required=5663604
+G6    GATE PASS NH_2020_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2020_tsd.tif                  value=c10c46f12978de0e68fd1ded93b65a84  required=c10c46f12978de0e68fd1ded93b65a84
+G8.2  GATE PASS NH_2020_tsd.tif                  value=1790762910961575181  required=!= 1789821075014293866
+X4    OBS       NH_2020_tsd.tif before           value=zero=322964 max=45565464  required=unchanged
+X4    OBS       NH_2020_tsd.tif after            value=zero=322964 max=45565464  required=unchanged
+G1    GATE PASS NH_2021_balive.tif               value=0  required=0
+G2    GATE PASS NH_2021_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2021_balive.tif               value=5659263  required=5659263
+G6    GATE PASS NH_2021_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2021_balive.tif               value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2021_balive.tif               value=1790762914191721618  required=!= 1789826991973874368
+G1    GATE PASS NH_2021_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS NH_2021_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2021_carbon_dwn.tif           value=5659263  required=5659263
+G6    GATE PASS NH_2021_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2021_carbon_dwn.tif           value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2021_carbon_dwn.tif           value=1790762914911754258  required=!= 1789826991973874368
+G1    GATE PASS NH_2021_qmd.tif                  value=0  required=0
+G2    GATE PASS NH_2021_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2021_qmd.tif                  value=5659263  required=5659263
+G6    GATE PASS NH_2021_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2021_qmd.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2021_qmd.tif                  value=1790762915271770579  required=!= 1789826991973874368
+G1    GATE PASS NH_2021_tcc.tif                  value=0  required=0
+G2    GATE PASS NH_2021_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2021_tcc.tif                  value=5653164  required=5653164
+G6    GATE PASS NH_2021_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2021_tcc.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2021_tcc.tif                  value=1790762918481916109  required=!= 1789903920484242039
+G1    GATE PASS NH_2021_tpa_live.tif             value=0  required=0
+G2    GATE PASS NH_2021_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2021_tpa_live.tif             value=5659263  required=5659263
+G6    GATE PASS NH_2021_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2021_tpa_live.tif             value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2021_tpa_live.tif             value=1790762917861888001  required=!= 1789826991973874368
+G1    GATE PASS NH_2021_tsd.tif                  value=0  required=0
+G2    GATE PASS NH_2021_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2021_tsd.tif                  value=5663604  required=5663604
+G6    GATE PASS NH_2021_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2021_tsd.tif                  value=c10c46f12978de0e68fd1ded93b65a84  required=c10c46f12978de0e68fd1ded93b65a84
+G8.2  GATE PASS NH_2021_tsd.tif                  value=1790762916521827250  required=!= 1789821075014293866
+X4    OBS       NH_2021_tsd.tif before           value=zero=889275 max=44791969  required=unchanged
+X4    OBS       NH_2021_tsd.tif after            value=zero=889275 max=44791969  required=unchanged
+G1    GATE PASS NH_2022_balive.tif               value=0  required=0
+G2    GATE PASS NH_2022_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2022_balive.tif               value=5659263  required=5659263
+G6    GATE PASS NH_2022_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2022_balive.tif               value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2022_balive.tif               value=1790762919541964166  required=!= 1789826991913873127
+G1    GATE PASS NH_2022_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS NH_2022_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2022_carbon_dwn.tif           value=5659263  required=5659263
+G6    GATE PASS NH_2022_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2022_carbon_dwn.tif           value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2022_carbon_dwn.tif           value=1790762920912026277  required=!= 1789826991913873127
+G1    GATE PASS NH_2022_qmd.tif                  value=0  required=0
+G2    GATE PASS NH_2022_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2022_qmd.tif                  value=5659263  required=5659263
+G6    GATE PASS NH_2022_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2022_qmd.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2022_qmd.tif                  value=1790762920792020837  required=!= 1789826991913873127
+G1    GATE PASS NH_2022_tcc.tif                  value=0  required=0
+G2    GATE PASS NH_2022_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2022_tcc.tif                  value=5653164  required=5653164
+G6    GATE PASS NH_2022_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2022_tcc.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2022_tcc.tif                  value=1790762924782201730  required=!= 1789903939644630800
+G1    GATE PASS NH_2022_tpa_live.tif             value=0  required=0
+G2    GATE PASS NH_2022_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2022_tpa_live.tif             value=5659263  required=5659263
+G6    GATE PASS NH_2022_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2022_tpa_live.tif             value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2022_tpa_live.tif             value=1790762923082124657  required=!= 1789826991913873127
+G1    GATE PASS NH_2022_tsd.tif                  value=0  required=0
+G2    GATE PASS NH_2022_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2022_tsd.tif                  value=5663604  required=5663604
+G6    GATE PASS NH_2022_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2022_tsd.tif                  value=c10c46f12978de0e68fd1ded93b65a84  required=c10c46f12978de0e68fd1ded93b65a84
+G8.2  GATE PASS NH_2022_tsd.tif                  value=1790762922142082043  required=!= 1789821075014293866
+X4    OBS       NH_2022_tsd.tif before           value=zero=632008 max=44380925  required=unchanged
+X4    OBS       NH_2022_tsd.tif after            value=zero=632008 max=44380925  required=unchanged
+G1    GATE PASS NH_2023_balive.tif               value=0  required=0
+G2    GATE PASS NH_2023_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2023_balive.tif               value=5659263  required=5659263
+G6    GATE PASS NH_2023_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2023_balive.tif               value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2023_balive.tif               value=1790762925122217143  required=!= 1789826991913873127
+G1    GATE PASS NH_2023_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS NH_2023_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2023_carbon_dwn.tif           value=5659263  required=5659263
+G6    GATE PASS NH_2023_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2023_carbon_dwn.tif           value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2023_carbon_dwn.tif           value=1790762925332226664  required=!= 1789826991913873127
+G1    GATE PASS NH_2023_qmd.tif                  value=0  required=0
+G2    GATE PASS NH_2023_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2023_qmd.tif                  value=5659263  required=5659263
+G6    GATE PASS NH_2023_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2023_qmd.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2023_qmd.tif                  value=1790762927782337738  required=!= 1789826991913873127
+G1    GATE PASS NH_2023_tcc.tif                  value=0  required=0
+G2    GATE PASS NH_2023_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2023_tcc.tif                  value=5653164  required=5653164
+G6    GATE PASS NH_2023_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2023_tcc.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2023_tcc.tif                  value=1790762929652422545  required=!= 1789903958855013119
+G1    GATE PASS NH_2023_tpa_live.tif             value=0  required=0
+G2    GATE PASS NH_2023_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2023_tpa_live.tif             value=5659263  required=5659263
+G6    GATE PASS NH_2023_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2023_tpa_live.tif             value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2023_tpa_live.tif             value=1790762927832340006  required=!= 1789826991913873127
+G1    GATE PASS NH_2023_tsd.tif                  value=0  required=0
+G2    GATE PASS NH_2023_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2023_tsd.tif                  value=5663604  required=5663604
+G6    GATE PASS NH_2023_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2023_tsd.tif                  value=c10c46f12978de0e68fd1ded93b65a84  required=c10c46f12978de0e68fd1ded93b65a84
+G8.2  GATE PASS NH_2023_tsd.tif                  value=1790762929072396222  required=!= 1789821075014293866
+X4    OBS       NH_2023_tsd.tif before           value=zero=1463971 max=43142790  required=unchanged
+X4    OBS       NH_2023_tsd.tif after            value=zero=1463971 max=43142790  required=unchanged
+G1    GATE PASS NH_2024_balive.tif               value=0  required=0
+G2    GATE PASS NH_2024_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2024_balive.tif               value=5659263  required=5659263
+G6    GATE PASS NH_2024_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2024_balive.tif               value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2024_balive.tif               value=1790762930872477905  required=!= 1789826991913873127
+G1    GATE PASS NH_2024_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS NH_2024_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2024_carbon_dwn.tif           value=5659263  required=5659263
+G6    GATE PASS NH_2024_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2024_carbon_dwn.tif           value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2024_carbon_dwn.tif           value=1790762932112534175  required=!= 1789826991913873127
+G1    GATE PASS NH_2024_qmd.tif                  value=0  required=0
+G2    GATE PASS NH_2024_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2024_qmd.tif                  value=5659263  required=5659263
+G6    GATE PASS NH_2024_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2024_qmd.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2024_qmd.tif                  value=1790762931932526009  required=!= 1789826991913873127
+G1    GATE PASS NH_2024_tpa_live.tif             value=0  required=0
+G2    GATE PASS NH_2024_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2024_tpa_live.tif             value=5659263  required=5659263
+G6    GATE PASS NH_2024_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2024_tpa_live.tif             value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2024_tpa_live.tif             value=1790762933802610868  required=!= 1789826991913873127
+G1    GATE PASS NH_2024_tsd.tif                  value=0  required=0
+G2    GATE PASS NH_2024_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2024_tsd.tif                  value=5663604  required=5663604
+G6    GATE PASS NH_2024_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2024_tsd.tif                  value=c10c46f12978de0e68fd1ded93b65a84  required=c10c46f12978de0e68fd1ded93b65a84
+G8.2  GATE PASS NH_2024_tsd.tif                  value=1790762932882569119  required=!= 1789821075014293866
+X4    OBS       NH_2024_tsd.tif before           value=zero=856870 max=42447357  required=unchanged
+X4    OBS       NH_2024_tsd.tif after            value=zero=856870 max=42447357  required=unchanged
+G1    GATE PASS NH_2025_balive.tif               value=0  required=0
+G2    GATE PASS NH_2025_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2025_balive.tif               value=5659263  required=5659263
+G6    GATE PASS NH_2025_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2025_balive.tif               value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2025_balive.tif               value=1790762935152672130  required=!= 1789826991913873127
+G1    GATE PASS NH_2025_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS NH_2025_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2025_carbon_dwn.tif           value=5659263  required=5659263
+G6    GATE PASS NH_2025_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2025_carbon_dwn.tif           value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2025_carbon_dwn.tif           value=1790762935302678936  required=!= 1789826991913873127
+G1    GATE PASS NH_2025_qmd.tif                  value=0  required=0
+G2    GATE PASS NH_2025_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2025_qmd.tif                  value=5659263  required=5659263
+G6    GATE PASS NH_2025_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2025_qmd.tif                  value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2025_qmd.tif                  value=1790762936492732938  required=!= 1789826991913873127
+G1    GATE PASS NH_2025_tpa_live.tif             value=0  required=0
+G2    GATE PASS NH_2025_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2025_tpa_live.tif             value=5659263  required=5659263
+G6    GATE PASS NH_2025_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2025_tpa_live.tif             value=15375b62cca9ab85ec4c23869218a6d7  required=15375b62cca9ab85ec4c23869218a6d7
+G8.2  GATE PASS NH_2025_tpa_live.tif             value=1790762937692787391  required=!= 1789826991913873127
+G1    GATE PASS NH_2025_tsd.tif                  value=0  required=0
+G2    GATE PASS NH_2025_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS NH_2025_tsd.tif                  value=5663604  required=5663604
+G6    GATE PASS NH_2025_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS NH_2025_tsd.tif                  value=c10c46f12978de0e68fd1ded93b65a84  required=c10c46f12978de0e68fd1ded93b65a84
+G8.2  GATE PASS NH_2025_tsd.tif                  value=1790762936592737475  required=!= 1789821075014293866
+X4    OBS       NH_2025_tsd.tif before           value=zero=0 max=42447357  required=unchanged
+X4    OBS       NH_2025_tsd.tif after            value=zero=0 max=42447357  required=unchanged
+X3    OBS       NH positives/train nlcd          value=window=9 centre=0 of 1794  required=report
+X3    OBS       NH positives/train disturbance   value=window=10 centre=1 of 1794  required=report
+X3    OBS       NH positives/val nlcd            value=window=1 centre=0 of 450  required=report
+X3    OBS       NH positives/val disturbance     value=window=1 centre=0 of 450  required=report
+X3    OBS       NH negatives/train nlcd          value=window=0 centre=0 of 1794  required=report
+X3    OBS       NH negatives/train disturbance   value=window=0 centre=0 of 1794  required=report
+X3    OBS       NH negatives/val nlcd            value=window=0 centre=0 of 450  required=report
+X3    OBS       NH negatives/val disturbance     value=window=0 centre=0 of 450  required=report
+G0    GATE PASS VT nlcd year-invariant           value=10 years same=True  required=True
+G0    GATE PASS VT nlcd                          value=(50450696, '682ef390d584a2a7b30b3eed10c75e15')  required=(50450696, '682ef390d584a2a7b30b3eed10c75e15')
+G0    GATE PASS VT disturbance                   value=(50447193, '64677a7523a8b20e24f1e595dbf8c39a')  required=(50447193, '64677a7523a8b20e24f1e595dbf8c39a')
+X1    OBS       VT nlcd-vs-disturbance           value=nlcd_only=0.00681% dist_only=0.00015%  required=report
+G1    GATE PASS VT_2016_balive.tif               value=0  required=0
+G2    GATE PASS VT_2016_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2016_balive.tif               value=2100649  required=2100649
+G6    GATE PASS VT_2016_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2016_balive.tif               value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2016_balive.tif               value=1790762967884158491  required=!= 1789826990953853284
+G1    GATE PASS VT_2016_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS VT_2016_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2016_carbon_dwn.tif           value=2100649  required=2100649
+G6    GATE PASS VT_2016_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2016_carbon_dwn.tif           value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2016_carbon_dwn.tif           value=1790762967194127105  required=!= 1789826990953853284
+G1    GATE PASS VT_2016_qmd.tif                  value=0  required=0
+G2    GATE PASS VT_2016_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2016_qmd.tif                  value=2100649  required=2100649
+G6    GATE PASS VT_2016_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2016_qmd.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2016_qmd.tif                  value=1790762967954161676  required=!= 1789826990953853284
+G1    GATE PASS VT_2016_tcc.tif                  value=0  required=0
+G2    GATE PASS VT_2016_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2016_tcc.tif                  value=2096352  required=2096352
+G6    GATE PASS VT_2016_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2016_tcc.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2016_tcc.tif                  value=1790762971184308605  required=!= 1789903988905648540
+G1    GATE PASS VT_2016_tpa_live.tif             value=0  required=0
+G2    GATE PASS VT_2016_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2016_tpa_live.tif             value=2100649  required=2100649
+G6    GATE PASS VT_2016_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2016_tpa_live.tif             value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2016_tpa_live.tif             value=1790762970644284039  required=!= 1789826990953853284
+G1    GATE PASS VT_2016_tsd.tif                  value=0  required=0
+G2    GATE PASS VT_2016_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2016_tsd.tif                  value=2104152  required=2104152
+G6    GATE PASS VT_2016_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2016_tsd.tif                  value=64677a7523a8b20e24f1e595dbf8c39a  required=64677a7523a8b20e24f1e595dbf8c39a
+G8.2  GATE PASS VT_2016_tsd.tif                  value=1790762969044211258  required=!= 1789821110405009807
+X4    OBS       VT_2016_tsd.tif before           value=zero=185367 max=49067844  required=unchanged
+X4    OBS       VT_2016_tsd.tif after            value=zero=185367 max=49067844  required=unchanged
+G1    GATE PASS VT_2017_balive.tif               value=0  required=0
+G2    GATE PASS VT_2017_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2017_balive.tif               value=2100649  required=2100649
+G6    GATE PASS VT_2017_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2017_balive.tif               value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2017_balive.tif               value=1790762971894340900  required=!= 1789826990953853284
+G1    GATE PASS VT_2017_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS VT_2017_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2017_carbon_dwn.tif           value=2100649  required=2100649
+G6    GATE PASS VT_2017_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2017_carbon_dwn.tif           value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2017_carbon_dwn.tif           value=1790762973444411409  required=!= 1789826990953853284
+G1    GATE PASS VT_2017_qmd.tif                  value=0  required=0
+G2    GATE PASS VT_2017_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2017_qmd.tif                  value=2100649  required=2100649
+G6    GATE PASS VT_2017_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2017_qmd.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2017_qmd.tif                  value=1790762973314405494  required=!= 1789826990953853284
+G1    GATE PASS VT_2017_tcc.tif                  value=0  required=0
+G2    GATE PASS VT_2017_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2017_tcc.tif                  value=2096352  required=2096352
+G6    GATE PASS VT_2017_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2017_tcc.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2017_tcc.tif                  value=1790762977134579261  required=!= 1789903997225826645
+G1    GATE PASS VT_2017_tpa_live.tif             value=0  required=0
+G2    GATE PASS VT_2017_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2017_tpa_live.tif             value=2100649  required=2100649
+G6    GATE PASS VT_2017_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2017_tpa_live.tif             value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2017_tpa_live.tif             value=1790762975394500110  required=!= 1789826990953853284
+G1    GATE PASS VT_2017_tsd.tif                  value=0  required=0
+G2    GATE PASS VT_2017_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2017_tsd.tif                  value=2104152  required=2104152
+G6    GATE PASS VT_2017_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2017_tsd.tif                  value=64677a7523a8b20e24f1e595dbf8c39a  required=64677a7523a8b20e24f1e595dbf8c39a
+G8.2  GATE PASS VT_2017_tsd.tif                  value=1790762974494459169  required=!= 1789821110415010009
+X4    OBS       VT_2017_tsd.tif before           value=zero=713322 max=48380961  required=unchanged
+X4    OBS       VT_2017_tsd.tif after            value=zero=713322 max=48380961  required=unchanged
+G1    GATE PASS VT_2018_balive.tif               value=0  required=0
+G2    GATE PASS VT_2018_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2018_balive.tif               value=2100649  required=2100649
+G6    GATE PASS VT_2018_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2018_balive.tif               value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2018_balive.tif               value=1790762977304586993  required=!= 1789826990953853284
+G1    GATE PASS VT_2018_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS VT_2018_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2018_carbon_dwn.tif           value=2100649  required=2100649
+G6    GATE PASS VT_2018_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2018_carbon_dwn.tif           value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2018_carbon_dwn.tif           value=1790762977474594729  required=!= 1789826990953853284
+G1    GATE PASS VT_2018_qmd.tif                  value=0  required=0
+G2    GATE PASS VT_2018_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2018_qmd.tif                  value=2100649  required=2100649
+G6    GATE PASS VT_2018_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2018_qmd.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2018_qmd.tif                  value=1790762979984708961  required=!= 1789826990953853284
+G1    GATE PASS VT_2018_tcc.tif                  value=0  required=0
+G2    GATE PASS VT_2018_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2018_tcc.tif                  value=2096352  required=2096352
+G6    GATE PASS VT_2018_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2018_tcc.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2018_tcc.tif                  value=1790762982434820463  required=!= 1789904005366004799
+G1    GATE PASS VT_2018_tpa_live.tif             value=0  required=0
+G2    GATE PASS VT_2018_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2018_tpa_live.tif             value=2100649  required=2100649
+G6    GATE PASS VT_2018_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2018_tpa_live.tif             value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2018_tpa_live.tif             value=1790762979514687571  required=!= 1789826990953853284
+G1    GATE PASS VT_2018_tsd.tif                  value=0  required=0
+G2    GATE PASS VT_2018_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2018_tsd.tif                  value=2104152  required=2104152
+G6    GATE PASS VT_2018_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2018_tsd.tif                  value=64677a7523a8b20e24f1e595dbf8c39a  required=64677a7523a8b20e24f1e595dbf8c39a
+G8.2  GATE PASS VT_2018_tsd.tif                  value=1790762980224719884  required=!= 1789821110415010009
+X4    OBS       VT_2018_tsd.tif before           value=zero=645545 max=47829319  required=unchanged
+X4    OBS       VT_2018_tsd.tif after            value=zero=645545 max=47829319  required=unchanged
+G1    GATE PASS VT_2019_balive.tif               value=0  required=0
+G2    GATE PASS VT_2019_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2019_balive.tif               value=2100649  required=2100649
+G6    GATE PASS VT_2019_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2019_balive.tif               value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2019_balive.tif               value=1790762982744834571  required=!= 1789826991113856592
+G1    GATE PASS VT_2019_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS VT_2019_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2019_carbon_dwn.tif           value=2100649  required=2100649
+G6    GATE PASS VT_2019_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2019_carbon_dwn.tif           value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2019_carbon_dwn.tif           value=1790762982314815001  required=!= 1789826991113856592
+G1    GATE PASS VT_2019_qmd.tif                  value=0  required=0
+G2    GATE PASS VT_2019_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2019_qmd.tif                  value=2100649  required=2100649
+G6    GATE PASS VT_2019_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2019_qmd.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2019_qmd.tif                  value=1790762984404910119  required=!= 1789826991113856592
+G1    GATE PASS VT_2019_tcc.tif                  value=0  required=0
+G2    GATE PASS VT_2019_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2019_tcc.tif                  value=2096352  required=2096352
+G6    GATE PASS VT_2019_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2019_tcc.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2019_tcc.tif                  value=1790762987565053933  required=!= 1789904013526181706
+G1    GATE PASS VT_2019_tpa_live.tif             value=0  required=0
+G2    GATE PASS VT_2019_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2019_tpa_live.tif             value=2100649  required=2100649
+G6    GATE PASS VT_2019_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2019_tpa_live.tif             value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2019_tpa_live.tif             value=1790762985464958361  required=!= 1789826991113856592
+G1    GATE PASS VT_2019_tsd.tif                  value=0  required=0
+G2    GATE PASS VT_2019_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2019_tsd.tif                  value=2104152  required=2104152
+G6    GATE PASS VT_2019_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2019_tsd.tif                  value=64677a7523a8b20e24f1e595dbf8c39a  required=64677a7523a8b20e24f1e595dbf8c39a
+G8.2  GATE PASS VT_2019_tsd.tif                  value=1790762985174945163  required=!= 1789821110415010009
+X4    OBS       VT_2019_tsd.tif before           value=zero=444472 max=47421959  required=unchanged
+X4    OBS       VT_2019_tsd.tif after            value=zero=444472 max=47421959  required=unchanged
+G1    GATE PASS VT_2020_balive.tif               value=0  required=0
+G2    GATE PASS VT_2020_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2020_balive.tif               value=2100649  required=2100649
+G6    GATE PASS VT_2020_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2020_balive.tif               value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2020_balive.tif               value=1790762987285041190  required=!= 1789826991113856592
+G1    GATE PASS VT_2020_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS VT_2020_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2020_carbon_dwn.tif           value=2100649  required=2100649
+G6    GATE PASS VT_2020_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2020_carbon_dwn.tif           value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2020_carbon_dwn.tif           value=1790762988345089432  required=!= 1789826991113856592
+G1    GATE PASS VT_2020_qmd.tif                  value=0  required=0
+G2    GATE PASS VT_2020_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2020_qmd.tif                  value=2100649  required=2100649
+G6    GATE PASS VT_2020_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2020_qmd.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2020_qmd.tif                  value=1790762989365135853  required=!= 1789826991113856592
+G1    GATE PASS VT_2020_tcc.tif                  value=0  required=0
+G2    GATE PASS VT_2020_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2020_tcc.tif                  value=2096352  required=2096352
+G6    GATE PASS VT_2020_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2020_tcc.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2020_tcc.tif                  value=1790762992655285583  required=!= 1789904021636372919
+G1    GATE PASS VT_2020_tpa_live.tif             value=0  required=0
+G2    GATE PASS VT_2020_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2020_tpa_live.tif             value=2100649  required=2100649
+G6    GATE PASS VT_2020_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2020_tpa_live.tif             value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2020_tpa_live.tif             value=1790762991065213222  required=!= 1789826991113856592
+G1    GATE PASS VT_2020_tsd.tif                  value=0  required=0
+G2    GATE PASS VT_2020_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2020_tsd.tif                  value=2104152  required=2104152
+G6    GATE PASS VT_2020_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2020_tsd.tif                  value=64677a7523a8b20e24f1e595dbf8c39a  required=64677a7523a8b20e24f1e595dbf8c39a
+G8.2  GATE PASS VT_2020_tsd.tif                  value=1790762990075168165  required=!= 1789821110415010009
+X4    OBS       VT_2020_tsd.tif before           value=zero=214032 max=47227366  required=unchanged
+X4    OBS       VT_2020_tsd.tif after            value=zero=214032 max=47227366  required=unchanged
+G1    GATE PASS VT_2021_balive.tif               value=0  required=0
+G2    GATE PASS VT_2021_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2021_balive.tif               value=2100649  required=2100649
+G6    GATE PASS VT_2021_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2021_balive.tif               value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2021_balive.tif               value=1790762992175263739  required=!= 1789826991113856592
+G1    GATE PASS VT_2021_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS VT_2021_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2021_carbon_dwn.tif           value=2100649  required=2100649
+G6    GATE PASS VT_2021_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2021_carbon_dwn.tif           value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2021_carbon_dwn.tif           value=1790762993905342476  required=!= 1789826991113856592
+G1    GATE PASS VT_2021_qmd.tif                  value=0  required=0
+G2    GATE PASS VT_2021_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2021_qmd.tif                  value=2100649  required=2100649
+G6    GATE PASS VT_2021_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2021_qmd.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2021_qmd.tif                  value=1790762994255358411  required=!= 1789826991113856592
+G1    GATE PASS VT_2021_tcc.tif                  value=0  required=0
+G2    GATE PASS VT_2021_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2021_tcc.tif                  value=2096352  required=2096352
+G6    GATE PASS VT_2021_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2021_tcc.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2021_tcc.tif                  value=1790762997735516848  required=!= 1789904029726545097
+G1    GATE PASS VT_2021_tpa_live.tif             value=0  required=0
+G2    GATE PASS VT_2021_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2021_tpa_live.tif             value=2100649  required=2100649
+G6    GATE PASS VT_2021_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2021_tpa_live.tif             value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2021_tpa_live.tif             value=1790762996635466769  required=!= 1789826991113856592
+G1    GATE PASS VT_2021_tsd.tif                  value=0  required=0
+G2    GATE PASS VT_2021_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2021_tsd.tif                  value=2104152  required=2104152
+G6    GATE PASS VT_2021_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2021_tsd.tif                  value=64677a7523a8b20e24f1e595dbf8c39a  required=64677a7523a8b20e24f1e595dbf8c39a
+G8.2  GATE PASS VT_2021_tsd.tif                  value=1790762994995392103  required=!= 1789821110415010009
+X4    OBS       VT_2021_tsd.tif before           value=zero=707133 max=46582245  required=unchanged
+X4    OBS       VT_2021_tsd.tif after            value=zero=707133 max=46582245  required=unchanged
+G1    GATE PASS VT_2022_balive.tif               value=0  required=0
+G2    GATE PASS VT_2022_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2022_balive.tif               value=2100649  required=2100649
+G6    GATE PASS VT_2022_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2022_balive.tif               value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2022_balive.tif               value=1790762997125489078  required=!= 1789826994823933090
+G1    GATE PASS VT_2022_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS VT_2022_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2022_carbon_dwn.tif           value=2100649  required=2100649
+G6    GATE PASS VT_2022_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2022_carbon_dwn.tif           value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2022_carbon_dwn.tif           value=1790762999515597889  required=!= 1789826994823933090
+G1    GATE PASS VT_2022_qmd.tif                  value=0  required=0
+G2    GATE PASS VT_2022_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2022_qmd.tif                  value=2100649  required=2100649
+G6    GATE PASS VT_2022_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2022_qmd.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2022_qmd.tif                  value=1790762999225584686  required=!= 1789826994823933090
+G1    GATE PASS VT_2022_tcc.tif                  value=0  required=0
+G2    GATE PASS VT_2022_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2022_tcc.tif                  value=2096352  required=2096352
+G6    GATE PASS VT_2022_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2022_tcc.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2022_tcc.tif                  value=1790763002505734017  required=!= 1789904037936717309
+G1    GATE PASS VT_2022_tpa_live.tif             value=0  required=0
+G2    GATE PASS VT_2022_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2022_tpa_live.tif             value=2100649  required=2100649
+G6    GATE PASS VT_2022_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2022_tpa_live.tif             value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2022_tpa_live.tif             value=1790763001385683026  required=!= 1789826994823933090
+G1    GATE PASS VT_2022_tsd.tif                  value=0  required=0
+G2    GATE PASS VT_2022_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2022_tsd.tif                  value=2104152  required=2104152
+G6    GATE PASS VT_2022_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2022_tsd.tif                  value=64677a7523a8b20e24f1e595dbf8c39a  required=64677a7523a8b20e24f1e595dbf8c39a
+G8.2  GATE PASS VT_2022_tsd.tif                  value=1790763000585646603  required=!= 1789821110415010009
+X4    OBS       VT_2022_tsd.tif before           value=zero=448669 max=46209937  required=unchanged
+X4    OBS       VT_2022_tsd.tif after            value=zero=448669 max=46209937  required=unchanged
+G1    GATE PASS VT_2023_balive.tif               value=0  required=0
+G2    GATE PASS VT_2023_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2023_balive.tif               value=2100649  required=2100649
+G6    GATE PASS VT_2023_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2023_balive.tif               value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2023_balive.tif               value=1790763003385774080  required=!= 1789826994823933090
+G1    GATE PASS VT_2023_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS VT_2023_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2023_carbon_dwn.tif           value=2100649  required=2100649
+G6    GATE PASS VT_2023_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2023_carbon_dwn.tif           value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2023_carbon_dwn.tif           value=1790763004215811869  required=!= 1789826994823933090
+G1    GATE PASS VT_2023_qmd.tif                  value=0  required=0
+G2    GATE PASS VT_2023_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2023_qmd.tif                  value=2100649  required=2100649
+G6    GATE PASS VT_2023_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2023_qmd.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2023_qmd.tif                  value=1790763004655831902  required=!= 1789826994823933090
+G1    GATE PASS VT_2023_tcc.tif                  value=0  required=0
+G2    GATE PASS VT_2023_tcc.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2023_tcc.tif                  value=2096352  required=2096352
+G6    GATE PASS VT_2023_tcc.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2023_tcc.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2023_tcc.tif                  value=1790763008576010371  required=!= 1789904046186889832
+G1    GATE PASS VT_2023_tpa_live.tif             value=0  required=0
+G2    GATE PASS VT_2023_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2023_tpa_live.tif             value=2100649  required=2100649
+G6    GATE PASS VT_2023_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2023_tpa_live.tif             value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2023_tpa_live.tif             value=1790763006875932972  required=!= 1789826994823933090
+G1    GATE PASS VT_2023_tsd.tif                  value=0  required=0
+G2    GATE PASS VT_2023_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2023_tsd.tif                  value=2104152  required=2104152
+G6    GATE PASS VT_2023_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2023_tsd.tif                  value=64677a7523a8b20e24f1e595dbf8c39a  required=64677a7523a8b20e24f1e595dbf8c39a
+G8.2  GATE PASS VT_2023_tsd.tif                  value=1790763005405866047  required=!= 1789821110415010009
+X4    OBS       VT_2023_tsd.tif before           value=zero=897491 max=45442867  required=unchanged
+X4    OBS       VT_2023_tsd.tif after            value=zero=897491 max=45442867  required=unchanged
+G1    GATE PASS VT_2024_balive.tif               value=0  required=0
+G2    GATE PASS VT_2024_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2024_balive.tif               value=2100649  required=2100649
+G6    GATE PASS VT_2024_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2024_balive.tif               value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2024_balive.tif               value=1790763007575964841  required=!= 1789826994823933090
+G1    GATE PASS VT_2024_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS VT_2024_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2024_carbon_dwn.tif           value=2100649  required=2100649
+G6    GATE PASS VT_2024_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2024_carbon_dwn.tif           value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2024_carbon_dwn.tif           value=1790763009666059998  required=!= 1789826994823933090
+G1    GATE PASS VT_2024_qmd.tif                  value=0  required=0
+G2    GATE PASS VT_2024_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2024_qmd.tif                  value=2100649  required=2100649
+G6    GATE PASS VT_2024_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2024_qmd.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2024_qmd.tif                  value=1790763009746063641  required=!= 1789826994823933090
+G1    GATE PASS VT_2024_tpa_live.tif             value=0  required=0
+G2    GATE PASS VT_2024_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2024_tpa_live.tif             value=2100649  required=2100649
+G6    GATE PASS VT_2024_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2024_tpa_live.tif             value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2024_tpa_live.tif             value=1790763011406139269  required=!= 1789826994823933090
+G1    GATE PASS VT_2024_tsd.tif                  value=0  required=0
+G2    GATE PASS VT_2024_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2024_tsd.tif                  value=2104152  required=2104152
+G6    GATE PASS VT_2024_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2024_tsd.tif                  value=64677a7523a8b20e24f1e595dbf8c39a  required=64677a7523a8b20e24f1e595dbf8c39a
+G8.2  GATE PASS VT_2024_tsd.tif                  value=1790763010736108743  required=!= 1789821110415010009
+X4    OBS       VT_2024_tsd.tif before           value=zero=728187 max=44833381  required=unchanged
+X4    OBS       VT_2024_tsd.tif after            value=zero=728187 max=44833381  required=unchanged
+G1    GATE PASS VT_2025_balive.tif               value=0  required=0
+G2    GATE PASS VT_2025_balive.tif               value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2025_balive.tif               value=2100649  required=2100649
+G6    GATE PASS VT_2025_balive.tif               value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2025_balive.tif               value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2025_balive.tif               value=1790763011866160225  required=!= 1789826994823933090
+G1    GATE PASS VT_2025_carbon_dwn.tif           value=0  required=0
+G2    GATE PASS VT_2025_carbon_dwn.tif           value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2025_carbon_dwn.tif           value=2100649  required=2100649
+G6    GATE PASS VT_2025_carbon_dwn.tif           value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2025_carbon_dwn.tif           value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2025_carbon_dwn.tif           value=1790763013546236762  required=!= 1789826994823933090
+G1    GATE PASS VT_2025_qmd.tif                  value=0  required=0
+G2    GATE PASS VT_2025_qmd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2025_qmd.tif                  value=2100649  required=2100649
+G6    GATE PASS VT_2025_qmd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2025_qmd.tif                  value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2025_qmd.tif                  value=1790763014216267285  required=!= 1789826994823933090
+G1    GATE PASS VT_2025_tpa_live.tif             value=0  required=0
+G2    GATE PASS VT_2025_tpa_live.tif             value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2025_tpa_live.tif             value=2100649  required=2100649
+G6    GATE PASS VT_2025_tpa_live.tif             value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2025_tpa_live.tif             value=682ef390d584a2a7b30b3eed10c75e15  required=682ef390d584a2a7b30b3eed10c75e15
+G8.2  GATE PASS VT_2025_tpa_live.tif             value=1790763013916253617  required=!= 1789826994823933090
+G1    GATE PASS VT_2025_tsd.tif                  value=0  required=0
+G2    GATE PASS VT_2025_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2025_tsd.tif                  value=2104152  required=2104152
+G6    GATE PASS VT_2025_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2025_tsd.tif                  value=64677a7523a8b20e24f1e595dbf8c39a  required=64677a7523a8b20e24f1e595dbf8c39a
+G8.2  GATE PASS VT_2025_tsd.tif                  value=1790763014426276852  required=!= 1789821110415010009
+X4    OBS       VT_2025_tsd.tif before           value=zero=0 max=44833381  required=unchanged
+X4    OBS       VT_2025_tsd.tif after            value=zero=0 max=44833381  required=unchanged
+X3    OBS       VT positives/train nlcd          value=window=3 centre=0 of 1809  required=report
+X3    OBS       VT positives/train disturbance   value=window=5 centre=0 of 1809  required=report
+X3    OBS       VT positives/val nlcd            value=window=0 centre=0 of 452  required=report
+X3    OBS       VT positives/val disturbance     value=window=0 centre=0 of 452  required=report
+X3    OBS       VT negatives/train nlcd          value=window=4 centre=0 of 1809  required=report
+X3    OBS       VT negatives/train disturbance   value=window=4 centre=0 of 1809  required=report
+X3    OBS       VT negatives/val nlcd            value=window=1 centre=0 of 452  required=report
+X3    OBS       VT negatives/val disturbance     value=window=1 centre=0 of 452  required=report
+X2    OBS       size after/before                value=1.005  required=report
+1145 rows, 0 gate failure(s): ALL GATES PASS
+
+G8.1  GATE PASS data/cache value=0 required=0   (after purge, 2026-09-30; 207 patches_* removed)
+G8.3  PROCESS PASS STALE_SEE_CR-0010.txt present in data/predictions, data/calibration, data/maps

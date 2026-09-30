@@ -1,0 +1,32 @@
+G4 PASS  VT_2016_balive.tif           differing px=0
+G9 PASS  VT_2016_balive.tif           profile diffs=none IMAGE_STRUCTURE same=True (GROUSE_COVERAGE=nlcd)
+G4 PASS  VT_2016_carbon_dwn.tif       differing px=0
+G9 PASS  VT_2016_carbon_dwn.tif       profile diffs=none IMAGE_STRUCTURE same=True (GROUSE_COVERAGE=nlcd)
+G4 PASS  VT_2016_qmd.tif              differing px=0
+G9 PASS  VT_2016_qmd.tif              profile diffs=none IMAGE_STRUCTURE same=True (GROUSE_COVERAGE=nlcd)
+G4 PASS  VT_2016_tpa_live.tif         differing px=0
+G9 PASS  VT_2016_tpa_live.tif         profile diffs=none IMAGE_STRUCTURE same=True (GROUSE_COVERAGE=nlcd)
+G4 PASS  VT_2019_balive.tif           differing px=0
+G9 PASS  VT_2019_balive.tif           profile diffs=none IMAGE_STRUCTURE same=True (GROUSE_COVERAGE=nlcd)
+G4 PASS  VT_2019_carbon_dwn.tif       differing px=0
+G9 PASS  VT_2019_carbon_dwn.tif       profile diffs=none IMAGE_STRUCTURE same=True (GROUSE_COVERAGE=nlcd)
+G4 PASS  VT_2019_qmd.tif              differing px=0
+G9 PASS  VT_2019_qmd.tif              profile diffs=none IMAGE_STRUCTURE same=True (GROUSE_COVERAGE=nlcd)
+G4 PASS  VT_2019_tpa_live.tif         differing px=0
+G9 PASS  VT_2019_tpa_live.tif         profile diffs=none IMAGE_STRUCTURE same=True (GROUSE_COVERAGE=nlcd)
+G4 PASS  VT_2022_balive.tif           differing px=0
+G9 PASS  VT_2022_balive.tif           profile diffs=none IMAGE_STRUCTURE same=True (GROUSE_COVERAGE=nlcd)
+G4 PASS  VT_2022_carbon_dwn.tif       differing px=0
+G9 PASS  VT_2022_carbon_dwn.tif       profile diffs=none IMAGE_STRUCTURE same=True (GROUSE_COVERAGE=nlcd)
+G4 PASS  VT_2022_qmd.tif              differing px=0
+G9 PASS  VT_2022_qmd.tif              profile diffs=none IMAGE_STRUCTURE same=True (GROUSE_COVERAGE=nlcd)
+G4 PASS  VT_2022_tpa_live.tif         differing px=0
+G9 PASS  VT_2022_tpa_live.tif         profile diffs=none IMAGE_STRUCTURE same=True (GROUSE_COVERAGE=nlcd)
+G4 PASS  ME_2016_tsd.tif              differing px=0
+G9 PASS  ME_2016_tsd.tif              profile diffs=none IMAGE_STRUCTURE same=True (GROUSE_COVERAGE=disturbance-intersection)
+G4 PASS  NH_2025_tsd.tif              differing px=0
+G9 PASS  NH_2025_tsd.tif              profile diffs=none IMAGE_STRUCTURE same=True (GROUSE_COVERAGE=disturbance-intersection)
+G4 PASS  VT_2025_tsd.tif              differing px=0
+G9 PASS  VT_2025_tsd.tif              profile diffs=none IMAGE_STRUCTURE same=True (GROUSE_COVERAGE=disturbance-intersection)
+
+15 files, 0 failure(s): ALL PASS

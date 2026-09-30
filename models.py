@@ -622,10 +622,24 @@ ROAD_DIST_MAX_M = 50000
 ROAD_DIST_LOG_SCALE = 1000.0
 
 
-def road_dist_encode(metres):
-    """Metres -> stored int16 units. Array-safe."""
+def _finite(values, name):
+    """Encoder input as float64, refusing NaN/inf. Encoders take
+    in-coverage values only; generators write nodata by mask AFTER
+    encoding. A NaN here would otherwise clip/rint to 0 - a real reading
+    for every one of these features (CR-0008, BUG-0036)."""
     import numpy as _np
-    m = _np.clip(_np.asarray(metres, dtype=_np.float64), 0, ROAD_DIST_MAX_M)
+    a = _np.asarray(values, dtype=_np.float64)
+    if not _np.isfinite(a).all():
+        raise ValueError(f"{name}: {int((~_np.isfinite(a)).sum())} "
+                         f"non-finite input value(s); mask nodata after "
+                         f"encoding instead of passing it in")
+    return a
+
+
+def road_dist_encode(metres):
+    """Metres -> stored int16 units. Array-safe. Finite input only."""
+    import numpy as _np
+    m = _np.clip(_finite(metres, "road_dist_encode"), 0, ROAD_DIST_MAX_M)
     return _np.rint(_np.log1p(m) * ROAD_DIST_LOG_SCALE).astype(_np.int16)
 
 
@@ -656,9 +670,10 @@ TSD_LOG_SCALE = 1000.0
 
 
 def tsd_encode(years):
-    """Years since last disturbance -> stored int16 units. Array-safe."""
+    """Years since last disturbance -> stored int16 units. Array-safe.
+    Finite input only."""
     import numpy as _np
-    y = _np.clip(_np.asarray(years, dtype=_np.float64), 0, TSD_MAX_YEARS)
+    y = _np.clip(_finite(years, "tsd_encode"), 0, TSD_MAX_YEARS)
     return _np.rint(_np.log1p(y) * TSD_LOG_SCALE).astype(_np.int16)
 
 
@@ -708,10 +723,10 @@ QMD_BA_CONSTANT = 0.005454
 def qmd_from_balive_tpa(balive, tpa_live):
     """Quadratic mean diameter (inches) from basal area (ft2/acre) and
     stems/acre. Returns 0 where there are no stems (see the non-forest
-    note above) rather than dividing by zero."""
+    note above) rather than dividing by zero. Finite input only."""
     import numpy as _np
-    ba = _np.asarray(balive, dtype=_np.float64)
-    tpa = _np.asarray(tpa_live, dtype=_np.float64)
+    ba = _finite(balive, "qmd_from_balive_tpa(balive)")
+    tpa = _finite(tpa_live, "qmd_from_balive_tpa(tpa_live)")
     out = _np.zeros(_np.broadcast(ba, tpa).shape, dtype=_np.float64)
     ok = tpa > 0
     _np.divide(ba, QMD_BA_CONSTANT * tpa, out=out, where=ok)
@@ -719,9 +734,10 @@ def qmd_from_balive_tpa(balive, tpa_live):
 
 
 def tpa_live_encode(stems_per_acre):
-    """Stems/acre -> stored int16 units (log). Array-safe."""
+    """Stems/acre -> stored int16 units (log). Array-safe. Finite input
+    only."""
     import numpy as _np
-    t = _np.clip(_np.asarray(stems_per_acre, dtype=_np.float64),
+    t = _np.clip(_finite(stems_per_acre, "tpa_live_encode"),
                  0, TPA_LIVE_MAX)
     return _np.rint(_np.log1p(t) * TPA_LIVE_LOG_SCALE).astype(_np.int16)
 
@@ -735,10 +751,11 @@ def tpa_live_decode(stored):
 
 def treemap_encode(feature, values):
     """Native TreeMap units -> stored int16, for the fixed-point three.
-    tpa_live has its own log pair above."""
+    tpa_live has its own log pair above. Finite input only."""
     import numpy as _np
     spec = TREEMAP_FIXED[feature]
-    v = _np.clip(_np.asarray(values, dtype=_np.float64), 0, spec["cap"])
+    v = _np.clip(_finite(values, f"treemap_encode({feature})"), 0,
+                 spec["cap"])
     return _np.rint(v * spec["mult"]).astype(_np.int16)
 
 

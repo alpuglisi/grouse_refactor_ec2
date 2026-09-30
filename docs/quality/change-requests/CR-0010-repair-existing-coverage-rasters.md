@@ -1,6 +1,6 @@
 # CR-0010: Repair the 174 existing rasters that carry fabricated values outside coverage
 
-**Status: APPROVED (v3), 2026-09-30 — implementation in progress.**
+**Status: IMPLEMENTED (v3), 2026-09-30 — all deliverables complete; every GATE passes (`docs/quality/evidence/CR-0010-gates.txt`).**
 Review history and dispositions live in `CR-0010-review-log.md`, not here.
 This document states only what is currently true and intended.
 
@@ -157,14 +157,17 @@ extractions of the vintages; either yields the same digest.
   value, so rule 6 makes `predict.py` and `calibrate.py` refuse them on
   repaired rasters. Those checkpoints are invalid until CR-0009's retrain
   (`train.py` defaults to `--missing-mask`; CR-0009 must keep it on).
-- **Training records:** 0 positives have a centre pixel outside any
-  in-scope feature's mask (round-7 reviewer measurement). One ME
+- **Training records** (X3, measured on the current record set): 1 NH
+  training positive has a centre pixel outside the `tsd` coverage mask;
+  no positive's centre is outside the NLCD mask. One ME
   validation negative, `(-67.10082, 44.50177)` in `val_negatives_ME.csv`,
   has an out-of-coverage centre; ME has 23 train + 4 val negatives with
   some out-of-coverage pixels in-window. Reported by X3; the record's
   disposition belongs to CR-0007.
-- **CR-0007 interaction:** because no positive's centre value changes and
-  `road_dist` is not touched here, no CR-0007 gate requires re-derivation.
+- **CR-0007 interaction:** `road_dist` is not touched here and on
+  CR-0007's post-partition record set no positive's centre value changes
+  (round-7 reviewer measurement), so no CR-0007 gate requires
+  re-derivation.
   Either CR can land first.
 - **Patch cache:** `data/cache` (28 GB, 206 `.npy` + 1 stray `.tmp`) holds
   patches built from pre-repair values and is purged.
@@ -200,33 +203,33 @@ the repair); the manifest hashes (B0) are the restore guarantee.
 **Not validatable here:** the effect on model performance (CR-0009).
 
 ## Deliverables (in execution order)
-- [ ] 1. `docs/quality/cr0010_pins.json` with the G0 and `N_pre` tables above.
-- [ ] 2. `check_raster_repair.py` implementing B0, F1, F2, G0–G8.2, X1–X4, with
+- [x] 1. `docs/quality/cr0010_pins.json` with the G0 and `N_pre` tables above.
+- [x] 2. `check_raster_repair.py` implementing B0, F1, F2, G0–G8.2, X1–X4, with
       `--root` and `--files`; unit-tested against a synthetic 3-file
       fixture that includes a no-op, an inflated mask and an in-coverage
       edit, each of which must fail.
-- [ ] 3. `repair_coverage_rasters.py` implementing § The change, rules 1–4.
-- [ ] 4. `grouse_data.refuse_if_repaired` and its calls at every write site
+- [x] 3. `repair_coverage_rasters.py` implementing § The change, rules 1–4.
+- [x] 4. `grouse_data.refuse_if_repaired` and its calls at every write site
       in rule 5's table; unit test covering the TreeMap `copy2` path (an
       untagged representative year with a tagged `copy2` destination must
       refuse), plus a test that each of the three generators refuses on a
       tagged scratch copy before opening anything for writing.
-- [ ] 5. Legacy-checkpoint refusal in `predict.py` and `calibrate.py` (rule
+- [x] 5. Legacy-checkpoint refusal in `predict.py` and `calibrate.py` (rule
       6); unit test with a `missing_mask=False` model and a tagged raster.
-- [ ] 6. Single-file rehearsal (Test plan), in a scratch directory.
-- [ ] 7. Hash the 174 originals and every other `*.tif` in `data/landfire/`;
+- [x] 6. Single-file rehearsal (Test plan), in a scratch directory.
+- [x] 7. Hash the 174 originals and every other `*.tif` in `data/landfire/`;
       commit both manifests (`docs/quality/evidence/CR-0010-manifest-*.txt`).
       Then back up all 174 files to `/home/ec2-user/grouse_backup/CR-0010/`
       — outside `data/landfire/`, so the backup never matches
       `grouse_data`'s raster discovery globs — as real copies (not hard
       links); manifest with sha256, size and pre-repair mtime per file.
-- [ ] 8. Run the repair; run `check_raster_repair.py`; all GATE rows pass.
+- [x] 8. Run the repair; run `check_raster_repair.py`; all GATE rows pass.
       Save its output to `docs/quality/evidence/CR-0010-gates.txt`
       (create the directory).
-- [ ] 9. Purge `data/cache/patches_*` (including the `.tmp` stray); G8.1.
-- [ ] 10. Write `STALE_SEE_CR-0010.txt` in `data/predictions/`,
+- [x] 9. Purge `data/cache/patches_*` (including the `.tmp` stray); G8.1.
+- [x] 10. Write `STALE_SEE_CR-0010.txt` in `data/predictions/`,
       `data/calibration/` and `data/maps/` (G8.3).
-- [ ] 11. Bookkeeping. CR-0010 is the sole owner of BUG-0030.
+- [x] 11. Bookkeeping. CR-0010 is the sole owner of BUG-0030.
       - File BUG-0030 (`tcc` fabricated `0` outside coverage) with all §2
         sections and a `BUG_LOG.md` row.
       - Recurrence review (§4) against BUG-0024/0025 and PA-0017, whose

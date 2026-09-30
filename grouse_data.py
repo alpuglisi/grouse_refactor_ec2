@@ -200,38 +200,25 @@ def grid_mismatch(src, ref, tol=1e-3):
     return None
 
 
-# CR-0010 repaired the existing tsd/TreeMap/tcc rasters (nodata outside
-# coverage) and tagged each one. The generators that write those files
-# still fabricate values outside coverage until CR-0008 lands, so they
-# must not silently overwrite a repaired file; and a checkpoint trained
-# without validity channels reads the repaired nodata as 0 - itself a
-# fabricated reading (tsd 0 = disturbed this year).
+# Rasters that carry nodata outside coverage: repaired by CR-0010
+# (GROUSE_REPAIR) or written by a generator fixed in CR-0008
+# (GROUSE_COVERAGE). A checkpoint trained without validity channels reads
+# that nodata as 0 - itself a fabricated reading (tsd 0 = disturbed this
+# year) - so predict.py and calibrate.py refuse the combination.
 REPAIR_TAG = "GROUSE_REPAIR"
+COVERAGE_TAGS = (REPAIR_TAG, "GROUSE_COVERAGE")
 
 
 def repaired_paths(paths):
-    """The subset of `paths` that exist and carry the CR-0010 repair tag."""
+    """The subset of `paths` that exist and carry nodata outside coverage
+    (either tag in COVERAGE_TAGS)."""
     out = []
     for p in paths:
         if os.path.exists(p):
             with rasterio.open(p) as src:
-                if REPAIR_TAG in src.tags():
+                if any(t in src.tags() for t in COVERAGE_TAGS):
                     out.append(p)
     return out
-
-
-def refuse_if_repaired(paths, allow=False):
-    """Exit before a generator writes anything if any target is a
-    CR-0010-repaired raster. Call with EVERY path the run will write,
-    before the first file is opened for writing or downloaded."""
-    hit = repaired_paths(paths)
-    if hit and not allow:
-        shown = "\n   ".join(hit[:5]) + ("\n   ..." if len(hit) > 5 else "")
-        raise SystemExit(
-            f"Refusing to overwrite {len(hit)} CR-0010-repaired raster(s):"
-            f"\n   {shown}\nThis generator still writes fabricated values "
-            f"outside coverage until CR-0008 lands. Pass "
-            f"--overwrite-repaired only if you know it is fixed.")
 
 
 def refuse_legacy_checkpoint_on_repaired(model, paths):

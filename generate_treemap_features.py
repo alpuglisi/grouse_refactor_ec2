@@ -123,7 +123,7 @@ from rasterio.vrt import WarpedVRT
 from rasterio.enums import Resampling
 from rasterio.windows import Window
 
-from grouse_data import GrouseData, refuse_if_repaired
+from grouse_data import GrouseData, grid_mismatch
 from models import (TREEMAP_FIXED, qmd_from_balive_tpa, tpa_live_encode,
                     treemap_encode)
 
@@ -254,23 +254,34 @@ def discover_vintages(src_dir, regions):
 
 
 def _clean(arr):
-    """Raw band -> float64 with non-forest as 0.0."""
+    """Raw band -> (float64 values, bad mask). Non-finite, negative and
+    >= NODATA_FLOOR raw values are not readings: they are flagged in
+    `bad` and hold a finite placeholder 0.0 only so the encoders (which
+    refuse NaN) can run - write_vintage writes nodata at every bad pixel,
+    so the placeholder never reaches the output. (It used to clamp them
+    to 0.0, i.e. "non-forest" - BUG-0025.)"""
     a = np.asarray(arr, dtype=np.float64)
-    a[~np.isfinite(a)] = 0.0
-    a[a >= NODATA_FLOOR] = 0.0
-    a[a < 0] = 0.0
-    return a
+    bad = ~np.isfinite(a) | (a >= NODATA_FLOOR) | (a < 0)
+    a[bad] = 0.0
+    return a, bad
 
 
 def write_vintage(region, year, vintage, src_dir, ref_path, profile,
-                  raster_dir, block_rows):
-    """One region, one of OUR vintage years, from one TreeMap vintage."""
+                  raster_dir, block_rows, nlcd_path):
+    """One region, one of OUR vintage years, from one TreeMap vintage.
+
+    Coverage: the raw bands cannot say where TreeMap has no data - Earth
+    Engine's unmask(0) merged "non-forest" and "outside CONUS" into one
+    0 before download - so coverage comes from the region's NLCD raster
+    (nodata outside the US), the reference CR-0010 repaired these files
+    with. In-coverage zeros stay 0: that IS non-forest."""
     with rasterio.open(ref_path) as ref:
         height, width = ref.height, ref.width
         ref_crs, ref_transform = ref.crs, ref.transform
 
     srcs, vrts, outs = [], {}, {}
     totals = {}
+    nlcd = rasterio.open(nlcd_path)
     try:
         for attr in SOURCE_ATTRS:
             path = find_source(src_dir, vintage, attr, region)
@@ -292,13 +303,16 @@ def write_vintage(region, year, vintage, src_dir, ref_path, profile,
         for feat in ("balive", "tpa_live", "qmd", "carbon_dwn"):
             path = os.path.join(raster_dir, f"{region}_{year}_{feat}.tif")
             outs[feat] = rasterio.open(path, "w", **profile)
+            outs[feat].update_tags(GROUSE_COVERAGE="nlcd")
             totals[feat] = [0.0, 0]
 
         for r0 in range(0, height, block_rows):
             nrows = min(block_rows, height - r0)
             win = Window(0, r0, width, nrows)
-            raw = {a: _clean(vrts[a].read(1, window=win))
-                   for a in SOURCE_ATTRS}
+            raw, bad = {}, {}
+            for a in SOURCE_ATTRS:
+                raw[a], bad[a] = _clean(vrts[a].read(1, window=win))
+            cov = nlcd.read(1, window=win) != -9999
 
             bands = {
                 "balive": raw["BALIVE"],
@@ -306,15 +320,23 @@ def write_vintage(region, year, vintage, src_dir, ref_path, profile,
                 "qmd": qmd_from_balive_tpa(raw["BALIVE"], raw["TPA_LIVE"]),
                 "carbon_dwn": raw["CARBON_DWN"],
             }
+            invalid = {
+                "balive": bad["BALIVE"],
+                "tpa_live": bad["TPA_LIVE"],
+                "qmd": bad["BALIVE"] | bad["TPA_LIVE"],
+                "carbon_dwn": bad["CARBON_DWN"],
+            }
             for feat, band in bands.items():
                 if feat == "tpa_live":
                     enc = tpa_live_encode(band)
                 else:
                     enc = treemap_encode(feat, band)
+                enc[~cov | invalid[feat]] = -9999
                 outs[feat].write(enc, 1, window=win)
                 totals[feat][0] += float(band.sum())
                 totals[feat][1] += band.size
     finally:
+        nlcd.close()
         for o in outs.values():
             o.close()
         for v in vrts.values():
@@ -331,7 +353,7 @@ def write_vintage(region, year, vintage, src_dir, ref_path, profile,
           f"(non-forest counted as 0) {means}")
 
 
-def plan_region(region, data, vintages):
+def plan_region(region, data, vintages, only_years=None, out_dir=None):
     """Everything about one region that's cheap to work out up front:
     the template grid, the output profile, and which of our years map
     to which TreeMap vintage. No raster data is read or written here -
@@ -347,7 +369,13 @@ def plan_region(region, data, vintages):
         return None
     ref_path = rd.latest_raster_path(others[0])
     years = sorted({y for f in others for y in rd.raster_years(f)})
+    if only_years:
+        years = [y for y in years if y in set(only_years)]
+        if not years:
+            print(f"   [!] none of {sorted(only_years)} on disk - skipping.")
+            return None
     print(f"   template grid: {os.path.basename(ref_path)}")
+    nlcd_path = _coverage_raster(rd, ref_path)
     mapping = {y: nearest_vintage(y, vintages) for y in years}
     print(f"   year -> TreeMap vintage: {mapping}")
     far = {y: v for y, v in mapping.items() if abs(y - v) > 2}
@@ -362,7 +390,8 @@ def plan_region(region, data, vintages):
     profile.update(driver="GTiff", count=1, dtype="int16", nodata=-9999,
                    compress="deflate", predictor=2, tiled=True)
 
-    raster_dir = data.config.resolve(data.config.raster_dir)
+    raster_dir = out_dir or data.config.resolve(data.config.raster_dir)
+    os.makedirs(raster_dir, exist_ok=True)
     # Several of our years can map to the SAME TreeMap vintage (e.g.
     # 2016/2017/2018 -> TreeMap 2016); write_vintage only needs to run
     # once per vintage, for one representative year, and the result
@@ -371,7 +400,25 @@ def plan_region(region, data, vintages):
     for y in years:
         by_vintage.setdefault(mapping[y], []).append(y)
     return {"ref_path": ref_path, "profile": profile,
-            "raster_dir": raster_dir, "by_vintage": by_vintage}
+            "raster_dir": raster_dir, "by_vintage": by_vintage,
+            "nlcd_path": nlcd_path}
+
+
+def _coverage_raster(rd, ref_path):
+    """The region's NLCD raster, required to sit on the template's exact
+    grid AND extent - the windowed reads in write_vintage index both with
+    the same Window, so a clip of the same grid would misalign."""
+    if not rd.raster_years("nlcd"):
+        raise SystemExit(f"{rd.region}: no NLCD raster on disk - it is "
+                         f"TreeMap's coverage reference. Run "
+                         f"download_tcc_nlcd.py first.")
+    path = rd.latest_raster_path("nlcd")
+    with rasterio.open(path) as n, rasterio.open(ref_path) as ref:
+        why = grid_mismatch(n, ref)
+        if why or n.shape != ref.shape or n.transform != ref.transform:
+            raise SystemExit(f"{path}: not on the template's grid and "
+                             f"extent ({why or 'shape/transform differ'})")
+    return path
 
 
 def main():
@@ -390,10 +437,12 @@ def main():
                     help="Worker processes for the (region, vintage) "
                          "writes, which are independent of each other. "
                          "Default: one per vCPU (os.cpu_count()).")
-    ap.add_argument("--overwrite-repaired", action="store_true",
-                    help="Allow overwriting rasters repaired by CR-0010. "
-                         "This generator still writes fabricated values "
-                         "outside coverage until CR-0008 lands.")
+    ap.add_argument("--out-dir", default=None,
+                    help="Write here instead of the pipeline raster dir "
+                         "(every write, including the year fan-out).")
+    ap.add_argument("--years", nargs="+", type=int, default=None,
+                    help="Only these output years, filtered BEFORE they "
+                         "are grouped by TreeMap vintage.")
     args = ap.parse_args()
 
     print(f"TreeMap source: {args.src_dir}")
@@ -406,27 +455,16 @@ def main():
 
     plans = {}
     for region in regions:
-        plan = plan_region(region, data, vintages)
+        plan = plan_region(region, data, vintages, args.years, args.out_dir)
         if plan is not None:
             plans[region] = plan
-
-    # CR-0010: check every path this run writes - each vintage's
-    # representative year AND every year its output is copy2'd onto -
-    # before any worker opens a file for writing.
-    refuse_if_repaired(
-        [os.path.join(plan["raster_dir"], f"{region}_{y}_{feat}.tif")
-         for region, plan in plans.items()
-         for years in plan["by_vintage"].values()
-         for y in years
-         for feat in ("balive", "tpa_live", "qmd", "carbon_dwn")],
-        allow=args.overwrite_repaired)
 
     # The unit of parallelism is one (region, vintage) pair: build the
     # full job list across every region up front, then hand it to a
     # process pool sized to the machine instead of the old one
     # region/vintage at a time, single-core loop.
     jobs = [(region, sorted(years)[0], vintage, plan["ref_path"],
-            plan["profile"], plan["raster_dir"])
+            plan["profile"], plan["raster_dir"], plan["nlcd_path"])
            for region, plan in plans.items()
            for vintage, years in plan["by_vintage"].items()]
 
@@ -439,9 +477,9 @@ def main():
             futures = [
                 ex.submit(write_vintage, region, first_year, vintage,
                           args.src_dir, ref_path, profile, raster_dir,
-                          args.block_rows)
+                          args.block_rows, nlcd_path)
                 for region, first_year, vintage, ref_path, profile,
-                    raster_dir in jobs]
+                    raster_dir, nlcd_path in jobs]
             # .result() re-raises any worker exception here, in the
             # main process, instead of it vanishing into the pool.
             for fut in concurrent.futures.as_completed(futures):

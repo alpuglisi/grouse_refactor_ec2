@@ -208,21 +208,50 @@ bookkeeping.**
 | 8 | v8 | A — correctness (fresh) | APPROVE WITH FOLLOW-UPS | 0 (1 MAJOR) |
 | 8 | v8 | B — implementability + §1 (fresh) | APPROVE WITH FOLLOW-UPS | 0 (4 MAJOR) |
 
-Round-8 findings are recorded in full in the reviewers' reports and will be
-dispositioned here in v9 (after CR-0010's implementation, which touches the
-same files). Summary: A1 `_clean` placeholder/`bad` per feature vs raising
-encoders; A2 `unmask(-1)` on uint8 bands (cast to int16; post-download G2
-check); A3 NLCD grid assert must include shape/transform; A4 G9 tag
-namespace; A5 guard must see `--out-dir`; A6 `hit` change is cosmetic.
-B1 legacy-checkpoint refusal must also match `GROUSE_COVERAGE`; B2 road_dist
-carve-out drops densified footprint, BUG-0023 §6 ruling, G7 precondition 2,
-excluded-point gate, G6 for regenerated files; B3 encoder/`hit`/`_clean`
-defects need BUG records; B4 inaccurate dispositions (R7-17 CR-0009 "9.75
-GB", R7-5 "moved" not "resolved", BUG-0035 timing reversal unrecorded);
-B5 = A1; B6 `--out-dir` must replace `plan["raster_dir"]`; B7 G4-T exact
-command, years 2016/2019/2022, pin `--block-rows 512`; B8 keep tcc guard
-until post-download G2 passes; B9 recurrence review scope; B10 flags/tests
-on guard removal; B11 A5 justification; B12 R7-15 label.
+### Round 8 dispositions (applied in v9)
+Each finding was checked against the code before disposition.
+
+| # | sev | concern | disposition |
+|---|---|---|---|
+| A1/B5 | MAJOR | `_clean` leaving NaN would make the new raising encoders crash; `bad` per feature undefined | **Accept** — §2: finite placeholder `0.0` plus `bad` mask; per-feature mapping (`qmd` = BALIVE ∪ TPA_LIVE); U1 injects NaN, negative, ≥1e9 |
+| A2 | MEDIUM | `unmask(-1)` on uint8 bands may clamp to 0; nothing tests it | **Accept** — `toInt16()` before `unmask(-1)`; in-code post-download coverage check (U5) |
+| A3 | MEDIUM | `grid_mismatch` allows a different extent; windowed reads would misalign | **Accept** — also assert height, width, transform |
+| A4 | LOW | G9 exception names the wrong tag namespace | **Accept** — G9 compares profile + `IMAGE_STRUCTURE` only |
+| A5 | LOW | Guard must see `--out-dir` during G4 | **Accept** — `--out-dir` replaces `raster_dir`/`plan["raster_dir"]` for every write, the guard included |
+| A6 | LOW | `hit` change alters no output | **Accept** — stated as clarity only |
+| B1 | MAJOR | Legacy-checkpoint refusal lapses on regenerated files (tag `GROUSE_COVERAGE`, not `GROUSE_REPAIR`) | **Accept** — §5 widens `repaired_paths`; U6 |
+| B2 | MAJOR | `road_dist` carve-out dropped densified footprint, BUG-0023 §6 ruling, G7 precondition 2, excluded-point gate, G6 for regenerated files | **Accept** — all listed in Out of scope and the tracker |
+| B3 | MAJOR | Encoder NaN→0, `hit`, `_clean` clamp have no BUG record | **Accept** — BUG-0036 for encoders; BUG-0025/0024 §4 amended to quote `_clean` and `hit` (same defects) |
+| B4 | MAJOR | Inaccurate dispositions: R7-17 (CR-0009 still "9.75 GB"), R7-5 ("resolved" should be "moved"), BUG-0035 timing reversal unrecorded | **Accept** — R7-17: CR-0009 correction added to the tracker. R7-5: corrected below to "moved to CR-0010"; CR-0010 changes 0 positive centre values (verified by CR-0010 reviewer A), so I17 is unaffected, and X3 reports window exposure. BUG-0035: drafted now, before approval, restoring the round-5 disposition |
+| B6 | MEDIUM | `copy2` fan-out would write to `data/landfire` despite `--out-dir` | **Accept** — see A5 |
+| B7 | MEDIUM | G4-T command, years, `--years` semantics, block rows | **Accept** — exact commands; years 2016/2019/2022; `--years` filters before grouping; `--block-rows 512` pinned |
+| B8 | MEDIUM | tcc guard removed before the tcc path is ever checked | **Accept** — replaced by the in-code post-download check (U5), which guards every future write |
+| B9 | MEDIUM | BUG-0035 recurrence review too narrow | **Accept** — BUG-0035 §7 cites BUG-0025, BUG-0030, PA-0017; failure analysis in BUG-0030 §7 → PA-0022. BUG_LOG row updates in deliverable 7 |
+| B10 | LOW | Guard removal silent on flags and tests | **Accept** — §5 lists them |
+| B11 | LOW | One-change justification missing | **Accept** — added under Order |
+| B12 | LOW | R7-15 labelled "Accepted" | **Accept** — relabelled below |
+
+**Corrections to the round-7 table above:** R7-5 is **moved to CR-0010**
+(not "resolved"); R7-15 is **not applicable — historical, kept verbatim**.
+
+### Round 9 (bounded re-review of v9)
+| reviewer | verdict |
+|---|---|
+| B — implementability | **APPROVE** — B1–B12 resolved |
+| A — correctness | **APPROVE WITH FOLLOW-UPS** — A1–A6 resolved |
+
+| # | sev | concern | disposition |
+|---|---|---|---|
+| B13 | LOW | Post-download check assumes `.tmp` and NLCD share a grid; with no template the output is EPSG:5070 | **Accept** — v9 text: check runs only on identical shape/transform, else skipped with a warning |
+| A7 | MEDIUM | U5's zero-tolerance check would refuse every future `tcc` download if TCC ever reports real 0 % outside the NLCD footprint (loud, not data loss) | **Tracked** — today `tcc > 0` outside NLCD is exactly 0; if U5 ever fires, fall back to masking `tcc` by NLCD as CR-0010 does. Tracker item |
+| A8 | LOW | Widened `repaired_paths` also catches new `nlcd` downloads | **Accept** — stated in Impact |
+| B14 | LOW | PA-0022's "PA-0019–0021 reserved" departs from creation-order numbering | **Tracked** — open-issues tracker |
+
+## Versions
+| version | date | change |
+|---|---|---|
+| v8 | 2026-09-30 | Clean rewrite, generator-only scope |
+| v9 | 2026-09-30 | Round-8 dispositions above |
 
 ## Author sign-off
-Pending v8 review.
+Reviewers A and B signed off on v9. Author: **signed off** — user instructed implementation 2026-09-30. **CR-0008 APPROVED (v9).**

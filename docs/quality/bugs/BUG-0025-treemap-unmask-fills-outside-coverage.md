@@ -17,15 +17,20 @@ Québec (every grid) and ocean (ME) read as non-forest in `balive`,
 `tpa_live`, `qmd` and `carbon_dwn`, a legitimate reading, instead of
 missing.
 
-**Unconfirmed on real data.** It depends on how Earth Engine's `unmask`
-treats pixels outside the image footprint, which a check of a real
-TreeMap raster over Québec would settle. It does not affect the Errol box.
+Confirmed on real data (see §6). It does not affect the Errol box.
 
 ## 4. What the defect was
 ```python
     single_band = image.select([band]).unmask(0).toFloat()
 ...
                            transform=transform, nodata=None,
+```
+and, in `generate_treemap_features.py`, `_clean` turned any sentinel that
+did reach it into the same fabricated value (CR-0008 round 8, B3):
+```python
+    a[~np.isfinite(a)] = 0.0
+    a[a >= NODATA_FLOOR] = 0.0
+    a[a < 0] = 0.0
 ```
 
 ## 5. Root cause analysis (Five Whys)
@@ -44,11 +49,23 @@ TreeMap raster over Québec would settle. It does not affect the Errol box.
 **Root cause:** same mechanism as BUG-0023.
 
 ## 6. Corrective action
-None yet. Proposed: unmask to 0 only inside TreeMap's footprint (e.g.
-the CONUS boundary, or the product's `geometry()`), and write nodata
-outside. Needs a CR and a re-download.
+Confirmed on real data: `data/treemap_raw` carries `nodata=None` and no
+sentinel at all, and every TreeMap feature read `0` outside the US
+(ME 96,215,819 px per file; NH 5,659,263; VT 2,100,649), plus
+11,700 / 4,464 / 2,137 px of `> 0` resampling bleed past the border.
+Because the raw bands cannot distinguish "outside CONUS" from
+"non-forest", coverage comes from an external reference: the region's
+NLCD valid footprint.
+- **Data — CR-0010:** outside-NLCD pixels set to `-9999` in all 120
+  TreeMap files; in-coverage zeros (non-forest) kept.
+- **Generator — CR-0008:** `generate_treemap_features.py` masks its
+  output with the region's NLCD raster, and `_clean` flags bad raw values
+  for nodata instead of clamping them to `0`. Verified: VT 2016/2019/2022
+  regenerated, all four features pixel-identical to CR-0010's repair.
+- `download_treemap.py` is unchanged: its raw output is an intermediate
+  the model never reads (CR-0008, Out of scope).
 
-Status: **OPEN**, unconfirmed on real data.
+Status: **FIXED** (CR-0010 data, CR-0008 generator).
 
 ## 7. Recurrence review
 Same mechanism as BUG-0023, found by its sweep. Not a recurrence.

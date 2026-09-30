@@ -1,6 +1,6 @@
 # CR-0008: Make the `tsd`, TreeMap and `tcc`/`nlcd` generators write nodata outside coverage
 
-**Status: PROPOSED (v8) — awaiting review.** Nothing implemented.
+**Status: IMPLEMENTED (v9), 2026-09-30 — all deliverables complete; G4/G9 15/15 pass (`docs/quality/evidence/CR-0008-gates.txt`), U1–U6 pass.**
 History, verdicts and dispositions: `CR-0008-review-log.md`. v1–v7 text:
 commit `bb170ea`. This document states only current intent.
 
@@ -8,18 +8,22 @@ commit `bb170ea`. This document states only current intent.
 output with CR-0010's repaired rasters). Independent of CR-0007. CR-0009
 is gated on it. `road_dist` ME/VT moved to a separate CR (see Out of scope).
 
+**One CR, not three (§1.1, one change per CR):** the three generator fixes
+share one mechanism (PA-0017), one acceptance method (G4 against CR-0010)
+and one guard removal; the bookkeeping deliverables are §1.5's
+requirement, not a separate change.
+
 ## Scope
 Fix the three generators behind BUG-0024 (`tsd`), BUG-0025 (TreeMap) and
-BUG-0030/BUG-0035 (`tcc`/`nlcd`) so that every future run writes the
-declared nodata (`-9999`) outside the product's coverage instead of a
-legitimate-looking value. No raster in `data/` is rewritten by this CR.
+BUG-0030/BUG-0035 (`tcc`/`nlcd`), and the encoders behind BUG-0036, so
+that every future run writes the declared nodata (`-9999`) outside the
+product's coverage instead of a legitimate-looking value. No raster in
+`data/` is rewritten by this CR.
 
 ## Why now
-CR-0010 repairs the files on disk, but the generators still produce the
-defect: the next run of any of them restores fabricated values (CR-0010
-guards against that with a refuse-to-overwrite check, which this CR
-removes). PA-0017 is a rule about generators; the repair alone does not
-satisfy it.
+CR-0010 repaired the files on disk, but the generators still produce the
+defect; CR-0010's refuse-to-overwrite guard is all that stops the next run
+from restoring fabricated values. PA-0017 is a rule about generators.
 
 ## The change
 
@@ -27,139 +31,158 @@ satisfy it.
 Today `_emit` writes `np.where(last >= 0, year - last, TSD_MAX_YEARS)`:
 a pixel no vintage covers reads "undisturbed for 30 years".
 
-- In the stripe loop, keep a boolean `cov` (initially all `True`) and for
-  each vintage `d` read, `cov &= ~np.isin(arr, NODATA_SENTINELS)`.
-  Because the loop emits output year `Y` before folding any vintage
-  `d > Y`, `cov` at emit time is exactly the intersection over vintages
-  `≤ Y` — the correct coverage for that year.
+- In the stripe loop keep a boolean `cov` (initially all `True`); for
+  each vintage `d` read, `cov &= ~np.isin(arr, NODATA_SENTINELS)`. The
+  loop emits output year `Y` before folding any vintage `d > Y`, so `cov`
+  at emit time is the intersection over vintages `≤ Y`.
 - `_emit` writes `-9999` where `~cov`, after `tsd_encode`.
-- `hit` becomes `(arr > 0) & ~np.isin(arr, NODATA_SENTINELS)`. Today it
-  excludes only the file's declared nodata tag, which is wrong for some
-  vintages (e.g. `32767` fill under a `-32768` tag). Raw value `0` is the
-  VAT "Background" class — covered, undisturbed — and correctly is not a
-  hit.
-- Add `--out-dir` (default: the pipeline raster dir) and `--years`.
+- `hit` becomes `(arr > 0) & ~np.isin(arr, NODATA_SENTINELS)`. This is
+  for clarity only: any pixel it would change is already `~cov`, so it
+  changes no output (measured: 0 pixels, all regions).
+- Add `--out-dir` (default: the pipeline raster dir) and `--years`
+  (output years to write). `--out-dir` replaces `raster_dir` for every
+  path the run writes.
 - Write tag `GROUSE_COVERAGE=disturbance-intersection`.
 
 ### 2. `generate_treemap_features.py` (BUG-0025)
-The raw TreeMap bands carry no sentinel: Earth Engine's `unmask(0)` has
-already merged "non-forest" and "outside CONUS" into one `0`
-(`data/treemap_raw` has `nodata=None`, 0 % NaN/negative). So coverage
-must come from an external reference, and the only local one is NLCD —
-the same reference CR-0010 uses for these features.
+The raw TreeMap bands carry no sentinel: Earth Engine's `unmask(0)` merged
+"non-forest" and "outside CONUS" into one `0`. Coverage therefore comes
+from the region's NLCD raster — the same reference CR-0010 used.
 
-- `write_vintage` opens the region's NLCD raster
-  (`rd.latest_raster_path("nlcd")`), asserts it has the output grid
-  (`grid_mismatch` returns nothing), and reads `nlcd != -9999` as
-  `cov` per stripe. If no NLCD raster exists, exit with an error.
-- `_clean` returns `(values, bad)` where `bad` marks non-finite,
-  `< 0` or `≥ NODATA_FLOOR` raw values, instead of silently setting them
-  to `0.0`. In-coverage zeros remain `0` (Branch A, user decision
-  2026-09-30).
-- After encoding, write `-9999` where `~cov | bad`.
-- The `shutil.copy2` year fan-out is unchanged: it copies an output that
-  is now correct.
-- Add `--out-dir` and `--years`.
+- `write_vintage` opens `rd.latest_raster_path("nlcd")` and asserts
+  `grid_mismatch` is `None` **and** `height`, `width` and `transform`
+  equal the template's (windowed reads need identical extents). It reads
+  `nlcd != -9999` as `cov` per stripe. No NLCD raster → exit with an error.
+- `_clean(arr)` returns `(values, bad)`: `bad` marks non-finite, `< 0`
+  and `≥ NODATA_FLOOR` raw values, and `values` holds a **finite
+  placeholder `0.0`** at those pixels so the encoders (§3) never see
+  NaN. The placeholder never reaches the output: per feature,
+  `bad_balive = bad[BALIVE]`, `bad_tpa_live = bad[TPA_LIVE]`,
+  `bad_qmd = bad[BALIVE] | bad[TPA_LIVE]`,
+  `bad_carbon_dwn = bad[CARBON_DWN]`, and after encoding each feature is
+  written `-9999` where `~cov | bad_<feature>`.
+- In-coverage zeros remain `0` (Branch A, user decision 2026-09-30).
+- Add `--out-dir` and `--years`. `--out-dir` **replaces
+  `plan["raster_dir"]`**, so `write_vintage`, the `shutil.copy2` year
+  fan-out and the guard all use it. `--years` filters output years
+  **before** they are grouped by vintage.
 - Write tag `GROUSE_COVERAGE=nlcd`.
 
-### 3. `models.py` encoders
+### 3. `models.py` encoders (BUG-0036)
 `tsd_encode`, `road_dist_encode`, `tpa_live_encode`, `treemap_encode`
-and `qmd_from_balive_tpa` map NaN to `0` without error (`np.clip` then
-`np.rint(...).astype(int16)`, or `tpa > 0` being False for NaN). Each
-now raises `ValueError` on any non-finite input. Contract, in each
-docstring: encoders take in-coverage values only; the generator writes
-nodata by mask after encoding. All current callers already pass finite
-values (checked: `generate_road_distance.py:216` encodes the EDT result
-before masking; the other two generators after §1/§2).
+and `qmd_from_balive_tpa` map NaN to `0` without error. Each now raises
+`ValueError` on any non-finite input. Contract, in each docstring:
+encoders take finite values; generators write nodata by mask after
+encoding. Callers: `generate_road_distance.py:216` (EDT result, finite)
+and the two generators above (finite after §1/§2). `predict.py` and
+`dataset.py` do not call them.
 
 ### 4. `download_tcc_nlcd.py` (BUG-0030 `tcc`, BUG-0035 `nlcd`)
-Earth Engine exports masked pixels as `0`. For `tcc`, `0` is also a real
-reading (0 % canopy), so `build_raster`'s range mask
-(`(arr >= lo) & (arr <= hi)`, `lo = 0`) keeps them. For `nlcd`,
-`valid_range` starts at 11, so the mask rejects them — correct only by
-accident.
+Earth Engine exports masked pixels as `0`. For `tcc` that is a real
+reading; for `nlcd` (`valid_range` 11–95) it is rejected only by accident.
 
-- In `year_image`, return `sub.select(band).mosaic().unmask(-1)`. `-1`
-  is outside both products' `valid_range`, so the existing range mask
-  turns it into `-9999`. Applies to both products; `nlcd` no longer
-  depends on the accident.
-- Factor the range mask into `mask_to_valid(arr, lo, hi)` so it can be
-  unit-tested.
+- `year_image` returns `sub.select(band).mosaic().toInt16().unmask(-1)`.
+  The cast makes `-1` representable whatever the band's native type
+  (both are unsigned 8-bit). `-1` is outside both valid ranges, so the
+  existing range mask writes `-9999`.
+- Factor the range mask into `mask_to_valid(arr, lo, hi)`.
+- **Post-download coverage check, in code.** `build_raster` warps to
+  `out_path + ".tmp"`, then for `tcc` requires
+  `count(tmp != -9999 where the region's NLCD == -9999) == 0`, and only
+  then `os.replace`s it. On failure it raises and leaves the existing
+  file untouched. The check runs only when the output and the region's
+  NLCD raster are on the same grid (same shape and transform); if there
+  is no NLCD raster or no template (output left in EPSG:5070), it is
+  skipped with a printed warning.
 - Write tag `GROUSE_COVERAGE=ee-mask`.
 
-### 5. Remove CR-0010's generator guard
-Delete the `grouse_data.refuse_if_repaired` calls CR-0010 added to the
-three generators (and the helper, if nothing else calls it). CR-0010's
-legacy-checkpoint refusal in `predict.py`/`calibrate.py` stays.
+### 5. Replace CR-0010's guard
+- Delete `refuse_if_repaired`'s calls and the `--overwrite-repaired`
+  flags from the three generators, and `refuse_if_repaired` itself.
+- Delete CR-0010's generator-guard tests (`test_helper`,
+  `test_treemap_copy2_destination_refuses`,
+  `test_tsd_refuses_before_opening`, `test_tcc_refuses_before_download`).
+- **Keep** the legacy-checkpoint refusal in `predict.py`/`calibrate.py`,
+  and widen `repaired_paths` to match `GROUSE_COVERAGE` as well as
+  `GROUSE_REPAIR`, so it still fires on files the fixed generators write.
 
 ## Acceptance gates
-All exact; no statistical thresholds. Outputs go to a scratch directory,
-never `data/landfire/`.
+All exact. Outputs go to a scratch directory, never `data/landfire/`.
 
 | id | check | required |
 |---|---|---|
-| G4-D | `generate_time_since_disturbance.py --out-dir <scratch> --years Y` for ME 2016, NH 2025, VT 2025, compared with CR-0010's repaired file of the same name | pixel-identical |
-| G4-T | `generate_treemap_features.py --src-dir data/treemap_raw --out-dir <scratch>` for VT, representative year of each vintage, all four features, compared with CR-0010's repaired files | pixel-identical |
-| U1 | `_clean`: a sentinel injected at an in-coverage pixel yields `-9999` in the output, not `0` | pass |
+| G4-D | `generate_time_since_disturbance.py --regions R --years Y --out-dir <scratch> --block-rows 512` for (ME, 2016), (NH, 2025), (VT, 2025); values compared with CR-0010's repaired file | pixel-identical |
+| G4-T | `generate_treemap_features.py --src-dir data/treemap_raw --regions VT --years 2016 2019 2022 --out-dir <scratch> --block-rows 512` (the representative year of each TreeMap vintage on disk); all 12 outputs compared with CR-0010's repaired files | pixel-identical |
+| G9 | Profile and `tags(ns='IMAGE_STRUCTURE')` of every G4 output equal CR-0010's file's. Default-namespace tags (`GROUSE_*`) are not compared | identical |
+| U1 | `_clean` + TreeMap write path: NaN, a negative value and a value ≥ 1e9, each injected at an in-coverage pixel of a different attribute, give `-9999` in the dependent features (per §2's `bad` mapping) and nowhere else | pass |
 | U2 | Each of the five encoder functions raises on NaN and on ±inf | pass |
-| U3 | `mask_to_valid`: `-1 → -9999`, `0 → 0` for `tcc`; `0 → -9999`, `-1 → -9999` for `nlcd` | pass |
-| U4 | `tsd` coverage: a synthetic 3-vintage stack where one vintage has a sentinel at a pixel yields `-9999` there for output years ≥ that vintage and a value for earlier years | pass |
-| G9 | Profile and `IMAGE_STRUCTURE` tags of G4 outputs equal the originals' (except the new `GROUSE_COVERAGE` tag) | identical |
+| U3 | `mask_to_valid`: `tcc` `-1 → -9999`, `0 → 0`; `nlcd` `0 → -9999`, `-1 → -9999` | pass |
+| U4 | `tsd` coverage: synthetic 3-vintage stack, sentinel at one pixel in the middle vintage → `-9999` for output years ≥ that vintage, a value for earlier years | pass |
+| U5 | Post-download check: a `tcc` temp file with a value inside the NLCD nodata footprint raises and leaves the existing file unchanged | pass |
+| U6 | `refuse_legacy_checkpoint_on_repaired` fires for a `missing_mask=False` model on a file tagged `GROUSE_COVERAGE` | pass |
 
-A G4 mismatch is a finding to investigate (e.g. a vintage added since the
-file was generated), not something to waive.
+`--block-rows 512` is pinned: WarpedVRT nearest-neighbour output can
+differ at single pixels between very different window heights (measured:
+1-row vs 512-row reads), while 512 and 1024 give identical results.
+
+A G4 mismatch is a finding to investigate, not to waive.
 
 ## Impact
-- **Data on disk:** none. Future runs of the three generators produce
-  what CR-0010 produced by repair.
-- **Code:** the three generators, five `models.py` functions, one
-  helper in `grouse_data.py` removed.
-- **Callers of the encoders** that pass NaN would now fail loudly instead
-  of storing `0`. None do today.
+- **Data on disk:** none. Future runs produce what CR-0010 produced.
+- **Code:** the three generators, five `models.py` functions,
+  `grouse_data.py` (guard removed, `repaired_paths` widened), tests.
+- **Encoder callers** that pass NaN now fail loudly. None do today.
+- **Legacy-checkpoint refusal** will also fire on freshly downloaded
+  `nlcd` files (they carry `GROUSE_COVERAGE` too), although `nlcd` values
+  do not change. Intended: the refusal keys on the tag, not the feature.
 - **CR-0007:** no effect (no data change).
 
 ## Risk: LOW
 | risk | mitigation |
 |---|---|
-| Generator fix differs from CR-0010's repair | G4-D/G4-T require pixel identity |
-| TreeMap run with a stale or missing NLCD raster | Grid assertion; exit if missing |
-| Earth Engine change cannot be run here (no GCP auth) | U3 tests the local half; the first real run is checked with CR-0010's `check_raster_repair.py` G2 against the NLCD pin (deliverable 9) |
-| Guard removed before the generators are fixed | Deliverable order: guard removal is after G4 passes |
+| Generator output differs from CR-0010's repair | G4-D/G4-T pixel identity, G9 |
+| `unmask(-1)` does nothing in Earth Engine (type clamp) | `toInt16()` cast; post-download check (U5) refuses to write a `tcc` file with values outside the NLCD footprint |
+| TreeMap run with a stale or mismatched NLCD raster | Full grid and extent assertion; exit if missing |
+| A regenerated file escapes the legacy-checkpoint refusal | `repaired_paths` matches `GROUSE_COVERAGE` (U6) |
+| Guard removed before the generators are fixed | Guard removal is deliverable 6, after G4 passes |
 
 ## Test plan
-**Here:** U1–U4, G4-D, G4-T, G9. Disk: G4 outputs are VT-sized except
-one ME `tsd` year; under 1 GB in total, deleted after the run.
+**Here:** U1–U6, G4-D, G4-T, G9. Disk: G4 writes 3 `tsd` files and 12
+VT TreeMap files to scratch (under 1 GB), deleted after the run.
 
-**Not here:** the Earth Engine change in `download_tcc_nlcd.py` (no GCP
-credentials). Accepted gap; deliverable 9 verifies the first real run.
+**Not here:** a real Earth Engine download (no GCP credentials). Covered
+by the `toInt16` cast and the in-code post-download check (U5), which
+runs on every future download.
 
 ## Deliverables (in execution order)
-- [ ] 1. `models.py` encoder contract and non-finite check (§3); U2.
-- [ ] 2. `generate_time_since_disturbance.py` (§1); U4.
-- [ ] 3. `generate_treemap_features.py` (§2); U1.
-- [ ] 4. `download_tcc_nlcd.py` (§4); U3.
-- [ ] 5. Run G4-D, G4-T, G9; save output to
-      `docs/quality/evidence/CR-0008-gates.txt`.
-- [ ] 6. Remove CR-0010's generator guard (§5).
-- [ ] 7. File BUG-0035 (`nlcd` correct only by accident) with all §2
-      sections, recurrence review against PA-0017, and a `BUG_LOG.md` row.
-- [ ] 8. Close BUG-0024 and BUG-0025 (corrective action: data CR-0010,
-      generator CR-0008); add this CR to BUG-0030's corrective action.
-      Update PA-0017's Swept? cell: `tsd`, TreeMap, `tcc`, `nlcd`
-      generators fixed.
-- [ ] 9. Add a line to `download_tcc_nlcd.py`'s docstring and to the
-      open-issues tracker: the next real download must be checked with
-      `check_raster_repair.py` G2 against the NLCD pin before use.
+- [x] 0. **Before approval:** BUG-0035 drafted (`nlcd` correct only by
+      accident) — `docs/quality/bugs/BUG-0035-*.md`.
+- [x] 1. `models.py` encoders (§3); U2.
+- [x] 2. `generate_time_since_disturbance.py` (§1); U4.
+- [x] 3. `generate_treemap_features.py` (§2); U1.
+- [x] 4. `download_tcc_nlcd.py` (§4); U3, U5.
+- [x] 5. Run G4-D, G4-T, G9; save to `docs/quality/evidence/CR-0008-gates.txt`.
+- [x] 6. Replace CR-0010's guard (§5); U6; the remaining CR-0010 tests pass.
+- [x] 7. Bookkeeping:
+      - File BUG-0036 (encoders map NaN to 0 silently; PA-0006 class) with
+        all §2 sections, recurrence review and `BUG_LOG.md` row.
+      - Amend BUG-0025 §4 to quote `_clean`'s clamp (`a[a < 0] = 0.0`) and
+        BUG-0024 §4 to quote `hit`, as part of the same defects.
+      - Close BUG-0024, BUG-0025, BUG-0030, BUG-0035 (corrective action:
+        data CR-0010, generator CR-0008); update their `BUG_LOG.md` rows.
+      - PA-0017's Swept? cell: `tsd`, TreeMap, `tcc`, `nlcd` generators fixed.
 
 ## Out of scope
-- **`road_dist` ME/VT** (BUG-0023): regeneration, `_download` atomicity,
-  `TIGER_YEAR`, Canadian-border roads, G7/RD1–RD5 → a separate CR, not
-  yet written (tracker).
+- **`road_dist` ME/VT** (BUG-0023) → a separate CR, not yet written. It
+  must carry, from v7 and accepted dispositions: the regeneration;
+  `_download` atomicity; the densified footprint reprojection;
+  `TIGER_YEAR`; the Canadian-border roads decision; G7/RD1–RD5 including
+  truth from every TIGER county intersecting grid + pad (PA-0018), the
+  excluded-point count gated at 0, and all 10 year-copies byte-identical;
+  G6 for the regenerated files; and the BUG-0023 §6 ruling that this
+  retroactive CR reviews `bf8d31a` but cannot discharge its §1.1
+  ordering deviation. Listed in the open-issues tracker.
 - **Repairing existing rasters** → CR-0010.
 - **`download_treemap.py`**: its raw output is an intermediate the model
-  never reads, and its `0` cannot be disambiguated in Earth Engine
-  without an external boundary. Coverage is resolved once, in the
-  generator (§2). Its `nodata=None` and `:315` clip affect only raw
-  values the mask overwrites.
+  never reads; coverage is resolved once, in the generator (§2).
 - `predict.py`'s validity mask; Branch B; the retrain (CR-0009).
-- The duplicate 15 GB disturbance extraction.

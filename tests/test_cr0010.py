@@ -1,5 +1,6 @@
-"""CR-0010 unit tests: the repair + checker on a synthetic fixture, the
-generator refuse-to-overwrite guard, and the legacy-checkpoint refusal.
+"""CR-0010 unit tests: the repair + checker on a synthetic fixture, and
+the legacy-checkpoint refusal. (The generator refuse-to-overwrite guard
+and its tests were removed by CR-0008, which fixed the generators.)
 
     python -m unittest tests.test_cr0010 -v
 """
@@ -12,7 +13,6 @@ import sys
 import tempfile
 import types
 import unittest
-from unittest import mock
 
 import numpy as np
 import rasterio
@@ -213,13 +213,6 @@ class Guards(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp)
 
-    def test_helper(self):
-        with self.assertRaises(SystemExit):
-            grouse_data.refuse_if_repaired([self.plain, self.tagged])
-        grouse_data.refuse_if_repaired([self.plain, self.tagged], allow=True)
-        grouse_data.refuse_if_repaired([self.plain,
-                                        os.path.join(self.tmp, "absent.tif")])
-
     def test_legacy_checkpoint(self):
         with self.assertRaises(SystemExit):
             grouse_data.refuse_legacy_checkpoint_on_repaired(
@@ -228,57 +221,6 @@ class Guards(unittest.TestCase):
             types.SimpleNamespace(missing_mask=True), [self.tagged])
         grouse_data.refuse_legacy_checkpoint_on_repaired(
             types.SimpleNamespace(missing_mask=False), [self.plain])
-
-    def test_treemap_copy2_destination_refuses(self):
-        """Untagged representative year 2016, tagged copy2 target 2017:
-        must refuse before any worker writes."""
-        import generate_treemap_features as g
-        plan = {"ref_path": self.plain, "profile": {}, "raster_dir": self.tmp,
-                "by_vintage": {2016: [2016, 2017]}}
-        before = sha(self.tagged)
-        with mock.patch.object(g, "GrouseData"), \
-                mock.patch.object(g, "discover_vintages", return_value=[2016]), \
-                mock.patch.object(g, "plan_region", return_value=plan), \
-                mock.patch.object(g, "write_vintage",
-                                  side_effect=AssertionError("wrote")), \
-                mock.patch.object(sys, "argv", ["x", "--src-dir", self.tmp,
-                                                "--regions", "VT"]):
-            with self.assertRaises(SystemExit):
-                g.main()
-        self.assertEqual(sha(self.tagged), before)
-
-    def test_tsd_refuses_before_opening(self):
-        import generate_time_since_disturbance as g
-        out = os.path.join(self.tmp, "VT_2020_tsd.tif")
-        write(out, np.zeros((H, W)), GROUSE_REPAIR="CR-0010")
-        before = sha(out)
-        rd = types.SimpleNamespace(
-            available_features=lambda: ["nlcd"],
-            latest_raster_path=lambda f: self.plain,
-            raster_years=lambda f: [2020])
-        data = mock.MagicMock()
-        data.__getitem__.return_value = rd
-        data.config.resolve.return_value = self.tmp
-        with self.assertRaises(SystemExit):
-            g.process_region("VT", data, {2019: self.plain}, 16)
-        self.assertEqual(sha(out), before)
-
-    def test_tcc_refuses_before_download(self):
-        import download_tcc_nlcd as g
-        write(os.path.join(self.tmp, "VT_2020_tcc.tif"), np.zeros((H, W)),
-              GROUSE_REPAIR="CR-0010")
-        with mock.patch.object(g, "ee_init"), \
-                mock.patch.object(g, "resolve_collection", return_value="c"), \
-                mock.patch.object(g, "collection_years", return_value=[2020]), \
-                mock.patch.object(g, "GrouseData"), \
-                mock.patch.object(g, "template_raster", return_value=None), \
-                mock.patch.object(g, "build_raster",
-                                  side_effect=AssertionError("downloaded")), \
-                mock.patch.object(sys, "argv", [
-                    "x", "--regions", "VT", "--features", "tcc", "--years",
-                    "2020", "--out-dir", self.tmp, "--force"]):
-            with self.assertRaises(SystemExit):
-                g.main()
 
 
 if __name__ == "__main__":

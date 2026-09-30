@@ -199,3 +199,15 @@ coverage-consistency check could, for each region and feature, flag
 pixels where the LANDFIRE reference (`evt`) is nodata but the feature is
 valid, or vice versa, beyond a small tolerance. That catches this whole
 class at generation time. It is a candidate change and needs its own CR.
+
+**CR-0009 item 5 record (2026-09-30).** The CR-0009 re-measurement beside `bf8d31a`'s before/after (map box, Errol NH):
+
+| map | P(ME>NH) (1a) | ≥0.8 gap pp (1b) | 2a road_dist m | 2b prob. |
+|---|---|---|---|---|
+| gap3.pth before `bf8d31a` | 0.8513 | 62.88 | +4,255 | — |
+| bce.pth before `bf8d31a` | 0.8235 | 45.57 | +4,255 | +0.3484 |
+| gap3.pth after | 0.5400 | 5.36 | +202.75 | — |
+| bce.pth after | 0.5089 | 0.08 | +202.75 | +0.1078 |
+| grouse_cr0009.pth (CR-0009) | 0.4777 | −0.05 | +202.68 | −0.0402 |
+
+The symptom collapsed with the `road_dist` fix alone, using the old checkpoints (rows 3–4), before any retrain; the retrain on the CR-0012 split keeps it gone. That credits BUG-0023's fix with the symptom, not CR-0009. Source: `docs/quality/evidence/CR-0009/symptom/report.txt` item 5 and CR-0009 § Why now.

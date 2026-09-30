@@ -259,3 +259,5 @@ owned by BUG-0034.
 the classes' occupied spatial blocks and year histograms; fail on
 divergence) is feasible and belongs with CR-0012's pooled-split checks. Not
 yet implemented. No CI exists, so it would run as a build-time assertion.
+
+**Closed (2026-09-30).** CR-0015 deliverable 7b passed and CR-0009 closed (the closure rule above). Status: **CLOSED**.

@@ -238,3 +238,5 @@ before this incident:
 Also re-read BUG-0001..0021 for causes stated without a recorded check:
 BUG-0017 is already labelled unconfirmed; the others quote the code they
 diagnose. No further instance found.
+
+**Closed (CR-0009 deliverable 10, 2026-09-30).** Re-measurement on the retrained model (§6 update above; `docs/quality/evidence/CR-0009/symptom/report.txt`): every row that measures the reported symptom (1a, 1b, 2b) is within its reference; the regenerated `data/predictions/NH_custom_suitability.tif` (sha256 `4d999fe3…`) is byte-identical to the map scored. The process defect (causes asserted before investigation) is addressed by PA-0016. Status: **CLOSED**.

@@ -127,7 +127,7 @@ region but not across the pooled data.
   a later edit cannot reintroduce the leak unnoticed (item 3 of the
   original proposal).
 
-Status: **FIXED (CR-0012), 2026-09-30.** It closes after CR-0009's
+Status: **CLOSED (2026-09-30: CR-0012 fixed it; CR-0009's retrain on the leak-free split is done).** Previously FIXED (CR-0012), 2026-09-30. It closes after CR-0009's
 retrain, because the split change invalidates every checkpoint and
 metric. CR-0009 deliverable 10 records the closure.
 

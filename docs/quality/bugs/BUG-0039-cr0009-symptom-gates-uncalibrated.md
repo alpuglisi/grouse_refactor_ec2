@@ -89,7 +89,7 @@ rule was unfiled when v4 was written (BUG-0033 § 5, step 4).
 tree, uncommitted per user) now reports 1a/1b/2a/2b as OBS, with the
 reference values beside them and the rule that a value past its reference
 is investigated (PA-0016). Promotion needs ≥ 50 retrain seeds and a CR.
-Status: **FIXED in text** — takes effect when CR-0009 v4 is committed.
+Status: **CLOSED (CR-0009 deliverable 10, 2026-09-30)** — every CR-0009 symptom row is OBS with PA-0021(f) fields (v5); CR-0009 ran and recorded them (`docs/quality/evidence/CR-0009/symptom/`). Earlier: FIXED in text — takes effect when CR-0009 v4 is committed.
 
 Original analysis follows.
 
@@ -108,7 +108,7 @@ Gate 2b additionally needs a constructed failing model (PA-0021(a)).
 CR-0011 A3 also applies: the committed `symptom_check.py` must compute
 the thresholds' calibration, not the CR's prose.
 
-**Status:** OPEN; tracked in `docs/quality/CR-0007-0008-OPEN-ISSUES.md`.
+**Status:** CLOSED 2026-09-30 (see the status line above); earlier tracked in `docs/quality/CR-0007-0008-OPEN-ISSUES.md`.
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`.

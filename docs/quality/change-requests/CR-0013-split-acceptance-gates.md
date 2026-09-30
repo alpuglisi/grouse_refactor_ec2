@@ -1,12 +1,6 @@
 # CR-0013: Acceptance gates for the pooled split and draw, as a committed script
 
-**Status: REVISED (v2.3), 2026-09-30.**
-- v2.2 text was signed off by both reviewers.
-- v2.3 answers the replay implementer's findings F1–F18
-  (`docs/quality/evidence/CR-0013-implementer-findings.md`). It awaits a
-  bounded re-review.
-- Deliverables 2–5 were done at `8501b51`. Deliverable 5a follows from
-  v2.3.
+**Status: APPROVED (v2.3 text; code at `3230262`), 2026-09-30.** Follow-ups (deliverable 5b) land before CR-0012's data run.
 
 History, verdicts and dispositions are in `CR-0013-review-log.md`. This
 CR was split from CR-0007 v7's acceptance layer (commit `bb170ea`). This

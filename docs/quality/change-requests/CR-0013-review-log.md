@@ -331,3 +331,38 @@ Each location below is the operative text (PA-0024(a)).
 | version | date | change |
 |---|---|---|
 | v2.3 | 2026-09-30 | Implementer findings F1–F18. <br>• Sources: CR-0007 at `6619bdd`; CR-0012 re-pinned to its v2.2 approval commit (to be filled). <br>• Definitions: coordinates, premises and ties; 15 features; envelope rule. <br>• Config: `columns`, `manifest_schema`, environment extended. <br>• Gates and checks: E11 (a)–(e); canonical-order gate; standing details. <br>• Runs: data-root layout; expected-FAIL list. <br>• Deliverable 5a added. |
+
+## Round 3 — code review (commit 3230262)
+| reviewer | verdict |
+|---|---|
+| A — attack power | **APPROVE WITH FOLLOW-UPS** — every attack row fails its named gate for the intended reason (all 18 gates evaluated per attack, reasons read); independence holds; own attacks caught or within stated limits 1/6 |
+| B — conformance | **APPROVE WITH FOLLOW-UPS** — every gate, standing_checks and the CLI conform to v2.3 with the config normative; 84 tests OK; CR-0012 can produce a conforming manifest from its text + config |
+
+A's follow-ups:
+- A-R3-1 MAJOR (tracked follow-up allowed): design rule 3 not enforced in
+  code — gate strictness depends on unpinned config keys
+  (`comparison.float_rel_tol`: at 1e-2 a 1.005× weight scaling passes;
+  `columns`, `row_order`, `regions_py.names`,
+  `columns.split_manifest_sections`). Fix: assert `float_rel_tol == 1e-12`
+  and pin a sha256 of the gate-affecting config sections in the tests.
+- A-R3-2 LOW: attack tests should assert the failure reason text, not only
+  FAIL.
+
+B's follow-ups:
+- B-R3-1 MEDIUM (latent): E11(b) lists rasters opened by `raster_path`'s
+  validation, incl. rejected fallback candidates (12 `*_2025_{cc,ch,evc,
+  fdist}.tif` placeholders fail validation today; no record resolves to
+  2025 yet). State it in `manifest_schema.inputs` so CR-0012's manifest
+  lists them.
+- B-R3-2 LOW: `hash_spec` is copied verbatim (descriptive strings).
+- B-R3-3 LOW: CR-0012 §2 coordinate-recompute wording (tracked).
+- G2 (LOW): "every environment key except op_rule" — clarity.
+
+## Quorum and approval (round 3)
+Reviewer A: APPROVE WITH FOLLOW-UPS. Reviewer B: APPROVE WITH FOLLOW-UPS.
+Author (lead): approve. **User pre-authorised (2026-09-30) that author +
+both reviewers' approval is sign-off. CR-0013 APPROVED (v2.3 + code at
+`3230262`).** Follow-ups A-R3-1 (pin gate-affecting config and
+`float_rel_tol`), A-R3-2, B-R3-1, B-R3-2 are assigned to the replay author
+as deliverable 5b, to land before CR-0012's data run (deliverable 6).
+

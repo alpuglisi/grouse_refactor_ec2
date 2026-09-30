@@ -91,7 +91,7 @@ comparing the positive and negative per-year histograms. Any change
 requires a re-fetch and a rebuild of negatives (user decision recorded in
 BUG-0073). Status: **OPEN**. Owner: lead.
 
-**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0022-negatives-rollover-round-robin.md` (DRAFT v1, awaiting independent review under CLAUDE.md §1.2; nothing implemented).
+**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0022-negatives-rollover-round-robin.md` (DRAFT v2, awaiting independent review under CLAUDE.md §1.2; nothing implemented). **User decision 2026-09-30: no re-fetch** — the code fix is latent until the next acquisition; today's year imbalance stays with BUG-0073's no-network remedy.
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md` for "year",

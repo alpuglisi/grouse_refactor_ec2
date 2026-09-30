@@ -276,7 +276,7 @@ Reviews: `docs/quality/evidence/CR-0019/code-review/`; dispositions in `CR-0019-
 ## Static code review 2026-09-30 (whole pipeline at `3b3e7d1`, no data, no execution), owner: lead
 Filed as BUG-0076..BUG-0092 (`docs/quality/bugs/`, `BUG_LOG.md`), rules PA-0033..PA-0047 (PA-0040 supersedes PA-0009). All OPEN, none fixed. In priority order:
 - [ ] BUG-0076 validation negatives drawn with holdout-fitted envelope weights (was D3) — **CR-0020 drafted**
-- [ ] BUG-0077 `get_negatives.py` rollover greedy in ascending year (candidate cause of BUG-0073) — **CR-0022 drafted** (re-fetch: user decision)
+- [ ] BUG-0077 `get_negatives.py` rollover greedy in ascending year (candidate cause of BUG-0073) — **CR-0022 drafted** (v2: user decided 2026-09-30 not to re-fetch; latent code fix + O11; BUG-0073's harmonisation CR still to write)
 - [ ] BUG-0078 `EVT_PHYS_NONVEG_PREFIXES` "Agriculture" never matches LANDFIRE "Agricultural" — **CR-0021 drafted** (measure first, rebuild if any row changes)
 - [ ] BUG-0079 non-atomic multi-year raster writes + `raster_path` fallback + filename-only year check (tsd future leakage, latent) — **CR-0023 drafted**
 - [ ] BUG-0080 `standing_checks` does not bind `block_assignments.csv` (latent, `--an-background`) — **CR-0024 drafted**

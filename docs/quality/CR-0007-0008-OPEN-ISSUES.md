@@ -226,3 +226,11 @@ Review follow-ups:
   Fix: raise `ValueError` on each case, then re-check B1 and `test_cr0012`. This is a production-code validation change, out of CR-0015's scope, and needs a CR or a trivial-fix record.
 - [ ] B-4 (LOW): V3 is OBS under CR-0015's literal rule (lead decision; both reviewers concur). Optional later CR: scope V3's separation requirement to the samplers the CR's "caught by" table assigns to V3, and restore it as a GATE (needs A-1 first).
 - [ ] B-6 (LOW): `pretrain.py`'s preflight calls the private `regions._state_polygons()`. Use a public API, such as a one-point `regions.in_state` or a new `regions.require_state_polygons()`.
+
+## CR-0015 bookkeeping design questions (2026-09-30), owner: lead
+- [ ] **D1:** validation data drives model selection, the divergence guard, `--dynamic-dropout` (`model_handler.py:1306`) and Platt calibration. There is no third holdout, so reported validation metrics carry selection bias. Decision needed: accept and document, or add a test holdout.
+- [ ] **D2:** `calibrate.cross_fitted_probs` (`calibrate.py:229-239`) uses random folds, not block folds, so `ece_cross_fitted` and `nll_cross_fitted` are slightly optimistic. Reported numbers only.
+- [ ] **D3:** training-negative weights (`Selection_Ratio` over every sighting, validation included) and the 300 m buffer depend on validation positives (`generate_negatives.attach_weights`). No CR-0013 gate asks this.
+- [ ] **D4:** there is no buffer between training and validation blocks. The 64 px window is about 1.9 km and the blocks are 3 km, so features leak across block edges. Labels do not.
+- [ ] The `train.py:246` comment "Covers every caller" omits `smoke_test_training.py` and `diagnose_training.py`, which build datasets without `standing_checks` (no model is kept). Doc fix.
+- [ ] The `find_tsd_contrast_points.py` docstring (about lines 40-44) says `read_window_stack` "zeroes NODATA_SENTINELS to 0". That has been stale since `51a4ad0`. Doc fix.

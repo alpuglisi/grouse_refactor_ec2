@@ -1,12 +1,6 @@
 # CR-0015: Draw assumed-negative background points only in-state, only in training blocks, and without treating 0 as nodata
 
-**Status: APPROVED (v2.2), 2026-09-30. Deliverables 1–8 IMPLEMENTED on the
-implementation branch; deliverable 9 waits for the lead to apply the
-`BUG_LOG.md`/`PREVENTIVE_ACTIONS.md` rows in
-`docs/quality/evidence/CR-0015-bookkeeping-rows.md` and for the code
-review.**
-History, lineage, verdicts and dispositions: `CR-0015-review-log.md`. This
-document states only current intent.
+**Status: IMPLEMENTED (v2.2), 2026-09-30.** Merged `3f60e6f` (implementation head `3e42cf2`); both code reviewers APPROVE WITH FOLLOW-UPS at `3add80b`, follow-ups in the review log; 265 tests OK on the merge; bookkeeping rows applied by the lead.
 
 ## Scope
 Change `train.sample_background_points` so the assumed-negative points
@@ -441,7 +435,7 @@ not use the AN path.
   - [x] 7b. V1–V3, plus the constructed-sampler runs for V1. Save the
         output to `docs/quality/evidence/CR-0015-background.txt`.
 - [x] 8. Remove the interim guard and U7.
-- [ ] 9. Close-out:
+- [x] 9. Close-out (lead, 2026-09-30: BUG_LOG/PA rows applied; BUG-0029 FIXED, closes with CR-0009):
   - BUG-0032: FIXED.
   - BUG-0042: FIXED.
   - **BUG-0029 closure rule:** corrective action "membership: CR-0007;

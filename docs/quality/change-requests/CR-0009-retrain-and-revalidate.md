@@ -358,7 +358,7 @@ epochs.
       written; CR-0014 landed.
 - [x] 5. Backups (§ Disk): 23 files, 1.3 GB, verified; manifest `docs/quality/evidence/CR-0009/backup_SHA256SUMS`.
 - [x] 6. Retrain (§ The change 1); record the evidence it lists. Saved checkpoint = epoch 3 (rank 0.7317); `docs/quality/evidence/CR-0009/retrain/retrain_summary.txt`.
-- [ ] 7. Refit calibration; confirm `model_path`.
+- [x] 7. Refit calibration; confirm `model_path`. `model_path` = /home/ec2-user/grouse2/grouse_cr0009.pth; scale 1.2035, bias -0.5154, ECE 0.0323 (cross-fitted 0.0294); `docs/quality/evidence/CR-0009/calibration/`.
 - [ ] 8. Record the new validation baseline, with the not-comparable
       note and BUG-0034.
 - [ ] 9. Maps (§ Symptom acceptance, § Stale markers); run

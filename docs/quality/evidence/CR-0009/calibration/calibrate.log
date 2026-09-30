@@ -1,0 +1,63 @@
+Device: cuda
+Checkpoint config: pool=attn, center_skip=True, features=['evt', 'evh', 'evc', 'sclass', 'fdist', 'nlcd', 'ch', 'cc', 'tcc', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn']
+   ME: EXCLUDED 644 train positive records - sighting years [2016, 2017, 2018, 2019] have no raster within +/-2 years for at least one feature (2,278 kept).
+   ME: EXCLUDED 170 val positive records - sighting years [2016, 2017, 2018, 2019] have no raster within +/-2 years for at least one feature (568 kept).
+   NH: EXCLUDED 210 train positive records - sighting years [2016, 2017, 2018, 2019] have no raster within +/-2 years for at least one feature (630 kept).
+   NH: EXCLUDED 46 val positive records - sighting years [2016, 2017, 2018, 2019] have no raster within +/-2 years for at least one feature (193 kept).
+   VT: EXCLUDED 305 train positive records - sighting years [2016, 2017, 2018, 2019] have no raster within +/-2 years for at least one feature (919 kept).
+   VT: EXCLUDED 62 val positive records - sighting years [2016, 2017, 2018, 2019] have no raster within +/-2 years for at least one feature (207 kept).
+Validation samples: 8,856 (2,214 points x 4 rotations)
+Scoring validation:   0%|          | 0/35 [00:00<?, ?it/s]Scoring validation:   3%|▎         | 1/35 [00:03<02:03,  3.65s/it]Scoring validation:   9%|▊         | 3/35 [00:03<00:31,  1.01it/s]Scoring validation:  14%|█▍        | 5/35 [00:03<00:15,  1.95it/s]Scoring validation:  20%|██        | 7/35 [00:04<00:09,  3.11it/s]Scoring validation:  26%|██▌       | 9/35 [00:04<00:05,  4.41it/s]Scoring validation:  31%|███▏      | 11/35 [00:04<00:04,  5.92it/s]Scoring validation:  37%|███▋      | 13/35 [00:04<00:02,  7.51it/s]Scoring validation:  43%|████▎     | 15/35 [00:04<00:02,  9.09it/s]Scoring validation:  49%|████▊     | 17/35 [00:04<00:01, 10.56it/s]Scoring validation:  54%|█████▍    | 19/35 [00:04<00:01, 11.86it/s]Scoring validation:  60%|██████    | 21/35 [00:04<00:01, 12.95it/s]Scoring validation:  66%|██████▌   | 23/35 [00:05<00:00, 13.81it/s]Scoring validation:  71%|███████▏  | 25/35 [00:05<00:00, 14.47it/s]Scoring validation:  77%|███████▋  | 27/35 [00:05<00:00, 14.98it/s]Scoring validation:  83%|████████▎ | 29/35 [00:05<00:00, 15.35it/s]Scoring validation:  89%|████████▊ | 31/35 [00:05<00:00, 15.62it/s]Scoring validation:  94%|█████████▍| 33/35 [00:05<00:00, 15.82it/s]Scoring validation: 100%|██████████| 35/35 [00:05<00:00, 16.46it/s]                                                                   
+RELIABILITY - BEFORE calibration
+           bin      n  mean pred  observed     gap
+   0.00-0.07    121      0.037     0.000   0.037
+   0.07-0.13     94      0.098     0.000   0.098 <-- !
+   0.13-0.20     89      0.166     0.112   0.053 <-- !
+   0.20-0.27     86      0.236     0.116   0.119 <-- !!
+   0.27-0.33    105      0.300     0.229   0.071 <-- !
+   0.33-0.40    122      0.370     0.262   0.108 <-- !!
+   0.40-0.47    138      0.435     0.304   0.130 <-- !!
+   0.47-0.53    201      0.502     0.378   0.124 <-- !!
+   0.53-0.60    181      0.569     0.436   0.132 <-- !!
+   0.60-0.67    309      0.636     0.485   0.151 <-- !!!
+   0.67-0.73    338      0.702     0.701   0.001
+   0.73-0.80    297      0.766     0.680   0.086 <-- !
+   0.80-0.87    122      0.826     0.795   0.031
+   0.87-0.93     11      0.881     0.818   0.063 <-- !
+   0.93-1.00      0      -          -       -
+
+  ECE 0.0873 | MCE 0.1506 | Brier 0.1973 | NLL 0.5716 | AUC 0.7783 | AP 0.6851
+
+RELIABILITY - AFTER Platt scaling (a = 1.204, b = -0.515), in-sample
+           bin      n  mean pred  observed     gap
+   0.00-0.07    234      0.028     0.009   0.019
+   0.07-0.13    128      0.100     0.117   0.017
+   0.13-0.20    120      0.166     0.183   0.017
+   0.20-0.27    133      0.236     0.271   0.035
+   0.27-0.33    132      0.301     0.311   0.009
+   0.33-0.40    167      0.367     0.371   0.004
+   0.40-0.47    158      0.431     0.380   0.052 <-- !
+   0.47-0.53    190      0.502     0.484   0.018
+   0.53-0.60    241      0.564     0.531   0.033
+   0.60-0.67    271      0.633     0.723   0.090 <-- !
+   0.67-0.73    227      0.700     0.683   0.017
+   0.73-0.80    151      0.761     0.742   0.019
+   0.80-0.87     58      0.824     0.741   0.083 <-- !
+   0.87-0.93      4      0.889     1.000   0.111 <-- !!
+   0.93-1.00      0      -          -       -
+
+  ECE 0.0323 | MCE 0.1109 | Brier 0.1890 | NLL 0.5499 | AUC 0.7783 | AP 0.6851
+  cross-fitted (5-fold, out-of-sample): ECE 0.0294 | MCE 0.1123 | Brier 0.1890 | NLL 0.5501
+  (temperature-only fit for comparison: T = 0.998, ECE 0.0874)
+
+  Ranking preserved: AUC before 0.778310 == after 0.778310 -> True
+
+VERDICT: UNDERCONFIDENT (scale 1.20 > 1): probabilities are compressed toward 0.5 and get sharpened; bias -0.515 moves a raw logit of 0 to p = 0.374 - a constant offset (training objective, balanced batches, label smoothing) that temperature scaling could never remove.
+
+CAVEAT: probabilities are calibrated to the validation prevalence (0.437 positive), not to true landscape occupancy - inherent to the presence/pseudo-absence design. predict.py --prior re-anchors them to a deployment prevalence you supply.
+
+Saved: data/calibration/calibration.json
+       data/calibration/reliability.csv
+       data/calibration/reliability.png
+predict.py picks up the scale and bias automatically from calibration.json.
+NOTE: these probabilities are relative to the validation design (44% positive). If a predicted map lights up wall-to-wall, that is prior mismatch, not a bad fit - use predict.py --prior <expected suitable fraction> or --style quantile.

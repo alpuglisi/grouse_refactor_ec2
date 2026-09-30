@@ -203,6 +203,9 @@ never read from a column.
 | E11 | M | (a) Every S ∪ I file is listed in M's inputs, with a sha256 equal to the file on disk. A listed input outside S ∪ I passes only if it is a digested artifact that matches disk. <br>(b) "Every raster read" includes the fallback candidates that `raster_path`'s validation opens. <br>(c) M's constants, specs, `REGIONS` and environment equal the config, and so does the running environment. <br>(d) M's output digests equal the digested artifacts. <br>(e) `regions.py`, parsed with `ast`, holds literal values equal to the config for the eight CR-0012 names plus `STATE_FIPS` and `COUNTY_POLYGONS_YEAR`. |
 | E12 | C, N; M | `verify_partition`, reimplemented, finds 0. M's dropped list equals the recomputation on the deduplicated raw candidates. |
 
+**Amended by CR-0017** (§3): new exact gate E13 (acquisition-domain edge),
+rule (b) in R3's pool step 6, and config entry `paths.domain_edge`.
+
 **Replay gates.** From S, I and the config, the script produces P, B, C and
 N, the same files CR-0012 writes. Equality is **full-row**: every
 column, row sets matched on key, floats to relative 1e-12, everything
@@ -314,6 +317,8 @@ committed by deliverable 1.
 | `--regions` subset | v7 § `--regions` hole | E1, E11 |
 | Windowless record kept | `inv_reviewH_i5.py` | E8 |
 | **Standing checks:** val file edited after acceptance; pre-CR file swapped in; raster touched; `--jitter 8` with augmentation | CR-0013 round-1 B | `standing_checks` raises |
+
+**Amended by CR-0017** (§3): five domain-edge attack rows.
 
 ## Observations (OBS: reported, never blocking)
 Terms used below:

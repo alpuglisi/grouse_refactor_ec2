@@ -1,0 +1,26 @@
+Device: cuda
+Features (discovered): ['evt', 'evh', 'evc', 'sclass', 'fdist', 'ch', 'cc', 'tcc', 'nlcd', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn']
+   Checkpoint config: pool=attn, center_skip=True
+Calibration: Platt scale 1.204, bias -0.515 from data/calibration/calibration.json (fitted 2026-09-30T14:05:16, ECE 0.087 -> 0.029 cross-fitted; validation prevalence 0.437)
+   evt: ME_2024_evt.tif
+   evh: ME_2024_evh.tif
+   evc: ME_2024_evc.tif
+   sclass: ME_2024_sclass.tif
+   fdist: ME_2024_fdist.tif
+   nlcd: ME_2025_nlcd.tif
+   ch: ME_2024_ch.tif
+   cc: ME_2024_cc.tif
+   tcc: ME_2023_tcc.tif
+   road_dist: ME_2025_road_dist.tif
+   tsd: ME_2025_tsd.tif
+   balive: ME_2025_balive.tif
+   tpa_live: ME_2025_tpa_live.tif
+   qmd: ME_2025_qmd.tif
+   carbon_dwn: ME_2025_carbon_dwn.tif
+   strip 1/1:   0%|          | 0/13 [00:00<?, ?it/s]   strip 1/1:   8%|▊         | 1/13 [00:00<00:06,  1.91it/s]   strip 1/1:  15%|█▌        | 2/13 [00:00<00:03,  3.11it/s]   strip 1/1:  23%|██▎       | 3/13 [00:00<00:02,  3.89it/s]   strip 1/1:  31%|███       | 4/13 [00:01<00:02,  4.42it/s]   strip 1/1:  38%|███▊      | 5/13 [00:01<00:01,  4.77it/s]   strip 1/1:  46%|████▌     | 6/13 [00:01<00:01,  5.01it/s]   strip 1/1:  54%|█████▍    | 7/13 [00:01<00:01,  5.18it/s]   strip 1/1:  62%|██████▏   | 8/13 [00:01<00:00,  5.30it/s]   strip 1/1:  69%|██████▉   | 9/13 [00:01<00:00,  5.37it/s]   strip 1/1:  77%|███████▋  | 10/13 [00:02<00:00,  5.42it/s]   strip 1/1:  85%|████████▍ | 11/13 [00:02<00:00,  5.46it/s]   strip 1/1:  92%|█████████▏| 12/13 [00:02<00:00,  5.33it/s]                                                                Scored 3,125/3,132 cells (99.8% - rest masked as nodata).
+Score distribution: min 0.007 | median 0.679 | p90 0.783 | max 0.957 | 74.5% >= 0.5 | 6.1% >= 0.8
+   [note] Over half the scored area exceeds p=0.5. The model's probabilities are relative to its presence/pseudo-absence validation design (calibrate.py 'HONEST LIMITS'), so over a real landscape they read inflated - no calibration fitted on that data can know the real prevalence. Remedies: --prior <expected suitable fraction, e.g. 0.1> to re-anchor the probabilities, or --style quantile to color/threshold by within-map rank (--alpha-below 0.8 then shows only the top 20% of the box).
+Saved GeoTIFF: data/predictions/ME_custom_suitability.tif
+
+Generating KMZ (absolute coloring)...
+   Saved data/predictions/ME_custom_suitability.kmz

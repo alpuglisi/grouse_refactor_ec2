@@ -1,0 +1,25 @@
+== NH_custom start 2026-09-30T15:04:48Z: python predict.py --region NH --model grouse_cr0009.pth --bounds -71.25 44.70 -70.95 44.90
+== NH_custom end 2026-09-30T15:05:35Z exit 0
+== VT_custom start 2026-09-30T15:05:35Z: python predict.py --region VT --model grouse_cr0009.pth --bounds -72.92913 43.57997 -72.57322 43.87024 --stride 8
+== VT_custom end 2026-09-30T15:06:01Z exit 0
+== ME_custom start 2026-09-30T15:06:01Z: python predict.py --region ME --model grouse_cr0009.pth --bounds -67.33428 44.69736 -67.06689 44.9043 --stride 16
+== ME_custom end 2026-09-30T15:06:25Z exit 0
+== ME_region start 2026-09-30T15:06:25Z: python predict.py --region ME --model grouse_cr0009.pth --stride 8
+== ME_region end 2026-09-30T15:36:32Z exit 0
+57b325bbd77f8eba73cdc90e5bb151a4e65d6f7a4a0a1dee2fdb92b14654287c  data/predictions/ME_custom_suitability.kmz
+340cb30a71f74b7c199af1fd33cbfb6ca4fd0b7969bd8ce0896b2c7543ed22f8  data/predictions/ME_custom_suitability.tif
+950c95beac2f0d50b1f2a04fc2d27ce92e59e4b203091152ed8daba93447ec3e  data/predictions/ME_suitability.kmz
+c72ce9aafe3cacf40a46f55864b0b7510bb980c427d6e09506416dfe8c4ce310  data/predictions/ME_suitability.tif
+11f7919bfdb5491c675e5baefcf0af2242691094206af053e94874cf021fc18a  data/predictions/NH_custom_suitability.kmz
+4d999fe301f9b336ebbadaf9185bd38fbc25185ec4af90835955d5f119ca3ac5  data/predictions/NH_custom_suitability.tif
+94bae59fee4954c448735f8d7a39e94b6384848b12b0b88f2de2365887659fe5  data/predictions/STALE_SEE_CR-0010.txt
+9fa6adf997ffbe004039311ee8aec0e8b7289d6046c8ebf0c772ad5b351395f2  data/predictions/VT_custom_suitability.kmz
+ce6c4f2b06957461dd620847c292d12d57996f587f5d9bafbaff233c9063acd1  data/predictions/VT_custom_suitability.tif
+
+Provenance (lead, 2026-09-30): data/predictions/NH_custom_suitability.tif sha256 4d999fe3... and
+data/predictions/ME_suitability.tif sha256 c72ce9aa... are byte-identical to the maps symptom_check.py
+scored in-process (docs/quality/evidence/CR-0009/symptom/SHA256SUMS; its 20-cell re-score guard passed,
+max|diff| 2.3e-5 / 3.7e-5). All four maps used calibration.json fitted 2026-09-30T14:05:16 on grouse_cr0009.pth.
+ME/VT custom extents = lon/lat bounds of the pre-CR files (BUG-0028: original request bounds unknown).
+Stale markers: data/predictions/ and data/calibration/ markers removed (every other file regenerated);
+data/maps/ marker stays (CR-0009 § Stale markers).

@@ -1,6 +1,6 @@
 # CR-0009: Retrain once on the rebuilt data, and prove the Errol map is still right
 
-**Status: APPROVED (v5.2), 2026-09-30** — author and both reviewers (round 5); user pre-authorised. The user
+**Status: IMPLEMENTED (v5.2), 2026-09-30** — all deliverables done (retrain `2af5b7b`, calibration `d1c8b34`, symptom check `f24581b`, maps and close-out this commit). Approved by the author and both reviewers (round 5); user pre-authorised. The user
 pre-authorised the full cycle (review, approval by the author and two
 reviewers, implementation) on 2026-09-30; the retrain runs on this machine
 (NVIDIA L40S, 46 GB). History, verdicts and dispositions:
@@ -361,10 +361,10 @@ epochs.
 - [x] 7. Refit calibration; confirm `model_path`. `model_path` = /home/ec2-user/grouse2/grouse_cr0009.pth; scale 1.2035, bias -0.5154, ECE 0.0323 (cross-fitted 0.0294); `docs/quality/evidence/CR-0009/calibration/`.
 - [x] 8. Record the new validation baseline, with the not-comparable
       note and BUG-0034. `docs/quality/evidence/CR-0009/validation_baseline.md`.
-- [ ] 9. Maps (§ Symptom acceptance, § Stale markers); run
+- [x] 9. Maps (§ Symptom acceptance, § Stale markers); run
       `symptom_check.py`; record every number in the evidence directory
       and summarise it in BUG-0022.
-- [ ] 10. Bookkeeping:
+- [x] 10. Bookkeeping:
       - BUG-0022: close, citing item 1–5 results and the investigation.
       - BUG-0023: add item 5's record.
       - BUG-0027: close (CR-0012 deliverable 8: "closing after CR-0009").
@@ -378,8 +378,8 @@ epochs.
         re-measurement after the rebuild (`docs/quality/evidence/CR-0009/`);
         no new instance".
       - `BUG_LOG.md` rows for each status change.
-- [ ] 11. `CHANGELOG.md`: pre-CR metrics not comparable; BUG-0034 note.
-- [ ] 12. Remove stale markers per § Stale markers.
+- [x] 11. `CHANGELOG.md`: pre-CR metrics not comparable; BUG-0034 note.
+- [x] 12. Remove stale markers per § Stale markers. `data/predictions/` and `data/calibration/` markers removed; `data/maps/` stays. Maps: `docs/quality/evidence/CR-0009/maps/maps.txt` (symptom-scored maps byte-identical to the files on disk).
 
 ## Out of scope
 - Model architecture, loss, hyperparameters and tuning beyond pinning the

@@ -1,0 +1,245 @@
+# BUG-0029 (DRAFT — not committed): negative candidates are clipped to a state, positives to a box, so each region's out-of-state positives have no negatives
+
+> Draft for review. Not in `docs/quality/bugs/`; `BUG_LOG.md` and
+> `PREVENTIVE_ACTIONS.md` are untouched.
+
+## 1. Description
+Positive records are assigned to a region by **bounding box**
+(`analyze_grouse.clip_to_region`, `BOXES[region]` from `regions.py`).
+Negative candidates for the same region are downloaded from GBIF with a
+**`stateProvince` filter** (`get_negatives.py:268`), so they can only
+come from that one state's administrative area. The region's boxes reach
+well into neighbouring states — NH's is `(-72.626, 42.605, -70.600,
+45.398)` — so each region's dataset covers a rectangle for positives and
+a state polygon for negatives.
+
+The result: the part of each region's box that lies outside its own
+state contains positives and essentially **no** negatives. Pooled across
+regions by `train.py`, the label prevalence becomes a function of
+geography in a model that has no location input.
+
+## 2. Where encountered
+Found during the Errol map investigation (2026-09-30,
+`INVESTIGATION_REPORT_errol_map.md` §2 step 7 and §4), while checking
+whether the in-box AUC could be used to measure a fix.
+
+- `get_negatives.py:266-269`, `base_params`:
+  ```python
+      def base_params(st, key, year):
+          return {"datasetKey": EOD_DATASET_KEY, "taxonKey": key,
+                  "country": "US", "stateProvince": STATES[st],
+                  "year": year, "hasCoordinate": "true"}
+  ```
+  with `get_negatives.py:45`:
+  ```python
+  STATES = {"ME": "Maine", "NH": "New Hampshire", "VT": "Vermont"}
+  ```
+  writing `data/negatives/gbif_negatives_{st}.csv`, which
+  `generate_negatives.py:140` reads as its **only** candidate pool:
+  ```python
+      cand_path = f"data/negatives/gbif_negatives_{region}.csv"
+  ```
+- Positives, by contrast: `analyze_grouse.clip_to_region`,
+  `longitude.between(min_lon, max_lon) & latitude.between(min_lat, max_lat)`
+  over `BOXES[region]`.
+
+## 3. What it caused to fail
+**Measured on the real datasets** (spatial join of every region's
+positives and negatives against TIGER state polygons,
+`data/roads/tl_2023_us_county.zip`):
+
+```
+NH pos: n=2244 by state {'NH': 1116, 'VT': 728, 'ME': 400}
+NH neg: n=2244 by state {'NH': 2243, 'ME': 1}
+ME pos: n=3860 by state {'ME': 3723, 'NH': 137}
+ME neg: n=3860 by state {'ME': 3859, 'other/none': 1}
+VT pos: n=2261 by state {'VT': 1544, 'NH': 717}
+VT neg: n=2261 by state {'VT': 2261}
+```
+
+- **Half of the NH region's positives (1,128 of 2,244) lie outside New
+  Hampshire**, against **1 of 2,244 negatives**. The NH dataset is
+  balanced 1:1 by count and violently unbalanced in space.
+- Pooled over all three regions, prevalence by state is ME 4,123 pos /
+  3,860 neg = **51.6 %**, NH 1,970 / 2,243 = **46.8 %**, VT 2,272 /
+  2,261 = **50.1 %**. (Modest on its own; the spatial *support* mismatch
+  above, not this figure, is the defect.)
+- **It broke the metric this investigation needed.** Inside the reported
+  Errol box the 66 in-box points are 14 ME positives, 0 ME negatives,
+  41 NH positives, 11 NH negatives. With no Maine negatives, in-box AUC
+  *rewards* inflating the whole Maine side: the defective map scored
+  AUC 0.7570 and the corrected one 0.7273. The plan's step 7 names
+  in-box AUC as the number to measure a fix against
+  (`INVESTIGATION_PLAN_errol_map.md` §9); here it points the wrong way,
+  and only the state-split statistics settled it.
+- **Suspected, unmeasured:** a spatially non-stationary label
+  distribution that the model can only express through the features
+  correlated with it. Whether it contributes to any real scoring bias
+  is an **untested hypothesis** and is explicitly *not* claimed as a
+  cause of the reported Errol symptom — that is BUG-0023, confirmed
+  separately by three checks.
+
+## 4. What the defect was
+Two different definitions of "this region", one per label class. The
+positive side is a rectangle:
+
+```python
+def clip_to_region(sightings, region):
+    min_lon, min_lat, max_lon, max_lat = BOXES[region]
+    in_box = (
+        sightings['longitude'].between(min_lon, max_lon) &
+        sightings['latitude'].between(min_lat, max_lat)
+    )
+```
+
+The negative side is a state name handed to a remote API:
+
+```python
+        return {"datasetKey": EOD_DATASET_KEY, "taxonKey": key,
+                "country": "US", "stateProvince": STATES[st],
+                "year": year, "hasCoordinate": "true"}
+```
+
+Nothing downstream reconciles them; `generate_negatives.py` samples,
+buffers, weights and block-splits whatever the state-filtered file
+contains, over the box's block grid.
+
+## 5. Root cause analysis (Five Whys)
+1. *Why do out-of-state parts of a region's box have no negatives?* The
+   negative candidate pool was fetched with `stateProvince = <the
+   region's state>`.
+2. *Why a state filter?* GBIF's `stateProvince` is the convenient
+   handle for "get me the records for New Hampshire", and the region was
+   conceived as a state.
+3. *Why doesn't that match the positives?* The positives use
+   `BOXES[region]`, a rectangle drawn around each state's sighting
+   extent with a buffer, for raster download. Membership for records
+   was then taken from the same rectangle.
+4. *Why did nobody notice the two disagree?* Both produce the right
+   *count* — the negative sampler draws as many negatives as there are
+   positives, so the dataset looks balanced at 1:1. Nothing compares
+   their **spatial support**; a count-based check cannot see it.
+5. *Why was there no rule?* PA-0018 requires a spatial computation's
+   source to be "everything that intersects the computation's full
+   extent plus a margin, never a per-state or per-region subset chosen
+   by label". This is exactly that, applied to the negative-sample pool.
+   PA-0018's own sweep looked at *computations* — distances, buffers,
+   thinning, block splits — and examined `generate_negatives.py`'s 300 m
+   buffer. It did not examine where the candidates it buffers **come
+   from**.
+
+**Root cause:** the two label classes of one dataset are drawn from
+differently-shaped regions — positives from a bounding box, negatives
+from a state polygon — so the dataset's positive support and negative
+support do not coincide, and no check compares them.
+
+## 6. Corrective action
+None implemented. This changes the training data, so per `CLAUDE.md` §1
+it needs a CR and independent review first.
+
+Proposed, for the CR to evaluate:
+1. **Make both classes use one definition of a region.** Either is
+   defensible, but it must be the same one:
+   - if regions become a true partition (the fix BUG-0027 needs
+     anyway), assign both classes by the same partition; or
+   - fetch negatives for every state the box intersects, then clip both
+     classes to the box.
+   Option (a) composes with BUG-0027 and is likely the cheaper joint
+   fix; the CR should decide.
+2. **A support check at dataset-build time:** compare positive and
+   negative spatial support (e.g. occupied 3 km blocks, or a convex
+   hull / state histogram) and fail or warn when they diverge beyond a
+   threshold. This is the check whose absence is why 50 %-of-positives
+   went unnoticed; it is the enforcement for the rule in §8.
+3. **Re-fetch negatives and rebuild the splits.** Requires network
+   access to GBIF, and invalidates every existing checkpoint's training
+   set — so it should be done in one pass with BUG-0027's split fix and
+   BUG-0023's `road_dist` regeneration, not three separate retrains.
+
+**Verification:** re-run the §3 by-state table and confirm the negative
+distribution matches the positive distribution region by region; then
+re-run `inv_points_auc.py` and confirm the Errol box has ME negatives,
+making in-box AUC a usable measure again.
+
+## 7. Recurrence review (`CLAUDE.md` §4)
+Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`:
+
+- **BUG-0027 / PA-0018 — same family, and the closest prior.** BUG-0027
+  is overlapping *boxes* plus a per-region split; this is a *box* for
+  one class and a *state* for the other. Both are "a per-region subset
+  chosen by label, used where the extent is something else". They share
+  the region-membership machinery and should be fixed together.
+- **BUG-0023 / PA-0017** — per-state source (TIGER roads) written onto a
+  multi-state grid. Identical shape one level down, in rasters rather
+  than records. This bug is its analogue for the *record* pipeline's
+  negative class. Notably: the reported Errol symptom and this finding
+  come from the same underlying mistake — treating a region's
+  rectangular grid as if it were its state.
+- **BUG-0026** — `diagnose_road_bias.py`, per-state roads in a
+  diagnostic. Same family.
+- **BUG-0001 / PA-0001** — duplicated box constants. Concerns the values,
+  not their use. Not this.
+
+Not a recurrence of a *fixed* bug: BUG-0027 is still OPEN and unfixed,
+and this was found by the same rule (PA-0018) that found it. It is a
+second instance in the same sweep's territory that the sweep missed.
+
+**Prior-preventive-action failure analysis (PA-0018).** PA-0018 is the
+right rule and it did not catch this. Why:
+
+- **The sweep was scoped to computations, not to data sources.**
+  PA-0018's Swept? entry reads "every per-region spatial computation on
+  `main`, from code", and it did examine `generate_negatives.py`: "the
+  300 m buffer uses the region's box-clipped sightings, which already
+  include neighbouring-state sightings inside the box — no new instance
+  beyond the outer box edge". That inspected what the buffer is measured
+  *against* and passed it. It never asked what the candidate pool being
+  buffered is, so it stopped one file short of
+  `data/negatives/gbif_negatives_{region}.csv` and one file further
+  short of `get_negatives.py`.
+- **The per-state filter is not in this repository's spatial code.** It
+  is a `stateProvince` string in an HTTP query parameter to GBIF. A
+  sweep reading spatial computations does not look like one that reads
+  API query dictionaries, so the instance was invisible to the method
+  used.
+
+## 8. Preventive action
+**PA-0020 (proposed; extends PA-0018 from spatial computations to the
+acquisition of the data they consume).**
+
+> PA-0018's "never a per-state or per-region subset chosen by label"
+> applies to how data is **acquired**, not only to how it is computed
+> on: any filter that bounds a dataset geographically — a remote API
+> query parameter (`stateProvince`, `country`, an admin code), a
+> download bounding box, a file-per-state naming convention — is part
+> of the spatial computation downstream of it, and must use the same
+> extent as everything it will be combined with. Where one dataset has
+> classes or strata acquired separately (positives and negatives,
+> different sources, different years), their **spatial supports must
+> be compared explicitly and must match**; equal *counts* are not
+> evidence of matching support. When sweeping for PA-0017/PA-0018
+> instances, trace each input back to its acquisition query, not only
+> to the file it is read from. Extends PA-0018 (BUG-0026), which missed
+> BUG-0029 by stopping at the consuming computation.
+
+**Sweep (§3.5) — required before this is closed, and NOT yet run.**
+Scope it by the mechanism: every geographic filter at acquisition time.
+Candidates, to be confirmed:
+`get_negatives.py` (`stateProvince`, this bug), `ebird.py`,
+`sightings.py`, `download_rev.py` (LANDFIRE per-region request
+rectangles), `download_tcc_nlcd.py` / `download_treemap.py`
+(Earth Engine `region_grid` `Rectangle` exports),
+`download_treemap.py`'s TreeMap fetch, `generate_road_distance.py`
+(already fixed by `bf8d31a` — it is the model of what the rule wants),
+and `download_attribute_tables.py`. For each: what extent does the
+query use, what extent will the result be combined with, and do they
+match?
+
+**Mechanical enforcement (§3.4).** Feasible: the §6.2 support check —
+compare the positive and negative classes' occupied spatial blocks at
+dataset-build time and fail on divergence — catches this whole class at
+the point the dataset is assembled, regardless of which acquisition
+query caused it. It pairs naturally with BUG-0027 §6.3's proposed
+pooled train/val disjointness check; both are dataset-build assertions
+and should go in the same CR. No CI exists yet, so it runs as a
+build-time assertion rather than a CI gate.

@@ -65,7 +65,10 @@ P7_IMPORT = [
 # Stale copies CR-0007 guards (section 3): the guard is the module's first
 # statement after its docstring, so running or importing the file stops
 # before any import. They are not import-smoked.
-P7_GUARDED = ["legacy/audit.py", "legacy/download.py", "legacy/download_more.py"]
+P7_GUARDED = ["legacy/audit.py", "legacy/download.py", "legacy/download_more.py",
+              # CR-0007 v9.2 (BUG-0048, PA-0026 sweep)
+              "legacy/download_landfire.py", "legacy/download_landfire_2.py",
+              "legacy/download_landfire_3.py"]
 GUARD_TAG = "BUG-0031"
 
 REGION_CONSTS = ["REGIONS", "STATE_FIPS", "STATE_NAMES", "TIGER_YEAR",
@@ -743,8 +746,50 @@ def guard_first(path):
     return isinstance(fn, ast.Name) and fn.id == "SystemExit"
 
 
+DOCS_PREFIX = "docs"
+_PATH_LOADERS = {"spec_from_file_location", "run_path", "SourceFileLoader"}
+
+
+def docs_import_problems(root, files=None):
+    """CR-0007 v9.2: P6 skips docs/quality/evidence/, which is safe only if
+    no scanned module runs code from docs/. Report every import of a
+    `docs...` module, every sys.path.insert/append, and every path-based
+    loader (importlib spec_from_file_location, runpy.run_path,
+    SourceFileLoader) whose argument mentions docs/."""
+    files = p6_scanned_files(root) if files is None else files
+    out = []
+    for p in files:
+        with open(os.path.join(root, p)) as f:
+            tree = ast.parse(f.read(), filename=p)
+        for n in ast.walk(tree):
+            mods = []
+            if isinstance(n, ast.Import):
+                mods = [a.name for a in n.names]
+            elif isinstance(n, ast.ImportFrom) and n.module and not n.level:
+                mods = [n.module]
+            for m in mods:
+                if m == DOCS_PREFIX or m.startswith(DOCS_PREFIX + "."):
+                    out.append(f"{p}:{n.lineno}: imports {m}")
+            if isinstance(n, ast.Call):
+                fn = n.func
+                name = fn.attr if isinstance(fn, ast.Attribute) else (
+                    fn.id if isinstance(fn, ast.Name) else "")
+                is_syspath = (isinstance(fn, ast.Attribute)
+                              and fn.attr in ("insert", "append", "extend")
+                              and ast.unparse(fn.value) == "sys.path")
+                if is_syspath or name in _PATH_LOADERS:
+                    args = " ".join(ast.unparse(a) for a in n.args)
+                    if re.search(rf"\b{DOCS_PREFIX}\b", args):
+                        out.append(f"{p}:{n.lineno}: {ast.unparse(fn)}({args})")
+    return out
+
+
 def check_p7(x):
     lines, ok = [], True
+    docs = docs_import_problems(x.root)
+    if docs:
+        ok = False
+        lines += [f"loads code from docs/: {d}" for d in docs]
     code = ("import importlib.util, sys; sys.path.insert(0, '.'); "
             "s = importlib.util.spec_from_file_location('_p7', sys.argv[1]); "
             "m = importlib.util.module_from_spec(s); s.loader.exec_module(m)")
@@ -770,7 +815,8 @@ def check_p7(x):
             lines.append(f"{p}: guard first statement {first}; run exits "
                          f"non-zero naming {GUARD_TAG} {fired}")
     lines.insert(0, f"{n_imp} of {len(P7_IMPORT)} modules import; "
-                    f"{len(P7_GUARDED)} guarded copies checked")
+                    f"{len(P7_GUARDED)} guarded copies checked; "
+                    f"{len(docs)} scanned modules load code from docs/")
     return ok, lines
 
 

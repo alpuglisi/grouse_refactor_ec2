@@ -1,0 +1,39 @@
+CR-0007 v9.2 acceptance run: python check_partition.py (no --only/--assume), exit 0.
+2026-09-30, HEAD cec1542 plus the uncommitted v9.2 changes. No data re-run (v9.2 changes no pipeline code).
+------------------------------------------------------------------------
+P1: PASS
+    evaluated_ME: 0 of 7,924 rows with state or region != ME
+    nonveg_flagged_ME: 0 of 4,184 rows with state or region != ME
+    evaluated_NH: 0 of 2,303 rows with state or region != NH
+    nonveg_flagged_NH: 0 of 1,184 rows with state or region != NH
+    evaluated_VT: 0 of 3,725 rows with state or region != VT
+    nonveg_flagged_VT: 0 of 2,173 rows with state or region != VT
+P2: PASS
+    ME & NH: 0 shared keys
+    ME & VT: 0 shared keys
+    NH & VT: 0 shared keys
+P3: PASS
+    keys filed under two states: 0 (a representative could then be the foreign record; CR-0007 A5)
+    ME: |K_R|=7,924 |E_R|=7,924 evaluated=7,924 extra=0 missing=0 own-state keys outside BOXES[ME]=0 duplicate keys=0 feature mismatches=0 (K_R keys with nodata, correctly absent: 0)
+    NH: |K_R|=2,303 |E_R|=2,303 evaluated=2,303 extra=0 missing=0 own-state keys outside BOXES[NH]=0 duplicate keys=0 feature mismatches=0 (K_R keys with nodata, correctly absent: 0)
+    VT: |K_R|=3,725 |E_R|=3,725 evaluated=3,725 extra=0 missing=0 own-state keys outside BOXES[VT]=0 duplicate keys=0 feature mismatches=0 (K_R keys with nodata, correctly absent: 0)
+P4: PASS
+    0 of 43,024 raw records violate the partition (state not in REGIONS 0, inside no state polygon 0, inside another state's polygon 0)
+P5: PASS
+    ME P5c: 0 envelopes whose Sightings != evaluated habitat value_counts (57 envelope rows)
+    ME P5a: rows 20,000 (BACKGROUND_N 20,000); outside box 0; outside ME polygon 0; used/envelope_id inconsistent 0
+    ME P5b: sum(Avail_N) 15,986 vs used rows 15,986; 0 envelopes whose Avail_N != used value_counts; 0 envelope rows in neither set
+    NH P5c: 0 envelopes whose Sightings != evaluated habitat value_counts (58 envelope rows)
+    NH P5a: rows 20,000 (BACKGROUND_N 20,000); outside box 0; outside NH polygon 0; used/envelope_id inconsistent 0
+    NH P5b: sum(Avail_N) 16,485 vs used rows 16,485; 0 envelopes whose Avail_N != used value_counts; 0 envelope rows in neither set
+    VT P5c: 0 envelopes whose Sightings != evaluated habitat value_counts (57 envelope rows)
+    VT P5a: rows 20,000 (BACKGROUND_N 20,000); outside box 0; outside VT polygon 0; used/envelope_id inconsistent 0
+    VT P5b: sum(Avail_N) 15,353 vs used rows 15,353; 0 envelopes whose Avail_N != used value_counts; 0 envelope rows in neither set
+P6: PASS
+    0 problem(s)
+P7: PASS
+    28 of 28 modules import; 6 guarded copies checked; 0 scanned modules load code from docs/
+P8: PASS
+    ME: KDE source 8,207 rows (own-state 7,924); evaluated rows not in source 0; evt_phys mismatches 0; density mismatches 0; zone mismatches 0
+    NH: KDE source 4,999 rows (own-state 2,303); evaluated rows not in source 0; evt_phys mismatches 0; density mismatches 0; zone mismatches 0
+    VT: KDE source 5,201 rows (own-state 3,725); evaluated rows not in source 0; evt_phys mismatches 0; density mismatches 0; zone mismatches 0

@@ -145,6 +145,52 @@ class SyntheticTree(unittest.TestCase):
         self.assertEqual(cp.p6_problems(d), [])
 
 
+    def test_evidence_dir_skipped_other_docs_scanned(self):
+        """CR-0007 v9.2: only docs/quality/evidence/ is outside the scan."""
+        f = self.good()
+        f["docs/quality/evidence/x.py"] = "BUFFER_M = 300\n"
+        f["docs/other/x.py"] = "BUFFER_M = 300\n"
+        d = self.make(f)
+        scanned = cp.p6_scanned_files(d)
+        self.assertNotIn("docs/quality/evidence/x.py", scanned)
+        self.assertIn("docs/other/x.py", scanned)
+        probs = cp.p6_problems(d)
+        self.assertEqual(len(probs), 1, probs)
+        self.assertTrue(probs[0].startswith("docs/other/x.py:1:"), probs)
+
+
+class DocsImports(unittest.TestCase):
+    """CR-0007 v9.2: no scanned module loads code from docs/ (P7)."""
+
+    def problems(self, text, path="user.py"):
+        d = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, d)
+        with open(os.path.join(d, path), "w") as fh:
+            fh.write(textwrap.dedent(text))
+        return cp.docs_import_problems(d, files=[path])
+
+    def test_clean_module_passes(self):
+        self.assertEqual(self.problems("""
+            import os, sys
+            sys.path.insert(0, os.path.dirname(__file__))
+            from regions import REGIONS
+            DOC = "see docs/quality/x.md"
+        """), [])
+
+    def test_each_way_of_loading_docs_code_flagged(self):
+        for src in ("import docs.quality.evidence.lib\n",
+                    "from docs.quality.evidence import lib\n",
+                    "import sys\nsys.path.insert(0, 'docs/quality/evidence/CR-0007-r7')\n",
+                    "import sys, os\nsys.path.append(os.path.join(HERE, 'docs'))\n",
+                    "import importlib.util as u\nu.spec_from_file_location('m', 'docs/x.py')\n",
+                    "import runpy\nrunpy.run_path('docs/quality/evidence/x.py')\n"):
+            with self.subTest(src=src):
+                self.assertEqual(len(self.problems(src)), 1, src)
+
+    def test_repository_has_none(self):
+        self.assertEqual(cp.docs_import_problems(REPO), [])
+
+
 class RepositoryTree(unittest.TestCase):
     def test_repository_tree(self):
         probs = cp.p6_problems(REPO)

@@ -51,16 +51,22 @@ itself superseded by `download_rev.py`.
 hand, so it went stale when the replacement did.
 
 ## 6. Corrective action
-**None yet — open.** Proposed remediation: make the first statement of each
-file `raise SystemExit("legacy/download_landfire*.py is a stale copy of
-download_rev.py (BUG-0048); use download_rev.py")`, as CR-0007 §3 does for
-its three copies. This is outside CR-0007's approved §3 (which names three
-files), so the implementer did not apply it. Owner: **CR-0007's author**,
-to carry it in the amendment CR-0007 needs for implementer finding F1, or
-in a separate CR (`docs/quality/evidence/CR-0007-implementer-findings.md`,
-F5; tracked in `docs/quality/CR-0007-0008-OPEN-ISSUES.md`).
+**CR-0007 v9.2 (§3, "v9.2 (BUG-0048)" paragraph):** line 1 of
+`legacy/download_landfire.py`, `legacy/download_landfire_2.py` and
+`legacy/download_landfire_3.py` is now
+```python
+raise SystemExit("legacy/download_landfire.py is a stale copy of download_rev.py (BUG-0031, BUG-0048); use download_rev.py")  # CR-0007 section 3, PA-0026
+```
+(with each file's own name). The replacement named is `download_rev.py`, the
+live LANDFIRE downloader that owns `data/landfire/`, not `legacy/download.py`
+(itself a guarded stale copy). The module-level guard covers import-and-call
+as well as script runs, which addresses the root cause (a guard attached to
+one entry path). Verified by `check_partition.py` P7: the three files are in
+`P7_GUARDED` (`check_partition.py:68-71`); P7 checks by AST that the guard
+is the first statement and that running each file exits non-zero naming
+BUG-0031. PASS in `docs/quality/evidence/CR-0007-gates-v9.2.txt`.
 
-Status: **OPEN** (owner named above).
+Status: **FIXED** (CR-0007 v9.2).
 
 ## 7. Recurrence review
 - **BUG-0031 / PA-0026**: the same mechanism; found by that rule's sweep.

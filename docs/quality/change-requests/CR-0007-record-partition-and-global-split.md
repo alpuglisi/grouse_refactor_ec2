@@ -1,6 +1,6 @@
 # CR-0007: Partition sighting records by state and centralise the shared spatial constants
 
-**Status: APPROVED (v9; v9.1 amendment pending bounded re-review), 2026-09-30 — IMPLEMENTED (all deliverables):** `check_partition.py` P1–P8 all PASS after deliverable 7 (`docs/quality/evidence/CR-0007-gates-d7.txt`). History, verdicts, dispositions and the v8 split:
+**Status: APPROVED (v9; v9.1 approved with follow-ups; v9.2 amendment pending bounded re-review), 2026-09-30 — IMPLEMENTED (all deliverables):** `check_partition.py` P1–P8 all PASS after deliverable 7 (`docs/quality/evidence/CR-0007-gates-d7.txt`) and after v9.2 (`docs/quality/evidence/CR-0007-gates-v9.2.txt`). History, verdicts, dispositions and the v8 split:
 `CR-0007-review-log.md`. This document states only current intent.
 
 ## Scope
@@ -98,6 +98,8 @@ box-clipped frame from `clip_to_region`.
   `envelope_metrics_*` writes (`:1016-1017`), and the map's markers and
   contours. The map's density surface (`visualization_density_surface`) is
   fit on the box KDE source, like the KDE. The map is not checked.
+- Because the `nonveg_flagged_*` write now follows the KDE stage, the file
+  also carries `spatial_density` and `spatial_zone` (and `region`).
 - **Availability** (`background_envelope_sample`, `:411`): box points are
   drawn in batches from one generator, keeping those where `in_state`
   holds, until `BACKGROUND_N` exist (raise after 20 batches; in-state share
@@ -125,6 +127,14 @@ first statement after the docstring and before any import,
 `raise SystemExit("<file> is a stale copy of <live script> (BUG-0031); use
 <live script>")`, as CR-0012 v2 §6 does for `clean.py` and
 `legacy/gen_negs.py`. Nothing imports these files.
+
+**v9.2 (BUG-0048):** `legacy/download_landfire.py`, `_2.py` and `_3.py`
+(PA-0026 sweep: they write `data/landfire/*.tif`, `download_rev.py`'s
+directory, and were guarded only inside `__main__`, naming the stale
+`download.py`) get the same first-statement guard, naming
+`download_rev.py` and citing BUG-0031 and BUG-0048. Their old `__main__`
+block is left in place, unreachable. They hold no P6 violation, so they
+are not P6-exempt.
 
 ## Acceptance
 `check_partition.py` (deliverable 0) never imports `analyze_grouse.py` or
@@ -157,14 +167,15 @@ as in `sample_raster` (`:276-295`). *E_R*: the own-state rows of S_R.
 | P4 | every raw record has `state` in `REGIONS` and lies inside its own state's polygon | 0 of 43,024 | 0 |
 | P5 | per R: (a) `availability_sample_R` has `BACKGROUND_N` rows, each inside `BOXES[R]` and R's polygon, `envelope_id` present iff `used`; (b) each envelope's `Avail_N` = count of `used` rows with that `envelope_id`, and `sum(Avail_N)` = `used` count; (c) `Sightings` = `evaluated_R[~nonveg_landcover].envelope_id.value_counts()` (0 if absent); (d) `Envelope` unique, each row in (b)'s or (c)'s set | (a), (b) file absent; (c) 0 mismatches | all hold |
 | P6 | `tests/test_shared_constants.py`: `regions.py` holds §1's pinned values; `PATH_TEMPLATES` holds both entries; the scan finds nothing | 34: 10 pins absent, 24 literal lines in 21 files | 0 |
-| P7 | the P7 list imports; each §3 copy's first statement is the guard and running it exits non-zero naming BUG-0031 | 28 of 28 import; 3 guards absent | holds |
+| P7 | the P7 list imports; each of the six §3 copies' first statement is the guard and running it exits non-zero naming BUG-0031; no P6-scanned module imports a `docs…` module or passes a `docs/` path to `sys.path` or a path-based loader (v9.2) | 28 of 28 import; 3 guards absent | holds |
 | P8 | per R, each `evaluated_R` row: `evt_phys` = crosswalk(`evt`); `spatial_density` (rtol 1e-6) and `spatial_zone` equal the `KDE_MODE` computation over S_R (a zone within rtol of p10/p90 is exempt) | holds (today's files are box-sourced) | holds |
 
 **P6 scan.** Scanned: `git ls-files '*.py'` minus basenames `inv_*`/`res_*`,
 `tests/` and `docs/quality/evidence/` (frozen review evidence, never run
 as pipeline code; excluded by v9.1 after CR-0013 committed evidence copies
 there). Exempt by name, nothing else: `regions.py`; `clean.py` and
-`legacy/gen_negs.py` (CR-0012 §6 guards); the three §3 copies;
+`legacy/gen_negs.py` (CR-0012 §6 guards); `legacy/audit.py`,
+`legacy/download.py`, `legacy/download_more.py` (§3);
 `generate_road_distance.py` and `check_road_dist.py` until deliverable 7.
 A violation is (i) an assignment, at any depth, to a §1 name, `BOXES`, or
 their `_DEFAULT` alias whose value contains a literal; (ii) a list, tuple
@@ -176,7 +187,9 @@ counted rule (i) only.
 
 **P7 list.** `regions`, `grouse_data`, `analyze_grouse`, every re-point
 file, and `download_rev` (an unedited importer of `regions`). Guarded
-copies are not imported.
+copies are not imported. The `docs/` check (v9.2) keeps the P6 exclusion
+of `docs/quality/evidence/` safe: excluded code can never be run by
+scanned code (`check_partition.docs_import_problems`).
 
 **Today** P1, P2, P3, P5, P6, P7 fail
 (`docs/quality/evidence/CR-0007-check-today.txt`); a no-op fails P1–P3 and
@@ -231,15 +244,15 @@ county file (specified, not exercised).
 - [x] 1. Back up `data/pipeline/`, `data/negatives/` (24 + 27 MB) to
       `/home/ec2-user/grouse_backup/CR-0007/` with a sha256 manifest.
 - [x] 2. §1 (all but deliverable 7's re-points); remove the
-      `expectedFailure` marker. *(2026-09-30: §1 done; the marker is kept
-      because of implementer finding F1.)*
+      `expectedFailure` marker (removed with v9.1).
 - [x] 3. §2.
 - [x] 4. §3.
 - [x] 5. Run `analyze_grouse.py`, then `check_partition.py` (acceptance
       run): P1–P8 pass; record O1–O4. Do **not** run
       `prepare_training_data.py` or `generate_negatives.py` (CR-0012).
-      *(2026-09-30: run; P1–P5, P7, P8 PASS, P6 FAIL (F1); O1–O4
-      recorded in `docs/quality/evidence/CR-0007-gates.txt`.)*
+      O1–O4: `docs/quality/evidence/CR-0007-gates.txt`; P1–P8 PASS after
+      v9.1 and deliverable 7 (`CR-0007-gates-d7.txt`) and after v9.2
+      (`CR-0007-gates-v9.2.txt`).
 - [x] 6. Bookkeeping (BUG ids: next free at filing): *(2026-09-30:
       BUG-0043..0047 + PA-0025; BUG-0031 + PA-0026, sweep BUG-0048;
       BUG-0029, BUG-0034 promoted; PA-0020 filed; see the review log's
@@ -284,6 +297,10 @@ county file (specified, not exercised).
 - [x] 7. After CR-0014 closes: the road-file re-points (last table row);
       remove their two P6 exemptions; P6 and P7 pass. CR-0007 closes after
       this deliverable.
+- [x] 8. v9.2 amendment: BUG-0048 guards (§3), P7's `docs/` check, the
+      synthetic tests (`tests/test_shared_constants.py`
+      `test_evidence_dir_skipped_other_docs_scanned`, `DocsImports`); P1–P8
+      pass (`docs/quality/evidence/CR-0007-gates-v9.2.txt`).
 
 ## Landing order
 Independent of CR-0010/CR-0008 (only LANDFIRE vegetation channels are

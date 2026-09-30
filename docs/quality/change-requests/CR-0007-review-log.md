@@ -898,3 +898,28 @@ P6 exemptions removed (`check_partition.py` and
 `tests/test_shared_constants.py` `EXPECTED_EXEMPT`, as reviewer A flagged).
 P1–P8 all PASS (`docs/quality/evidence/CR-0007-gates-d7.txt`).
 
+
+## v9.2 (author = implementer, 2026-09-30) — v9.1 follow-ups; pending bounded re-review
+Each v9.1 follow-up, with the operative location of its change (PA-0024(a)):
+
+| follow-up (v9.1 review) | change | location |
+|---|---|---|
+| BUG-0048 (B, MEDIUM in substance) | **Remediated, not deferred.** First-statement guard in the three `legacy/download_landfire*.py`, naming `download_rev.py` (the live LANDFIRE downloader that owns `data/landfire/`; not `legacy/download.py`, itself a guarded copy) and citing BUG-0031, BUG-0048. Added to P7's guard list. Not added to `P6_EXEMPT`/`EXPECTED_EXEMPT`: the files hold no P6 violation, and exemptions stay minimal. BUG-0048 → FIXED | line 1 of `legacy/download_landfire.py`, `_2.py`, `_3.py`; `check_partition.py:68-71` (`P7_GUARDED`); CR §3 "v9.2 (BUG-0048)" paragraph; `BUG-0048-…md` §6; `BUG_LOG.md` BUG-0048 row (only that row edited); `PREVENTIVE_ACTIONS.md` PA-0002 and PA-0026 Swept? cells; tracker item ticked |
+| Synthetic test for the evidence exclusion (B) | `docs/quality/evidence/x.py` is not in `p6_scanned_files`; `docs/other/x.py` is, and is the single P6 problem reported | `tests/test_shared_constants.py` `SyntheticTree.test_evidence_dir_skipped_other_docs_scanned` |
+| No scanned module imports from `docs/` (A) | New P7 sub-check `docs_import_problems`: flags any `import docs…`/`from docs… import`, any `sys.path.insert/append/extend`, and any `spec_from_file_location`/`run_path`/`SourceFileLoader` whose argument mentions `docs`. Synthetic tests: a clean module passes; six ways of loading docs code each flagged once; the repository has none | `check_partition.py` `docs_import_problems`, `check_p7`; `tests/test_shared_constants.py` `DocsImports`; CR §Acceptance P7 row and "P7 list" paragraph |
+| F3.3 (B) | One bullet: `nonveg_flagged_*` now also carries `spatial_density`, `spatial_zone` (and `region`) | CR §2, after the map bullet |
+| Stale italic notes on deliverables 2, 5 (B) | Replaced with current facts (marker removed in v9.1; P1–P8 pass after d7 and after v9.2) | CR § Deliverables 2, 5; new deliverable 8 (v9.2) |
+
+Also: CR §Acceptance "P6 scan" names the three exempt §3 copies explicitly,
+since §3 now lists six guarded copies and only three are exempt.
+
+**Validation.** `python check_partition.py` (acceptance run): P1–P8 all
+PASS, exit 0; P7 "6 guarded copies checked; 0 scanned modules load code
+from docs/" (`docs/quality/evidence/CR-0007-gates-v9.2.txt`).
+`python -m unittest tests.test_check_partition tests.test_shared_constants
+tests.test_nodata_zero_lint tests.test_cr0014 tests.test_check_road_dist`:
+57 tests OK. `python legacy/download_landfire_2.py` exits 1 with the guard
+message. Nothing committed.
+
+**Sign-off:** author (implementer) signs v9.2. Reviewers A and B: pending
+bounded re-review.

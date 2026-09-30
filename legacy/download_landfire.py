@@ -1,3 +1,4 @@
+raise SystemExit("legacy/download_landfire.py is a stale copy of download_rev.py (BUG-0031, BUG-0048); use download_rev.py")  # CR-0007 section 3, PA-0026
 import os
 import time
 import requests

@@ -1,3 +1,5 @@
+> **SUPERSEDED (2026-09-30, ~16:00 UTC).** The programme this handoff describes is complete: CR-0009, CR-0012, CR-0013, CR-0015, CR-0017 and CR-0018 are IMPLEMENTED (with CR-0008, CR-0010, CR-0014, CR-0016 earlier; CR-0007 CLOSED). The CR-0009 retrain ran on the 16-vCPU instance (saved epoch 3, rank 0.7317); the Errol map symptom is absent on the regenerated maps (BUG-0022 CLOSED). Open work lives in `docs/quality/CR-0007-0008-OPEN-ISSUES.md` and the OPEN rows of `docs/quality/bugs/BUG_LOG.md` (e.g. BUG-0034, BUG-0051, BUG-0059..0062, BUG-0068, BUG-0072). The snapshot below is kept for history only.
+
 # Resume handoff — change-control programme (snapshot 2026-09-30 ~13:25 UTC)
 
 Read this first when work resumes. Then read `CLAUDE.md`, and

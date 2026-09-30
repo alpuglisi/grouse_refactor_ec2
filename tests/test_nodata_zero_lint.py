@@ -40,7 +40,8 @@ ALLOWLIST = {}
 # Today's matches, pinned until deliverable 4 classifies them (CR-0015
 # "Expected result on today's tree"). Keyed by statement text.
 EXPECTED_UNCLASSIFIED = {
-    ("train.py", "set(NODATA_SENTINELS) | {nodata, 0}"),
+    # train.py "set(NODATA_SENTINELS) | {nodata, 0}" (BUG-0032) was removed
+    # by CR-0015 deliverable 6 (the section 2 fix); no allowlist entry.
     ("find_tsd_contrast_points.py",
      "~np.isin(nlcd_arr, NODATA_SENTINELS) & (nlcd_arr != 0)"),
     ("generate_time_since_disturbance.py", "(arr > 0) & ~sentinel"),

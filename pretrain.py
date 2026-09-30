@@ -120,7 +120,7 @@ def main():
     parser.add_argument("--tiles", type=int, default=10000,
                         help="Unlabeled tiles sampled per region "
                              "(uniform over the raster, valid-data "
-                             "filtered).")
+                             "filtered, in-state).")
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--img-size", type=int, default=64)
@@ -161,6 +161,18 @@ def main():
     parser.add_argument("--save-path", default="grouse_ssl_backbone.pth")
     args = parser.parse_args()
 
+    # CR-0015 section 3: tiles are drawn in-state, which needs geopandas,
+    # pyogrio and the county file. Fail here, before any GPU work.
+    try:
+        import geopandas  # noqa: F401
+        import pyogrio  # noqa: F401
+        import regions as _regions
+        _regions._state_polygons()
+    except Exception as e:
+        raise SystemExit(f"pretrain.py needs geopandas, pyogrio and the "
+                         f"TIGER county file for in-state tiles (CR-0015): "
+                         f"{type(e).__name__}: {e}")
+
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
     np.random.seed(args.seed)
@@ -177,8 +189,11 @@ def main():
     parts = []
     for i, region in enumerate(args.regions):
         rd = data[region]
+        # SSL tiles carry no label, so tiles in validation blocks leak
+        # none; they are kept in-state (CR-0015 section 3).
         df = sample_background_points(rd, features, args.tiles,
-                                      seed=args.seed + i)
+                                      seed=args.seed + i, region=region,
+                                      train_blocks_only=False)
         parts.append(SSLPairDataset(df, rd, cat_f, cont_f,
                                     img_size=args.img_size,
                                     jitter=args.jitter,

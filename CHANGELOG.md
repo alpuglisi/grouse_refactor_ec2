@@ -16,6 +16,48 @@ the diff.
 
 ---
 
+## Assumed-negative background: in-state, training blocks only, 0 is a reading (CR-0015, 2026-09-30)
+
+**Defects (BUG-0029 assumed-negative part, BUG-0042, BUG-0032).**
+`train.sample_background_points` drew uniform pixels over the region's
+raster box. That box includes neighbouring states and Canada: 36.0 %
+(ME), 52.5 % (NH) and 47.3 % (VT) of accepted points were out of state.
+Of the in-state draws, about 20 % fell in **validation** blocks, yet
+every point was labelled 0 and added to **training**. The validity test
+`set(NODATA_SENTINELS) | {nodata, 0}` also rejected a first-feature
+reading of `0` as nodata. With the discovered feature order that is
+`evt`, where 0 never occurs, but an explicit `--features` list can make
+it live (e.g. `tcc`, 0 % canopy).
+
+**Change.** The function now takes the required keywords `region` and
+`train_blocks_only`. It keeps a draw only when:
+- the pixel is not a sentinel, not the declared nodata, and finite (0
+  is kept);
+- the point is inside the state (`regions.in_state`);
+- with `train_blocks_only`, the point lies in a training block. The
+  block comes from the lon/lat through `regions.to_5070`,
+  `regions.block_ids` and `regions.block_split`, the same rule
+  `generate_negatives.py` uses.
+
+`train.build_datasets` draws training blocks only. `pretrain.py` draws
+in-state tiles over all blocks, because SSL tiles carry no label.
+
+**Consequences.**
+- **Every model trained with `--an-background > 0` before this change
+  learned from out-of-state and validation-block assumed negatives.**
+  Its validation metrics are optimistic by an unknown amount. Retrain
+  before comparing.
+- `pretrain.py` now always needs geopandas, pyogrio and the TIGER
+  county file, and fails at start without them. Its tile set changes:
+  in-state only, and 0-valued pixels are now eligible. An existing
+  `grouse_ssl_backbone.pth` still loads, but the new code cannot
+  reproduce it.
+- `regions.to_5070` and `regions.block_split` are now the single copies
+  of the transform and the unassigned-block md5 rule (PA-0001).
+  `prepare_training_data.to_5070` wraps the first, and
+  `generate_negatives.split_for_unassigned` is gone. Pipeline outputs
+  are byte-identical (CR-0015 B1).
+
 ## road_dist: roads from neighbouring states, NODATA outside US coverage (2026-09-29)
 
 **Symptom (user, Errol NH map):** everything on the Maine side of the

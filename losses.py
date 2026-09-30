@@ -53,8 +53,8 @@ class ANFullLoss(nn.Module):
 
     i.e. lambda-weighted BCE on logits, with the random-background half
     of the objective supplied by the data pipeline (train.py
-    --an-background samples uniform in-raster locations as assumed
-    negatives). At lambda=1 this is exactly BCEWithLogits. Computed via
+    --an-background samples uniform in-raster, in-state, training-block
+    locations as assumed negatives; CR-0015). At lambda=1 this is exactly BCEWithLogits. Computed via
     logsigmoid, so it is finite at any logit (the reference
     implementation clamps probabilities instead).
 

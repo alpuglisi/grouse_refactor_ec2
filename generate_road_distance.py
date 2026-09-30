@@ -73,9 +73,11 @@ region grid.
 
 Pixels outside every US county (Canada, open ocean) are written as
 NODATA: TIGER has no roads there, so any distance would be invented.
-missing_mask models see them as missing. Distances just SOUTH of the
-Canadian border are still upper bounds (Canadian roads are absent); the
-run prints how much of the grid lies outside US coverage.
+missing_mask models see them as missing. Just SOUTH of the Canadian
+border a Canadian road could be nearer than any TIGER road, so pixels
+nearer to Canadian land (LANDFIRE evt, not water) than to a TIGER road
+are NODATA too (CR-0014's Canada rule). Canadian land beyond the grid
+edge is not seen - a stated residual (BUG-0037).
 
 MEMORY: the distance transform runs on the whole region grid at once
 (it has to - a pixel's nearest road can be arbitrarily far), so peak
@@ -94,6 +96,7 @@ import os
 import glob
 import argparse
 import urllib.request
+import zipfile
 
 import numpy as np
 import rasterio
@@ -101,17 +104,21 @@ import rasterio.features
 from scipy.ndimage import distance_transform_edt
 from rasterio.transform import Affine, array_bounds
 
-from grouse_data import GrouseData
+from grouse_data import GrouseData, NODATA_SENTINELS
 from models import ROAD_DIST_MAX_M, road_dist_encode
 
 CACHE_DIR = "data/roads"
-# TIGER/Line vintage. 2025 shapefiles were released September 2025
-# (database updates through May 2025); a 2026 vintage was in progress
-# for the geodatabase formats as of September 2026, so --tiger-year can
-# be raised once the shapefiles are confirmed live. Changing the
-# vintage changes road_dist's VALUES (not its geometry): re-run this
-# script, and the patch cache rebuilds itself from the new mtimes.
-TIGER_YEAR = 2025
+# TIGER/Line vintage, pinned to 2023 (user decision, CR-0014): every
+# cached road file and the NH raster are 2023, and CR-0014's acceptance
+# verifier pins its truth to the same vintage. Changing the vintage
+# changes road_dist's VALUES (not its geometry) and needs a CR: re-run
+# this script and re-pin check_road_dist.py.
+TIGER_YEAR = 2023
+# LANDFIRE evt vintage that decides which pixels outside US counties are
+# LAND (Canada) for the Canada rule in build_distance_raster. Pinned, not
+# "latest": CR-0014's verifier pins this file by sha256.
+LAND_EVT_YEAR = 2024
+OPEN_WATER_EVT = 7292
 STATE_FIPS = {"ME": "23", "NH": "33", "VT": "50"}
 # Margin around the region grid for road loading and the distance
 # transform: a road this far outside the grid still sets the distance of
@@ -121,12 +128,41 @@ ROAD_DIST_NODATA = -9999
 PAVED_MTFCC_DEFAULT = ["S1100", "S1200", "S1400", "S1630", "S1640"]
 
 
+def _zip_ok(path):
+    """A complete zip. A truncated download fails ZipFile() itself with
+    BadZipFile rather than testzip() returning a name - both are
+    invalid."""
+    try:
+        with zipfile.ZipFile(path) as z:
+            return z.testzip() is None
+    except zipfile.BadZipFile:
+        return False
+
+
 def _download(url, path):
+    """Fetch to path + '.part', validate, then os.replace - so an
+    interrupted download never leaves a truncated zip that a later run
+    would reuse forever. A cached file that fails validation is deleted
+    and fetched again."""
     if os.path.exists(path):
-        return path
+        if _zip_ok(path):
+            return path
+        print(f"      [warn] cached {os.path.basename(path)} is not a valid "
+              f"zip - fetching again")
+        os.remove(path)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     print(f"      downloading {os.path.basename(path)} ...")
-    urllib.request.urlretrieve(url, path)
+    part = path + ".part"
+    try:
+        urllib.request.urlretrieve(url, part)
+    except BaseException:
+        if os.path.exists(part):
+            os.remove(part)
+        raise
+    if not _zip_ok(part):
+        os.remove(part)
+        raise RuntimeError(f"{url}: downloaded file is not a valid zip")
+    os.replace(part, path)
     return path
 
 
@@ -146,7 +182,10 @@ def counties_for_grid(counties, grid_bounds, grid_crs):
     matching rows reprojected to grid_crs."""
     from shapely.geometry import box
     import geopandas as gpd
-    footprint = gpd.GeoSeries([box(*grid_bounds)], crs=grid_crs)
+    # Densified before reprojecting, so a straight bbox edge cannot bow
+    # inside a county in the geographic CRS and miss it.
+    footprint = gpd.GeoSeries([box(*grid_bounds).segmentize(1000.0)],
+                              crs=grid_crs)
     footprint = footprint.to_crs(counties.crs).iloc[0]
     sel = counties[counties.intersects(footprint)]
     return sel.to_crs(grid_crs)
@@ -181,7 +220,8 @@ def padded_grid(transform, height, width, pad_px):
     return t, height + 2 * pad_px, width + 2 * pad_px
 
 
-def build_distance_raster(roads, template_path, pad_px=0, coverage=None):
+def build_distance_raster(roads, template_path, pad_px=0, coverage=None,
+                          land_evt_path=None):
     """Rasterize the road lines onto the template's grid EXPANDED by
     pad_px pixels, Euclidean-distance-transform the complement, and crop
     back to the template grid, so roads up to pad_px outside the grid
@@ -192,7 +232,15 @@ def build_distance_raster(roads, template_path, pad_px=0, coverage=None):
     coverage: polygons (in the template CRS) where road data exists
     (the US counties). Pixels outside them come back as NaN in dist_m
     and as ROAD_DIST_NODATA in the encoded raster.
-    Returns (encoded int16, dist_m float with NaN, transform, crs)."""
+
+    land_evt_path: the region's LANDFIRE evt raster (LAND_EVT_YEAR).
+    Canada rule (CR-0014, BUG-0037): TIGER has no Canadian roads, so
+    where Canadian LAND (outside coverage, evt not a sentinel and not
+    Open Water) is closer than the nearest TIGER road, the true distance
+    is unknown - a Canadian road could be nearer - and the pixel is
+    written as nodata too. D_can is +inf when there is no such land.
+    Returns (encoded int16, dist_m float with NaN, transform, crs,
+    n_canada)."""
     with rasterio.open(template_path) as src:
         transform, crs = src.transform, src.crs
         height, width = src.height, src.width
@@ -214,19 +262,36 @@ def build_distance_raster(roads, template_path, pad_px=0, coverage=None):
     del mask
     dist_m = dist_m[pad_px:pad_px + height, pad_px:pad_px + width]
     encoded = road_dist_encode(dist_m)
+    n_canada = 0
     if coverage is not None:
         inside = rasterio.features.rasterize(
             ((geom, 1) for geom in coverage if geom is not None),
             out_shape=(height, width), transform=transform, fill=0,
             default_value=1, all_touched=True, dtype="uint8").astype(bool)
-        dist_m = np.where(inside, dist_m, np.nan)
-        encoded = np.where(inside, encoded,
+        keep = inside
+        if land_evt_path is not None:
+            with rasterio.open(land_evt_path) as ev:
+                if ev.shape != (height, width) or ev.transform != transform:
+                    raise SystemExit(f"{land_evt_path}: not on the "
+                                     f"template grid")
+                evt = ev.read(1)
+            land = (~inside & ~np.isin(evt, NODATA_SENTINELS)
+                    & (evt != OPEN_WATER_EVT))
+            del evt
+            if land.any():
+                d_can = distance_transform_edt(~land, sampling=(res_y, res_x))
+                canada = inside & (d_can < dist_m)
+                del d_can
+                n_canada = int(canada.sum())
+                keep = inside & ~canada
+        dist_m = np.where(keep, dist_m, np.nan)
+        encoded = np.where(keep, encoded,
                            ROAD_DIST_NODATA).astype(np.int16)
-    return encoded, dist_m, transform, crs
+    return encoded, dist_m, transform, crs, n_canada
 
 
 def process_region(region, data, mtfcc, tiger_year=TIGER_YEAR,
-                   pad_km=PAD_KM_DEFAULT):
+                   pad_km=PAD_KM_DEFAULT, out_dir=None):
     print(f"\n{'=' * 60}\n{region}\n{'=' * 60}")
     rd = data[region]
     template_feature = next(
@@ -262,14 +327,19 @@ def process_region(region, data, mtfcc, tiger_year=TIGER_YEAR,
          f"{len(by_state)} state(s) (STATEFP: {by_state}), grid + "
          f"{pad_km:g} km margin")
     roads = load_paved_roads(county_rows, mtfcc, target_crs, tiger_year)
-    encoded, dist_m, transform, crs = build_distance_raster(
-        roads, template, pad_px=pad_px, coverage=county_rows.geometry)
+    if LAND_EVT_YEAR not in rd.raster_years("evt"):
+        raise SystemExit(f"{region}: no {LAND_EVT_YEAR} evt raster - it "
+                         f"decides Canadian land for the Canada rule")
+    land_evt = rd.raster_path("evt", LAND_EVT_YEAR, nearest=False,
+                              validate=False)
+    encoded, dist_m, transform, crs, n_canada = build_distance_raster(
+        roads, template, pad_px=pad_px, coverage=county_rows.geometry,
+        land_evt_path=land_evt)
     outside = float(np.isnan(dist_m).mean())
     print(f"      {100 * outside:.1f}% of the grid lies outside US county "
          f"coverage (Canada/ocean) -> NODATA")
-    if outside > 0:
-        print("      [note] distances near the Canadian border are upper "
-              "bounds: TIGER has no Canadian roads.")
+    print(f"      {n_canada:,} px inside US coverage are nearer Canadian "
+          f"land than any TIGER road -> NODATA (Canada rule)")
     # Reported in METRES (the encoded raster is log-scaled - see
     # models.road_dist_encode). A median anywhere near ROAD_DIST_MAX_M
     # would mean the sanity bound is actually binding, which it should
@@ -289,7 +359,8 @@ def process_region(region, data, mtfcc, tiger_year=TIGER_YEAR,
              f"S1400 local/rural roads) so the feature carries near-field "
              f"structure rather than mostly 'far'.")
 
-    raster_dir = data.config.resolve(data.config.raster_dir)
+    raster_dir = out_dir or data.config.resolve(data.config.raster_dir)
+    os.makedirs(raster_dir, exist_ok=True)
     for year in years:
         out = os.path.join(raster_dir, f"{region}_{year}_road_dist.tif")
         with rasterio.open(out, "w", driver="GTiff",
@@ -299,6 +370,8 @@ def process_region(region, data, mtfcc, tiger_year=TIGER_YEAR,
                            nodata=ROAD_DIST_NODATA,
                            compress="deflate", predictor=2, tiled=True) as dst:
             dst.write(encoded, 1)
+            dst.update_tags(GROUSE_COVERAGE="tiger-minus-canada",
+                            GROUSE_TIGER_YEAR=str(tiger_year))
         print(f"      wrote {os.path.basename(out)} "
              f"({os.path.getsize(out) / 1e6:.1f} MB)")
 
@@ -323,6 +396,10 @@ def main():
                          "roads and running the distance transform, so "
                          "roads just outside the grid still count. "
                          "Default: %(default)s km.")
+    ap.add_argument("--out-dir", default=None,
+                    help="Write here instead of the pipeline raster dir "
+                         "(rehearsal). Output years still come from the "
+                         "pipeline raster dir.")
     args = ap.parse_args()
 
     try:
@@ -335,7 +412,7 @@ def main():
     data = GrouseData()
     for region in args.regions:
         process_region(region, data, args.mtfcc, args.tiger_year,
-                       args.pad_km)
+                       args.pad_km, args.out_dir)
     print("\nDone. road_dist VALUES changed (roads from neighbouring "
          "states, NODATA outside US coverage). The patch cache rebuilds "
          "itself from the new mtimes, but every model trained on the old "

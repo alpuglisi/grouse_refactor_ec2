@@ -231,8 +231,8 @@ def refuse_legacy_checkpoint_on_repaired(model, paths):
     if hit:
         raise SystemExit(
             f"This checkpoint has no validity channels (missing_mask="
-            f"False), but {len(hit)} input raster(s) were repaired by "
-            f"CR-0010 to carry nodata outside coverage, e.g. {hit[0]}. "
+            f"False), but {len(hit)} input raster(s) carry nodata outside "
+            f"coverage (CR-0010/CR-0008/CR-0014), e.g. {hit[0]}. "
             f"The model would read that nodata as 0. Use a checkpoint "
             f"trained with --missing-mask (CR-0009 retrain).")
 

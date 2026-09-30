@@ -45,5 +45,18 @@
       "sha256": "52e5049c360a5143146ac1342d4177f8"
     }
   },
-  "C": {}
+  "C": {
+    "VT": {
+      "count": 69475,
+      "sha256": "a14fbc20317dffa7ad667d75c18bc396"
+    },
+    "NH": {
+      "count": 108684,
+      "sha256": "fe6b7f2595cae38e64cd0dfd4ca306c8"
+    },
+    "ME": {
+      "count": 822494,
+      "sha256": "6af4a96ae5a4b1771508b24c7cbf4b3d"
+    }
+  }
 }

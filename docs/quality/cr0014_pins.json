@@ -1,0 +1,49 @@
+{
+  "_comment": "CR-0014 pinned recipe and constants. T pins from CR-0008 v7 G0 (reproduced by two reviewers). C pins are written by `check_road_dist.py pin` from the verifier's own TIGER copy, before regeneration. Do not edit without a CR.",
+  "tiger_year": 2023,
+  "mtfcc": [
+    "S1100",
+    "S1200",
+    "S1400",
+    "S1630",
+    "S1640"
+  ],
+  "pad_px": 333,
+  "evt_year": 2024,
+  "evt_sha256": {
+    "ME": "96047bc6c9ac78c7180892d2c9674c8dff24547a1874f4b71730d34c22b57a74",
+    "NH": "92133c1931767538e43d87f96690c297acd3d103d72592a5af383c2aac556ac9",
+    "VT": "c844da4db0ac1834b9b0dfaeb5f8bfbae69b5f2506ba84e6e8c10bd997d362ff"
+  },
+  "state_fips": {
+    "ME": "23",
+    "NH": "33",
+    "VT": "50"
+  },
+  "rd_points_per_stratum": 400,
+  "rd_seed": 20260930,
+  "rd_thresholds": {
+    "rd1_median_abs_m": 20.0,
+    "rd2_p99_abs_m": 60.0,
+    "rd3_max_abs_m": 60.0,
+    "rd4_signed_band_m": [
+      -20.0,
+      5.0
+    ]
+  },
+  "T": {
+    "ME": {
+      "inside": 107441621,
+      "sha256": "22a9995e0b920e81c205a962e7e64237"
+    },
+    "NH": {
+      "inside": 51386748,
+      "sha256": "1a29cc5bc79b7d4c73dc49e4fb9ac93a"
+    },
+    "VT": {
+      "inside": 50450367,
+      "sha256": "52e5049c360a5143146ac1342d4177f8"
+    }
+  },
+  "C": {}
+}

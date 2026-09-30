@@ -49,15 +49,27 @@ branch, and the skipped records keep a fill value that downstream
 counting treats as a class (BUG-0049's mechanism).
 
 ## 6. Corrective action
-**None yet.** The fix is confined to one function:
-- catch only `MissingDataError`;
-- print the year and the number of records left uncoded;
-- let anything else propagate.
+Commit `4683e3c` (trivial fix, no CR; confirmed confined: the function
+body plus one name, `MissingDataError`, added to the existing
+`from grouse_data import (...)` line; no signature, CLI or output
+change).
 
-That meets the trivial-fix test, so no CR is needed. Owner: the next
-change to `diagnose_wetland.py` (tracker).
+`diagnose_wetland.center_codes` now catches only `MissingDataError` from
+`rd.raster_path`. It prints `[warn] [<region>] <feature> <year>: no raster
+(...) - N record(s) left uncoded (-1)` and continues. Any other error
+propagates. Skipped records still carry `-1`, but the skip is now
+visible with its record count.
 
-Status: **OPEN** (low; diagnostic only).
+Test: `tests/test_pa0027_fixes.py::Bug0055CenterCodes`: on a synthetic
+GeoTIFF, a year with `MissingDataError` leaves its 2 records at `-1` and
+prints the count, and the other year is coded; a `RuntimeError`
+propagates. Both tests fail on the pre-fix code.
+
+Not re-checked: whether the figures cited in `WETLAND_LEAN_FINDINGS.md`
+were produced with a skipped year (§3). That needs a re-run on real data
+and is outside this fix.
+
+Status: **FIXED** (`4683e3c`).
 
 ## 7. Recurrence review
 - **BUG-0049** (same pass): same mechanism.

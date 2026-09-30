@@ -81,21 +81,37 @@ validity check (BUG-0049's mechanism), resting on an unverified
 assumption about an upstream check.
 
 ## 6. Corrective action
-**None yet.** Open for the lead to decide.
+Commit `4683e3c` (trivial fix, no CR; confirmed confined: the change is
+inside `_raster_valid_fraction` only; no signature, caller, CLI or file
+format change).
 
-The fix is confined to one function: return `0.0` (invalid) on a
-rasterio open or read error, narrowed to `rasterio.errors.RasterioIOError`
-and `OSError`, and re-raise anything else. The callers are unchanged,
-because 0.0 is below `MIN_VALID_PIXEL_FRAC`:
-- an unreadable download is rejected;
-- an unreadable existing file is re-fetched.
+`download_rev._raster_valid_fraction` now catches only
+`(rasterio.errors.RasterioIOError, OSError)` around the open/read, logs
+the path and the exception type, and returns `0.0` (invalid). Any other
+exception propagates. The docstring no longer claims the zip check
+covers readability. The callers are unchanged: `0.0 < MIN_VALID_PIXEL_FRAC`,
+so
+- an unreadable download is rejected and the existing file is left
+  untouched (`:297-298`);
+- an unreadable existing file is re-fetched under `--refetch-empty`
+  (`:400-401`).
 
-That meets `CLAUDE.md`'s trivial-fix test: one function, no signature
-change, no behaviour change beyond the defect. So a BUG is required but
-no CR. This pass is documentation only, so the fix is left to the owner.
-Owner: the next change to `download_rev.py` (tracker).
+This addresses the root cause (the error branch resolved to the success
+branch): the error branch is now the fail-closed "invalid" outcome.
+The caller's `frac is None` test at `:401` is now unreachable and was left
+in place (outside the function). The caller's rejection message after a
+download still says "raster is empty (0.00% valid pixels)"; the probe's
+own log line, printed first, names the real cause.
 
-Status: **OPEN**.
+Test: `tests/test_pa0027_fixes.py::Bug0052RasterValidFraction`: a
+garbage file, a truncated GeoTIFF and a missing path return `0.0`; a
+non-IO error (`RuntimeError`) propagates; a readable raster still returns
+its fraction. The four defect tests fail on the pre-fix code.
+
+The no-nodata half (`return 1.0`) is unchanged and stays a tracked
+hypothesis (tracker).
+
+Status: **FIXED** (`4683e3c`).
 
 ## 7. Recurrence review
 - **BUG-0049** was filed in the same pass: same mechanism, found by

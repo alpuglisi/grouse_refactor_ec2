@@ -67,13 +67,43 @@ question. CR-0013 treats the crosswalk as a pinned, required input. That
 question is outside this bug and is recorded in the tracker.
 
 ## 6. Corrective action
-**None yet.** The fix is confined to one function: let the read error
-propagate, either by deleting the `try` or by adding context and
-re-raising. That meets the trivial-fix test, so no CR is needed; a BUG is
-required. This pass is documentation only. Owner: the next change to
-`analyze_grouse.py` (tracker).
+Commit `4683e3c` (trivial fix, no CR).
 
-Status: **OPEN**.
+**Lead decision (2026-09-30):** the EVT crosswalk is a required input
+(CR-0013 pins its path and sha256), so a missing crosswalk and an
+unreadable one both **raise** (fail closed); neither degrades to
+`None` / `"Unmapped"`. This settles the design question in §5, under
+PA-0027's "a missing **required** input raises". A table that reads but
+lacks `VALUE`/`EVT_PHYS` also used to return `None` and is treated the
+same way.
+
+`analyze_grouse.load_evt_crosswalk` now:
+- raises `FileNotFoundError` (naming the glob and
+  `download_attribute_tables.py`) when no `LF*_EVT.csv` exists;
+- lets any `pd.read_csv` error propagate (the `try/except Exception` is
+  deleted);
+- raises `ValueError` (naming the path and the columns found) when
+  `VALUE` or `EVT_PHYS` is missing;
+- never returns `None`; the docstring says so.
+
+Confinement check: the change is inside one function, with no signature,
+schema, CLI or file-format change. The behaviour change is the defect
+fix itself: every former `None` return now raises. The callers' `None`
+branches (`analyze_grouse.py:787` in `analyze_region` and `:1110` in `__main__`,
+`generate_negatives.py:407`) are now unreachable. They were left in
+place so the fix stays inside one function; their removal is a tracker
+item. `grouse_data.GrouseData.evt_crosswalk` still returns `None` when
+the table is absent or malformed. It has no caller in tracked code; it is
+a tracker item too.
+
+Test: `tests/test_pa0027_fixes.py::Bug0053EvtCrosswalk`: missing table
+-> `FileNotFoundError`, empty file -> `EmptyDataError`, a `read_csv`
+`RuntimeError` propagates, missing columns -> `ValueError`, and the
+newest valid table still loads. The four defect tests fail on the
+pre-fix code. `tests/test_cr0012.py` (which runs `generate_negatives.py`
+on a synthetic tree with a crosswalk) passes.
+
+Status: **FIXED** (`4683e3c`).
 
 ## 7. Recurrence review
 - **BUG-0049** (same pass): same mechanism.

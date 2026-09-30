@@ -1,0 +1,8 @@
+CR-0017 deliverable 5 preconditions, 2026-09-30T15:44:07Z
+integration HEAD: 55e68fc7657810f20274271879a08ad121083f57  cr0017-combined: 439a752ea176318ab6deb2776f7bcab7b779a389
+CR-0009: **Status: IMPLEMENTED (v5.2), 2026-09-30** — all deliverable
+CR-0015 B1: docs/quality/evidence/CR-0015-B1/ (20/20 byte-identical, 18/18 GATEs); CR-0015 IMPLEMENTED
+live acceptance_record.json sha256: 66d63e1da915529ed0f33bf4f152d6626d9843c9fa8185a55a9727f54489d478
+backup: /home/ec2-user/grouse_backup/CR-0017 (sha256 verified: live_before.sha256)
+
+Live run 2026-09-30T15:52:00Z: merge 4080f74; generate_negatives exit 0 (pool 22,099; (b)-only 89); MC PASS vs backup (88 C / 23 N: ME 9, NH 1, VT 13); acceptance 19/19 GATEs (record 85ac8989...); --calibrate 19/19, OBS file rewritten, final record 9d5ad0a9...; standing_checks(64,0,False) OK.

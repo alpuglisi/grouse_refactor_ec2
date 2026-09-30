@@ -1,0 +1,14 @@
+MC0: PASS 20 old artifacts equal the d6 record
+MC1: PASS P and B unchanged
+MC2: FAIL pre-registered 88, found in old C 88; old 22,187 -> new 22,187 rows (expected 22,099)
+MC3[ME]: FAIL removed 0, pre-registered 9; unexpected [], kept [(-70.27172, 46.207695), (-69.26533, 47.419594), (-69.23717, 47.447037)]; retained rows with changed lines 0 []
+MC4[ME]: PASS train/hab 2045->2045 -0+0; train/nv 877->877 -0+0; val/hab 517->517 -0+0; val/nv 221->221 -0+0
+MC5[ME]: PASS train_/val_ parts equal the split subsets
+MC3[NH]: FAIL removed 0, pre-registered 1; unexpected [], kept [(-71.363304, 42.70035)]; retained rows with changed lines 0 []
+MC4[NH]: PASS train/hab 588->588 -0+0; train/nv 252->252 -0+0; val/hab 167->167 -0+0; val/nv 72->72 -0+0
+MC5[NH]: PASS train_/val_ parts equal the split subsets
+MC3[VT]: FAIL removed 0, pre-registered 13; unexpected [], kept [(-73.415794, 44.03201), (-73.38281, 43.59231), (-73.382385, 43.591824)]; retained rows with changed lines 0 []
+MC4[VT]: PASS train/hab 857->857 -0+0; train/nv 367->367 -0+0; val/hab 188->188 -0+0; val/nv 81->81 -0+0
+MC5[VT]: PASS train_/val_ parts equal the split subsets
+
+MC: FAIL MC2, MC3[ME], MC3[NH], MC3[VT]

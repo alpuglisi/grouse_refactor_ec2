@@ -224,7 +224,7 @@ acceptance. Checks performed:
 | reviewer | verdict |
 |---|---|
 | A — attack power | **APPROVE (text)** — all round-1 findings resolved in operative text; interfaces consistent with CR-0012 v2; no new attack passes every gate beyond stated limits 1, 2, 4 |
-| B — implementability | **REJECT** — 2 new BLOCKING (below); all C1–C12 resolved |
+| B — implementability | REJECT on v2 (2 new BLOCKING) → **APPROVE WITH FOLLOW-UPS on v2.1** (29f388b) |
 
 The script, config and tests (deliverables 2–4) and the first run (5) are
 pre-approval and still need their own review once written.
@@ -236,4 +236,17 @@ Round-2 reviewer B new findings, applied in **v2.1** (text-only):
 | R2-B2 | BLOCKING | E0's "dtypes CR-0012 names" — none are named | **Accept** — E0 reduced to the exact ordered column set (in the config); types constrained by R1–R4 full-row equality |
 | R2-L1 | LOW | Swept? owner must be a BUG or CR, not a tracker item | **Accept** — owner: CR-0013 |
 | R2-L2 | LOW | "`:304-309` columns plus `region`" is a line reference | **Accept as is** — resolves at the pinned commit; the config carries the column list (R2-B2) |
+
+Reviewer B's v2.1 follow-ups (LOW), applied in **v2.2**:
+- Landing order now shows CR-0012 text approval (commit recorded) before
+  CR-0013 deliverable 3.
+- Deliverable 2a: run the PA-0021 sweep this CR owns.
+- Deliverable 2 spells out how E0's column lists are derived.
+
+## Text sign-off (round 2)
+Reviewer A: APPROVE (text, v2). Reviewer B: APPROVE WITH FOLLOW-UPS (text,
+v2.1). **CR-0013 is not approved yet:** deliverables 0–5 (bookkeeping,
+evidence, config, sweep, `acceptance_split.py`, tests, first run) are
+pre-approval under §1.1 and must be written and reviewed first; deliverable
+3 waits for CR-0012's text approval (rule 4).
 

@@ -381,6 +381,15 @@ A z-score is reported only for rows that have a null. Rows marked
       provenance-only.
 - [ ] 2. The config and OBS file (constants, specs and environment; no
       references).
+      E0's ordered column lists are derived and written out here:
+      positives = the `evaluated_sightings` columns at the pinned commit
+      plus `region`, `block_id`, `split`; negatives = `CSV_KEEP` plus the
+      envelope features and the other columns written at the pinned
+      commit, plus `region`.
+- [ ] 2a. The PA-0021 sweep (this CR owns it, per deliverable 0's Swept?
+      cell): the acceptance tables of CR-0007..0013 and live-code
+      thresholds; each instance found gets its own BUG (§3.5); update the
+      Swept? cell.
 - [ ] 3. `acceptance_split.py`, by a separate author (rule 4).
 - [ ] 4. `tests/test_acceptance_split.py`: every attack row, the unit
       tests and the shuffle test. Run it; all pass.
@@ -397,9 +406,10 @@ A z-score is reported only for rows that have a null. Rows marked
       record. After CR-0014, re-calibrate O8.
 
 ## Landing order
-CR-0007 → CR-0013 (deliverables 0–5, then approval) → CR-0009 baselines
-→ CR-0012 (deliverable 6 runs inside it) → CR-0009 retrain. CR-0014
-before CR-0012's acceptance run, or that run is repeated.
+CR-0007 → CR-0012 **text approved** (its commit recorded here; rule 4) →
+CR-0013 deliverables 0–5, then CR-0013 approval → CR-0009 baselines →
+CR-0012 implemented (deliverable 6 runs inside it) → CR-0009 retrain.
+CR-0014 (implemented) precedes CR-0012's acceptance run.
 
 ## Out of scope
 - The split and draw (CR-0012) and membership (CR-0007).

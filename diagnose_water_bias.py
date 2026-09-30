@@ -53,7 +53,7 @@ import rasterio
 from pyproj import Transformer
 from scipy.ndimage import distance_transform_edt
 
-from grouse_data import GrouseData, WETLAND_NLCD_CLASSES
+from grouse_data import GrouseData, MissingDataError, WETLAND_NLCD_CLASSES
 
 from regions import REGIONS
 
@@ -112,8 +112,12 @@ def process_region(region, data):
     rd = data[region]
     try:
         nlcd_path = rd.latest_raster_path("nlcd")
-    except Exception as e:
-        print(f"  [!] No usable NLCD raster for {region} ({e}). Skipping.")
+    except MissingDataError as e:
+        # BUG-0070 (PA-0027): only "no valid NLCD raster" is an expected
+        # skip, printed with its type; any other error propagates.
+        print(f"  [!] No usable NLCD raster for {region} "
+              f"({type(e).__name__}: {e}). Skipping {region}; it is "
+              f"absent from the VERDICT.")
         return None
     print(f"  NLCD raster: {nlcd_path}")
 

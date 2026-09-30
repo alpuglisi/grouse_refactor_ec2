@@ -478,7 +478,8 @@ def cmd_check(args, pins):
                 n = int(C[rows_[inb], cols_[inb]].sum())
                 add("X1", "OBS", f"{r} {kind} centre in C", n, "report")
         except Exception as e:  # observation only; never fails the check
-            add("X1", "OBS", f"{r} records", f"skipped: {e}", "report")
+            add("X1", "OBS", f"{r} records",
+                f"skipped: {type(e).__name__}: {e}", "report")
         del D
         print(f"{r}: checked", flush=True)
 

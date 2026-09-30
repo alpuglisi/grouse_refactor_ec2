@@ -131,6 +131,34 @@ ALLOWLIST = {
     ('grouse_data.py', 'RegionData._is_valid_raster', 0): (
         '7aa534a313f5', FAIL_CLOSED,
         "validity probe -> invalid (the caller's nearest-year fallback is designed and recorded by E11(b)); PA-0027 sweep (BUG-0049 s.8) grouse_data.py:327"),
+    # Classified by the fixes of CR-0018's candidates (BUG-0065..0071).
+    ('download_rev.py', 'published_products', 0): (
+        'c4af624a644e', VISIBLE_UNKNOWN,
+        'listing failure printed with type as "treated as unavailable"; caller runs the jobs without the pre-flight, as before the check existed; BUG-0065 (CR-0018 C1)'),
+    ('download_tcc_nlcd.py', 'ee_init', 0): (
+        'b672607d9dc0', FALLBACK,
+        'first auth path failed -> ADC path; both failing -> SystemExit naming both errors with type; BUG-0067 (CR-0018 C3)'),
+    ('download_treemap.py', 'ee_init', 0): (
+        'b672607d9dc0', FALLBACK,
+        'first auth path failed -> ADC path; both failing -> SystemExit naming both errors with type; BUG-0067 (CR-0018 C3)'),
+    ('analyze_grouse.py', 'load_state_boundaries', 0): (
+        '26b1745397e6', VISIBLE_UNKNOWN,
+        'map decoration: download failure printed with type, map renders without boundaries; BUG-0069 (CR-0018 C5)'),
+    ('analyze_grouse.py', 'load_state_boundaries', 1): (
+        '6f36107e178e', VISIBLE_UNKNOWN,
+        'map decoration: read failure printed with type, map renders without boundaries; BUG-0069 (CR-0018 C5)'),
+    ('check_exotic.py', 'check_sclass_meaning', 0): (
+        '316a35fde7d8', VISIBLE_UNKNOWN,
+        'diagnostic: unreadable table printed with type, check reported as not done; BUG-0069 (CR-0018 C5)'),
+    ('check_raster.py', 'check_one', 0): (
+        '0126c821f736', VISIBLE_UNKNOWN,
+        'diagnostic: COULD NOT OPEN printed with type for that file; BUG-0069 (CR-0018 C5)'),
+    ('check_road_dist.py', 'cmd_check', 0): (
+        '058574d910b3', VISIBLE_UNKNOWN,
+        'OBS X1 row records "skipped: <type>: <msg>", never a GATE; BUG-0069 (CR-0018 C5)'),
+    ('symptom_check.py', 'region_point_frames', 0): (
+        'c7ffbe09fa59', VISIBLE_UNKNOWN,
+        'file hash recorded as "not hashed (<type>: <msg>)"; BUG-0069 (CR-0018 C5)'),
 }
 
 # key -> (digest, owning BUG). Open defects; removing the entry is part
@@ -139,28 +167,19 @@ KNOWN_OPEN = {
     ('download_rev.py', 'download_one', 0): ('714a04258470', 'BUG-0013'),
     ('download_rev.py', 'download_one', 1): ('11306fa01b42', 'BUG-0013'),
     ('ebird.py', 'main', 0): ('8bc7ec3f45b2', 'BUG-0013'),
+    # CR-0018 C4 / C5 site; fix pending until CR-0017 (which edits
+    # acceptance_split.py) merges.
+    ('acceptance_split.py', 'git_commit', 0): ('1bef1b004199', 'BUG-0068'),
+    ('acceptance_split.py', 'full_run', 0): ('5c01e691829a', 'BUG-0069'),
 }
 
 # key -> (digest, candidate id). CR-0018's BUG candidates (CR section 4),
 # pinned until each is filed and fixed or moved to ALLOWLIST by review;
 # the lead may replace a CR-0018-Cn id by the BUG id it is filed under.
 EXPECTED_UNCLASSIFIED = {
-    ('download_rev.py', 'published_products', 0): ('c64736437d46', 'CR-0018-C1'),
-    ('download_tcc_nlcd.py', 'fetch_tile', 0): ('9408667ddb10', 'CR-0018-C2'),
-    ('download_treemap.py', 'fetch_tile', 0): ('5bdafe0db0cf', 'CR-0018-C2'),
-    ('download_tcc_nlcd.py', 'ee_init', 0): ('f30ab3d84bc7', 'CR-0018-C3'),
-    ('download_treemap.py', 'ee_init', 0): ('f30ab3d84bc7', 'CR-0018-C3'),
-    ('acceptance_split.py', 'git_commit', 0): ('1bef1b004199', 'CR-0018-C4'),
-    ('acceptance_split.py', 'full_run', 0): ('5c01e691829a', 'CR-0018-C5'),
-    ('analyze_grouse.py', 'load_state_boundaries', 0): ('f60ef2b09228', 'CR-0018-C5'),
-    ('analyze_grouse.py', 'load_state_boundaries', 1): ('0d27d8305b05', 'CR-0018-C5'),
-    ('check_exotic.py', 'check_sclass_meaning', 0): ('52841f9f918f', 'CR-0018-C5'),
-    ('check_raster.py', 'check_one', 0): ('cab80fa34317', 'CR-0018-C5'),
-    ('check_road_dist.py', 'cmd_check', 0): ('6245b58398e9', 'CR-0018-C5'),
-    ('symptom_check.py', 'region_point_frames', 0): ('27faa6cca98a', 'CR-0018-C5'),
-    ('diagnose_training.py', 'main', 0): ('2139181fae8b', 'CR-0018-C6'),
-    ('diagnose_water_bias.py', 'process_region', 0): ('b97acb340971', 'CR-0018-C6'),
-    ('generate_treemap_features.py', '_source_is_valid', 0): ('7ce950d3d7c4', 'CR-0018-C7'),
+    # Empty: CR-0018's candidates C1-C7 were filed as BUG-0065..0071;
+    # the fixed sites are in ALLOWLIST (or no longer flagged), the two
+    # pending acceptance_split.py sites are in KNOWN_OPEN.
 }
 
 # PA-0026 guarded files (not scanned). Growth is a review item.

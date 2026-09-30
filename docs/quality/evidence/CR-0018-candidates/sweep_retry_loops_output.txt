@@ -1,0 +1,13 @@
+acceptance_split.py:852 run: broad handler in a loop, NON-CONFORMING
+acceptance_split.py:1675 gate_E8: broad handler in a loop, NON-CONFORMING
+acceptance_split.py:1749 gate_E10: broad handler in a loop, NON-CONFORMING
+acceptance_split.py:1782 parse_regions_py: broad handler in a loop, NON-CONFORMING
+check_road_dist.py:480 cmd_check: broad handler in a loop, NON-CONFORMING
+dataset.py:208 _close_handles: broad handler in a loop, NON-CONFORMING
+download_rev.py:242 download_one: broad handler in a loop, NON-CONFORMING
+download_tcc_nlcd.py:194 resolve_collection: broad handler in a loop, NON-CONFORMING
+download_tcc_nlcd.py:376 _fetch_all: broad handler in a loop, aborts on every path
+download_treemap.py:298 _fetch_all: broad handler in a loop, aborts on every path
+ebird.py:106 main: broad handler in a loop, NON-CONFORMING
+symptom_check.py:663 region_point_frames: broad handler in a loop, NON-CONFORMING
+65 files; 12 broad handler(s) inside loops

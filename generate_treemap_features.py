@@ -176,7 +176,14 @@ def _source_is_valid(path, min_valid_frac=0.001):
                                          min(src.width, 1024)))
             frac = float((arr > 0).mean()) if arr.size else 0.0
             return frac >= min_valid_frac
-    except Exception:
+    except OSError as e:
+        # BUG-0071 (PA-0027): only an unreadable file (vanished, or not
+        # a readable GeoTIFF - RasterioIOError is an OSError) is
+        # invalid, and the real cause is printed; find_source's warning
+        # alone would blame "no real content". Any other error
+        # propagates instead of silently dropping the vintage.
+        print(f"   [warn] {path}: cannot be read as a raster "
+              f"({type(e).__name__}: {e}) - treated as invalid")
         return False
 
 

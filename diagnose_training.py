@@ -23,7 +23,7 @@ import argparse
 import torch
 from torch.utils.data import ConcatDataset, DataLoader
 
-from grouse_data import GrouseData
+from grouse_data import GrouseData, MissingDataError
 from regions import REGIONS
 from models import FEATURE_SPEC, split_features
 from dataset import GrousePatchDataset
@@ -44,19 +44,29 @@ def main():
     print("1. DATA COMPOSITION (the most likely culprit)")
     print("=" * 60)
     total_tr_pos = total_tr_neg = total_va_pos = total_va_neg = 0
+    skipped = []
     for region in args.regions:
         rd = data[region]
         try:
             tp, tn = len(rd.positives("train")), len(rd.negatives("train"))
             vp, vn = len(rd.positives("val")), len(rd.negatives("val"))
-        except Exception as e:
-            print(f"  {region}: FAILED to load files - {e}")
+        except MissingDataError as e:
+            # BUG-0070 (PA-0027): only a missing split file is an
+            # expected skip; it is printed and the totals below say
+            # they exclude it. Any other error propagates.
+            print(f"  {region}: SKIPPED, split files missing - "
+                  f"{type(e).__name__}: {e}")
+            skipped.append(region)
             continue
         total_tr_pos += tp; total_tr_neg += tn
         total_va_pos += vp; total_va_neg += vn
         print(f"  {region}: train {tp:,} pos / {tn:,} neg | "
               f"val {vp:,} pos / {vn:,} neg")
 
+    if skipped:
+        print(f"\n  [!] INCOMPLETE: the totals below EXCLUDE skipped "
+              f"region(s) {skipped}; they are not the counts train.py "
+              f"would see for --regions {args.regions}.")
     eff_tr_pos = total_tr_pos * 4   # rotation expansion
     eff_va_pos = total_va_pos * 4
     print(f"\n  AFTER 4x rotation expansion (what the model actually sees):")

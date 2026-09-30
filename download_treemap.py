@@ -149,8 +149,11 @@ def ee_init(project):
     try:
         ee.Initialize(project=project) if project else ee.Initialize()
         return ee
-    except Exception as persistent_err:
-        pass
+    except Exception as e:
+        # BUG-0067: the `as` name is deleted when the clause ends
+        # (Python 3), so keep the error under a different name for the
+        # SystemExit below; falls through to the ADC path.
+        persistent_err = e
     try:
         import google.auth
         credentials, adc_project = google.auth.default(scopes=[
@@ -165,8 +168,10 @@ def ee_init(project):
     except Exception as adc_err:
         raise SystemExit(
             f"Earth Engine init failed via both paths.\n"
-            f"  earthengine's own credentials: {persistent_err}\n"
-            f"  Application Default Credentials: {adc_err}\n"
+            f"  earthengine's own credentials: "
+            f"{type(persistent_err).__name__}: {persistent_err}\n"
+            f"  Application Default Credentials: "
+            f"{type(adc_err).__name__}: {adc_err}\n"
             f"Run 'earthengine authenticate' once on this machine, and "
             f"pass a Google Cloud project via --project or "
             f"EARTHENGINE_PROJECT. If that specifically fails with "
@@ -260,10 +265,20 @@ def fetch_tile(ee, image, rect, dest, retries=4):
             with rasterio.open(dest):     # parse check
                 pass
             return
-        except Exception as e:
+        except (requests.exceptions.RequestException, ee.EEException,
+                rasterio.errors.RasterioIOError) as e:
+            # BUG-0066 (PA-0027 retry clause): only transient types are
+            # retried (network, EE server, truncated GeoTIFF); anything
+            # else propagates at once. Each retry is logged with its
+            # type and traceback; exhaustion raises.
             if attempt == retries:
                 raise RuntimeError(f"tile {rect} failed after "
-                                   f"{retries + 1} attempts: {e}")
+                                   f"{retries + 1} attempts: "
+                                   f"{type(e).__name__}: {e}") from e
+            import traceback
+            print(f"   [retry {attempt + 1}/{retries}] tile {rect}: "
+                  f"{type(e).__name__}: {e}\n{traceback.format_exc()}",
+                  file=sys.stderr, flush=True)
             time.sleep(delay)
             delay *= 2
 

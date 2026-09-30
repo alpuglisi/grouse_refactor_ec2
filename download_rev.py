@@ -146,7 +146,11 @@ def published_products(year, session=None):
         if res.status_code != 200:
             return None
         services = res.json().get("services") or []
-    except Exception:
+    except Exception as e:
+        # BUG-0065 (PA-0027): the caller's "unreachable" message cannot
+        # tell a network error from a parser bug; print the type here.
+        log(f"  [~] LF{year}: product listing {SERVICES_URL}/{folder} "
+            f"failed ({type(e).__name__}: {e}) - treated as unavailable")
         return None
     codes = set()
     pat = re.compile(rf"^LF{year}_([A-Za-z0-9]+)(?:_|$)")

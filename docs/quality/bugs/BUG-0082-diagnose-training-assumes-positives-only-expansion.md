@@ -1,7 +1,7 @@
 # BUG-0082: `diagnose_training.py` section 1 multiplies only positives by 4, but `train.py` rotation-expands both classes, so it reports a 4:1 ratio, an 80 % all-positive baseline and a false "imbalance is severe" verdict on balanced data
 
 > Found by the 2026-09-30 static code review at `3b3e7d1`.
-> **Status: OPEN; owner: lead; trivial fix (one function).**
+> **Status: FIXED in code (`2c05388`, 2026-09-30, trivial fix, no CR); validation pending on the data host; owner: lead.**
 
 ## 1. Description
 Section 1 ("what the model actually sees") computes the effective class
@@ -66,7 +66,8 @@ producer, so a producer change left it wrong with nothing to detect it.
 `train.build_datasets` (or `GrousePatchDataset` with the same
 `expand_rotations` for both classes) and report `len(ds)` and
 `labels.mean()`; delete the literal `* 4` and the `> 3` verdict.
-Status: **OPEN**. Owner: lead.
+**Implemented 2026-09-30, commit `2c05388` (trivial fix under CLAUDE.md §1: one function, no public signature, file format or schema change).** diagnose_training.py section 1 now expands both classes by the same factor (`EXPANSION = 4`), reports a majority-class baseline and a two-sided ratio check, and prints the assumption it makes (PA-0039). Validation here: `python -m py_compile` only, since this environment has no numpy, torch, rasterio or data tree. To verify: `python diagnose_training.py` on the data host: section 1 shows a 1.00 : 1 ratio and no imbalance warning on the CR-0019 files.
+Status: **FIXED (code); validation pending on the data host.** Owner: lead.
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md` for

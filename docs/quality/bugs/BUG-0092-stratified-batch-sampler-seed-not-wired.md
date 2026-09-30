@@ -1,8 +1,7 @@
 # BUG-0092: `StratifiedBatchSampler` is always built with `seed=0`, so batch composition and order are identical across `--seed` values and across ensemble members
 
 > Found by the 2026-09-30 static code review at `3b3e7d1`.
-> **Status: OPEN (low); owner: lead; trivial fix (thread the seed
-> through `fit()`).**
+> **Status: FIXED in code (`2c05388`, 2026-09-30, trivial fix, no CR); validation pending on the data host; owner: lead.**
 
 ## 1. Description
 `fit()` constructs `StratifiedBatchSampler(train_labels, batch_size,
@@ -55,7 +54,8 @@ constant default seed that the run's `--seed` is never wired to.
 **None yet.** Trivial fix: add `seed` to `fit()` (default from
 `torch.initial_seed() % 2**32` or an explicit argument), pass
 `seed + member index` from `train.py`, and record it in the run args.
-Status: **OPEN (low)**. Owner: lead.
+**Implemented 2026-09-30, commit `2c05388` (trivial fix under CLAUDE.md §1: one function, no public signature, file format or schema change).** `fit()` seeds `StratifiedBatchSampler` from `torch.initial_seed() % 2**32`, i.e. `train.py --seed` (+ member index for ensembles); `--seed 0` reproduces the previous batch order exactly. Validation here: `python -m py_compile` only, since this environment has no numpy, torch, rasterio or data tree. To verify: on a torch install: `StratifiedBatchSampler(labels, 32, seed=0)` and `seed=1` yield different first batches, `seed=0` yields the pre-fix sequence; two `train.py --seed 0` runs log identical epoch-1 batch compositions.
+Status: **FIXED (code); validation pending on the data host.** Owner: lead.
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md` for "seed",

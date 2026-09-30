@@ -1,8 +1,7 @@
 # BUG-0087: `symptom_check.pair_rows` labels its per-cell inputs "real units" but writes the stored int16 codes for `tsd`, `tpa_live`, `balive`, `qmd` and `carbon_dwn`; only `road_dist` is decoded
 
 > Found by the 2026-09-30 static code review at `3b3e7d1`.
-> **Status: OPEN (low; the OBS rows 2a/2b use only `road_dist` and
-> `prob`, so the recorded numbers are unaffected); owner: lead; trivial
+> **Status: FIXED in code (`2c05388`, 2026-09-30, trivial fix, no CR); validation pending on the data host; owner: lead.**
 > fix once a shared decoder exists.**
 
 ## 1. Description
@@ -61,7 +60,8 @@ hand, and this one stopped after the first feature.
 **None yet.** Proposed: add `models.decode_feature(name, stored)`
 mapping each encoded feature to its decoder (identity for the rest),
 call it in `pair_rows` and `inspect_point.py`, and add the PA-0043
-test. Status: **OPEN (low)**. Owner: lead.
+test. **Implemented 2026-09-30, commit `2c05388` (trivial fix under CLAUDE.md §1: one function, no public signature, file format or schema change).** `pair_rows` undoes the storage encoding after the `FEATURE_SPEC` scale for every encoded feature (log decoders for `road_dist`/`tsd`/`tpa_live`, `treemap_decode` for the fixed-point three); `road_dist_m` is kept as a column. The shared `decode_feature` API of PA-0043 is still a CR item. Validation here: `python -m py_compile` only, since this environment has no numpy, torch, rasterio or data tree. To verify: re-run `symptom_check.py` in-process as CR-0009 deliverable 9 did: `pairs_frozen.csv` `tsd` values lie in [0, 30], `balive` in [0, 400]; the 2a/2b OBS rows are unchanged against `docs/quality/evidence/CR-0009/symptom/report.txt`.
+Status: **FIXED (code); validation pending on the data host.** Owner: lead.
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md` for "decode",

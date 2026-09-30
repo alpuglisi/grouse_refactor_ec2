@@ -281,8 +281,8 @@ Filed as BUG-0076..BUG-0092 (`docs/quality/bugs/`, `BUG_LOG.md`), rules PA-0033.
 - [ ] BUG-0079 non-atomic multi-year raster writes + `raster_path` fallback + filename-only year check (tsd future leakage, latent) — small CR
 - [ ] BUG-0080 `standing_checks` does not bind `block_assignments.csv` (latent, `--an-background`) — small CR
 - [ ] BUG-0081 `analyze_grouse.py` skip paths leave stale outputs, exit 0 — trivial fixes / small CR
-- [ ] BUG-0082, BUG-0083, BUG-0085 `diagnose_training.py`, `smoke_test_training.py`, `bench_pipeline.py` restate `train.py` defaults/rules by hand — `TRAIN_DEFAULTS` CR
-- [ ] BUG-0084 `diagnose_wetland.py` mean-of-sigmoids scorer — trivial fix
+- [ ] BUG-0083, BUG-0085 `diagnose_training.py` §3, `smoke_test_training.py`, `bench_pipeline.py` restate `train.py` defaults by hand — `TRAIN_DEFAULTS` CR
+- [x] BUG-0082, BUG-0084, BUG-0087, BUG-0088, BUG-0091, BUG-0092 — fixed in code (`2c05388`, trivial fixes); validation pending on the data host (commands in each BUG §6)
 - [ ] BUG-0086 `--use-weights` double weighting (latent) — lead decision
-- [ ] BUG-0087, BUG-0088, BUG-0089, BUG-0090, BUG-0091, BUG-0092 (low) — trivial fixes
+- [ ] BUG-0089, BUG-0090 (low) — CRs
 - Candidates not filed (unverified here, need one check each): Earth Engine exports requested on a lattice half a pixel off the NLCD/TCC/TreeMap native grid (`download_tcc_nlcd.py:310-313`, `download_treemap.py:234-237`; fixed ~15 m shift before the template warp — confirm native origins, then file); GBIF negatives taken as an index-order prefix rather than a sample (`get_negatives.py:269-272`; folded into BUG-0073/BUG-0077's CR as a question).

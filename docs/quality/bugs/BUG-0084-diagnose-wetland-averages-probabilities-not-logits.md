@@ -1,7 +1,7 @@
 # BUG-0084: `diagnose_wetland.score_points` averages sigmoids over the 4 rotations and omits the mirror, so its per-class score table and "overall per-point AUC" are not the model's validated or deployed score
 
 > Found by the 2026-09-30 static code review at `3b3e7d1`.
-> **Status: OPEN; owner: lead; trivial fix (one function).**
+> **Status: FIXED in code (`2c05388`, 2026-09-30, trivial fix, no CR); validation pending on the data host; owner: lead.**
 
 ## 1. Description
 The canonical per-point score averages **logits** over the D4 views
@@ -60,7 +60,8 @@ mechanically checked.
 **None yet.** Trivial fix: `return d4_tta_logits(model, cat_x, cont_x,
 flip_tta=True)` per batch on the unrotated view, or average the four
 stored rotations' logits plus mirror before one sigmoid, matching
-`evaluate`. Status: **OPEN**. Owner: lead.
+`evaluate`. **Implemented 2026-09-30, commit `2c05388` (trivial fix under CLAUDE.md §1: one function, no public signature, file format or schema change).** `score_points` now averages logits over the 4 stored rotations and their mirrors before one sigmoid (the `evaluate`/`d4_tta_logits` score). Validation here: `python -m py_compile` only, since this environment has no numpy, torch, rasterio or data tree. To verify: on the data host, `score_points(model, ds, device)` equals `1/(1+exp(-g))` for `g` from `calibrate.collect_val_logits(model, ds, ...)` on the same dataset (unit check needing torch); the 'Overall per-point AUC' then matches the checkpoint's logged TTA AUC on the same points.
+Status: **FIXED (code); validation pending on the data host.** Owner: lead.
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** `BUG_LOG.md`, `PREVENTIVE_ACTIONS.md` and `CHANGELOG.md`

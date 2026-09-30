@@ -3,7 +3,7 @@
 > Found by the 2026-09-30 static code review at `3b3e7d1`. Caller-side
 > sibling of BUG-0071, which fixed the probe inside `_source_is_valid`
 > and left this "warn and continue" as a design choice (CR-0018 §5).
-> **Status: OPEN (low); owner: lead; trivial fix (one function).**
+> **Status: FIXED in code (`2c05388`, 2026-09-30, trivial fix, no CR); validation pending on the data host; owner: lead.**
 
 ## 1. Description
 `discover_vintages` walks `TREEMAP_YEARS` and, if any (region,
@@ -59,8 +59,8 @@ code and no output marking, the same mechanism as BUG-0081.
 **None yet.** Trivial fix: raise `SystemExit` naming the missing files
 unless an explicit `--allow-missing-vintages` is passed, and when it is,
 tag every written file with the vintage actually used
-(`GROUSE_TREEMAP_VINTAGE`) and exit non-zero. Status: **OPEN (low)**.
-Owner: lead.
+(`GROUSE_TREEMAP_VINTAGE`) and exit non-zero. **Implemented 2026-09-30, commit `2c05388` (trivial fix under CLAUDE.md §1: one function, no public signature, file format or schema change).** `discover_vintages` refuses a partially present vintage with `SystemExit` naming the missing (region, attribute) sources; a vintage with no source for any region or attribute (2023 today) is still skipped, with a note instead of a warning. Validation here: `python -m py_compile` only, since this environment has no numpy, torch, rasterio or data tree. To verify: on the data host, rename one `TreeMap2022_ME_BALIVE.tif` and run `generate_treemap_features.py`: it exits naming that file; restore it and the run proceeds as before with '2023: not downloaded, skipping'.
+Status: **FIXED (code); validation pending on the data host.** Owner: lead.
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** as BUG-0081. **Matches:** BUG-0071 (probe side of the same

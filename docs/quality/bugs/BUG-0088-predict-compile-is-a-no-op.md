@@ -1,8 +1,7 @@
 # BUG-0088: `predict.py --compile` is a no-op: `torch.compile(model)` wraps `forward()`, but the scorer calls `model.logits`, which the wrapper forwards uncompiled; the same defect was diagnosed and fixed in `model_handler.py`, whose docstring names this site
 
 > Found by the 2026-09-30 static code review at `3b3e7d1`.
-> **Status: OPEN (low; throughput only, outputs unaffected); owner:
-> lead; trivial fix.**
+> **Status: FIXED in code (`2c05388`, 2026-09-30, trivial fix, no CR); validation pending on the data host; owner: lead.**
 
 ## 1. Description
 `predict_region` does `model = torch.compile(model)` and then scores
@@ -49,7 +48,8 @@ keyed to file names, not call shapes.
 ## 6. Corrective action
 **None yet.** Trivial fix: `model.logits = torch.compile(model.logits)`
 (or pass a compiled callable into `d4_tta_logits`), or drop the flag.
-Status: **OPEN (low)**. Owner: lead.
+**Implemented 2026-09-30, commit `2c05388` (trivial fix under CLAUDE.md §1: one function, no public signature, file format or schema change).** `predict_region` compiles `model.logits` (the method `d4_tta_logits` calls) instead of the module. Validation here: `python -m py_compile` only, since this environment has no numpy, torch, rasterio or data tree. To verify: `python predict.py --region NH --bounds <small box> --tif-only --compile` prints 'Compiling model.logits' and writes a GeoTIFF equal to the eager run to floating-point rounding, faster.
+Status: **FIXED (code); validation pending on the data host.** Owner: lead.
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** `BUG_LOG.md`, `PREVENTIVE_ACTIONS.md`, `CHANGELOG.md` for

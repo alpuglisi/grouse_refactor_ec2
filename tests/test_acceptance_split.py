@@ -59,7 +59,15 @@ S_COLS = ["longitude", "latitude", "state", "year", "n_visits", "first_year", "l
 G_COLS = ["common_name", "scientific_name", "longitude", "latitude", "obs_date", "year",
           "month", "state", "gbif_id", "how_many", "coord_uncertainty_m"]
 RASTER_YEARS = {"evt": [2022, 2023], "evh": [2022, 2023], "sclass": [2021, 2022, 2023]}
-REGIONS_PY = '''"""fixture regions.py (CR-0007/CR-0012 constants)."""
+with open(PROD_CONFIG, encoding="utf-8") as _f:
+    YEAR_MIN = json.load(_f)["constants"]["YEAR_MIN"]      # CR-0019
+# CR-0019 (review A4): fixture years are set deterministically. Both classes
+# cycle over the same years >= YEAR_MIN, so the correct tree's pooled P and N
+# year sets are equal by construction (asserted in TestYearFloorUnits); a
+# few sightings and candidates carry LOW_YEAR (< YEAR_MIN) for the attacks.
+FIX_YEARS = [YEAR_MIN + k for k in range(4)]
+LOW_YEAR = YEAR_MIN - 1
+REGIONS_PY = '''"""fixture regions.py (CR-0007/CR-0012/CR-0019 constants)."""
 REGIONS = ("ME", "NH", "VT")
 STATE_FIPS = {"ME": "23", "NH": "33", "VT": "50"}
 MIN_SPACING_M = 30
@@ -70,7 +78,7 @@ BLOCK_ORIGIN_5070 = (0.0, 0.0)
 VAL_FRACTION = 0.2
 SPLIT_SEED = 42
 WINDOW_PX = 64
-'''
+''' + f"YEAR_MIN = {YEAR_MIN}\n"
 
 
 def _seed(*parts):
@@ -192,6 +200,28 @@ def _clear_of(lons, lats, spots, radius_deg):
     return ok
 
 
+def _thin_key(lon, lat, seed=42):
+    """The seeded thin order key (config hash_spec), computed here with
+    hashlib directly, independently of acceptance_split."""
+    return int.from_bytes(hashlib.blake2b(f"{seed}:{lon:.6f},{lat:.6f}".encode(),
+                                          digest_size=8).digest(), "big")
+
+
+def _sighting_years(lon, lat):
+    """CR-0019 fixture years: FIX_YEARS by position; LOW_YEAR on (i) the
+    member of each near pair (i, 110 + i) that is first in thin order and
+    (ii) some isolated rows (10, 13, 16, 19: the 300 m buffer candidates
+    are built around rows 0-19; and every row 25, 35, ..., 105)."""
+    n = len(lon)
+    year = np.array([FIX_YEARS[i % len(FIX_YEARS)] for i in range(n)])
+    low = [10, 13, 16, 19] + list(range(25, 110, 10))
+    for i in range(8):
+        j = 110 + i
+        low.append(i if _thin_key(lon[i], lat[i]) < _thin_key(lon[j], lat[j]) else j)
+    year[low] = LOW_YEAR
+    return year
+
+
 def _write_sightings(root):
     out = {}
     spots = [NH_IN_ME] + list(OUTSIDE.values())
@@ -224,7 +254,8 @@ def _write_sightings(root):
         nonveg = rng.random(n) < 0.1
         nonveg[-6:] = False                              # border pairs are habitat
         nonveg[110:118] = False
-        year = rng.integers(2019, 2024, n)
+        rng.integers(2019, 2024, n)                      # consumed: keeps the other columns' draws
+        year = _sighting_years(lon, lat)                 # CR-0019: deterministic
         df = pd.DataFrame({
             "longitude": lon, "latitude": lat, "state": R, "year": year, "n_visits": 1,
             "first_year": year, "last_year": year, "x_5070": x, "y_5070": y,
@@ -288,7 +319,9 @@ def _write_candidates(root, S):
             lon.append(NH_IN_ME[0])
             lat.append(NH_IN_ME[1])
         n = len(lon)
-        yr = rng.integers(2019, 2024, n)
+        rng.integers(2019, 2024, n)                      # consumed: keeps the other columns' draws
+        yr = np.array([FIX_YEARS[i % len(FIX_YEARS)] for i in range(n)])     # CR-0019
+        yr[[i for i in range(min(n, 650)) if i % 13 == 6]] = LOW_YEAR       # pool step 1 drops these
         unc = rng.choice([10.0, 50.0, 250.0, np.nan], n)
         unc[rng.random(n) < 0.04] = 5000.0
         if R == "NH":
@@ -316,7 +349,7 @@ def _write_candidates(root, S):
         # exact-key duplicates later in file order, some with SMALLER gbif_id
         dup = df.iloc[100:140].copy()
         dup["gbif_id"] = [next(ids) - (50000 if k % 2 else 0) for k in range(len(dup))]
-        dup["year"] = (dup["year"] % 5) + 2019
+        dup["year"] = [FIX_YEARS[k % len(FIX_YEARS)] for k in range(len(dup))]   # CR-0019
         dup["common_name"] = "Duplicate Pin"
         df = pd.concat([df, dup], ignore_index=True)[G_COLS]
         df.to_csv(os.path.join(root, "data", "negatives", f"gbif_negatives_{R}.csv"), index=False)
@@ -828,6 +861,57 @@ class WindowlessKept(A.Replay):
         return df.copy()
 
 
+# --- CR-0019 section 3: year-floor attack pipelines -------------------------
+class NoYearFloor(A.Replay):
+    """Positives step 2 unchanged (no year floor)."""
+    def year_floor(self, df):
+        return np.ones(len(df), bool)
+
+
+class FloorAfterThin(A.Replay):
+    """The floor applied after thinning (step 4), not at step 2."""
+    def year_floor(self, df):
+        return np.ones(len(df), bool)
+
+    def thin(self, lons, lats, xs, ys, frame=None):
+        keep = A.Replay.thin(self, lons, lats, xs, ys, frame)
+        if frame is not None and "nonveg_landcover" in frame.columns:      # positives only
+            keep = keep & (frame["year"] >= self.C["YEAR_MIN"]).to_numpy()
+        return keep
+
+
+class FloorOffByOne(A.Replay):
+    """year > YEAR_MIN instead of year >= YEAR_MIN."""
+    def year_floor(self, df):
+        return (df["year"] > self.C["YEAR_MIN"]).to_numpy()
+
+
+class SourceLevelFloor(A.Replay):
+    """The floor applied to evaluated_sightings itself (a source-level cut):
+    every consumer, the 300 m buffer included, sees only year >= YEAR_MIN."""
+    def sightings(self, R, section):
+        S = A.Replay.sightings(self, R, section)
+        return S[S["year"] >= self.C["YEAR_MIN"]].copy()
+
+
+class TrainOnlyFloor(A.Replay):
+    """The floor applied to the train split only (after the split)."""
+    def year_floor(self, df):
+        return np.ones(len(df), bool)
+
+    def run_positives(self):
+        A.Replay.run_positives(self)
+        for R in self.regions:
+            p = self.pos[R]
+            self.pos[R] = p[~((p["split"] == "train") & (p["year"] < self.C["YEAR_MIN"]))]
+
+
+class NoPoolFloor(A.Replay):
+    """Pool step 1 unchanged (no candidate year floor)."""
+    def pool_year_floor(self, cand):
+        return cand
+
+
 # --------------------------------------------------------------------------
 # Tests
 # --------------------------------------------------------------------------
@@ -913,7 +997,7 @@ class TestReference(unittest.TestCase):
         lines = []
         code, res = A.full_run(root, CFG, do_obs=False, out=lines.append)
         self.assertEqual(code, 1)
-        for g in ("E0", "E1", "E3", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13", "R3"):
+        for g in ("E0", "E1", "E3", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13", "E14", "R3"):
             self.assertEqual(res[g]["status"], "FAIL", g)
             self.assertIn(rel, res[g]["missing"], g)
         self.assertTrue(any(l.startswith("E0   FAIL  (missing") for l in lines))
@@ -1489,7 +1573,320 @@ class TestDomainEdgeUnits(unittest.TestCase):
         src = inspect.getsource(A.standing_checks)
         self.assertNotIn("E13", src)
         self.assertIn("E13", A.GATE_IDS)
-        self.assertEqual(len(A.GATE_IDS), 19)
+        self.assertEqual(len(A.GATE_IDS), 20)          # CR-0019: + E14
+
+
+# --------------------------------------------------------------------------
+# CR-0019 section 3: E14 and the year floor
+# --------------------------------------------------------------------------
+REGIONS3 = ("ME", "NH", "VT")
+
+
+def _files(root, kind):
+    """Pooled frame of a per-region file kind, read with pandas directly."""
+    return pd.concat([read(root, kind, R).assign(_R=R) for R in REGIONS3], ignore_index=True)
+
+
+def _keys(df):
+    return set(zip(np.round(df["longitude"].to_numpy(float), 5), np.round(df["latitude"].to_numpy(float), 5)))
+
+
+def _xy(lon, lat):
+    """EPSG:4326 -> EPSG:5070 with pyproj directly (not acceptance_split)."""
+    from pyproj import Transformer
+    t = Transformer.from_crs("EPSG:4326", "EPSG:5070", always_xy=True)
+    return t.transform(np.asarray(lon, float), np.asarray(lat, float))
+
+
+def _min_dist(qlon, qlat, rlon, rlat):
+    from scipy.spatial import cKDTree
+    qx, qy = _xy(qlon, qlat)
+    rx, ry = _xy(rlon, rlat)
+    if len(rx) == 0:
+        return np.full(len(qx), np.inf)
+    d, _ = cKDTree(np.column_stack([rx, ry])).query(np.column_stack([qx, qy]))
+    return d
+
+
+class TestYearFloorAttacks(unittest.TestCase):
+    """CR-0019 section 3 attack rows. Each first asserts, by a computation
+    made here with pandas/pyproj/hashlib on the files (not by the gate
+    under test), that the fixture rows the row needs exist (PA-0021(a): no
+    attack may pass vacuously); then that the named gates fail for the
+    intended reason."""
+
+    assertFails = TestAttacks.assertFails
+
+    def e14_problems(self, root):
+        res = gates(root, only={"E14"})
+        self.assertEqual(res["E14"]["status"], "FAIL", res["E14"])
+        return res["E14"]["problems"]
+
+    def test_no_floor(self):
+        root = fresh()
+        emit_attack(root, NoYearFloor)
+        P, N = _files(root, "thinned_positives"), _files(root, "negatives")
+        low = P[P["year"] < YEAR_MIN]
+        hab = low[~low["nonveg_landcover"].astype(bool)]
+        self.assertGreater(len(hab), 0, "fixture: no habitat positive with year < YEAR_MIN "
+                                        "survives the window and the thin")
+        self.assertTrue(set(hab["year"]) - set(N["year"]),
+                        "fixture: every pre-floor positive year also has a negative")
+        self.assertFails(root, {"E14": "distinct years differ", "R1": "rows not in the replay",
+                                "R2": "rows not in the replay"})
+        self.assertTrue(any(x.startswith("P (combined, pooled)") for x in self.e14_problems(root)))
+
+    def test_floor_after_thinning(self):
+        S = _files(BASE, "sightings")
+        S = S[~S["nonveg_landcover"].astype(bool)].reset_index(drop=True)
+        x, y = _xy(S["longitude"], S["latitude"])
+        from scipy.spatial import cKDTree
+        pairs = cKDTree(np.column_stack([x, y])).query_pairs(CFG["constants"]["MIN_SPACING_M"] - 1e-9)
+        ref_keys = _keys(_files(BASE, "thinned_positives"))
+        want = []
+        for i, j in pairs:
+            for a, b in ((i, j), (j, i)):
+                if (S["year"][a] < YEAR_MIN <= S["year"][b] and
+                        _thin_key(S["longitude"][a], S["latitude"][a]) <
+                        _thin_key(S["longitude"][b], S["latitude"][b]) and
+                        _keys(S.iloc[[b]]) <= ref_keys):
+                    want.append(b)
+        self.assertTrue(want, "fixture: no habitat pair closer than MIN_SPACING_M with the "
+                              "year < YEAR_MIN member first in thin order and its >= YEAR_MIN "
+                              "partner kept by the correct tree")
+        root = fresh()
+        emit_attack(root, FloorAfterThin)
+        lost = _keys(S.iloc[want]) - _keys(_files(root, "thinned_positives"))
+        self.assertTrue(lost, "fixture: the attack kept every such partner")
+        self.assertFails(root, {"R1": "replay rows absent"})
+        self.assertEqual(gates(root, only={"E14"})["E14"]["status"], "PASS")     # E14 passes
+
+    def test_floor_off_by_one(self):
+        P = _files(BASE, "thinned_positives")
+        at = P[(P["year"] == YEAR_MIN) & ~P["nonveg_landcover"].astype(bool)]
+        self.assertGreater(len(at), 0, "fixture: no habitat positive with year == YEAR_MIN "
+                                       "survives the thin")
+        root = fresh()
+        emit_attack(root, FloorOffByOne)
+        self.assertFails(root, {"R1": "replay rows absent", "R2": "replay rows absent"})
+
+    def test_floor_applied_to_the_sightings(self):
+        root = fresh()
+        rep = emit_attack(root, SourceLevelFloor)
+        S = _files(BASE, "sightings")
+        lo, hi = S[S["year"] < YEAR_MIN], S[S["year"] >= YEAR_MIN]
+        C = rep.pool_full
+        only_low = ((_min_dist(C["longitude"], C["latitude"], lo["longitude"], lo["latitude"]) <= BUF) &
+                    (_min_dist(C["longitude"], C["latitude"], hi["longitude"], hi["latitude"]) > BUF))
+        cand = C[only_low]
+        self.assertGreater(len(cand), 0, "fixture: no candidate within BUFFER_M of a year < "
+                                         "YEAR_MIN sighting only that survives steps 7-10")
+        self.assertFalse(_keys(cand) & _keys(read(BASE, "candidate_pool")))
+        self.assertTrue(_keys(cand) & _keys(_files(root, "negatives")),
+                        "fixture: no such candidate is drawn")
+        self.assertFails(root, {"R3": "rows not in the replay", "R4": "rows not in the replay"})
+
+    def test_floor_on_the_train_split_only(self):
+        root = fresh()
+        emit_attack(root, TrainOnlyFloor)
+        P = _files(root, "thinned_positives")
+        low_val = P[(P["year"] < YEAR_MIN) & (P["split"] == "val")]
+        self.assertGreater(len(low_val), 0, "fixture: no year < YEAR_MIN positive in a "
+                                            "validation block")
+        B = read(root, "block_assignments")
+        bsplit = dict(zip(B["block_id"].astype(str), B["split"].astype(str)))
+        self.assertTrue(all(bsplit.get(b) == "val" for b in low_val["block_id"].astype(str)))
+        self.assertFails(root, {"E14": "P (combined, pooled)", "R1": "rows not in the replay",
+                                "R2": "rows not in the replay"})
+
+    def test_positives_later_than_every_negative(self):
+        """Pipeline right, inputs wrong: habitat positives re-acquired to a
+        later year than every candidate (fixture variant)."""
+        root = fresh()
+        G = pd.concat([read(root, "gbif_candidates", R) for R in REGIONS3], ignore_index=True)
+        late = int(G["year"].max()) + 1
+        ref = read(BASE, "thinned_positives", "ME")
+        pick = _keys(ref[~ref["nonveg_landcover"].astype(bool)].head(3))
+        sp = os.path.join(root, A.rpath(CFG, "sightings", "ME"))
+        S = pd.read_csv(sp, float_precision="round_trip")
+        m = np.array([k in pick for k in zip(np.round(S["longitude"], 5), np.round(S["latitude"], 5))])
+        self.assertEqual(int(m.sum()), 3)
+        S.loc[m, "year"] = late
+        S.to_csv(sp, index=False)
+        emit_attack(root, A.Replay)
+        P = _files(root, "thinned_positives")
+        above = P[(P["year"] > G["year"].max()) & ~P["nonveg_landcover"].astype(bool)]
+        self.assertGreater(len(above), 0, "fixture: no habitat positive above every candidate "
+                                          "year survives the window and the thin")
+        self.assertFails(root, {"E14": "distinct years differ"})
+        res = gates(root, only={"E14", "R1"})
+        self.assertFalse(any("combined, pooled" in x for x in res["E14"]["problems"]))  # (a) holds
+        self.assertEqual(res["R1"]["status"], "PASS", res["R1"])                      # pipeline right
+
+    def test_no_pool_floor(self):
+        G = read(BASE, "gbif_candidates", "ME")
+        self.assertTrue((G["year"] < YEAR_MIN).any(), "fixture: no raw candidate below YEAR_MIN")
+        root = fresh()
+        emit_attack(root, NoPoolFloor)
+        C = read(root, "candidate_pool")
+        self.assertTrue((C["year"] < YEAR_MIN).any(), "fixture: no candidate with year < "
+                                                      "YEAR_MIN survives to C")
+        self.assertFails(root, {"E14": "C: ", "R3": "rows not in the replay"})
+
+
+class TestYearFloorUnits(unittest.TestCase):
+    def test_reference_year_sets_equal_by_construction(self):
+        """Review A4: in the correct tree the pooled P and N year sets are
+        equal, and every attack's pre-floor rows exist in the raw inputs."""
+        P, N = _files(BASE, "thinned_positives"), _files(BASE, "negatives")
+        self.assertEqual(sorted(set(P["year"])), FIX_YEARS)
+        self.assertEqual(sorted(set(N["year"])), FIX_YEARS)
+        C = read(BASE, "candidate_pool")
+        self.assertTrue((C["year"] >= YEAR_MIN).all())
+        S = _files(BASE, "sightings")
+        self.assertTrue(((S["year"] < YEAR_MIN) & ~S["nonveg_landcover"].astype(bool)).any())
+        G = pd.concat([read(BASE, "gbif_candidates", R) for R in REGIONS3])
+        self.assertTrue((G["year"] < YEAR_MIN).any())
+        self.assertEqual(gates(fresh(), only={"E14"})["E14"]["status"], "PASS")
+
+    def test_step2_floor_is_inclusive(self):
+        rep = A.Replay(BASE, CFG)
+        df = pd.DataFrame({"year": [YEAR_MIN - 1, YEAR_MIN, YEAR_MIN + 1]})
+        self.assertEqual(list(rep.year_floor(df)), [False, True, True])
+
+    def test_pool_step1_drops_below_floor_keeps_null(self):
+        rep = A.Replay(BASE, CFG)
+        df = pd.DataFrame({"year": [YEAR_MIN - 1, YEAR_MIN, np.nan], "k": [0, 1, 2]})
+        self.assertEqual(list(rep.pool_year_floor(df)["k"]), [1, 2])
+
+    def test_pool_step1_count_and_step7_null_drop(self):
+        """Count "1" is after the floor; a null-year candidate survives step 1
+        and is dropped at step 7 (extraction)."""
+        rep = A.Replay(BASE, CFG)
+        cand = rep.load_candidates()
+        G = pd.concat([read(BASE, "gbif_candidates", R).assign(_R=R) for R in REGIONS3])
+        for R in REGIONS3:
+            g = G[G["_R"] == R]
+            self.assertEqual(rep.counts["negatives"][R]["1"], int((g["year"] >= YEAR_MIN).sum()))
+        self.assertTrue((cand["year"] >= YEAR_MIN).all())
+        C = read(BASE, "candidate_pool")
+        sub = C[C["region"] == "ME"].head(4)[["longitude", "latitude", "year"]].copy()
+        sub["year"] = sub["year"].astype(float)
+        sub.iloc[0, sub.columns.get_loc("year")] = np.nan
+        self.assertEqual(len(rep.pool_year_floor(sub)), 4)
+        out = rep.extract("ME", sub)
+        self.assertEqual(_keys(out), _keys(sub.iloc[1:]))
+
+    def test_null_year_sighting_raises(self):
+        root = fresh()
+        sp = os.path.join(root, A.rpath(CFG, "sightings", "NH"))
+        S = pd.read_csv(sp, float_precision="round_trip")
+        i = S.index[S["nonveg_landcover"].astype(bool)][0]          # a non-habitat row
+        S["year"] = S["year"].astype(float)
+        S.loc[i, "year"] = np.nan
+        S.to_csv(sp, index=False)
+        with self.assertRaises(A.ReplayError) as cm:
+            A.Replay(root, CFG).run(stop_on_error=True)
+        self.assertIn("null year", str(cm.exception))
+
+    def _mutate(self, kind, R, fn):
+        root = fresh()
+        df = read(root, kind, R)
+        df = fn(df)
+        if kind == "thinned_positives":
+            write_set(root, A.P_KINDS, R, df)
+        elif kind == "negatives":
+            write_set(root, A.N_KINDS, R, df)
+        else:
+            df.to_csv(os.path.join(root, A.rpath(CFG, kind, R)), index=False)
+        return gates(root, only={"E14"})["E14"]
+
+    def _set_year(self, value, rows=1):
+        def fn(df):
+            df = df.copy()
+            if isinstance(value, float):
+                df["year"] = df["year"].astype(float)
+            df.loc[df.index[:rows], "year"] = value
+            return df
+        return fn
+
+    def test_e14a_positives(self):
+        for value, what in ((np.nan, "null 1"), (YEAR_MIN + 0.5, "non-integral 1"),
+                            (YEAR_MIN - 1, "year < YEAR_MIN 1")):
+            r = self._mutate("thinned_positives", "VT", self._set_year(value))
+            self.assertEqual(r["status"], "FAIL", value)
+            self.assertTrue(any(x.startswith("P (combined, pooled): 1 rows") and what in x
+                                for x in r["problems"]), r["problems"])
+        r = self._mutate("thinned_positives", "VT", self._set_year(YEAR_MIN))
+        self.assertEqual(r["status"], "PASS", r)                  # == YEAR_MIN passes
+
+    def test_e14a_negatives(self):
+        r = self._mutate("negatives", "NH", self._set_year(YEAR_MIN - 1))
+        self.assertTrue(any(x.startswith("N (combined, pooled): 1 rows") for x in r["problems"]),
+                        r["problems"])
+
+    def test_e14a_pool(self):
+        r = self._mutate("candidate_pool", None, self._set_year(np.nan))
+        self.assertEqual(r["status"], "PASS", r)                  # a null C year is allowed
+        r = self._mutate("candidate_pool", None, self._set_year(YEAR_MIN - 1))
+        self.assertEqual(r["status"], "FAIL")
+        self.assertTrue(any(x.startswith("C: 1 rows with a non-null year < YEAR_MIN")
+                            for x in r["problems"]), r["problems"])
+
+    def test_e14b_upper_end_divergence(self):
+        """(b): N without its latest year fails, although (a) holds."""
+        top = FIX_YEARS[-1]
+
+        def fn(df):
+            df = df.copy()
+            df.loc[df["year"] == top, "year"] = top - 1
+            return df
+        root = fresh()
+        for R in REGIONS3:
+            write_set(root, A.N_KINDS, R, fn(read(root, "negatives", R)))
+        r = gates(root, only={"E14"})["E14"]
+        self.assertEqual(r["status"], "FAIL")
+        self.assertEqual(len(r["problems"]), 1, r["problems"])
+        self.assertIn(f"only in P {{{top}}}", r["problems"][0])
+
+    def test_e14_in_standing_subset_without_C(self):
+        import inspect
+        self.assertIn('("E14", gate_E14, {"include_C": False})', inspect.getsource(A.standing_checks))
+        root = fresh()
+        os.remove(os.path.join(root, A.rpath(CFG, "candidate_pool")))
+        ctx = A.Context(root, CFG, coords="columns")
+        self.assertEqual(A.evaluate(A.gate_E14, ctx, include_C=False)[0], "PASS")
+        self.assertEqual(A.evaluate(A.gate_E14, ctx)[0], "FAIL")
+
+    def test_config_year_min_and_regions_py(self):
+        self.assertIsInstance(CFG["constants"]["YEAR_MIN"], int)
+        self.assertEqual(CFG["regions_py"]["names"]["YEAR_MIN"], "YEAR_MIN")
+        root = fresh()
+        rp = os.path.join(TMP, f"regions_ym_{_N[0]}.py")
+        with open(rp, "w") as f:
+            f.write(REGIONS_PY.replace(f"YEAR_MIN = {YEAR_MIN}", f"YEAR_MIN = {YEAR_MIN - 1}"))
+        with open(CFG_PATH) as f:
+            c = json.load(f)
+        c["regions_py"]["path"] = rp
+        p = os.path.join(TMP, "ym.json")
+        with open(p, "w") as f:
+            json.dump(c, f)
+        res = gates(root, only={"E11"}, cfg=A.load_config(p))
+        self.assertEqual(res["E11"]["status"], "FAIL")
+        self.assertTrue(any("regions.py: YEAR_MIN" in x for x in res["E11"]["problems"]))
+
+    def test_manifest_without_year_min_fails_E11(self):
+        root = fresh()
+        mp = os.path.join(root, A.rpath(CFG, "split_manifest"))
+        with open(mp) as f:
+            m = json.load(f)
+        for sec in ("positives", "negatives"):
+            m[sec]["constants"].pop("YEAR_MIN")
+        with open(mp, "w") as f:
+            json.dump(m, f)
+        res = gates(root, only={"E11"})
+        self.assertEqual(res["E11"]["status"], "FAIL")
+        self.assertTrue(any("constants differs" in x and "YEAR_MIN" in x for x in res["E11"]["problems"]))
 
 
 class TestStanding(unittest.TestCase):
@@ -1604,7 +2001,7 @@ GATE_SECTION_SHA256 = {
     "block_id": "1d9284b22bd75dc1206e5ef865fbd0ca260988c69c5340ee9630173ad78f2402",
     "columns": "a2ad2a0c13194c6a17f0a4e845b343f7c205f6f62fa49c50725f1a44e1d46e73",
     "comparison": "84998a87573c00d01683c92413b58c3d848ca6a684e4fe7fb2006c1882999296",
-    "constants": "b4b8c08fdb74f04dd72594ffe42ef3c5f038d9e1cb5f71c896cbfa301ed233e5",
+    "constants": "09dc9f9142497863e554a68aac4395868b235f83e7ce2625d9f9864abce73422",   # CR-0019: + YEAR_MIN
     "dedup": "1dd8c5068b95ed5e7bdebcdfae84bf6930d389a93225a372938573d185ccb8a0",
     "distance": "942007efe795b0e9d5725a24582819cdf481eb807e8c4a4c2a7367ee36f02375",
     "envelope": "184dffd4e3a4e7a489db2ecf8de86c0d2a45c56becf1ab7c064a6223d9df0502",
@@ -1616,7 +2013,7 @@ GATE_SECTION_SHA256 = {
     "paths": "14f974c9fe084aa1db73b74ab038888816f91b7bc17002c215e7f62366355ef5",   # CR-0017: + domain_edge
     "pins": "9957bf9f9161c6a2d61d9573b91d952e5e4e77db26e9f0158adad3725354f0d9",
     "raster": "f05264dd8932f962a54552e8db3a77264158357b5744c4c4029f1aa70173dca8",
-    "regions_py": "71890049878a8ce76dea88baf1a901f8ee7d3b7c02684f45e3c648ef4c9a1d00",
+    "regions_py": "6359cff9feaa57c7ebbc6479bb06b9609c5b727b749a5390ad12a26b4344acd4",   # CR-0019: + YEAR_MIN
     "rounding": "63aa62dd917e18ec81b13f0ecbf4539db5f3a884d7fe22ee0d366cc79d01e120",
     "row_order": "add25a56f55a254fca815b698cfa3598997e946ec6627b13a70538c0959b91f6",
     "schema_version": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
@@ -1816,7 +2213,7 @@ class TestUnits(unittest.TestCase):
         need = {"REGIONS", "MIN_SPACING_M", "BLOCK_SIZE_M", "BLOCK_ORIGIN_5070", "BUFFER_M",
                 "VAL_FRACTION", "SPLIT_SEED", "WINDOW_PX", "NEG_RATIO", "NONVEG_MAX_FRAC",
                 "W_FLOOR", "W_CAP", "NEUTRAL_WEIGHT", "NONVEG_WEIGHT", "MAX_COORD_UNCERTAINTY_M",
-                "KEY_DECIMALS"}
+                "KEY_DECIMALS", "YEAR_MIN"}
         prod = A.load_config(PROD_CONFIG)
         self.assertEqual(set(prod["constants"]), need)
         self.assertEqual(prod["obs"]["OBS_Z"], 4)

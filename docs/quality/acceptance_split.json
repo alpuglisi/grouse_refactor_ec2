@@ -31,7 +31,8 @@
     "NEUTRAL_WEIGHT": 1.0,
     "NONVEG_WEIGHT": 10.0,
     "MAX_COORD_UNCERTAINTY_M": 1000,
-    "KEY_DECIMALS": 5
+    "KEY_DECIMALS": 5,
+    "YEAR_MIN": 2020
   },
   "hash_spec": {
     "algorithm": "blake2b",
@@ -251,7 +252,8 @@
       "BLOCK_ORIGIN_5070": "BLOCK_ORIGIN_5070",
       "VAL_FRACTION": "VAL_FRACTION",
       "SPLIT_SEED": "SPLIT_SEED",
-      "WINDOW_PX": "WINDOW_PX"
+      "WINDOW_PX": "WINDOW_PX",
+      "YEAR_MIN": "YEAR_MIN"
     },
     "extra": {
       "COUNTY_POLYGONS_YEAR": "paths.county_polygons.year",

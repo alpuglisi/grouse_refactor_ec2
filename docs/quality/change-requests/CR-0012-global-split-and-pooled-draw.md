@@ -1,6 +1,6 @@
 # CR-0012: One global block grid, one pooled train/val split, one pooled negative draw
 
-**Status: TEXT APPROVED (v2.2.1, commit `cec1542`), 2026-09-30.** Implementation waits for CR-0013 approval and CR-0009's baselines (deliverable 0).
+**Status: IMPLEMENTED (v2.2.1), 2026-09-30.** Code merged `4eb10dd` (follow-ups `df83c27`); real run `1bc2df6` (18/18 CR-0013 GATEs); test plan 7/7 PASS; per-region `block_assignments_{ME,NH,VT}.csv` deleted by the user (backed up in `grouse_backup/CR-0012/`), standing checks pass.
 History, verdicts and dispositions: `CR-0012-review-log.md`. Split from
 CR-0007 v7 (`bb170ea`). This document states only current intent.
 
@@ -318,7 +318,7 @@ commit.
       Real run `1bc2df6` (18/18 GATEs); test plan 7/7 PASS (`docs/quality/evidence/CR-0012-d6/test_plan.txt`; item 7 after BUG-0056/0057 fix `40dbecf`).
       CR-0014 should have landed first; if it lands after, repeat this
       step.
-- [ ] 7. Delete `data/pipeline/block_assignments_{ME,NH,VT}.csv`.
+- [x] 7. Delete `data/pipeline/block_assignments_{ME,NH,VT}.csv`. Deleted 2026-09-30 (sha256 matched `grouse_backup/CR-0012/pipeline/` beforehand); `standing_checks(64,0,False)` passes after.
 - [x] 8. Bookkeeping (done 2026-09-30; details in `CR-0012-review-log.md`
       § Deliverable 8):
       - BUG-0049 for `generate_negatives.py:153`, with a PA-0011

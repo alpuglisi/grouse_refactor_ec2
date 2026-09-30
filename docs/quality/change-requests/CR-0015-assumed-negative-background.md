@@ -1,6 +1,6 @@
 # CR-0015: Draw assumed-negative background points only in-state, only in training blocks, and without treating 0 as nodata
 
-**Status: IMPLEMENTED (v2.2), 2026-09-30.** Merged `3f60e6f` (implementation head `3e42cf2`); both code reviewers APPROVE WITH FOLLOW-UPS at `3add80b`, follow-ups in the review log; 265 tests OK on the merge; bookkeeping rows applied by the lead.
+**Status: IMPLEMENTED (v2.2), 2026-09-30.** Merged `3f60e6f` (implementation head `3e42cf2`); both code reviewers APPROVE WITH FOLLOW-UPS at `3add80b`, follow-ups in the review log; 265 tests OK on the merge; bookkeeping rows applied by the lead. History, lineage, verdicts and dispositions: `CR-0015-review-log.md`. This document states only current intent.
 
 ## Scope
 Change `train.sample_background_points` so the assumed-negative points

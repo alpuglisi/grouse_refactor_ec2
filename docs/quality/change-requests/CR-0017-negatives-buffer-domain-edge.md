@@ -13,8 +13,8 @@ CR-0013's acceptance to match, then regenerate the pool and negatives.
 - **BUG-0050**: the 300 m buffer has no sightings across the Canadian
   border.
 - **A sibling instance, found while scoping this CR**: the same blindness
-  at the NY and MA state lines. It gets its own BUG at filing
-  (deliverable 8). BUG-0050's evidence script
+  at the NY and MA state lines. It gets its own BUG, placeholder
+  **BUG-NEW-a**; the lead allocates the id (deliverable 8). BUG-0050's evidence script
   (`docs/quality/evidence/CR-0012-d8/canada_buffer.py`) included NY and
   MA counties in its boundary, as if sightings existed there. None do:
   every sighting was acquired by `stateProvince` ∈ {Maine, New Hampshire,
@@ -22,7 +22,8 @@ CR-0013's acceptance to match, then regenerate the pool and negatives.
   evidence file, line 1).
 
 ## Why now
-Pool step 6 (`generate_negatives.py:392-400`) guarantees "no negative
+Pool step 6 (`generate_negatives.py:392-400` on this branch;
+`:380-389` in CR-0015's implementation, `3add80b`) guarantees "no negative
 within `BUFFER_M` of a known grouse". It checks that only against sightings
 inside ME ∪ NH ∪ VT. A candidate near the edge of that domain is tested
 against part of its 300 m neighbourhood. The rest lies in Canada, NY or
@@ -104,8 +105,11 @@ candidates. So the final pool is the old pool minus exactly the rows with
 `regions.py` still imports geopandas only inside functions.
 
 **Dependency on CR-0015 (APPROVED, being implemented).** This CR lands
-**after CR-0015's deliverable 5 is merged and its gate B1 has passed**,
-and is written against that code:
+**after CR-0015's implementation is merged and its gate B1 has passed**.
+It is written against that code: branch
+`worktree-agent-a74570e35615ea5e3`, head `3add80b`, under code review. At
+that head, CR-0015 changes nothing in `generate_negatives.py`, `regions.py`
+or `prepare_training_data.py` beyond deliverable 5 (`52cb67c`):
 - `to_5070` is `regions.to_5070`, reached through
   `prepare_training_data.to_5070`;
 - pool step 10 calls `regions.block_split`.
@@ -337,7 +341,7 @@ regeneration and bookkeeping. They cannot land separately:
 - [ ] 8. Bookkeeping:
       - **BUG-0050:** corrective action "CR-0017"; status FIXED;
         `BUG_LOG.md` row updated.
-      - **New BUG (next free id):** the buffer is blind at the NY and MA
+      - **BUG-NEW-a** (placeholder; id allocated by the lead): the buffer is blind at the NY and MA
         state lines (C 49, N 11). It carries the full §2 sections and a
         recurrence review against BUG-0050 and PA-0023, with a
         prior-preventive-action failure analysis. BUG-0050's evidence

@@ -1,0 +1,2 @@
+record path: absent
+pre-acceptance output-path check: PASS

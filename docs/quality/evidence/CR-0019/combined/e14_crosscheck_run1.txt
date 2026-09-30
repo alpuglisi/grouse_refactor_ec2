@@ -1,0 +1,5 @@
+E14(a) P: 4809 rows, bad 0, min 2020, max 2024
+E14(a) N: 4809 rows, bad 0, min 2020, max 2024
+E14(a) C: 22099 rows, 0 null, non-null below 2020: 0
+E14(b) P years [2020, 2021, 2022, 2023, 2024] vs N years [2020, 2021, 2022, 2023, 2024]: equal
+YEAR_MIN 2020 E14 CROSSCHECK PASS

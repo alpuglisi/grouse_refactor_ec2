@@ -1,0 +1,46 @@
+CR-0013 acceptance_split.py report
+data root : /tmp/claude-1000/cr0019-combined-scratch
+config    : /home/ec2-user/grouse2/.claude/worktrees/cr0019-combined/docs/quality/acceptance_split.json (sha256 07e417f2870210b9d03c0823793e0496a9fe4bcda99d62ca5e191298003c9c41)
+commit    : c599307e23c9bedbb83d23c4ce3801122f33d328 (dirty tracked .py: False)
+started   : 2026-09-30T17:34:58.791500+00:00
+
+GATES (exact)
+E0   PASS
+E1   PASS
+E1p  PASS
+E2   PASS
+E3   PASS
+E4   PASS
+E5   PASS
+E6   PASS
+E7   PASS
+E8   PASS
+E9   PASS
+E10  PASS
+E11  PASS
+E12  PASS
+E13  PASS
+E14  PASS
+R1   PASS
+R2   PASS
+R3   PASS
+R4   PASS
+
+OBSERVATIONS (reported, never blocking)
+OBS references: references stale (footing changed); flags |z| > 4: 0
+O1   OBS   median_m=2820
+O2   OBS   records_per_val_block=1.527; share_gap=0.003474
+O3   OBS   moran_k4.positive_blocks=-0.00374 (z=-0.28); moran_k8.positive_blocks=-0.00232 (z=-0.23)
+O4   OBS   moran_k4.pool_blocks=0.00502 (z=+0.68); moran_k4.selected-record_blocks=-0.0007828 (z=-0.03); moran_k8.pool_blocks=0.0007391 (z=+0.18); moran_k8.selected-record_blocks=0.0007478 (z=+0.16)
+O5   OBS   Exc.ME=1.437; Exc.NH=1.607; Exc.VT=0.8467; Excws_val.ME=4.45; Excws_val.NH=4.418; Excws_val.VT=3.236; S.ME=0.59; S.NH=0.6167; S.VT=0.4991; Sws_val.ME=0.675; Sws_val.NH=0.6218; Sws_val.VT=0.6456
+O6   OBS   basis_tv_sel_vs_wpool.ME=0.6493; basis_tv_sel_vs_wpool.NH=0.6432; basis_tv_sel_vs_wpool.VT=0.6539; basis_tv_train_val.ME=0.004315; basis_tv_train_val.NH=0.02986; basis_tv_train_val.VT=0.01649; evtphys_tv_nonveg.ME=0.02166; evtphys_tv_nonveg.NH=0.06388; evtphys_tv_nonveg.VT=0.0464; hab_weight_sel_over_pool.ME=1.125; hab_weight_sel_over_pool.NH=1.233; hab_weight_sel_over_pool.VT=1.17; nonveg_val_minus_train.ME=0.0003086; nonveg_val_minus_train.NH=0.0008336; nonveg_val_minus_train.VT=0.000537; species_tv.ME=0.04598; species_tv.NH=0.06905; species_tv.VT=0.1145
+O7   OBS   SUP_O.ME=2; SUP_O.NH=0; SUP_O.VT=0; SUP_R.ME=4.16; SUP_R.NH=2.407; SUP_R.VT=3.766; hab_pool_over_target_worst.ME=2.006; hab_pool_over_target_worst.NH=2.741; hab_pool_over_target_worst.VT=2.105; pool_over_target.ME=3.986; pool_over_target.NH=6.288; pool_over_target.VT=4.895
+O8   OBS   neg_ks.ME=0.03865; neg_ks.NH=0.09832; neg_ks.VT=0.1041; neg_ks.pooled=0.03155; neg_smd.ME=0.07465; neg_smd.NH=0.1655; neg_smd.VT=0.1869; neg_smd.pooled=0.08798; neghab_ks.ME=0.04616; neghab_ks.NH=0.1079; neghab_ks.VT=0.1277; neghab_ks.pooled=0.04253; pos_ks.ME=0.05376; pos_ks.NH=0.1346; pos_ks.VT=0.1043; pos_ks.pooled=0.04404; pos_smd.ME=0.04855; pos_smd.NH=0.2545; pos_smd.VT=0.1888; pos_smd.pooled=0.04115
+O9   OBS   year_hist.neg.ME={"2020":1217,"2021":715,"2022":601,"2023":206,"2024":115}; year_hist.neg.NH={"2020":282,"2021":233,"2022":157,"2023":83,"2024":72}; year_hist.neg.VT={"2020":362,"2021":345,"2022":252,"2023":91,"2024":78}; year_hist.pos.ME={"2020":601,"2021":729,"2022":794,"2023":345,"2024":385}; year_hist.pos.NH={"2020":132,"2021":147,"2022":167,"2023":151,"2024":230}; year_hist.pos.VT={"2020":195,"2021":181,"2022":213,"2023":212,"2024":327}
+O10  OBS   val_fraction.neg.ME=0.1973; val_fraction.neg.NH=0.2334; val_fraction.neg.VT=0.1826; val_fraction.pos.ME=0.1973; val_fraction.pos.NH=0.2334; val_fraction.pos.VT=0.1826
+
+SUMMARY: 20/20 GATEs pass; FAIL: none
+ACCEPTED. record written: /tmp/claude-1000/cr0019-combined-scratch/data/pipeline/acceptance_record.json
+record sha256: b9f8bcd9753d961495b39104cfca64f52e953b02fdc4caf7c0eeda76376d1052
+runtime: 41.3 s
+exit 0, 42 s

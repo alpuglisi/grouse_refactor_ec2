@@ -1,0 +1,116 @@
+CR-0019 deliverable 4, combined check: scratch-tree real-data run of the
+COMBINED code (pipeline side + acceptance side), 2026-09-30.
+
+Code: worktree /home/ec2-user/grouse2/.claude/worktrees/cr0019-combined,
+  branch cr0019-combined, HEAD c599307e23c9bedbb83d23c4ce3801122f33d328
+  (= main 140a73e + c990a82 pipeline side 0a5e14e + c599307 acceptance
+  side 65768a4). UNMERGED into main.
+  Clean tree: `git status --porcelain` empty before and after the runs;
+  both manifest sections and both acceptance records say commit c599307,
+  dirty false. No code edited.
+Config: docs/quality/acceptance_split.json sha256
+  07e417f2870210b9d03c0823793e0496a9fe4bcda99d62ca5e191298003c9c41.
+
+Scratch tree: /tmp/claude-1000/cr0019-combined-scratch, built by
+  mkscratch.sh (the pipeline half's script with the path changed; log
+  mkscratch.log; rebuilt fresh for run 2, mkscratch_run2.log):
+  - data/pipeline and data/negatives copied (cp -a), 41 regular files, no
+    symlink inside them;
+  - every other data/ directory recreated with symlinked FILES (cp -rs):
+    3,543 symlinks, no symlinked directory;
+  - output-path check before the generators: the 20 generator outputs,
+    split_manifest.json and acceptance_record.json are regular files;
+    scratch, scratch/data, data/pipeline, data/negatives not symlinks.
+  - precheck_acc.sh before each acceptance run (precheck_acc_run{1,2}.log):
+    PASS. The record path is absent (prepare_training_data removes it,
+    CR-0012 step 6), not a symlink; manifest not a symlink; 0 symlinks in
+    the copied dirs; written dirs not symlinks.
+
+Live tree (/home/ec2-user/grouse2/data, read-only): sha256 of all 41 files
+  in data/pipeline + data/negatives before (live_before.sha256; same hashes
+  as ../scratch/live_before.sha256), mid-way (after run 1) and after
+  everything (live_after.sha256): byte-identical, "LIVE UNCHANGED".
+  data/pipeline/acceptance_record.json before and after:
+  9d5ad0a9f92c4278e752cb1207f76decd63972d7159933f0ce8d8b41d18c5aba
+  (the CR-0017 live record). `git status --porcelain data` in the live
+  repo: empty.
+
+Commands (scripts in this directory; generators and acceptance via
+run.sh, cwd = scratch, nice -n 10):
+  1. bash mkscratch.sh                          -> mkscratch.log
+  2. run.sh prepare: python <worktree>/prepare_training_data.py
+     -> prepare_training_data_run1.log, exit 0, 120 s.
+     Positives ME 2,854, NH 827, VT 1,128 = 4,809 (pre-registered).
+  3. run.sh gn: python <worktree>/generate_negatives.py
+     -> generate_negatives_run1.log, exit 0, 137 s.
+     Pool 22,099; draw ME 2,291/563, NH 634/193, VT 922/206 (= P).
+     scratch_after_gen1.sha256 (40 files; no record). Equal to the
+     pipeline half's ../scratch/scratch_run1.sha256 except
+     split_manifest.json, whose only differences are the two "commit"
+     fields (628083d there, c599307 here).
+  4. cwd = worktree:
+       nice -n 10 python docs/quality/evidence/CR-0019/check_must_change.py \
+         --old /home/ec2-user/grouse2 --new /tmp/claude-1000/cr0019-combined-scratch
+     -> mc_live_vs_scratch.txt: "MC: PASS (42/42 checks pass)", exit 0.
+     Identical to ../scratch/mc_live_vs_scratch.txt (bar that file's
+     appended "exit 0" line).
+  5. bash precheck_acc.sh -> PASS; then run.sh acc:
+       python <worktree>/acceptance_split.py \
+         --data-root /tmp/claude-1000/cr0019-combined-scratch
+     (full run, OBS computed, no --calibrate) -> acceptance_run1.log:
+     "SUMMARY: 20/20 GATEs pass; FAIL: none" (E0..E14 incl. E1p, R1..R4),
+     exit 0, 42 s. ACCEPTED; record written inside scratch only
+     (/tmp/claude-1000/cr0019-combined-scratch/data/pipeline/
+     acceptance_record.json), sha256
+     8df0fa9e68b34d989e45f259b08afc1a62730f3dd96e7cf0ae6c34ae97e33d41
+     (copy acceptance_record_run1.json). The acceptance run changed no
+     other scratch file (scratch_run1.sha256 minus the record ==
+     scratch_after_gen1.sha256).
+     OBS (never blocking): references stale (footing changed; deliverable
+     6 step 6 recalibrates); |z| > 4 flags: 0. O9: P and N year
+     histograms both span 2020..2024 in every region.
+  6. E14 is one gate for (a) and (b) in acceptance_split.gate_E14; its
+     PASS means neither part reported a problem. Independent pandas
+     restatement, e14_crosscheck.py (cwd = scratch) -> e14_crosscheck_run1.txt:
+     (a) P 4,809 rows, 0 bad, years 2020..2024; N 4,809 rows, 0 bad,
+     2020..2024; C 22,099 rows, 0 null, 0 below YEAR_MIN 2020.
+     (b) P years {2020..2024} == N years {2020..2024}. PASS.
+  7. Year-gap check: ../scratch/yeargap_check.py (cwd = scratch;
+     train.filter_by_year_gap as build_datasets calls it, features =
+     train.discover_features) -> yeargap_check_run1.txt, exit 0.
+     Tolerance 2: all 12 (region, class, split) frames returned unchanged
+     (0 rows dropped). Tolerance 1: all 12 refuse. Output identical to
+     ../scratch/yeargap_check.txt (bar its "exit 0" line).
+     standing_check.py (cwd = scratch): acceptance_split.standing_checks
+     (what build_datasets runs first) with train.py defaults (img_size 64,
+     jitter 0, no augment) -> standing_check_run1.txt: PASS, so
+     build_datasets would now proceed on this tree. build_datasets itself
+     was not called (it builds image chips; kept CPU modest).
+  8. Run 2 (determinism): fresh scratch tree (mkscratch.sh again), steps
+     2-7 repeated -> *_run2.* files.
+     - generator outputs + manifest: scratch_after_gen1.sha256 ==
+       scratch_after_gen2.sha256 (40 files, cmp): BYTE-IDENTICAL.
+     - prepare/generate logs identical except the timing line.
+     - MC: 42/42 PASS, output identical (cmp).
+     - acceptance: 20/20 again, exit 0; log differs only in "started",
+       "record sha256" and "runtime" lines. Record sha256
+       b9f8bcd9753d961495b39104cfca64f52e953b02fdc4caf7c0eeda76376d1052.
+     - acceptance_record.json differs run 1 vs run 2 ONLY in created_utc
+       (record_compare.txt; copies acceptance_record_run{1,2}.json).
+     - scratch_run1.sha256 vs scratch_run2.sha256
+       (scratch_run1_vs_run2.diff): only data/pipeline/acceptance_record.json.
+     - e14_crosscheck, yeargap_check, standing_check outputs identical to
+       run 1.
+
+Files changed live -> scratch (live_vs_scratch_changed.txt, 22): all P
+  files (thinned/train/val x 3), block_assignments.csv, candidate_pool.csv,
+  all N files (negatives/train/val x 3), split_manifest.json,
+  acceptance_record.json; 19 unchanged (availability_sample, bin_tuning,
+  envelope_metrics, evaluated_sightings, nonveg_flagged, gbif_*).
+
+RESULT: combined code on real data: MC PASS 42/42; acceptance 20/20 GATEs
+  PASS incl. E14 ((a) and (b) confirmed independently); record written in
+  scratch only; year-gap filter at tolerance 2 drops 0 rows, tolerance 1
+  refuses; standing_checks passes; second run on a fresh tree
+  byte-identical (outputs and manifest; record equal except created_utc);
+  live data unchanged.

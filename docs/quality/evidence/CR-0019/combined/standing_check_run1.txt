@@ -1,0 +1,1 @@
+standing_checks PASS on /tmp/claude-1000/cr0019-combined-scratch (img_size 64)

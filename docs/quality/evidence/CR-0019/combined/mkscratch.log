@@ -1,0 +1,2 @@
+output-path check: no output path is a symlink (20 outputs + manifest + record checked)
+symlinked files: 3543; regular files: 41

@@ -101,3 +101,41 @@ have a later one, and AUC 0.6615 / 0.5584 / 0.6125 (A2), all re-measured;
   (B4), the two representative-year rules (A2), duplicated `START_YEAR`.
 - **Tracker:** CR-0020 (retrain/baseline); §6 warning; BUG-NEW-a; B12;
   A6 (BUG-0060).
+
+## Implementation code review (2026-09-30)
+Two independent agents that wrote neither half reviewed the combined
+branch `cr0019-combined`. Reports: `docs/quality/evidence/CR-0019/code-review/`
+(`code_review_A.md`, `code_review_B.md`).
+
+| reviewer | heads | verdict | blocking |
+|---|---|---|---|
+| A | `c599307` | APPROVE WITH FOLLOW-UPS | 0 (0 MAJOR, 0 MEDIUM, 3 LOW, 2 INFO); 10/10 own mutants killed |
+| B | `c599307` (code), `3cd1ea9` (evidence) | APPROVE WITH FOLLOW-UPS | 0 (0 MAJOR, 1 MEDIUM, 5 LOW); 23/24 mutants killed (A10 survived → F1) |
+
+| id | sev | finding (short) | disposition |
+|---|---|---|---|
+| A-1 (= B12) | LOW | `filter_by_year_gap` raises bare `SystemExit` from a library function | Accepted for approval as is (fail-closed; CLI correct). Tracked: named `SystemExit` subclass, with CR-0020's train-side work (tracker § CR-0019) |
+| A-2 (= B F4) | LOW | Replay raises raw `KeyError` on a candidate file with no `year` column; CR §3 says `ReplayError` | Tracked (tracker § CR-0019 code review). Fail-closed today (R-gate FAIL) |
+| A-3 | LOW | Deliverable-4 evidence calls `filter_by_year_gap` directly, not `build_datasets` | Resolved: combined scratch run (`3cd1ea9`) `standing_check.py` + `yeargap_check_run*.txt`; `combined/RUN.txt` step 7 records why `build_datasets` itself was not called |
+| A-4 | INFO | "returns the frame unchanged" is content-equal, new object | No action (CR mandates the same return expression) |
+| A-5 | INFO | `calibrate.py:356` always checks at tolerance 2 | No action (pre-existing; no-op on post-CR data); noted for CR-0020 |
+| B F1 | MEDIUM | E14(b) tests only a year in P not N; mutant `P ⊆ N` survives | Accepted, fixed before the live run: mirror test `b8e96cf` (mutant now killed) |
+| B F2 | LOW | Stale "EXCLUDE" wording: `download_tcc_nlcd.py:291-295`, `grouse_model_results_summary.md:61` | Doc fixed in deliverable 7 (`grouse_model_results_summary.md`); the `download_tcc_nlcd.py` text is a runtime warning string, not a comment → tracked |
+| B F3 | LOW | PA-0030: `gate_E14` `years` keys conditional, absent path untested | Tracked (comment + unit test) |
+| B F5 | LOW | Pre-existing PA-0031 sweep false positives in `gate_E13` (CR-0017) | Tracked with the PA-0031 lint item |
+| B F6 | LOW | `combined/standing_check.py`/`RUN.txt` say "no augment"; default is augment on (equivalent at jitter 0) | Tracked (evidence wording) |
+
+**Sign-off.** Author + reviewers approved; user pre-authorised
+(2026-09-30). The user explicitly authorised the live run (deliverable 6).
+Quorum: author (lead), A (APPROVE WITH FOLLOW-UPS), B (APPROVE WITH
+FOLLOW-UPS). No BLOCKING or MAJOR finding; the only MEDIUM (B F1) fixed.
+
+## Close-out (2026-09-30)
+- Deliverables 1–9 ticked in the CR; status IMPLEMENTED.
+- Deliverable 8 filed BUG-0073 (the §5 residual, "BUG-NEW-a"), and the
+  PA-0020 sweep found BUG-0074 (`sample_background_points` single
+  vintage, latent) and BUG-0075 (duplicated `START_YEAR`, PA-0025).
+  Method and result: `PREVENTIVE_ACTIONS.md` PA-0020 Swept?.
+- Standing check on `main` after the merge:
+  `docs/quality/evidence/CR-0019/live/standing_main.txt` (pass, record
+  `ed27583b…`).

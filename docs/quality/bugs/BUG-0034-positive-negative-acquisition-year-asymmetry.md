@@ -5,7 +5,9 @@
 > evidence. The investigation text (§§1–5, 7) is unchanged. §6's status
 > and §8's filing note were updated at promotion. References to "CR-0007
 > §6" and "gate (d)" are to CR-0007 v5/v6, which were superseded.
-> **Status: OPEN; fix owned by a future CR.**
+> **Status: FIXED (root cause: disjoint per-class temporal support) by
+> CR-0019, 2026-09-30** (§6). Consequence (b)'s within-epoch remainder
+> moved to **BUG-0073** (OPEN) per PA-0024(b).
 
 ## 1. Description
 The two label classes of one dataset are fetched from the **same GBIF
@@ -247,6 +249,38 @@ retired from LFPS in Dec 2025).
 
 Status: **OPEN**, confirmed on real data, unfixed; fix owned by a future CR.
 
+**Corrective action (CR-0019, IMPLEMENTED 2026-09-30).** "Floor at
+selection, refusal, E14":
+- One constant `regions.YEAR_MIN = 2020` selects both classes: positives
+  at step 2, **before thinning** (the recommendation above; the CR-0012 A9
+  thin-order interaction), candidates at pool step 1. Acquisition is
+  unchanged, so the 300 m buffer still uses every sighting year. Code
+  `628083d` (pipeline), `65b2469` (acceptance), merged to `main`
+  (`c990a82`, `c599307`; test `b8e96cf`).
+- `train.filter_by_year_gap` **refuses** (`SystemExit`) instead of
+  dropping, so what trains equals what CR-0013 accepted.
+- CR-0013 gained exact gate **E14** ((a) every P/N year `≥ YEAR_MIN`;
+  (b) pooled P and N year sets equal), also in the standing subset: the
+  build-time support comparison §8 asked for, as an exact predicate
+  rather than a drop-rate tolerance.
+- Live run (evidence `00b0b84`, `docs/quality/evidence/CR-0019/live/`):
+  P 6,232 → 4,809, N 6,232 → 4,809, both 2020–2024; prevalence 0.5000 in
+  both splits; `filter_by_year_gap` at tolerance 2 drops 0 rows; MC 42/42,
+  20/20 GATEs, record `ed27583b…`.
+
+Verified against the root cause, not the symptom: the classes now share
+one floor by construction and E14(b) fails any support divergence at
+either end. Consequences (a) and (e) are fixed. (c) and (d) came from the
+train-time drop acting after the files were built; there is no such drop
+now, so unfiltered consumers read the same floored rows that train, and
+the block split and draw are computed on them (CR-0019 §4: 656
+positive-only-pre-2020 blocks removed before the split). The year-matching half of
+the recommendation was **not** done (the pool cannot supply it; CR-0019
+§5): consequence (b)'s remainder (year→label AUC 0.6615 within
+2020–2024) is **BUG-0073**.
+
+Status: **FIXED** (root cause), 2026-09-30, by CR-0019. Residual: BUG-0073 (OPEN).
+
 ## 7. Recurrence review (`CLAUDE.md` §4)
 Searched `BUG_LOG.md` (all 27 rows), `PREVENTIVE_ACTIONS.md`
 (PA-0001…0018), both root-level drafts, and CR-0006 through CR-0009.
@@ -325,7 +359,7 @@ executed. Pair it with a per-class year-histogram comparison at
 dataset-build time, alongside BUG-0029's proposed spatial-support check
 — both are "compare the classes' support" assertions on the same frame.
 
-**Sweep (§3.5), scoped by the mechanism — NOT yet run.** Every
+**Sweep (§3.5), scoped by the mechanism — run by CR-0019 deliverable 8 (2026-09-30; result in PA-0020's Swept? cell: BUG-0073, BUG-0074, BUG-0075).** Original text: Every
 acquisition or selection parameter that is applied to one class and not
 the other, on any axis. Known candidates: the year floors above;
 `MAX_COORD_UNCERTAINTY_M` (`generate_negatives.py:159`, applied to

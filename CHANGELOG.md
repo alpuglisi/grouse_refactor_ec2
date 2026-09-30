@@ -16,6 +16,55 @@ the diff.
 
 ---
 
+## One year floor for both classes; the year-gap filter refuses instead of dropping (CR-0019, 2026-09-30)
+
+**Defect (BUG-0034).** Positives were acquired from 2016
+(`START_YEAR`), negatives from 2020 (`get_negatives.py --years`), from
+the same GBIF dataset. The 1:1 draw matched the counts, then
+`train.filter_by_year_gap` silently dropped every pre-2020 positive
+(1,437 of 6,232) and no negative at training time: validation
+prevalence 0.4372 against a documented 0.5, and a disjoint year support
+that no count check could see.
+
+**Change.** One constant, `regions.YEAR_MIN = 2020`, selects both
+classes: positives at step 2 (before thinning; `evaluated_sightings_*`,
+the 300 m buffer and the envelope metrics keep every year from 2016),
+candidates at pool step 1. `filter_by_year_gap` keeps its verdict but
+now refuses (`SystemExit` naming region, class/split, count, years,
+tolerance and the remedy) instead of dropping. CR-0013's acceptance
+gained exact gate E14 (every P/N year `≥ YEAR_MIN`; pooled P and N year
+sets equal), in the standing subset too. Code `628083d`, `65b2469`
+(combined `c990a82`, `c599307`, test `b8e96cf`).
+
+**Data (live run, evidence `00b0b84`, `docs/quality/evidence/CR-0019/live/`).**
+Positives 6,232 → 4,809 (4,795 kept, 1,437 pre-2020 removed, 14 added by
+re-thinning); negatives 6,232 → 4,809, matched 1:1 per region and split;
+both classes span exactly 2020–2024. Must-change gate 42/42 against the
+backup `/home/ec2-user/grouse_backup/CR-0019`; acceptance 20/20 GATEs;
+OBS references recalibrated; record `ed27583b…`. Prevalence is now
+**0.5000** in both splits, and `filter_by_year_gap` at the default
+tolerance drops 0 rows of either class.
+
+**Consequences.**
+- **CR-0009's baseline is no longer comparable** (AUC 0.7783, AP 0.6851
+  at prevalence 0.4372): prevalence moves to 0.5 (AP moves with it by
+  construction) and the validation set changed. The retrain, calibration
+  refit and new baseline are CR-0020.
+- **Warning: until CR-0020 lands, do not use `grouse_cr0009.pth` or any
+  other pre-CR-0019 checkpoint against this split** in any BUG-0060
+  entry point — `calibrate.py --model`, `train.py --distill-from`,
+  `--init-from`, `--resume` — nor evaluate one on the new validation set
+  (`diagnose_*`, `bench_pipeline.py`). 48 of the new 962 validation
+  negatives were that model's training negatives, and nothing refuses a
+  checkpoint fitted under another split (BUG-0060, open). The existing
+  `calibration.json` and maps are unchanged; `predict.py` reads no split
+  file.
+- **Residual (BUG-0073, open).** Within 2020–2024 the year
+  *distributions* still differ (negatives front-loaded on 2020, 1,861 of
+  4,809; positives peak in 2022): year alone predicts the label at AUC
+  0.6615. The two classes' representative-year rules (latest visit vs
+  smallest `gbif_id`) are the leading candidate cause; its own CR.
+
 ## Negatives: no candidate within 300 m of the sightings' domain edge (CR-0017, 2026-09-30)
 
 **Defects (BUG-0050, BUG-0064).** Pool step 6 promised "no negative

@@ -81,6 +81,10 @@ Conventions:
 1. Load `evaluated_sightings_R` for every R in `REGIONS`. Raise unless
    `state == region == R` on every row.
 2. Keep the habitat rows (`~nonveg_landcover`).
+   **Amended by CR-0019:** step 2 also keeps only `year >= YEAR_MIN`
+   (`regions.YEAR_MIN = 2020`, before thinning) and raises on a null
+   `year` in any evaluated row; count `"2"` is after both conditions
+   (CR-0019 §2).
 3. Drop rows that fail `window_in_bounds` in any `FEATURE_SPEC` raster at
    `rd.raster_path(feat, year)`, with `year` filled as at
    `dataset.py:98-102`, the column max taken over the region's
@@ -102,6 +106,9 @@ Conventions:
 
 **Candidate pool (`generate_negatives.py`):**
 1. Load `gbif_negatives_R` for every R. Raise unless `state == R`.
+   **Amended by CR-0019:** step 1 also drops every candidate with a
+   non-null `year < YEAR_MIN` (null years are still dropped at step 7);
+   count `"1"` is after this drop (CR-0019 §2).
 2. Apply the `MAX_COORD_UNCERTAINTY_M` filter.
 3. Deduplicate on the key, keeping the row with the **smallest `gbif_id`**.
    `gbif_id` is non-null and unique over all 265,212 rows. File order is

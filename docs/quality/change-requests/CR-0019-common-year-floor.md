@@ -1,8 +1,10 @@
 # CR-0019: One year floor for both classes, applied at selection; the train-time year-gap filter refuses instead of dropping
 
-**Status: APPROVED (v3), 2026-09-30.** Author + reviewers approved; user
-pre-authorised (2026-09-30). Verdicts and dispositions:
-`CR-0019-review-log.md`. This document states only current intent.
+**Status: IMPLEMENTED, 2026-09-30** (v3 text). Author + reviewers
+approved; user pre-authorised (2026-09-30); code review A and B APPROVE
+WITH FOLLOW-UPS; live run `00b0b84` (MC 42/42, 20/20 GATEs, record
+`ed27583b…`). Verdicts and dispositions: `CR-0019-review-log.md`. This
+document states only current intent.
 
 ## Scope
 Select both classes only from `YEAR_MIN = 2020`, the first year both
@@ -291,7 +293,7 @@ a user decision) or coarser matching.
 
 It is a separate defect (distribution within a common support, not
 support) and a PA-0020 time-axis selection asymmetry in its own right.
-It is proposed as its own BUG (BUG-NEW-a; the lead allocates the id),
+It is filed as its own BUG, **BUG-0073** (proposed as BUG-NEW-a),
 with both representative-year rules and the acquisition order as
 candidate causes to be tested (PA-0016), owned by a future CR (review
 log § Proposed bookkeeping). CR-0019 does not change either rule.
@@ -442,29 +444,43 @@ Every training file is regenerated and the validation set changes.
   they are excluded, not measured.
 
 ## Deliverables (in execution order)
-- [ ] 1. Pre-approval (CR-0011 A3), reviewed with this CR:
+- [x] 1. Pre-approval (CR-0011 A3), reviewed with this CR:
       `docs/quality/evidence/CR-0019/preregister.py`, `preregister.txt`,
       the four `preregister_*.csv`, `check_must_change.py`,
       `mc_selftest.py`, `mc_selftest.txt`; plus a reviewer's PA-0021(a)
       wrong-tree runs of MC, recorded in the evidence directory.
-- [ ] 2. Acceptance changes (§3) on an unmerged CR-0019 branch, by a fresh
+      — Done: `95d7463`, `a89151f` (B6/B7 pins); wrong trees
+      `reviewB/mc_wrongtrees.txt`, `mc_wrongtrees_round2.txt`.
+- [x] 2. Acceptance changes (§3) on an unmerged CR-0019 branch, by a fresh
       agent that does not also write deliverable 3 (CR-0013 rule 4):
       `acceptance_split.py`, the config, the tests and the fixture edits
       (§3); `tests/test_acceptance_split.py` passes (`test_cr0012`'s
       constants test passes only after deliverable 3); the
       read-only run on today's files gives exactly the expected FAILs
       (evidence `acceptance_prefix.txt`).
-- [ ] 3. Pipeline and `train.py` changes (§2) and `tests/test_cr0019.py`
+      — Done: `65b2469`, evidence `65768a4` (`acceptance_prefix.txt`,
+      `acceptance_tests.txt`); merged via `c599307`.
+- [x] 3. Pipeline and `train.py` changes (§2) and `tests/test_cr0019.py`
       on the same branch; the suites in § Test plan pass.
-- [ ] 4. Scratch-tree real-data run (§ Test plan); evidence under
+      — Done: `628083d`; merged via `c990a82`. Code review A/B (review
+      log § Implementation code review) re-ran the suites; E14(b) mirror
+      test `b8e96cf` (B F1).
+- [x] 4. Scratch-tree real-data run (§ Test plan); evidence under
       `docs/quality/evidence/CR-0019/scratch/`.
-- [ ] 5. Preconditions, recorded before any write under `data/`: no other
+      — Done: pipeline part `0a5e14e` (`scratch/`); combined code
+      `3cd1ea9` (`combined/`): MC 42/42 vs live, 20/20 GATEs (E14 a/b),
+      second run byte-identical, tolerance 2 drops 0 and tolerance 1
+      refuses, live tree unchanged.
+- [x] 5. Preconditions, recorded before any write under `data/`: no other
       CR is mid-way through a data write; the live artifacts equal the
       CR-0017 record (MC0). Back up the 20 digested artifacts, the
       manifest, the record and the OBS file to
       `/home/ec2-user/grouse_backup/CR-0019/` (mirroring `data/…`),
       sha256 verified; MC0 passes with `--old` = the backup.
-- [ ] 6. Live run, in order: (1) with a clean working tree and the user
+      — Done: `live/preconditions.txt`, `live/mc0_backup.txt`,
+      `live/live_before.sha256`; backup `/home/ec2-user/grouse_backup/CR-0019`
+      (evidence `00b0b84`).
+- [x] 6. Live run, in order: (1) with a clean working tree and the user
       told not to commit meanwhile, `git checkout` the CR-0019 branch in
       the live tree; (2) `prepare_training_data.py`;
       (3) `generate_negatives.py`; (4) MC, old = backup, new = live: PASS;
@@ -475,12 +491,23 @@ Every training file is regenerated and the validation set changes.
       restore every backed-up file (sha256 verified), `git checkout main`,
       record the failure, commit no data evidence, stop. On success commit
       the evidence, the record copy and the OBS file.
-- [ ] 7. Pointer lines in CR-0012 §2 and CR-0013 (§ Impact);
+      — Done (user authorised the live run): branch `b8e96cf`; MC 42/42 vs
+      backup (`live/mc_live.txt`); 20/20 GATEs incl. E14
+      (`live/acceptance.log`); `--calibrate` 20/20, OBS rewritten
+      (`live/calibrate.log`, `acceptance_split_obs.json`); record
+      `ed27583b…` (`live/acceptance_record.json`); merged to `main`,
+      evidence `00b0b84`; `--standing` on `main`: pass
+      (`live/standing_main.txt`).
+- [x] 7. Pointer lines in CR-0012 §2 and CR-0013 (§ Impact);
       `ARCHITECTURE.md`; `CHANGELOG.md` entry: the data change, the new
       prevalence, CR-0009's baseline no longer comparable, and the §6
       warning (no pre-CR-0019 checkpoint in any BUG-0060 entry point
       against this split).
-- [ ] 8. Bookkeeping (review log § Proposed bookkeeping): BUG-0034
+      — Done: CR-0012 §2 positives step 2 and pool step 1; CR-0013 E-table,
+      standing subset, § Attacks; `ARCHITECTURE.md` pipeline stages 4–5 and
+      the `filter_by_year_gap` sentence; `CHANGELOG.md` entry; code review
+      B F2's doc half (`grouse_model_results_summary.md`).
+- [x] 8. Bookkeeping (review log § Proposed bookkeeping): BUG-0034
       corrective action and status; `BUG_LOG.md` row; the residual BUG
       (§5) filed; PA-0020 Swept? cell (BUG-0034 live instance fixed, the
       source-axis item it owns resolved, sweep by mechanism for any other
@@ -489,7 +516,13 @@ Every training file is regenerated and the validation set changes.
       representative-year rules (§5) and the duplicated `START_YEAR`
       literal); tracker: CR-0020, the §6 warning, the
       residual, MEDIUM/LOW review items.
-- [ ] 9. Close-out: every item above ticked; status IMPLEMENTED.
+      — Done: BUG-0034 FIXED (root cause) by CR-0019; residual filed as
+      **BUG-0073**; the sweep (method and result in PA-0020 Swept?) found
+      **BUG-0074** (`sample_background_points` single vintage, latent) and
+      **BUG-0075** (duplicated `START_YEAR`, PA-0025); `BUG_LOG.md` rows;
+      PA-0020 and PA-0025 Swept? cells; tracker § CR-0019 and § CR-0019
+      implementation code review.
+- [x] 9. Close-out: every item above ticked; status IMPLEMENTED.
 
 ## Out of scope
 - **The retrain, calibration and new baseline** (§6): CR-0020.

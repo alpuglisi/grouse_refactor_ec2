@@ -1,0 +1,6 @@
+CR-0019 deliverable 6 step (7): acceptance_split.py --standing on main after the merge
+date: 2026-09-30T17:56:43Z  main HEAD: 00b0b8497b6389aad7ad947305c04f3d04ae0a0f
+record sha256: ed27583beb8b9f95b23ce3c51d18817ee1d9a1a42043b0c773138b028da9c42a
+
+standing checks: pass
+exit 0

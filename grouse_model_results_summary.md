@@ -58,9 +58,12 @@ random background) is assumed a true negative; no focal phase
   assumed-negatives to training only (unbuffered from known
   positives — label noise is intentional, absorbed by lambda
   upweighting per Cole et al.'s design).
-- `--max-train-year-gap`: excludes training records whose sighting
-  year has no raster within N years for any feature (default 2;
-  validation never filtered).
+- `--max-train-year-gap` (alias of `--max-year-gap`): at the time of
+  these runs, excluded training records whose sighting year had no
+  raster within N years for any feature (default 2). Since CR-0019 it
+  excludes nothing: `regions.YEAR_MIN` selects the years of both classes
+  at data preparation, and `train.py` refuses (exits) if any train or
+  validation record would fall outside the tolerance.
 
 ## Architecture options relevant to recent runs
 

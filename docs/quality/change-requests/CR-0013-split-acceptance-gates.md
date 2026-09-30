@@ -206,6 +206,12 @@ never read from a column.
 **Amended by CR-0017** (§3): new exact gate E13 (acquisition-domain edge),
 rule (b) in R3's pool step 6, and config entry `paths.domain_edge`.
 
+**Amended by CR-0019** (§3): new exact gate E14 (one year floor: (a) every
+P/N year and every non-null C year `≥ YEAR_MIN`; (b) pooled P and N year
+sets equal); R1/R3 replay the positives step 2 and pool step 1 floor;
+config `constants.YEAR_MIN` and `regions_py.names.YEAR_MIN` (E11(c), (e)).
+20 GATEs.
+
 **Replay gates.** From S, I and the config, the script produces P, B, C and
 N, the same files CR-0012 writes. Equality is **full-row**: every
 column, row sets matched on key, floats to relative 1e-12, everything
@@ -258,6 +264,9 @@ data_root=None, config=None)` is called by CR-0012 §5.
 | E0 (P, N), E1, E1p, E3 (N), E4–E6 | GATE | GATE |
 | E0 (B, C, M), E2, E3 (C), E7–E12, R1–R4 | GATE | covered by the record digests |
 | O1–O10 | OBS | — |
+
+**Amended by CR-0019** (§3): E14 (P and N only) joins the standing subset;
+C's E14 check is covered by the record digests.
 
 ## CLI and report
 `acceptance_split.py` takes these options:
@@ -319,6 +328,8 @@ committed by deliverable 1.
 | **Standing checks:** val file edited after acceptance; pre-CR file swapped in; raster touched; `--jitter 8` with augmentation | CR-0013 round-1 B | `standing_checks` raises |
 
 **Amended by CR-0017** (§3): five domain-edge attack rows.
+
+**Amended by CR-0019** (§3): seven year-floor attack rows (CR-0019 § 3 attack table).
 
 ## Observations (OBS: reported, never blocking)
 Terms used below:

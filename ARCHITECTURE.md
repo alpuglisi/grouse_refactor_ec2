@@ -60,11 +60,18 @@ non-vegetated records, fits habitat envelopes, runs the KDE stage.
 `block_assignments.csv`, and the `positives` section of
 `split_manifest.json`. Pooled minimum-spacing thinning plus one pooled
 spatial-block train/val split on a single global grid (CR-0012). No flags.
+Only habitat rows with `year >= regions.YEAR_MIN` (2020) are selected, before
+thinning (CR-0019). The floor is a *selection*: `evaluated_sightings_*`
+keep every year from `START_YEAR` (2016), and the negatives' 300 m buffer
+and the envelope metrics still use them.
 
 **5. Prepare negatives** — `generate_negatives.py` → `candidate_pool.csv`,
 `negatives_{region}.csv` + train/val splits, and the manifest's
 `negatives` section. Needs stages 3 and 4 (envelope metrics, block
-assignments, positives manifest). `acceptance_split.py` (CR-0013) must
+assignments, positives manifest). Candidates with a non-null
+`year < regions.YEAR_MIN` are dropped at pool step 1, so both classes carry
+one year floor (CR-0019; acceptance gate E14 checks it and that the pooled
+positive and negative year sets are equal). `acceptance_split.py` (CR-0013) must
 then pass before `train.py`/`calibrate.py`/`bench_pipeline.py` will run
 (`build_datasets` calls `acceptance_split.standing_checks`).
 
@@ -250,9 +257,12 @@ problem, and it is one fewer CONUS download.
 **TreeMap vintages are mapped to ours by nearest year, so these features
 never shrink retention.** TreeMap has 2016/2020/2022/2023; the stack has
 its own vintages. Writing every one of our years from the nearest TreeMap
-year keeps a file present for each, so the `all()` year-gap filter
+year keeps a file present for each, so the `all()` year-gap check
 (`train.py`'s `filter_by_year_gap`, applied to training and validation alike) sees no change and LANDFIRE remains the binding
-constraint. The cost is that the filter also cannot warn when a mapping is
+constraint. Since CR-0019 that check drops nothing: `regions.YEAR_MIN`
+selects the years at data preparation, and `filter_by_year_gap` refuses
+(exits naming region, class/split, count, years, tolerance) if any
+split-file record would fall outside `--max-year-gap`. The cost is that the filter also cannot warn when a mapping is
 stale — `generate_treemap_features.py` prints the mapping and flags any
 gap over 2 years itself.
 

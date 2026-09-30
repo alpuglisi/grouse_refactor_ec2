@@ -356,7 +356,7 @@ epochs.
 - [x] 3. Round-5 review; approval by the author and both reviewers.
 - [ ] 4. Confirm CR-0012 deliverable 6 passed, with `acceptance_record.json`
       written; CR-0014 landed.
-- [ ] 5. Backups (§ Disk).
+- [x] 5. Backups (§ Disk): 23 files, 1.3 GB, verified; manifest `docs/quality/evidence/CR-0009/backup_SHA256SUMS`.
 - [ ] 6. Retrain (§ The change 1); record the evidence it lists.
 - [ ] 7. Refit calibration; confirm `model_path`.
 - [ ] 8. Record the new validation baseline, with the not-comparable

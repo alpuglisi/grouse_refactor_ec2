@@ -212,3 +212,87 @@ passes the guard. 2 tests OK; `train.py --help` works; L1 lint unchanged
 (4 statements). No other live caller of the flag (`losses.py` mentions it
 in a docstring only). Deleted with the guard by deliverable 8.
 
+
+## Implementation record — deliverables 2–8 (2026-09-30)
+Branch `worktree-agent-a74570e35615ea5e3`, based on `00c0b6f`. The
+implementer's interpretations and results, for the code review:
+
+- **Deliverable 5, transform home.** The CR names
+  `generate_negatives.to_albers` (`:93-95`) as "the transform that
+  produces `x_5070`/`y_5070` in CR-0012's pool". After CR-0012 landed,
+  that function no longer exists. The pool's transform is
+  `prepare_training_data.to_5070`, which `generate_negatives.py`
+  imports. So that function is now the thin wrapper that delegates to
+  `regions.to_5070`, and its callers are unchanged. B1 covers the
+  switch. It was also run on the positives, because that wrapper feeds
+  them too.
+- **Deliverable 5, other changes.** `split_for_unassigned` was deleted,
+  and `tests/test_cr0012.py`'s md5-rule test now exercises
+  `regions.block_split`. `acceptance_split.py` keeps its own copy of the
+  rule, as the CR requires.
+- **B1: PASS.** In a scratch tree, all 20 manifest outputs are
+  byte-identical to the latest CR-0012 deliverable 6 run (the
+  candidate pool, every negatives file, block assignments and every
+  positives file), and `acceptance_split.py` passes 18/18. Evidence:
+  `docs/quality/evidence/CR-0015-B1/`.
+- **Deliverable 6.** U1–U6 are in `tests/test_cr0015_sampler.py`.
+  - The sampler also records its draw counts in
+    `DataFrame.attrs["acceptance"]` for V2. This does not change the
+    output columns.
+  - `pretrain.py` checks its new dependency by loading the county
+    polygons immediately after `parse_args`.
+- **PA-0021(a), wrong samplers.** They were built by an independent
+  agent in `tests/cr0015_wrong_samplers.py`. The original round-2
+  reviewer could not be resumed.
+  - U2 fails on the today's, unassigned-excluded (shortfall at n =
+    30,000; kinds (iv)/(v) = 0 at n = 50), unassigned-train,
+    `VAL_FRACTION` and native-x/y samplers.
+  - U1 fails on today's sampler.
+- **L1.** Allowlist: the three deliverable-4 statements plus the
+  deliberate pre-CR copy in the wrong-samplers module.
+  `EXPECTED_UNCLASSIFIED` is empty.
+- **7a, V3 calibration → OBS.**
+  - Fair p99 over 100 seeds: ME 0.0179, NH 0.0153, VT 0.0154.
+  - Minimum broken statistic, per region:
+
+    | sampler | ME | NH | VT |
+    |---|---|---|---|
+    | today's | 0.081 | 0.130 | 0.071 |
+    | unassigned-excluded | 0.776 | 0.754 | 0.676 |
+    | unassigned-train | 0.107 | 0.108 | 0.091 |
+    | md5-0.18 | 0.0053 | 0.0059 | 0.0003 |
+
+  - md5-0.18 does not separate. The CR says "if it does not separate
+    every broken sampler, V3 is demoted to OBS", so V3 is recorded as
+    **OBS** (`docs/quality/cr0015_v3_calibration.json`,
+    `v3_status`).
+  - **Open question for the lead:** under PA-0021(c)'s reading, V3's
+    broken pipeline is the one it exists to catch (over-exclusion). That
+    one separates by about 40× the bound. The md5-0.18 sampler is V1's
+    target, and V1 catches it (59–73 points per region). Under that
+    reading, V3 would be a GATE.
+- **7b (`docs/quality/evidence/CR-0015-background.txt`).**
+  `GROUSE_REQUIRE_REAL_DATA=1`: 6 tests OK, no `skipped=`.
+  - **V1:** 0 out-of-state points and 0 validation-block points in ME,
+    NH and VT (n = 5,000, seed 0).
+  - **V1 on the wrong samplers** fails as required:
+
+    | sampler | failing count | ME | NH | VT |
+    |---|---|---|---|---|
+    | today's | out-of-state | 1,770 | 2,653 | 2,413 |
+    | today's | validation-block | 982 | 938 | 1,012 |
+    | unassigned-train | validation-block | 777 | 745 | 784 |
+    | md5-0.18 | validation-block | 73 | 62 | 59 |
+
+  - **V2** acceptance: ME 0.403, NH 0.377, VT 0.416.
+  - **V3** statistic: 0.0047 / 0.0017 / 0.0002, all within the bounds.
+- **Deliverable 8.** The guard and `tests/test_cr0015_guard.py` were
+  removed after 7b. The full suite passes: 239 tests OK. The 6
+  real-data tests skip without a data root, by design.
+- **Sweep findings** (placeholder ids): BUG-NEW-1 (`predict.py` Edge
+  metric), BUG-NEW-2 (`missing_mask=False` embed), BUG-NEW-3 (no split
+  provenance on checkpoints). BUG-0017 was re-examined and is FIXED by
+  `51a4ad0`.
+- **Handed to the lead:** the `BUG_LOG`/PA rows, the Swept? cells and the
+  tracker items in `docs/quality/evidence/CR-0015-bookkeeping-rows.md`
+  (deliverable 9).

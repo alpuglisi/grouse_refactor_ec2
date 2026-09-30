@@ -161,7 +161,7 @@ ALLOWLIST = {
         'file hash recorded as "not hashed (<type>: <msg>)"; BUG-0069 (CR-0018 C5)'),
     ('scan_ckpts.py', '<module>', 0): (
         'f89a54ca9f30', VISIBLE_UNKNOWN,
-        'diagnostic scanner: "could not load (<type>: <msg>)" printed for that checkpoint; tracked by user commit f3fa11b, classified by the lead 2026-09-30'),
+        'diagnostic scanner: "could not load (<type>: <msg>)" printed for that checkpoint (PA-0027 visible-unknown); tracked by user commit f3fa11b, classified by the lead 2026-09-30'),
 }
 
 # key -> (digest, owning BUG). Open defects; removing the entry is part

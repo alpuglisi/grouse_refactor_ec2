@@ -69,7 +69,8 @@ def check_sclass_meaning(raster_dir):
     try:
         tbl = pd.read_csv(path)
     except Exception as e:
-        print(f"\n  Could not read {path}: {e}")
+        print(f"\n  Could not read {path} ({type(e).__name__}: {e}); "
+             f"SClass meaning check not done")
         return
     tbl.columns = [c.upper().strip() for c in tbl.columns]
     print(f"\n  SClass attribute table: {os.path.basename(path)}")

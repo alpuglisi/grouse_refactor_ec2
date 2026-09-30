@@ -55,7 +55,7 @@ def check_one(path):
             print(f"  sample of distinct values present: {u[:10]}"
                  + (" ..." if len(u) > 10 else ""))
     except Exception as e:
-        print(f"  [!] COULD NOT OPEN: {e}")
+        print(f"  [!] COULD NOT OPEN: {type(e).__name__}: {e}")
 
 
 def main():

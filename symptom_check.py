@@ -661,7 +661,8 @@ def region_point_frames(regions, box):
                 p = rd.path(kind)
                 files[str(p)] = sha256(p)
             except Exception as e:          # path template naming differs
-                files[f"{r}:{kind}"] = f"not hashed ({e})"
+                files[f"{r}:{kind}"] = (f"not hashed "
+                                        f"({type(e).__name__}: {e})")
     return frames, files
 
 

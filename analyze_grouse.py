@@ -656,7 +656,8 @@ def load_state_boundaries():
             urllib.request.urlretrieve(STATE_BOUNDARY_URL, zip_path)
             src = zip_path
         except Exception as e:
-            print(f"  [!] Could not download state boundaries ({e}). "
+            print(f"  [!] Could not download state boundaries "
+                 f"({type(e).__name__}: {e}). "
                  f"Map renders without them; to fix, place any state "
                  f"boundary .geojson/.shp in {MAP_DATA_DIR}/")
             return None
@@ -669,7 +670,9 @@ def load_state_boundaries():
              f"({len(gdf)} polygons).")
         return gdf
     except Exception as e:
-        print(f"  [!] Could not read boundary file {src}: {e}")
+        print(f"  [!] Could not read boundary file {src} "
+             f"({type(e).__name__}: {e}); map renders without state "
+             f"boundaries")
         return None
 
 

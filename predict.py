@@ -312,8 +312,13 @@ def predict_region(model, device, srcs, ref, cat_f, cont_f,
                 for f in list(edge_cat_capture) + list(edge_cont_capture)}
 
     if use_compile:
-        print("   Compiling model graph (torch.compile)...")
-        model = torch.compile(model)
+        # BUG-0088: torch.compile(model) compiles forward() only; the
+        # scorer (models.d4_tta_logits) calls model.logits, which an
+        # OptimizedModule forwards to the original, uncompiled method.
+        # Compile the bound scoring method instead, exactly as
+        # GrouseModelHandler._install_compiled_logits does.
+        print("   Compiling model.logits (torch.compile)...")
+        model.logits = torch.compile(model.logits)
 
     strip_rows = max(stride, (STRIP_TARGET_ROWS // stride) * stride)
     n_strips = math.ceil(max(height - IMG_SIZE + 1, 1) / strip_rows)

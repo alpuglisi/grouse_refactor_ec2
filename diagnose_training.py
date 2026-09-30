@@ -67,24 +67,35 @@ def main():
         print(f"\n  [!] INCOMPLETE: the totals below EXCLUDE skipped "
               f"region(s) {skipped}; they are not the counts train.py "
               f"would see for --regions {args.regions}.")
-    eff_tr_pos = total_tr_pos * 4   # rotation expansion
-    eff_va_pos = total_va_pos * 4
-    print(f"\n  AFTER 4x rotation expansion (what the model actually sees):")
-    print(f"    train: {eff_tr_pos:,} pos vs {total_tr_neg:,} neg "
-          f"-> ratio {eff_tr_pos / max(total_tr_neg, 1):.1f} : 1")
-    print(f"    val:   {eff_va_pos:,} pos vs {total_va_neg:,} neg "
-          f"-> ratio {eff_va_pos / max(total_va_neg, 1):.1f} : 1")
+    # BUG-0082: train.py rotation-expands BOTH classes, for training and
+    # validation (train.build_datasets: "symmetric 4x -> 1:1 effective
+    # balance"). This diagnostic cannot call build_datasets (it needs the
+    # acceptance record and every raster), so it applies the same factor
+    # to both classes and says so (PA-0039).
+    EXPANSION = 4
+    eff_tr_pos, eff_tr_neg = total_tr_pos * EXPANSION, total_tr_neg * EXPANSION
+    eff_va_pos, eff_va_neg = total_va_pos * EXPANSION, total_va_neg * EXPANSION
+    print(f"\n  AFTER {EXPANSION}x rotation expansion of BOTH classes (what "
+          f"the model actually sees; assumes train.py's symmetric "
+          f"expansion - train.build_datasets is the source of truth):")
+    print(f"    train: {eff_tr_pos:,} pos vs {eff_tr_neg:,} neg "
+          f"-> ratio {eff_tr_pos / max(eff_tr_neg, 1):.2f} : 1")
+    print(f"    val:   {eff_va_pos:,} pos vs {eff_va_neg:,} neg "
+          f"-> ratio {eff_va_pos / max(eff_va_neg, 1):.2f} : 1")
     print(f"    expected train samples in train.py: "
-          f"{eff_tr_pos + total_tr_neg:,}")
+          f"{eff_tr_pos + eff_tr_neg:,} (before any --an-background rows)")
     print(f"    expected val samples in train.py:   "
-          f"{eff_va_pos + total_va_neg:,}")
-    maj = eff_va_pos / max(eff_va_pos + total_va_neg, 1) * 100
-    print(f"    val accuracy if model just predicts ALL POSITIVE: {maj:.2f}%")
+          f"{eff_va_pos + eff_va_neg:,}")
+    maj = max(eff_va_pos, eff_va_neg) / max(eff_va_pos + eff_va_neg, 1) * 100
+    print(f"    val accuracy if model just predicts the MAJORITY class: "
+          f"{maj:.2f}%")
     print(f"    (compare to the frozen accuracy from your run)")
-    if eff_tr_pos / max(total_tr_neg, 1) > 3:
-        print(f"\n  [!] Training imbalance is severe. This alone explains "
-             f"collapsed, frozen predictions. See the fix list the "
-             f"assistant provided.")
+    ratio = eff_tr_pos / max(eff_tr_neg, 1)
+    if ratio > 3 or ratio < 1 / 3:
+        print(f"\n  [!] Training imbalance is severe ({ratio:.2f} : 1). This "
+             f"alone can explain collapsed, frozen predictions; note that "
+             f"train.py's default StratifiedBatchSampler rebalances every "
+             f"batch regardless.")
 
     # ------------------------------------------------------------------
     print("\n" + "=" * 60)

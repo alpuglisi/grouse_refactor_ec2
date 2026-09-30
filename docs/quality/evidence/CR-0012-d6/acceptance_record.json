@@ -1,0 +1,1835 @@
+{
+ "artifacts": {
+  "data/negatives/candidate_pool.csv": "1ff4f933328ed03a4645709428712e95644984753e5d371624db86eb9dab3419",
+  "data/negatives/negatives_ME.csv": "8d1ed7653f0a6d30c51d9cb14287551f5c6ee49c9bd785740d8197718e7de52c",
+  "data/negatives/negatives_NH.csv": "8430ae8a9ebc7c185b5f9f8c3bcf4cc73bc59ed40a3efb0e092bb694e883c69b",
+  "data/negatives/negatives_VT.csv": "ba449de5bc2181aefcbb60c14af994c237d72b61a546455c25793a57036f987b",
+  "data/negatives/train_negatives_ME.csv": "3e776f7f46b152f2ea6c0fde2f075a823d2acb169062786c0272170a362f3487",
+  "data/negatives/train_negatives_NH.csv": "40baccf41c7f525ce47b5daac55ba3f0d9624964e2bc6d0386a5bf3851b28c75",
+  "data/negatives/train_negatives_VT.csv": "6405bf2916a3b95f5cccf1158fa22c3af4c9c973e3e09516e834b81624079b71",
+  "data/negatives/val_negatives_ME.csv": "77baf269d00445d341fa880489f26f9e6c28470f5918eb090438aec548da6fba",
+  "data/negatives/val_negatives_NH.csv": "5140fce0d9baed8f35938e7a1d9d2cc0a0a8ca01bad26206fd53a8fef89cd405",
+  "data/negatives/val_negatives_VT.csv": "46548285874ff07d55d49df091c723793a49b56c89ea7a12a1f215d2a21ff28c",
+  "data/pipeline/block_assignments.csv": "a8984f9e8a2c079e0f4fcd0824e3bd4ff0294dbad3feb2161084b4208848d543",
+  "data/pipeline/thinned_positives_ME.csv": "6c3dcdca88c92b2c3ddc51227a4f797d75f3af7d786053910720330e3bb44a2f",
+  "data/pipeline/thinned_positives_NH.csv": "586a0e9799fd27930ec73df4cb660610d500540d9d041a1f71b5c93c2c0801db",
+  "data/pipeline/thinned_positives_VT.csv": "45e6f58b768eaa24977c720fcb2beec8488f242d918b3ad8a34d9fe8953cb05c",
+  "data/pipeline/train_positives_ME.csv": "12f81ba05663a5450af8c267b22e7d9cd05bfe79ffdc129567ae3bf755e19d0a",
+  "data/pipeline/train_positives_NH.csv": "e9cb44fe762ed9293cccf0e6a3e0cbb8dc3eb7da5472af2e695a67c60c181fea",
+  "data/pipeline/train_positives_VT.csv": "3c751ae01f791b676ee430e2c7aa9671ea962a33d0eb375a8a9fa56eb48261da",
+  "data/pipeline/val_positives_ME.csv": "f7ea2e3412298705b7e20163b9e4c93c01875d29454e8735a12e908ef54aad01",
+  "data/pipeline/val_positives_NH.csv": "48fb779d18ea19c77433e33f2f5d2062f1124d4b8d8715e94b4cfd47d185f55b",
+  "data/pipeline/val_positives_VT.csv": "5b2813990daabfac6983a575460eabe725c5e0e121c2be24f787d2edc32c43ac"
+ },
+ "commit": "df83c270e3bf3cbf8cd353e7971607f612316f01",
+ "config_path": "/home/ec2-user/grouse2/docs/quality/acceptance_split.json",
+ "config_sha256": "1e3bfaa45655e005fd9258c842d080274431812d72f53ea4bbc165236b67bfc5",
+ "cr": "CR-0013",
+ "created_utc": "2026-09-30T13:11:59.927715+00:00",
+ "dirty": false,
+ "inputs": {
+  "data/landfire/ME_2016_balive.tif": "c7dff88af0b43deedb6c7c657da52387e9547dc9eca6bc2b4cf19dfda481362a",
+  "data/landfire/ME_2016_carbon_dwn.tif": "9fbb0d56cc4ca6512f85d24baf709ed02837277e38b19099b7a8a592313f4c17",
+  "data/landfire/ME_2016_nlcd.tif": "3a7f6f3098b34c0056614e15a93afb1f1611bdf60ee4716cda8b61eb11563f2b",
+  "data/landfire/ME_2016_qmd.tif": "c369eeae712744e3eae1202279527e9af2381bef25161ffb65c800384190e951",
+  "data/landfire/ME_2016_road_dist.tif": "2c19e3281df72e7fdd3c1958f42ab41b58ebc8e50908ad309aca030a04c9b272",
+  "data/landfire/ME_2016_tcc.tif": "e0d91479e012d7587de9ad78024478b1b1f03df176fe684f51eed492a4f2ea8a",
+  "data/landfire/ME_2016_tpa_live.tif": "125608065435c76b83806b7236f711599da6c652b4708fd1cd19b2239f9e1e02",
+  "data/landfire/ME_2016_tsd.tif": "dbc952a6ab0a353ccbac4a531f6eab938ffd07bfa5807a2d18fffadc09c956ef",
+  "data/landfire/ME_2017_balive.tif": "c7dff88af0b43deedb6c7c657da52387e9547dc9eca6bc2b4cf19dfda481362a",
+  "data/landfire/ME_2017_carbon_dwn.tif": "9fbb0d56cc4ca6512f85d24baf709ed02837277e38b19099b7a8a592313f4c17",
+  "data/landfire/ME_2017_nlcd.tif": "52bfba71e19ab0d976a830f2f4f4d1a6784a0da3429063cf2ae0c405bea0e012",
+  "data/landfire/ME_2017_qmd.tif": "c369eeae712744e3eae1202279527e9af2381bef25161ffb65c800384190e951",
+  "data/landfire/ME_2017_road_dist.tif": "2c19e3281df72e7fdd3c1958f42ab41b58ebc8e50908ad309aca030a04c9b272",
+  "data/landfire/ME_2017_tcc.tif": "0f4d301bd1dac5367112d747eee02b103b6faecb284293d3b29671d54ffadc34",
+  "data/landfire/ME_2017_tpa_live.tif": "125608065435c76b83806b7236f711599da6c652b4708fd1cd19b2239f9e1e02",
+  "data/landfire/ME_2017_tsd.tif": "ee4839a5c66697b13eb84ca8d7ad0174e69ea16f6e811d80b015f85f924d3957",
+  "data/landfire/ME_2018_balive.tif": "c7dff88af0b43deedb6c7c657da52387e9547dc9eca6bc2b4cf19dfda481362a",
+  "data/landfire/ME_2018_carbon_dwn.tif": "9fbb0d56cc4ca6512f85d24baf709ed02837277e38b19099b7a8a592313f4c17",
+  "data/landfire/ME_2018_nlcd.tif": "2b0ab17fd35b2c31214faa6981c6de1928306032abcc223e4b1b849c55a2e320",
+  "data/landfire/ME_2018_qmd.tif": "c369eeae712744e3eae1202279527e9af2381bef25161ffb65c800384190e951",
+  "data/landfire/ME_2018_road_dist.tif": "2c19e3281df72e7fdd3c1958f42ab41b58ebc8e50908ad309aca030a04c9b272",
+  "data/landfire/ME_2018_tcc.tif": "6bdd938f722815460b3a790b6b9bb8820658be9b55e13cdb0ec6e7f9cc9b17f5",
+  "data/landfire/ME_2018_tpa_live.tif": "125608065435c76b83806b7236f711599da6c652b4708fd1cd19b2239f9e1e02",
+  "data/landfire/ME_2018_tsd.tif": "f3dce3053e7c73d8a668521e6f43b022f724be565be84529887a9eebf196bf42",
+  "data/landfire/ME_2019_balive.tif": "f31e99f54ea67478a914927144be8c07d56bf3293fdf5be702dbfe9f16dae2d5",
+  "data/landfire/ME_2019_carbon_dwn.tif": "2dcc78baf6860e0310125bc4bc295923e78bf253b05c35af07091b1f6b73c4fd",
+  "data/landfire/ME_2019_nlcd.tif": "c5dc14c33265b0b837554bf1802b484df43583d02807761bbfdad1c35bd57111",
+  "data/landfire/ME_2019_qmd.tif": "72bc3708588ed6562c0cbab70f9a500c459593c45e71c4dff7f29c5a50303986",
+  "data/landfire/ME_2019_road_dist.tif": "2c19e3281df72e7fdd3c1958f42ab41b58ebc8e50908ad309aca030a04c9b272",
+  "data/landfire/ME_2019_tcc.tif": "11d9976849820f48a74f916fa3bd442576874e5865a6aa8bae63840c60bd9a11",
+  "data/landfire/ME_2019_tpa_live.tif": "56bac4a2e4e2fb4c866ed6627090c4cd7c1827c40730125b48dd92ef66dd6600",
+  "data/landfire/ME_2019_tsd.tif": "8df15a5a1a3be3edac5055e583c5ca2601962200f1c968a7f1bfd4a3d7ba5b6c",
+  "data/landfire/ME_2020_balive.tif": "f31e99f54ea67478a914927144be8c07d56bf3293fdf5be702dbfe9f16dae2d5",
+  "data/landfire/ME_2020_carbon_dwn.tif": "2dcc78baf6860e0310125bc4bc295923e78bf253b05c35af07091b1f6b73c4fd",
+  "data/landfire/ME_2020_nlcd.tif": "e1ba41fd5dfa325fbca8facc709c2688b11a8dc584e9c6978c443f7c54ff9057",
+  "data/landfire/ME_2020_qmd.tif": "72bc3708588ed6562c0cbab70f9a500c459593c45e71c4dff7f29c5a50303986",
+  "data/landfire/ME_2020_road_dist.tif": "2c19e3281df72e7fdd3c1958f42ab41b58ebc8e50908ad309aca030a04c9b272",
+  "data/landfire/ME_2020_tcc.tif": "0f4c04f2c9ccc319d3077fe24d7ff7113f3658c3af441980fa5e0ce36666a225",
+  "data/landfire/ME_2020_tpa_live.tif": "56bac4a2e4e2fb4c866ed6627090c4cd7c1827c40730125b48dd92ef66dd6600",
+  "data/landfire/ME_2020_tsd.tif": "5246e8412533cc8235358c086c23a99fae84f6bee98e65bf7fbbcc12761c8d9d",
+  "data/landfire/ME_2021_balive.tif": "f31e99f54ea67478a914927144be8c07d56bf3293fdf5be702dbfe9f16dae2d5",
+  "data/landfire/ME_2021_carbon_dwn.tif": "2dcc78baf6860e0310125bc4bc295923e78bf253b05c35af07091b1f6b73c4fd",
+  "data/landfire/ME_2021_nlcd.tif": "dcbba48c9e7f56e1a70fe5485c7487debe8593f182ded89094522551398e155b",
+  "data/landfire/ME_2021_qmd.tif": "72bc3708588ed6562c0cbab70f9a500c459593c45e71c4dff7f29c5a50303986",
+  "data/landfire/ME_2021_road_dist.tif": "2c19e3281df72e7fdd3c1958f42ab41b58ebc8e50908ad309aca030a04c9b272",
+  "data/landfire/ME_2021_tcc.tif": "076e63880d22c09f64f7fda020a0bf643291440b7b1e94ddf90177158918b725",
+  "data/landfire/ME_2021_tpa_live.tif": "56bac4a2e4e2fb4c866ed6627090c4cd7c1827c40730125b48dd92ef66dd6600",
+  "data/landfire/ME_2021_tsd.tif": "65b3ca707cd1537f0e501a2679f54b988f23d128aa282feb6953776acdc3812c",
+  "data/landfire/ME_2022_balive.tif": "bd5f01ae8d6b2426098b3175a72716234e63ab1248d169f68a9e5ed4a4e45028",
+  "data/landfire/ME_2022_carbon_dwn.tif": "eb0c5de08b27655ec329d8fdead42a86d60ce721d35559d0d96582d9ccd93fdf",
+  "data/landfire/ME_2022_cc.tif": "a035c41b1fb361ac30aa8f7a8ab8188f025ceaa4e67ecea5f274f9bf72fc9f44",
+  "data/landfire/ME_2022_ch.tif": "fffc26b59aa6dd1d9025c15c7abd9c32144b52cb88b8614eef94e3758258ac08",
+  "data/landfire/ME_2022_evc.tif": "cd9995d416a9d8d65f0d838af3f55176909834184c29f23cef51aa0902a1baf1",
+  "data/landfire/ME_2022_evh.tif": "74a330b109f82be6060a4710d1f28016f00b8a8a87c4f005572cd84e6e39126f",
+  "data/landfire/ME_2022_evt.tif": "7f45b6b8e7e5b397109ae533043f6b4bfccc25742d150ada9172d19d7eb175e0",
+  "data/landfire/ME_2022_fdist.tif": "00eae4365aca19a209757e81190b258b83679e3a6d84cf0d1e22095b39582207",
+  "data/landfire/ME_2022_nlcd.tif": "f95ce5490471b8c6b259c47e0e0e2d404820008422de730cd0f99d083c31c8e4",
+  "data/landfire/ME_2022_qmd.tif": "f596e61cf882daaf8568b67dc1804d168ef84250c3c7f96852192e80ff053864",
+  "data/landfire/ME_2022_road_dist.tif": "2c19e3281df72e7fdd3c1958f42ab41b58ebc8e50908ad309aca030a04c9b272",
+  "data/landfire/ME_2022_sclass.tif": "d67ea61ee8d8ea7e3ebfb848655b9cdb880601aaec05f37046a2b3b42ed8be55",
+  "data/landfire/ME_2022_tcc.tif": "a0a384ebb410df2a5b56a4335a44135d61a8aad87f22276c29faa338672811e4",
+  "data/landfire/ME_2022_tpa_live.tif": "82cc3ae3b58bc711fa04adf04e4f583b921285f02a30ae84ab6505810e8ab084",
+  "data/landfire/ME_2022_tsd.tif": "b255f9df2760641aba775ec2682611c0558d295b5242596307532bc3110f4c43",
+  "data/landfire/ME_2023_balive.tif": "bd5f01ae8d6b2426098b3175a72716234e63ab1248d169f68a9e5ed4a4e45028",
+  "data/landfire/ME_2023_carbon_dwn.tif": "eb0c5de08b27655ec329d8fdead42a86d60ce721d35559d0d96582d9ccd93fdf",
+  "data/landfire/ME_2023_cc.tif": "101910f955f552331d72f27ae56160ae76adc0b68eac6d440cd1becf8b402d05",
+  "data/landfire/ME_2023_ch.tif": "e2b490ea06c2b0dcbf686c3782eaedefc81baf246b646316f90fec94f1977029",
+  "data/landfire/ME_2023_evc.tif": "f9bb76bd33c3bec7a2107a58b4d87014112ed69c3a95bdcc58f3c8b18f17c702",
+  "data/landfire/ME_2023_evh.tif": "019c7d9a48a2444f34217a60ccb03186e3339d9c05eb3a182fb4eb1e57ed1446",
+  "data/landfire/ME_2023_evt.tif": "30c3a483c3662172c9b8dad846ffbb90205aa242fb19aea12781ca5588bf7b7f",
+  "data/landfire/ME_2023_fdist.tif": "23b96afd1c9c069926d44ef821ffc4fca4e63c3118d7a175d1f3e62a9afea9e9",
+  "data/landfire/ME_2023_nlcd.tif": "da4fb7445773f34bdbbd29f71caba06e025245fd18f8cc08b9c6a648dcf6599f",
+  "data/landfire/ME_2023_qmd.tif": "f596e61cf882daaf8568b67dc1804d168ef84250c3c7f96852192e80ff053864",
+  "data/landfire/ME_2023_road_dist.tif": "2c19e3281df72e7fdd3c1958f42ab41b58ebc8e50908ad309aca030a04c9b272",
+  "data/landfire/ME_2023_sclass.tif": "2983b2c75fe4c501e9355466bec86d8a54206a670aa7d1da2664b70916425a64",
+  "data/landfire/ME_2023_tcc.tif": "4176379d5d48a785f2fa58256a0c2c289b2ca6f986df49c2cfe24fd0e75521e9",
+  "data/landfire/ME_2023_tpa_live.tif": "82cc3ae3b58bc711fa04adf04e4f583b921285f02a30ae84ab6505810e8ab084",
+  "data/landfire/ME_2023_tsd.tif": "75ef545783aaba32a1f569b60b72e54de3398f6ce00622cf08811c86b5b0ca94",
+  "data/landfire/ME_2024_balive.tif": "bd5f01ae8d6b2426098b3175a72716234e63ab1248d169f68a9e5ed4a4e45028",
+  "data/landfire/ME_2024_carbon_dwn.tif": "eb0c5de08b27655ec329d8fdead42a86d60ce721d35559d0d96582d9ccd93fdf",
+  "data/landfire/ME_2024_cc.tif": "4129f4d41c62ed26ce16e585beb7e2bde9443dc069afa004e2e921710ace082e",
+  "data/landfire/ME_2024_ch.tif": "e70d37d6c00b846e1042a8f513f0ce27f94dc7547f381304dccba11b1fa2a1eb",
+  "data/landfire/ME_2024_evc.tif": "3ae21975f3d059634b26572cd8b9320e968d0a6815e5fd41dd808a1a6156018e",
+  "data/landfire/ME_2024_evh.tif": "4b8b601e1077bb7f0c3e59118e84cfcdf936306e247e95d28866bdc628939118",
+  "data/landfire/ME_2024_evt.tif": "96047bc6c9ac78c7180892d2c9674c8dff24547a1874f4b71730d34c22b57a74",
+  "data/landfire/ME_2024_fdist.tif": "13f0f1d22efc1015e2da1c92b291e513f07303c883773ffe1488d32f967d1282",
+  "data/landfire/ME_2024_nlcd.tif": "c50d619749156c78aa9aab9b1ab547c30578edf3a2cfe410ffe160ef2b17e046",
+  "data/landfire/ME_2024_qmd.tif": "f596e61cf882daaf8568b67dc1804d168ef84250c3c7f96852192e80ff053864",
+  "data/landfire/ME_2024_road_dist.tif": "2c19e3281df72e7fdd3c1958f42ab41b58ebc8e50908ad309aca030a04c9b272",
+  "data/landfire/ME_2024_sclass.tif": "439aad25e65bf64fa4c1800d5ca09d869d6e328abc5f426c8ec4ff6555a47ec6",
+  "data/landfire/ME_2024_tpa_live.tif": "82cc3ae3b58bc711fa04adf04e4f583b921285f02a30ae84ab6505810e8ab084",
+  "data/landfire/ME_2024_tsd.tif": "cb1fe3c295f669133d42cb00e22ed7eb70413558518eed1f6a81ee012061c70c",
+  "data/landfire/NH_2016_balive.tif": "1d034a592dfb52acbf70eda664d9ab98fe2a4e21a433b0192f4e2b64bfbefb86",
+  "data/landfire/NH_2016_carbon_dwn.tif": "3a009cc7bb80a3090a43f66213dc823db4b17064ca79af7c80d3ff183844409e",
+  "data/landfire/NH_2016_nlcd.tif": "79deb8f054a0b6031c555ca8be98478620210f5583d77476bd44a6089adc6477",
+  "data/landfire/NH_2016_qmd.tif": "cffc794fbecb05d4d767793a854f64490b093020e8c3c9620f049aaf68bad2e7",
+  "data/landfire/NH_2016_road_dist.tif": "8e44166d0e43ed265432fc6688152a5e31b6f0c1de2e559cefc182d296ddd2bf",
+  "data/landfire/NH_2016_tcc.tif": "e3e1d27c92cf5119409dca5924c99879aab6c5ba69812c054abf44bf9ff970f2",
+  "data/landfire/NH_2016_tpa_live.tif": "bd75b4edb4d8058962ed78b357db4d0cc46a91ac5cdaaf50abd27793bc485247",
+  "data/landfire/NH_2016_tsd.tif": "e609a3cfa18c8cdc5a60f65f03a871d4966fb784125a1f864763184ce2f89cb0",
+  "data/landfire/NH_2017_balive.tif": "1d034a592dfb52acbf70eda664d9ab98fe2a4e21a433b0192f4e2b64bfbefb86",
+  "data/landfire/NH_2017_carbon_dwn.tif": "3a009cc7bb80a3090a43f66213dc823db4b17064ca79af7c80d3ff183844409e",
+  "data/landfire/NH_2017_nlcd.tif": "4165d05ecdc82d9967f9b0df54b96724269a820ea081b7b90823e6c5b0473256",
+  "data/landfire/NH_2017_qmd.tif": "cffc794fbecb05d4d767793a854f64490b093020e8c3c9620f049aaf68bad2e7",
+  "data/landfire/NH_2017_road_dist.tif": "8e44166d0e43ed265432fc6688152a5e31b6f0c1de2e559cefc182d296ddd2bf",
+  "data/landfire/NH_2017_tcc.tif": "05c3a90ecbd7031cba66b132f3e87f02a1dbc8fbbd60a38e0f81126f1887a1bd",
+  "data/landfire/NH_2017_tpa_live.tif": "bd75b4edb4d8058962ed78b357db4d0cc46a91ac5cdaaf50abd27793bc485247",
+  "data/landfire/NH_2017_tsd.tif": "c1747cfa4399fd9f7f58e762903e4e695dbed895863f04dacde784e5600f7edb",
+  "data/landfire/NH_2018_balive.tif": "1d034a592dfb52acbf70eda664d9ab98fe2a4e21a433b0192f4e2b64bfbefb86",
+  "data/landfire/NH_2018_carbon_dwn.tif": "3a009cc7bb80a3090a43f66213dc823db4b17064ca79af7c80d3ff183844409e",
+  "data/landfire/NH_2018_nlcd.tif": "56af6e40a45d9e8ada0ff8ea8ccdca3899f612c08f48523b05d14ce72fae859d",
+  "data/landfire/NH_2018_qmd.tif": "cffc794fbecb05d4d767793a854f64490b093020e8c3c9620f049aaf68bad2e7",
+  "data/landfire/NH_2018_road_dist.tif": "8e44166d0e43ed265432fc6688152a5e31b6f0c1de2e559cefc182d296ddd2bf",
+  "data/landfire/NH_2018_tcc.tif": "a6a2f8aa83284463447ba2bf4ce714422d7cba6f92023b360b0c33ed0a33e0f3",
+  "data/landfire/NH_2018_tpa_live.tif": "bd75b4edb4d8058962ed78b357db4d0cc46a91ac5cdaaf50abd27793bc485247",
+  "data/landfire/NH_2018_tsd.tif": "4e91036ff83f1ac99bb3b9a4f2db3118a04c4ac42f229ebd8fd852baa41c04aa",
+  "data/landfire/NH_2019_balive.tif": "fcb7b7f692286749771a3fd034cba8707922239e2b928ea53ae7eccbdf2f87f6",
+  "data/landfire/NH_2019_carbon_dwn.tif": "15126c3b1f920c3519cae4085b63c39d99214a4d28ca102adec1f06bc1166d8c",
+  "data/landfire/NH_2019_nlcd.tif": "8bd09330da8d39fd3a2174ef1194a88c76401f028414421fc918e922aafd1e85",
+  "data/landfire/NH_2019_qmd.tif": "e72731190018b18854f256d6ed9ce07468e159d9a967f836098ea6b75c77efaf",
+  "data/landfire/NH_2019_road_dist.tif": "8e44166d0e43ed265432fc6688152a5e31b6f0c1de2e559cefc182d296ddd2bf",
+  "data/landfire/NH_2019_tcc.tif": "4bbeb5ae2df42fc9bc7b1b070fcabdc055b60a724df9182b2c986500c4d97204",
+  "data/landfire/NH_2019_tpa_live.tif": "20ec13aa3ed68294ce06647acabae1dc38e8acd6aed5a7d458464c00c0233fbc",
+  "data/landfire/NH_2019_tsd.tif": "eae6c49a14ff7ec537b826c10f87160f6837b17d8eebb961eb6ed8d2a5aa0d9a",
+  "data/landfire/NH_2020_balive.tif": "fcb7b7f692286749771a3fd034cba8707922239e2b928ea53ae7eccbdf2f87f6",
+  "data/landfire/NH_2020_carbon_dwn.tif": "15126c3b1f920c3519cae4085b63c39d99214a4d28ca102adec1f06bc1166d8c",
+  "data/landfire/NH_2020_nlcd.tif": "ffe6870a9262a494bf9f56a600cdf160ab854aed71e028ecfb79174f0ea1f3e8",
+  "data/landfire/NH_2020_qmd.tif": "e72731190018b18854f256d6ed9ce07468e159d9a967f836098ea6b75c77efaf",
+  "data/landfire/NH_2020_road_dist.tif": "8e44166d0e43ed265432fc6688152a5e31b6f0c1de2e559cefc182d296ddd2bf",
+  "data/landfire/NH_2020_tcc.tif": "be1a42ecd0e30ee2a265e609301b0ae55dd218e30e768c81331098291df6b0ea",
+  "data/landfire/NH_2020_tpa_live.tif": "20ec13aa3ed68294ce06647acabae1dc38e8acd6aed5a7d458464c00c0233fbc",
+  "data/landfire/NH_2020_tsd.tif": "810eb015650873dd5680bbf4ce4bd251bae08ea546010fedc8da7723937ca3cf",
+  "data/landfire/NH_2021_balive.tif": "fcb7b7f692286749771a3fd034cba8707922239e2b928ea53ae7eccbdf2f87f6",
+  "data/landfire/NH_2021_carbon_dwn.tif": "15126c3b1f920c3519cae4085b63c39d99214a4d28ca102adec1f06bc1166d8c",
+  "data/landfire/NH_2021_nlcd.tif": "f0fc1131fdc01539e8fa62223b8d10ed30d1df6b7bab7e4a13b7345454c73be7",
+  "data/landfire/NH_2021_qmd.tif": "e72731190018b18854f256d6ed9ce07468e159d9a967f836098ea6b75c77efaf",
+  "data/landfire/NH_2021_road_dist.tif": "8e44166d0e43ed265432fc6688152a5e31b6f0c1de2e559cefc182d296ddd2bf",
+  "data/landfire/NH_2021_tcc.tif": "21ccfa95c022edc999a7755ed6fd5e794d5a541a88e24060fe65cc681ed0929d",
+  "data/landfire/NH_2021_tpa_live.tif": "20ec13aa3ed68294ce06647acabae1dc38e8acd6aed5a7d458464c00c0233fbc",
+  "data/landfire/NH_2021_tsd.tif": "0a4cd7f58c0744a66ee01e243679d8b649af03c37eb92bb1a0774733ffdb69d6",
+  "data/landfire/NH_2022_balive.tif": "58471fcd307803cefe90350529ca4e3c9a3f7dfea73fb448f235bb9b6162ddc5",
+  "data/landfire/NH_2022_carbon_dwn.tif": "8f09b856f24f4fde3abdd61da86897d1d023e941d8e6afbaba0a4e914959989f",
+  "data/landfire/NH_2022_cc.tif": "fdd74fb1f85d9f1828df7a226bfd8bb7555553479480ae438521b572dbb1ae37",
+  "data/landfire/NH_2022_ch.tif": "341d530b1e956258c6f9224e897d22aba610aafd12bb88726dcb86166ce29d6e",
+  "data/landfire/NH_2022_evc.tif": "0d833ebbea8632734541d823cefa4e5800080cdacce0c0a779f4bbbcee37eb71",
+  "data/landfire/NH_2022_evh.tif": "f93ad4959e26c894a1ad33f25f61365515e4b1b80e24d3cfc1f7fe7d57ad25e1",
+  "data/landfire/NH_2022_evt.tif": "4508e756fcf05110cf5d4630377585109c4281a865863d012004de0453da29e2",
+  "data/landfire/NH_2022_fdist.tif": "ece4b8cc5ae1e646fef72cf320e0f8e55d7574ccea941a808c7e2b78376aa6bf",
+  "data/landfire/NH_2022_nlcd.tif": "f553b61eea2627a4724c5c4980ddc8f831e002332b5a7bea40ea0d5e53ed925c",
+  "data/landfire/NH_2022_qmd.tif": "3182ded517636e002cdf32d8bf2e5871cb81ba2ced9292fed18557b659b11ffc",
+  "data/landfire/NH_2022_road_dist.tif": "8e44166d0e43ed265432fc6688152a5e31b6f0c1de2e559cefc182d296ddd2bf",
+  "data/landfire/NH_2022_sclass.tif": "9406a65cecde8eac61d52fdf7e3ad76ffcc12be10070ebe49a7a0853aaf79a8b",
+  "data/landfire/NH_2022_tcc.tif": "aab5b5fe9f01442aefbff64d0acd2b6d4f0c84220e086f45c3e9a4d6547c4f35",
+  "data/landfire/NH_2022_tpa_live.tif": "9bb17fb6a4c21bacb1bcff9f01c604080d102687fa9cbe330729355958e72b2a",
+  "data/landfire/NH_2022_tsd.tif": "04178628dc6b889986660b2ab1aa53cbecad6cee3f44ad95fc60577a2fdaaed2",
+  "data/landfire/NH_2023_balive.tif": "58471fcd307803cefe90350529ca4e3c9a3f7dfea73fb448f235bb9b6162ddc5",
+  "data/landfire/NH_2023_carbon_dwn.tif": "8f09b856f24f4fde3abdd61da86897d1d023e941d8e6afbaba0a4e914959989f",
+  "data/landfire/NH_2023_cc.tif": "6be7e33f60a611dc25203998424f273267bc20f3da42761def35e3fedbd587a9",
+  "data/landfire/NH_2023_ch.tif": "f03862c62549b26867904f478a8ba1b4d5ba13032e0647841c925eb497de2c46",
+  "data/landfire/NH_2023_evc.tif": "46a9a6a575581f16a2fb1eb2b1f3630127f5f37d22cc875195706c8aa0c265f7",
+  "data/landfire/NH_2023_evh.tif": "1adaa3a6f4cae1ed5c647d07a2e5ae120b96b66879a30751ced8fb44948d617c",
+  "data/landfire/NH_2023_evt.tif": "5bee743e4ca0369a98042a6f2fd7cc79410ec65230b20615c5faef9a6fe182ed",
+  "data/landfire/NH_2023_fdist.tif": "9e242dfaf998fbbcaee3420116f3c7585ccf51a06f853afad33e04e4f2e5bf6d",
+  "data/landfire/NH_2023_nlcd.tif": "07b62a6bda4157acc51427383a8cc9d18f08b4ffff92e7d5542384beb723f698",
+  "data/landfire/NH_2023_qmd.tif": "3182ded517636e002cdf32d8bf2e5871cb81ba2ced9292fed18557b659b11ffc",
+  "data/landfire/NH_2023_road_dist.tif": "8e44166d0e43ed265432fc6688152a5e31b6f0c1de2e559cefc182d296ddd2bf",
+  "data/landfire/NH_2023_sclass.tif": "9d1d52b304f56724a10e721ee637d8ae728ca69d3ec245f116782beb34a67c70",
+  "data/landfire/NH_2023_tcc.tif": "7ec71f127ab055ec8044f6dcd8acac2c7a6623a5b1300f2dbcf066b89d7f2648",
+  "data/landfire/NH_2023_tpa_live.tif": "9bb17fb6a4c21bacb1bcff9f01c604080d102687fa9cbe330729355958e72b2a",
+  "data/landfire/NH_2023_tsd.tif": "cb9bb2299ad9c247f9e525459a397dbc3b0b52252ef9d1dcc39687f31941d11c",
+  "data/landfire/NH_2024_balive.tif": "58471fcd307803cefe90350529ca4e3c9a3f7dfea73fb448f235bb9b6162ddc5",
+  "data/landfire/NH_2024_carbon_dwn.tif": "8f09b856f24f4fde3abdd61da86897d1d023e941d8e6afbaba0a4e914959989f",
+  "data/landfire/NH_2024_cc.tif": "76876507843188c1ea1bf854a6a491472360dcd928e06063a84d6d90e4d847ec",
+  "data/landfire/NH_2024_ch.tif": "5e759aea6d553f7e2d6fe8712a48cf4b1a55cf4075f2bd6cab9e2505e9280750",
+  "data/landfire/NH_2024_evc.tif": "8d7ba7b50975ae381754e0b6fee60b1de8f95388d121fc3986704e422be0e382",
+  "data/landfire/NH_2024_evh.tif": "0210282a4a2225f83191dcbfa6b14604c167452138647220e6b209b11ddadde5",
+  "data/landfire/NH_2024_evt.tif": "92133c1931767538e43d87f96690c297acd3d103d72592a5af383c2aac556ac9",
+  "data/landfire/NH_2024_fdist.tif": "fdd838d8df6699ae668643a9f151d6b73181c85fef9f85455b1aa9865d27b466",
+  "data/landfire/NH_2024_nlcd.tif": "4b511325ffce3cee7971c3d0d87b5f63ab89a0597e624d138d1f4e40d2658803",
+  "data/landfire/NH_2024_qmd.tif": "3182ded517636e002cdf32d8bf2e5871cb81ba2ced9292fed18557b659b11ffc",
+  "data/landfire/NH_2024_road_dist.tif": "8e44166d0e43ed265432fc6688152a5e31b6f0c1de2e559cefc182d296ddd2bf",
+  "data/landfire/NH_2024_sclass.tif": "5020eb356a84cbc7484bbdb764af53fa562fe389ca3af1fc69387749175b4988",
+  "data/landfire/NH_2024_tpa_live.tif": "9bb17fb6a4c21bacb1bcff9f01c604080d102687fa9cbe330729355958e72b2a",
+  "data/landfire/NH_2024_tsd.tif": "6b884e5cf3010fba242b5eaaa51f50a2d01a1f38d615e0b12defc489aa318196",
+  "data/landfire/VT_2016_balive.tif": "e009b7430fc7c57c3bff4643cf68c04499287d42880d43974e01d949b14dd2d7",
+  "data/landfire/VT_2016_carbon_dwn.tif": "a641cc3fa76acc88a10032d9be9e0133df2abc64e3a94c6d6dc3b4159c421a3f",
+  "data/landfire/VT_2016_nlcd.tif": "b7cc6f5fa0c83bda76130a44600e18bfb2382d034b9d9f20be9d981a77ec585d",
+  "data/landfire/VT_2016_qmd.tif": "1012f3577e808a49d5e5076e0f3aa88026040a7f68bfbf44717165ef2b4cefcb",
+  "data/landfire/VT_2016_road_dist.tif": "15f141eee4d96ea716143f5020defc63d5f7a6f4fff51700273cce8dafccddbb",
+  "data/landfire/VT_2016_tcc.tif": "d0e4ce27057a91cb5bf61460e701eff6ee3108c16926b13498f99fa3f2d52343",
+  "data/landfire/VT_2016_tpa_live.tif": "44fdf47663d6ceb78345457914dacdb6bc68bfbfa1daaff7816b109bf332ed95",
+  "data/landfire/VT_2016_tsd.tif": "fa305ec6e147b3e7c93b918f2b2644ba48f6a526a6ef65a78e06f1c9320af296",
+  "data/landfire/VT_2017_balive.tif": "e009b7430fc7c57c3bff4643cf68c04499287d42880d43974e01d949b14dd2d7",
+  "data/landfire/VT_2017_carbon_dwn.tif": "a641cc3fa76acc88a10032d9be9e0133df2abc64e3a94c6d6dc3b4159c421a3f",
+  "data/landfire/VT_2017_nlcd.tif": "66d4d931e165101a857ec5bc4f3a4c4f133dd97bf1cfbfe94070afeb3ecc5663",
+  "data/landfire/VT_2017_qmd.tif": "1012f3577e808a49d5e5076e0f3aa88026040a7f68bfbf44717165ef2b4cefcb",
+  "data/landfire/VT_2017_road_dist.tif": "15f141eee4d96ea716143f5020defc63d5f7a6f4fff51700273cce8dafccddbb",
+  "data/landfire/VT_2017_tcc.tif": "fbf9f815c9eea57bcd2802ec478e742093e74629d2329e9c14006f755ee029ac",
+  "data/landfire/VT_2017_tpa_live.tif": "44fdf47663d6ceb78345457914dacdb6bc68bfbfa1daaff7816b109bf332ed95",
+  "data/landfire/VT_2017_tsd.tif": "361806f4da76a034e850b7be321cc278507e9a2bdd64aae25b502c9db9d76153",
+  "data/landfire/VT_2018_balive.tif": "e009b7430fc7c57c3bff4643cf68c04499287d42880d43974e01d949b14dd2d7",
+  "data/landfire/VT_2018_carbon_dwn.tif": "a641cc3fa76acc88a10032d9be9e0133df2abc64e3a94c6d6dc3b4159c421a3f",
+  "data/landfire/VT_2018_nlcd.tif": "0a2e3dc8319cec3e3fd124ff32363d047c21c9a7b4a7e681d98b44e404ee4a18",
+  "data/landfire/VT_2018_qmd.tif": "1012f3577e808a49d5e5076e0f3aa88026040a7f68bfbf44717165ef2b4cefcb",
+  "data/landfire/VT_2018_road_dist.tif": "15f141eee4d96ea716143f5020defc63d5f7a6f4fff51700273cce8dafccddbb",
+  "data/landfire/VT_2018_tcc.tif": "939f8da7820fdfa223f36a73bdfedc1f02f3c5afec125646e6a096d686ddc9ea",
+  "data/landfire/VT_2018_tpa_live.tif": "44fdf47663d6ceb78345457914dacdb6bc68bfbfa1daaff7816b109bf332ed95",
+  "data/landfire/VT_2018_tsd.tif": "8cc8564c2f0ceee8577eec7b6bdc992b5b815575089dab9ed2db05b232d1c681",
+  "data/landfire/VT_2019_balive.tif": "1453772dd1bb0c4be6f2bfa7e0509606d5cbc55e872d49e8aadc7838c07da1f2",
+  "data/landfire/VT_2019_carbon_dwn.tif": "a8ea5e9a9367c66ce3f71530b1ea97b760c6c9b486c93f86c552bbaf68371df5",
+  "data/landfire/VT_2019_nlcd.tif": "71b8ce8d7624f05af8595da07fd8066557d769f596c2909a5be41a6e25f9b355",
+  "data/landfire/VT_2019_qmd.tif": "3a93ba0a3c4d7bbe8da837961e4542d210920630327860d2bbfe1aa33a4a4584",
+  "data/landfire/VT_2019_road_dist.tif": "15f141eee4d96ea716143f5020defc63d5f7a6f4fff51700273cce8dafccddbb",
+  "data/landfire/VT_2019_tcc.tif": "213f59c2f77c6d6053893e4a57797bc2626eb89555fe01644107d9fd04d6be00",
+  "data/landfire/VT_2019_tpa_live.tif": "6a198c80cee7496e706589b882c36c136c26daa03bc864aea5a793033b43283a",
+  "data/landfire/VT_2019_tsd.tif": "f1bb2308ca200789d081e87c948efe7d962e834d2edfa7345961e965d7dff738",
+  "data/landfire/VT_2020_balive.tif": "1453772dd1bb0c4be6f2bfa7e0509606d5cbc55e872d49e8aadc7838c07da1f2",
+  "data/landfire/VT_2020_carbon_dwn.tif": "a8ea5e9a9367c66ce3f71530b1ea97b760c6c9b486c93f86c552bbaf68371df5",
+  "data/landfire/VT_2020_nlcd.tif": "28c54df7b4ad83a10ed4bab57db80a1f811875b7c27eba2900301e806b51bdab",
+  "data/landfire/VT_2020_qmd.tif": "3a93ba0a3c4d7bbe8da837961e4542d210920630327860d2bbfe1aa33a4a4584",
+  "data/landfire/VT_2020_road_dist.tif": "15f141eee4d96ea716143f5020defc63d5f7a6f4fff51700273cce8dafccddbb",
+  "data/landfire/VT_2020_tcc.tif": "d33f10b52cf536206e04a8a20c08be4e586ec1c60f14ebceff424dcb5b6c81d5",
+  "data/landfire/VT_2020_tpa_live.tif": "6a198c80cee7496e706589b882c36c136c26daa03bc864aea5a793033b43283a",
+  "data/landfire/VT_2020_tsd.tif": "b426264ba8b09c641d2f13d0f0f57f9d5a9260441b8f808f7124dcdb11e39e97",
+  "data/landfire/VT_2021_balive.tif": "1453772dd1bb0c4be6f2bfa7e0509606d5cbc55e872d49e8aadc7838c07da1f2",
+  "data/landfire/VT_2021_carbon_dwn.tif": "a8ea5e9a9367c66ce3f71530b1ea97b760c6c9b486c93f86c552bbaf68371df5",
+  "data/landfire/VT_2021_nlcd.tif": "7e7d414c66240b7d279b7c17992e871b7f79ef5f2cb4acf180d732dc854d02a1",
+  "data/landfire/VT_2021_qmd.tif": "3a93ba0a3c4d7bbe8da837961e4542d210920630327860d2bbfe1aa33a4a4584",
+  "data/landfire/VT_2021_road_dist.tif": "15f141eee4d96ea716143f5020defc63d5f7a6f4fff51700273cce8dafccddbb",
+  "data/landfire/VT_2021_tcc.tif": "9ec3d29d562b645e438314e34996d418c736fe7138dd7896ccd69b7b7e1cdcdb",
+  "data/landfire/VT_2021_tpa_live.tif": "6a198c80cee7496e706589b882c36c136c26daa03bc864aea5a793033b43283a",
+  "data/landfire/VT_2021_tsd.tif": "2d0204d027f88e78cb82c9aae71fc6e98c09ed97afd589c8fa017d286ba74a51",
+  "data/landfire/VT_2022_balive.tif": "6f37d0856a46a375caa768bfd27fa290ff22f1c54736da2161b66c2c882fc0a0",
+  "data/landfire/VT_2022_carbon_dwn.tif": "1b28a4fde8957d7e62c6fb166d0bee3d6c53f130b5b0399c1cd718b01a36aa0f",
+  "data/landfire/VT_2022_cc.tif": "615b18e1ff52cc301527efa4b657a97dd2a5c3e5fa0fe044557f6ab994224802",
+  "data/landfire/VT_2022_ch.tif": "6e2a3fdb100cec7e0c409c00107be00a1d0af15d27d97a18b6eabd65a06c28ff",
+  "data/landfire/VT_2022_evc.tif": "44ceac0213c5efbaaf3eddd17b8abd6a5ee4cda86ae128f8bb8c195d30b4d60d",
+  "data/landfire/VT_2022_evh.tif": "da62bd8e7db9141a79ae30d029d41483ef228c74089dda398361d7093f5ff386",
+  "data/landfire/VT_2022_evt.tif": "f36fc76479d2123d1d171c5868a609c87126b58f6bd292cee8f5366dbbb77b85",
+  "data/landfire/VT_2022_fdist.tif": "73238db730144f84d9dac2db5a05d17abd8f06a090ed57a701174cf36a75e27b",
+  "data/landfire/VT_2022_nlcd.tif": "3443bc9ee17136eded062a25d54f08136d5d5dbca3449597a59097488cd49a9f",
+  "data/landfire/VT_2022_qmd.tif": "fee9441efdb2bc261643b176fe6bd1f88ed37e7c1ea01bd419d05c5447c19857",
+  "data/landfire/VT_2022_road_dist.tif": "15f141eee4d96ea716143f5020defc63d5f7a6f4fff51700273cce8dafccddbb",
+  "data/landfire/VT_2022_sclass.tif": "39efacc6262e6d5fa2eb7b9afc838084bcb18ef90beb41fb9f375596c123de0c",
+  "data/landfire/VT_2022_tcc.tif": "88e2f4801b3834916a2d60d4d3ec7e7501e297db61d083496992bad622ca52c8",
+  "data/landfire/VT_2022_tpa_live.tif": "a132688f285d96cb78927c06e7f0ff13217b07ef0907439fed52c44b59f53489",
+  "data/landfire/VT_2022_tsd.tif": "a31278af90d2987c9ac40773558179d6160666b5a1e73be6d44cf1238be627c6",
+  "data/landfire/VT_2023_balive.tif": "6f37d0856a46a375caa768bfd27fa290ff22f1c54736da2161b66c2c882fc0a0",
+  "data/landfire/VT_2023_carbon_dwn.tif": "1b28a4fde8957d7e62c6fb166d0bee3d6c53f130b5b0399c1cd718b01a36aa0f",
+  "data/landfire/VT_2023_cc.tif": "0a7c84ae1a4fbb2f63ea1a690627d8bf50512dc8955abef9a62c5f876815f2bd",
+  "data/landfire/VT_2023_ch.tif": "6f7291c68d670df2a4f27ed2e0f14a51276f1bac03b1dd4ccfb0a51bb4c153ba",
+  "data/landfire/VT_2023_evc.tif": "1532f4bdb80cf360050056879bc8b3a9ee270910fb713d85201d8e1737388d3b",
+  "data/landfire/VT_2023_evh.tif": "505a95341dd25819f4cbac7354706505391f437f81e5c59a5e0eb46bd871c3c8",
+  "data/landfire/VT_2023_evt.tif": "645fa1b2da53f00ecf7eea492b904ffd47f20a9014531c0d7cef74c6fe80d291",
+  "data/landfire/VT_2023_fdist.tif": "bc9c6c76954fa38ffd67854e231c92ef2f6ff7147889aa0af60de9150737337e",
+  "data/landfire/VT_2023_nlcd.tif": "376c30609258d3855693f79c1bab13a8914d6fe5b1f3cbc743c009176b533b46",
+  "data/landfire/VT_2023_qmd.tif": "fee9441efdb2bc261643b176fe6bd1f88ed37e7c1ea01bd419d05c5447c19857",
+  "data/landfire/VT_2023_road_dist.tif": "15f141eee4d96ea716143f5020defc63d5f7a6f4fff51700273cce8dafccddbb",
+  "data/landfire/VT_2023_sclass.tif": "c083840d7205686f518cc5cc9e85d42df5c2f0425d4fcf55d9851d9d4bbc0382",
+  "data/landfire/VT_2023_tcc.tif": "981773c0239fe79717a8cf19c57a5ba54aecd10586fff75e8400dd8c495d690b",
+  "data/landfire/VT_2023_tpa_live.tif": "a132688f285d96cb78927c06e7f0ff13217b07ef0907439fed52c44b59f53489",
+  "data/landfire/VT_2023_tsd.tif": "51a63bf6e48ffa97f45092c1c1a4a48c41ae5a24656585c1b1ebd563c9f96124",
+  "data/landfire/VT_2024_balive.tif": "6f37d0856a46a375caa768bfd27fa290ff22f1c54736da2161b66c2c882fc0a0",
+  "data/landfire/VT_2024_carbon_dwn.tif": "1b28a4fde8957d7e62c6fb166d0bee3d6c53f130b5b0399c1cd718b01a36aa0f",
+  "data/landfire/VT_2024_cc.tif": "1abafdccc99b4861284fb1c9cbe63b4bb28438ac202d21c3b3e45486dbc67e0f",
+  "data/landfire/VT_2024_ch.tif": "963068328eaedcf947e82f0e1962804fe4017e3bf599c9841d2318382b3e00cc",
+  "data/landfire/VT_2024_evc.tif": "f7feaf28b949dae5903b700fcd17eb55c7b0ff744c5ca7334d228af3b7015196",
+  "data/landfire/VT_2024_evh.tif": "f21ae6990f42478cf9d968bddc0d8205c09cebfa67c989d45033d0b6f89b2e65",
+  "data/landfire/VT_2024_evt.tif": "c844da4db0ac1834b9b0dfaeb5f8bfbae69b5f2506ba84e6e8c10bd997d362ff",
+  "data/landfire/VT_2024_fdist.tif": "4790d2511d5f60fbb5c706c6db15fee5e346affa13ae61e4d492e2d4a7016b1e",
+  "data/landfire/VT_2024_nlcd.tif": "c4dd7b0bb2ef0d9f0c8307f424c476a10e7eb504f9ebf7d06dcab39551e2ac1a",
+  "data/landfire/VT_2024_qmd.tif": "fee9441efdb2bc261643b176fe6bd1f88ed37e7c1ea01bd419d05c5447c19857",
+  "data/landfire/VT_2024_road_dist.tif": "15f141eee4d96ea716143f5020defc63d5f7a6f4fff51700273cce8dafccddbb",
+  "data/landfire/VT_2024_sclass.tif": "ad44154ace97db5013740fa95403bd41e3dcd39308d604fb9f1097326ff7a5e0",
+  "data/landfire/VT_2024_tpa_live.tif": "a132688f285d96cb78927c06e7f0ff13217b07ef0907439fed52c44b59f53489",
+  "data/landfire/VT_2024_tsd.tif": "73e9f164b668cc9877b6a7481efd641c69878587c32ae7c8ef589047986f2650",
+  "data/landfire/attribute_tables/LF2025_EVT.csv": "5ccc130b250dbe709340afb2cc02ecdb3c4c374e2dba19cec91e2c2713e4963d",
+  "data/negatives/gbif_negatives_ME.csv": "8306d34296a79dae6e3aaa67f467b189d801fd0f6a753cf76e7b1b49e8329aa3",
+  "data/negatives/gbif_negatives_NH.csv": "7f04aa41d9f0433e79bfb0c8e85f9a8a194fa82cf5b3affa445cbf6122ba9000",
+  "data/negatives/gbif_negatives_VT.csv": "cce1ebdc4508f3559a5cf8babb93582ecc653ae7b4e17e6f0d94a8645f59c362",
+  "data/pipeline/envelope_metrics_ME.csv": "eeaf172a0d4edae568df69f4563b6fbc7c32f2bace57f62e299fd46f9cefda0f",
+  "data/pipeline/envelope_metrics_NH.csv": "aa71459a987b71eb12f89c8d2c83b1ffb70d3ba38385ed266f6d1fc175e15be7",
+  "data/pipeline/envelope_metrics_VT.csv": "1fb35025518b4d104f1006d029576513179c2f196b9e55286db115a8531f3575",
+  "data/pipeline/evaluated_sightings_ME.csv": "788c32866d103805c1d2d6173e96a2fee5b264ab08e82994148e15e341c0e95d",
+  "data/pipeline/evaluated_sightings_NH.csv": "2da374a11a83a7468eeddb8ee2a2919406fde8adfc253a6b09123099c86ad28d",
+  "data/pipeline/evaluated_sightings_VT.csv": "98f456943933f453f7492fcb247da9257fbb67b039ade4fd9417d1593ad4e4eb",
+  "data/roads/tl_2023_us_county.zip": "692e12c30c83adcaabdbac0d3954fafa55e1c89a24b36d95e72e02dff938652e"
+ },
+ "obs": {
+  "O1.median_m": 2551.9066473992652,
+  "O10.val_fraction.neg.ME": 0.20163934426229507,
+  "O10.val_fraction.neg.NH": 0.22150139017608897,
+  "O10.val_fraction.neg.VT": 0.18017414601473544,
+  "O10.val_fraction.pos.ME": 0.20163934426229507,
+  "O10.val_fraction.pos.NH": 0.22150139017608897,
+  "O10.val_fraction.pos.VT": 0.18017414601473544,
+  "O2.records_per_val_block": 1.6416337285902503,
+  "O2.share_gap": 0.0033546185664285744,
+  "O3.moran_k4.positive_blocks": 0.004912679056989891,
+  "O3.moran_k8.positive_blocks": 0.005913085526869061,
+  "O4.moran_k4.pool_blocks": -5.096332536883222e-05,
+  "O4.moran_k4.selected-record_blocks": 0.0015274390612896938,
+  "O4.moran_k8.pool_blocks": -0.0032622454204118746,
+  "O4.moran_k8.selected-record_blocks": 0.004503458438226174,
+  "O5.Exc.ME": 1.1234570086563578,
+  "O5.Exc.NH": 1.1620956708643682,
+  "O5.Exc.VT": 0.5763608141587927,
+  "O5.Excws_val.ME": 3.483806104621653,
+  "O5.Excws_val.NH": 3.80443634085482,
+  "O5.Excws_val.VT": 2.814856863208718,
+  "O5.S.ME": 0.5330601092896174,
+  "O5.S.NH": 0.5607043558850788,
+  "O5.S.VT": 0.43670462156731416,
+  "O5.Sws_val.ME": 0.6422764227642277,
+  "O5.Sws_val.NH": 0.5899581589958159,
+  "O5.Sws_val.VT": 0.620817843866171,
+  "O6.basis_tv_sel_vs_wpool.ME": 0.649266937007847,
+  "O6.basis_tv_sel_vs_wpool.NH": 0.6428620796089326,
+  "O6.basis_tv_sel_vs_wpool.VT": 0.6545677211331317,
+  "O6.basis_tv_train_val.ME": 0.00863925477037112,
+  "O6.basis_tv_train_val.NH": 0.03171448495716279,
+  "O6.basis_tv_train_val.VT": 0.012555579852759003,
+  "O6.evtphys_tv_nonveg.ME": 0.02516689602344339,
+  "O6.evtphys_tv_nonveg.NH": 0.05035043626884485,
+  "O6.evtphys_tv_nonveg.VT": 0.054454650565262074,
+  "O6.hab_weight_sel_over_pool.ME": 1.103536373462912,
+  "O6.hab_weight_sel_over_pool.NH": 1.2009148379073602,
+  "O6.hab_weight_sel_over_pool.VT": 1.1286258317392441,
+  "O6.nonveg_val_minus_train.ME": -0.0006788979594107847,
+  "O6.nonveg_val_minus_train.NH": 0.0012552301255230325,
+  "O6.nonveg_val_minus_train.VT": 0.0012786403284982262,
+  "O6.species_tv.ME": 0.045883909969275445,
+  "O6.species_tv.NH": 0.07654642647779752,
+  "O6.species_tv.VT": 0.10874822915149489,
+  "O7.SUP_O.ME": 2,
+  "O7.SUP_O.NH": 0,
+  "O7.SUP_O.VT": 0,
+  "O7.SUP_R.ME": 4.131302529065614,
+  "O7.SUP_R.NH": 3.841941645583582,
+  "O7.SUP_R.VT": 3.6535263811738905,
+  "O7.hab_pool_over_target_worst.ME": 1.5706601466992665,
+  "O7.hab_pool_over_target_worst.NH": 2.317365269461078,
+  "O7.hab_pool_over_target_worst.VT": 1.5985997666277714,
+  "O7.pool_over_target.ME": 3.115846994535519,
+  "O7.pool_over_target.NH": 4.832252085264133,
+  "O7.pool_over_target.VT": 3.7300736771600804,
+  "O8.neg_ks.ME": 0.035725613929650596,
+  "O8.neg_ks.NH": 0.12369495915521012,
+  "O8.neg_ks.VT": 0.072645600991326,
+  "O8.neg_ks.pooled": 0.0369628861293162,
+  "O8.neg_smd.ME": 0.07509476593063319,
+  "O8.neg_smd.NH": 0.18715204520428602,
+  "O8.neg_smd.VT": 0.12190553442225854,
+  "O8.neg_smd.pooled": 0.07557246465895605,
+  "O8.neghab_ks.ME": 0.046449092706180584,
+  "O8.neghab_ks.NH": 0.12359973929691637,
+  "O8.neghab_ks.VT": 0.11505995680131087,
+  "O8.neghab_ks.pooled": 0.05476591046502466,
+  "O8.pos_ks.ME": 0.04688569472963722,
+  "O8.pos_ks.NH": 0.12544331540147435,
+  "O8.pos_ks.VT": 0.06489175595888919,
+  "O8.pos_ks.pooled": 0.04193636242474119,
+  "O8.pos_smd.ME": 0.06346908896754488,
+  "O8.pos_smd.NH": 0.22973038736804066,
+  "O8.pos_smd.VT": 0.0964990252975733,
+  "O8.pos_smd.pooled": 0.05462884302801319,
+  "O9.year_hist.neg.ME": {
+   "2020": 1550,
+   "2021": 901,
+   "2022": 785,
+   "2023": 270,
+   "2024": 154
+  },
+  "O9.year_hist.neg.NH": {
+   "2020": 376,
+   "2021": 297,
+   "2022": 205,
+   "2023": 107,
+   "2024": 94
+  },
+  "O9.year_hist.neg.VT": {
+   "2020": 459,
+   "2021": 473,
+   "2022": 313,
+   "2023": 141,
+   "2024": 107
+  },
+  "O9.year_hist.pos.ME": {
+   "2016": 106,
+   "2017": 110,
+   "2018": 298,
+   "2019": 300,
+   "2020": 599,
+   "2021": 725,
+   "2022": 793,
+   "2023": 344,
+   "2024": 385
+  },
+  "O9.year_hist.pos.NH": {
+   "2016": 61,
+   "2017": 66,
+   "2018": 65,
+   "2019": 64,
+   "2020": 131,
+   "2021": 146,
+   "2022": 166,
+   "2023": 150,
+   "2024": 230
+  },
+  "O9.year_hist.pos.VT": {
+   "2016": 102,
+   "2017": 81,
+   "2018": 89,
+   "2019": 95,
+   "2020": 195,
+   "2021": 181,
+   "2022": 213,
+   "2023": 211,
+   "2024": 326
+  }
+ },
+ "obs_sha256": "1fca1f4066d2894183b3941ab6be4db63b74f2178ce3584446f8d0dd3acd5bc2",
+ "rasters": [
+  [
+   "data/landfire/ME_2016_balive.tif",
+   105993890,
+   1790762724573129646
+  ],
+  [
+   "data/landfire/ME_2016_carbon_dwn.tif",
+   97298614,
+   1790762724733136834
+  ],
+  [
+   "data/landfire/ME_2016_nlcd.tif",
+   28169279,
+   1789903692889579594
+  ],
+  [
+   "data/landfire/ME_2016_qmd.tif",
+   100332264,
+   1790762722713046065
+  ],
+  [
+   "data/landfire/ME_2016_road_dist.tif",
+   38001690,
+   1790765405634399083
+  ],
+  [
+   "data/landfire/ME_2016_tcc.tif",
+   80676064,
+   1790762731803454526
+  ],
+  [
+   "data/landfire/ME_2016_tpa_live.tif",
+   109713418,
+   1790762732243474296
+  ],
+  [
+   "data/landfire/ME_2016_tsd.tif",
+   8496210,
+   1790762728983327810
+  ],
+  [
+   "data/landfire/ME_2017_balive.tif",
+   105993890,
+   1790762736733676264
+  ],
+  [
+   "data/landfire/ME_2017_carbon_dwn.tif",
+   97298614,
+   1790762737583714550
+  ],
+  [
+   "data/landfire/ME_2017_nlcd.tif",
+   28128098,
+   1789903713740000269
+  ],
+  [
+   "data/landfire/ME_2017_qmd.tif",
+   100332264,
+   1790762740033824901
+  ],
+  [
+   "data/landfire/ME_2017_road_dist.tif",
+   38001690,
+   1790765409384569983
+  ],
+  [
+   "data/landfire/ME_2017_tcc.tif",
+   81407620,
+   1790762748784219021
+  ],
+  [
+   "data/landfire/ME_2017_tpa_live.tif",
+   109713418,
+   1790762743293971740
+  ],
+  [
+   "data/landfire/ME_2017_tsd.tif",
+   8970624,
+   1790762744244014530
+  ],
+  [
+   "data/landfire/ME_2018_balive.tif",
+   105993890,
+   1790762750174281630
+  ],
+  [
+   "data/landfire/ME_2018_carbon_dwn.tif",
+   97298614,
+   1790762751974362938
+  ],
+  [
+   "data/landfire/ME_2018_nlcd.tif",
+   28146282,
+   1789903734870434256
+  ],
+  [
+   "data/landfire/ME_2018_qmd.tif",
+   100332264,
+   1790762756504568143
+  ],
+  [
+   "data/landfire/ME_2018_road_dist.tif",
+   38001690,
+   1790765413204744070
+  ],
+  [
+   "data/landfire/ME_2018_tcc.tif",
+   81631894,
+   1790762759224691358
+  ],
+  [
+   "data/landfire/ME_2018_tpa_live.tif",
+   109713418,
+   1790762759594708119
+  ],
+  [
+   "data/landfire/ME_2018_tsd.tif",
+   9432128,
+   1790762760884766556
+  ],
+  [
+   "data/landfire/ME_2019_balive.tif",
+   103985624,
+   1790762766335013439
+  ],
+  [
+   "data/landfire/ME_2019_carbon_dwn.tif",
+   99209356,
+   1790762767315057834
+  ],
+  [
+   "data/landfire/ME_2019_nlcd.tif",
+   28222765,
+   1789903755550854942
+  ],
+  [
+   "data/landfire/ME_2019_qmd.tif",
+   98395896,
+   1790762766795034277
+  ],
+  [
+   "data/landfire/ME_2019_road_dist.tif",
+   38001690,
+   1790765417384934538
+  ],
+  [
+   "data/landfire/ME_2019_tcc.tif",
+   82301726,
+   1790762778145550417
+  ],
+  [
+   "data/landfire/ME_2019_tpa_live.tif",
+   107477782,
+   1790762774115367115
+  ],
+  [
+   "data/landfire/ME_2019_tsd.tif",
+   9938282,
+   1790762770485202005
+  ],
+  [
+   "data/landfire/ME_2020_balive.tif",
+   103985624,
+   1790762776285465815
+  ],
+  [
+   "data/landfire/ME_2020_carbon_dwn.tif",
+   99209356,
+   1790762781765714115
+  ],
+  [
+   "data/landfire/ME_2020_nlcd.tif",
+   28149104,
+   1789903776331281523
+  ],
+  [
+   "data/landfire/ME_2020_qmd.tif",
+   98395896,
+   1790762782205733955
+  ],
+  [
+   "data/landfire/ME_2020_road_dist.tif",
+   38001690,
+   1790765421175106778
+  ],
+  [
+   "data/landfire/ME_2020_tcc.tif",
+   83266780,
+   1790762789796076994
+  ],
+  [
+   "data/landfire/ME_2020_tpa_live.tif",
+   107477782,
+   1790762789156048056
+  ],
+  [
+   "data/landfire/ME_2020_tsd.tif",
+   10262810,
+   1790762785515883462
+  ],
+  [
+   "data/landfire/ME_2021_balive.tif",
+   103985624,
+   1790762791266143466
+  ],
+  [
+   "data/landfire/ME_2021_carbon_dwn.tif",
+   99209356,
+   1790762796966401208
+  ],
+  [
+   "data/landfire/ME_2021_nlcd.tif",
+   28043198,
+   1789903797291710859
+  ],
+  [
+   "data/landfire/ME_2021_qmd.tif",
+   98395896,
+   1790762797456423366
+  ],
+  [
+   "data/landfire/ME_2021_road_dist.tif",
+   38001690,
+   1790765424955278562
+  ],
+  [
+   "data/landfire/ME_2021_tcc.tif",
+   84725062,
+   1790762800376555642
+  ],
+  [
+   "data/landfire/ME_2021_tpa_live.tif",
+   107477782,
+   1790762804616749162
+  ],
+  [
+   "data/landfire/ME_2021_tsd.tif",
+   10614952,
+   1790762802016630493
+  ],
+  [
+   "data/landfire/ME_2022_balive.tif",
+   104027622,
+   1790762806296825839
+  ],
+  [
+   "data/landfire/ME_2022_carbon_dwn.tif",
+   99234152,
+   1790762809766984215
+  ],
+  [
+   "data/landfire/ME_2022_cc.tif",
+   52583876,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/ME_2022_ch.tif",
+   36925686,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/ME_2022_evc.tif",
+   123312036,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/ME_2022_evh.tif",
+   72888370,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/ME_2022_evt.tif",
+   56535214,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/ME_2022_fdist.tif",
+   13877684,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/ME_2022_nlcd.tif",
+   27959689,
+   1789903817792130900
+  ],
+  [
+   "data/landfire/ME_2022_qmd.tif",
+   98442628,
+   1790762812327100110
+  ],
+  [
+   "data/landfire/ME_2022_road_dist.tif",
+   38001690,
+   1790765428735450350
+  ],
+  [
+   "data/landfire/ME_2022_sclass.tif",
+   40413342,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/ME_2022_tcc.tif",
+   84290014,
+   1790762817007311890
+  ],
+  [
+   "data/landfire/ME_2022_tpa_live.tif",
+   107564616,
+   1790762815657250737
+  ],
+  [
+   "data/landfire/ME_2022_tsd.tif",
+   10930520,
+   1790762816757300561
+  ],
+  [
+   "data/landfire/ME_2023_balive.tif",
+   104027622,
+   1790762821517516275
+  ],
+  [
+   "data/landfire/ME_2023_carbon_dwn.tif",
+   99234152,
+   1790762824467649962
+  ],
+  [
+   "data/landfire/ME_2023_cc.tif",
+   56904126,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/ME_2023_ch.tif",
+   42860174,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/ME_2023_evc.tif",
+   145293458,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/ME_2023_evh.tif",
+   86820670,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/ME_2023_evt.tif",
+   55127620,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/ME_2023_fdist.tif",
+   14359208,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/ME_2023_nlcd.tif",
+   27974424,
+   1789903838352553690
+  ],
+  [
+   "data/landfire/ME_2023_qmd.tif",
+   98442628,
+   1790762824817665824
+  ],
+  [
+   "data/landfire/ME_2023_road_dist.tif",
+   38001690,
+   1790765432535623043
+  ],
+  [
+   "data/landfire/ME_2023_sclass.tif",
+   40069290,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/ME_2023_tcc.tif",
+   85305308,
+   1790762830377917792
+  ],
+  [
+   "data/landfire/ME_2023_tpa_live.tif",
+   107564616,
+   1790762832037993019
+  ],
+  [
+   "data/landfire/ME_2023_tsd.tif",
+   11265076,
+   1790762829397873380
+  ],
+  [
+   "data/landfire/ME_2024_balive.tif",
+   104027622,
+   1790762837208229953
+  ],
+  [
+   "data/landfire/ME_2024_carbon_dwn.tif",
+   99234152,
+   1790762836538199244
+  ],
+  [
+   "data/landfire/ME_2024_cc.tif",
+   57220288,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/ME_2024_ch.tif",
+   43001194,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/ME_2024_evc.tif",
+   145612130,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/ME_2024_evh.tif",
+   86840514,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/ME_2024_evt.tif",
+   55038818,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/ME_2024_fdist.tif",
+   14661864,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/ME_2024_nlcd.tif",
+   28033373,
+   1789903859172986634
+  ],
+  [
+   "data/landfire/ME_2024_qmd.tif",
+   98442628,
+   1790762838478288163
+  ],
+  [
+   "data/landfire/ME_2024_road_dist.tif",
+   38001690,
+   1790765436285793409
+  ],
+  [
+   "data/landfire/ME_2024_sclass.tif",
+   40110218,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/ME_2024_tpa_live.tif",
+   107564616,
+   1790762844258551167
+  ],
+  [
+   "data/landfire/ME_2024_tsd.tif",
+   11586468,
+   1790762841898444222
+  ],
+  [
+   "data/landfire/NH_2016_balive.tif",
+   52730696,
+   1790762885380418781
+  ],
+  [
+   "data/landfire/NH_2016_carbon_dwn.tif",
+   48499272,
+   1790762886120451992
+  ],
+  [
+   "data/landfire/NH_2016_nlcd.tif",
+   14712604,
+   1789903872403260884
+  ],
+  [
+   "data/landfire/NH_2016_qmd.tif",
+   50499218,
+   1790762886210456031
+  ],
+  [
+   "data/landfire/NH_2016_road_dist.tif",
+   19472144,
+   1790765347711763499
+  ],
+  [
+   "data/landfire/NH_2016_tcc.tif",
+   40714852,
+   1790762889450601441
+  ],
+  [
+   "data/landfire/NH_2016_tpa_live.tif",
+   54479270,
+   1790762889040583041
+  ],
+  [
+   "data/landfire/NH_2016_tsd.tif",
+   2400052,
+   1790762887440511233
+  ],
+  [
+   "data/landfire/NH_2017_balive.tif",
+   52730696,
+   1790762890440645872
+  ],
+  [
+   "data/landfire/NH_2017_carbon_dwn.tif",
+   48499272,
+   1790762892080719475
+  ],
+  [
+   "data/landfire/NH_2017_nlcd.tif",
+   14737919,
+   1789903881143441932
+  ],
+  [
+   "data/landfire/NH_2017_qmd.tif",
+   50499218,
+   1790762891770705563
+  ],
+  [
+   "data/landfire/NH_2017_road_dist.tif",
+   19472144,
+   1790765349401840430
+  ],
+  [
+   "data/landfire/NH_2017_tcc.tif",
+   41142654,
+   1790762895660881505
+  ],
+  [
+   "data/landfire/NH_2017_tpa_live.tif",
+   54479270,
+   1790762894210815733
+  ],
+  [
+   "data/landfire/NH_2017_tsd.tif",
+   2659510,
+   1790762893360777175
+  ],
+  [
+   "data/landfire/NH_2018_balive.tif",
+   52730696,
+   1790762896350912804
+  ],
+  [
+   "data/landfire/NH_2018_carbon_dwn.tif",
+   48499272,
+   1790762896560922330
+  ],
+  [
+   "data/landfire/NH_2018_nlcd.tif",
+   14775783,
+   1789903889653618152
+  ],
+  [
+   "data/landfire/NH_2018_qmd.tif",
+   50499218,
+   1790762898661017540
+  ],
+  [
+   "data/landfire/NH_2018_road_dist.tif",
+   19472144,
+   1790765351081916904
+  ],
+  [
+   "data/landfire/NH_2018_tcc.tif",
+   41202436,
+   1790762901681154457
+  ],
+  [
+   "data/landfire/NH_2018_tpa_live.tif",
+   54479270,
+   1790762898791023434
+  ],
+  [
+   "data/landfire/NH_2018_tsd.tif",
+   2868390,
+   1790762899711065144
+  ],
+  [
+   "data/landfire/NH_2019_balive.tif",
+   50668652,
+   1790762901181131788
+  ],
+  [
+   "data/landfire/NH_2019_carbon_dwn.tif",
+   48690800,
+   1790762902711201154
+  ],
+  [
+   "data/landfire/NH_2019_nlcd.tif",
+   14798708,
+   1789903898223795549
+  ],
+  [
+   "data/landfire/NH_2019_qmd.tif",
+   48748300,
+   1790762903541238782
+  ],
+  [
+   "data/landfire/NH_2019_road_dist.tif",
+   19472144,
+   1790765352781994272
+  ],
+  [
+   "data/landfire/NH_2019_tcc.tif",
+   41230130,
+   1790762906901391113
+  ],
+  [
+   "data/landfire/NH_2019_tpa_live.tif",
+   52184790,
+   1790762905611332629
+  ],
+  [
+   "data/landfire/NH_2019_tsd.tif",
+   3088926,
+   1790762904441279585
+  ],
+  [
+   "data/landfire/NH_2020_balive.tif",
+   50668652,
+   1790762906701382045
+  ],
+  [
+   "data/landfire/NH_2020_carbon_dwn.tif",
+   48690800,
+   1790762908651470451
+  ],
+  [
+   "data/landfire/NH_2020_nlcd.tif",
+   14815337,
+   1789903906793977460
+  ],
+  [
+   "data/landfire/NH_2020_qmd.tif",
+   48748300,
+   1790762909701518055
+  ],
+  [
+   "data/landfire/NH_2020_road_dist.tif",
+   19472144,
+   1790765354462070612
+  ],
+  [
+   "data/landfire/NH_2020_tcc.tif",
+   41570092,
+   1790762912181630489
+  ],
+  [
+   "data/landfire/NH_2020_tpa_live.tif",
+   52184790,
+   1790762911711609181
+  ],
+  [
+   "data/landfire/NH_2020_tsd.tif",
+   3195650,
+   1790762910961575181
+  ],
+  [
+   "data/landfire/NH_2021_balive.tif",
+   50668652,
+   1790762914191721618
+  ],
+  [
+   "data/landfire/NH_2021_carbon_dwn.tif",
+   48690800,
+   1790762914911754258
+  ],
+  [
+   "data/landfire/NH_2021_nlcd.tif",
+   14783121,
+   1789903915364162824
+  ],
+  [
+   "data/landfire/NH_2021_qmd.tif",
+   48748300,
+   1790762915271770579
+  ],
+  [
+   "data/landfire/NH_2021_road_dist.tif",
+   19472144,
+   1790765356132146495
+  ],
+  [
+   "data/landfire/NH_2021_tcc.tif",
+   41889478,
+   1790762918481916109
+  ],
+  [
+   "data/landfire/NH_2021_tpa_live.tif",
+   52184790,
+   1790762917861888001
+  ],
+  [
+   "data/landfire/NH_2021_tsd.tif",
+   3387638,
+   1790762916521827250
+  ],
+  [
+   "data/landfire/NH_2022_balive.tif",
+   50754684,
+   1790762919541964166
+  ],
+  [
+   "data/landfire/NH_2022_carbon_dwn.tif",
+   48766700,
+   1790762920912026277
+  ],
+  [
+   "data/landfire/NH_2022_cc.tif",
+   23765308,
+   1789903925504345147
+  ],
+  [
+   "data/landfire/NH_2022_ch.tif",
+   16456265,
+   1789903929554428330
+  ],
+  [
+   "data/landfire/NH_2022_evc.tif",
+   53155162,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/NH_2022_evh.tif",
+   31386914,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/NH_2022_evt.tif",
+   24139102,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/NH_2022_fdist.tif",
+   3132868,
+   1789903931124460578
+  ],
+  [
+   "data/landfire/NH_2022_nlcd.tif",
+   14778785,
+   1789903934704533828
+  ],
+  [
+   "data/landfire/NH_2022_qmd.tif",
+   48833248,
+   1790762920792020837
+  ],
+  [
+   "data/landfire/NH_2022_road_dist.tif",
+   19472144,
+   1790765357822223283
+  ],
+  [
+   "data/landfire/NH_2022_sclass.tif",
+   18383038,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/NH_2022_tcc.tif",
+   41690856,
+   1790762924782201730
+  ],
+  [
+   "data/landfire/NH_2022_tpa_live.tif",
+   52296630,
+   1790762923082124657
+  ],
+  [
+   "data/landfire/NH_2022_tsd.tif",
+   3495670,
+   1790762922142082043
+  ],
+  [
+   "data/landfire/NH_2023_balive.tif",
+   50754684,
+   1790762925122217143
+  ],
+  [
+   "data/landfire/NH_2023_carbon_dwn.tif",
+   48766700,
+   1790762925332226664
+  ],
+  [
+   "data/landfire/NH_2023_cc.tif",
+   24145580,
+   1789903944484725811
+  ],
+  [
+   "data/landfire/NH_2023_ch.tif",
+   17407953,
+   1789903948634809674
+  ],
+  [
+   "data/landfire/NH_2023_evc.tif",
+   56243518,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/NH_2023_evh.tif",
+   33207436,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/NH_2023_evt.tif",
+   23729306,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/NH_2023_fdist.tif",
+   3093204,
+   1789903950254842736
+  ],
+  [
+   "data/landfire/NH_2023_nlcd.tif",
+   14765641,
+   1789903953844913935
+  ],
+  [
+   "data/landfire/NH_2023_qmd.tif",
+   48833248,
+   1790762927782337738
+  ],
+  [
+   "data/landfire/NH_2023_road_dist.tif",
+   19472144,
+   1790765359512300075
+  ],
+  [
+   "data/landfire/NH_2023_sclass.tif",
+   18267876,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/NH_2023_tcc.tif",
+   41934568,
+   1790762929652422545
+  ],
+  [
+   "data/landfire/NH_2023_tpa_live.tif",
+   52296630,
+   1790762927832340006
+  ],
+  [
+   "data/landfire/NH_2023_tsd.tif",
+   3663540,
+   1790762929072396222
+  ],
+  [
+   "data/landfire/NH_2024_balive.tif",
+   50754684,
+   1790762930872477905
+  ],
+  [
+   "data/landfire/NH_2024_carbon_dwn.tif",
+   48766700,
+   1790762932112534175
+  ],
+  [
+   "data/landfire/NH_2024_cc.tif",
+   24230135,
+   1789903963725109531
+  ],
+  [
+   "data/landfire/NH_2024_ch.tif",
+   17544481,
+   1789903967895195585
+  ],
+  [
+   "data/landfire/NH_2024_evc.tif",
+   56211320,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/NH_2024_evh.tif",
+   33155384,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/NH_2024_evt.tif",
+   23704636,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/NH_2024_fdist.tif",
+   3454655,
+   1789903969515232313
+  ],
+  [
+   "data/landfire/NH_2024_nlcd.tif",
+   14782470,
+   1789903973105313703
+  ],
+  [
+   "data/landfire/NH_2024_qmd.tif",
+   48833248,
+   1790762931932526009
+  ],
+  [
+   "data/landfire/NH_2024_road_dist.tif",
+   19472144,
+   1790765361202376867
+  ],
+  [
+   "data/landfire/NH_2024_sclass.tif",
+   18299330,
+   1789713197381634740
+  ],
+  [
+   "data/landfire/NH_2024_tpa_live.tif",
+   52296630,
+   1790762933802610868
+  ],
+  [
+   "data/landfire/NH_2024_tsd.tif",
+   3822612,
+   1790762932882569119
+  ],
+  [
+   "data/landfire/VT_2016_balive.tif",
+   50923860,
+   1790762967884158491
+  ],
+  [
+   "data/landfire/VT_2016_carbon_dwn.tif",
+   46882956,
+   1790762967194127105
+  ],
+  [
+   "data/landfire/VT_2016_nlcd.tif",
+   13546946,
+   1789903983885540321
+  ],
+  [
+   "data/landfire/VT_2016_qmd.tif",
+   48904954,
+   1790762967954161676
+  ],
+  [
+   "data/landfire/VT_2016_road_dist.tif",
+   18777800,
+   1790765311270108683
+  ],
+  [
+   "data/landfire/VT_2016_tcc.tif",
+   39453554,
+   1790762971184308605
+  ],
+  [
+   "data/landfire/VT_2016_tpa_live.tif",
+   52661456,
+   1790762970644284039
+  ],
+  [
+   "data/landfire/VT_2016_tsd.tif",
+   1438750,
+   1790762969044211258
+  ],
+  [
+   "data/landfire/VT_2017_balive.tif",
+   50923860,
+   1790762971894340900
+  ],
+  [
+   "data/landfire/VT_2017_carbon_dwn.tif",
+   46882956,
+   1790762973444411409
+  ],
+  [
+   "data/landfire/VT_2017_nlcd.tif",
+   13567825,
+   1789903992405723992
+  ],
+  [
+   "data/landfire/VT_2017_qmd.tif",
+   48904954,
+   1790762973314405494
+  ],
+  [
+   "data/landfire/VT_2017_road_dist.tif",
+   18777800,
+   1790765312830179421
+  ],
+  [
+   "data/landfire/VT_2017_tcc.tif",
+   39889230,
+   1790762977134579261
+  ],
+  [
+   "data/landfire/VT_2017_tpa_live.tif",
+   52661456,
+   1790762975394500110
+  ],
+  [
+   "data/landfire/VT_2017_tsd.tif",
+   1621852,
+   1790762974494459169
+  ],
+  [
+   "data/landfire/VT_2018_balive.tif",
+   50923860,
+   1790762977304586993
+  ],
+  [
+   "data/landfire/VT_2018_carbon_dwn.tif",
+   46882956,
+   1790762977474594729
+  ],
+  [
+   "data/landfire/VT_2018_nlcd.tif",
+   13599244,
+   1789904000575898168
+  ],
+  [
+   "data/landfire/VT_2018_qmd.tif",
+   48904954,
+   1790762979984708961
+  ],
+  [
+   "data/landfire/VT_2018_road_dist.tif",
+   18777800,
+   1790765314430251972
+  ],
+  [
+   "data/landfire/VT_2018_tcc.tif",
+   39905656,
+   1790762982434820463
+  ],
+  [
+   "data/landfire/VT_2018_tpa_live.tif",
+   52661456,
+   1790762979514687571
+  ],
+  [
+   "data/landfire/VT_2018_tsd.tif",
+   1763298,
+   1790762980224719884
+  ],
+  [
+   "data/landfire/VT_2019_balive.tif",
+   47253718,
+   1790762982744834571
+  ],
+  [
+   "data/landfire/VT_2019_carbon_dwn.tif",
+   45477968,
+   1790762982314815001
+  ],
+  [
+   "data/landfire/VT_2019_nlcd.tif",
+   13616932,
+   1789904008696078929
+  ],
+  [
+   "data/landfire/VT_2019_qmd.tif",
+   45580282,
+   1790762984404910119
+  ],
+  [
+   "data/landfire/VT_2019_road_dist.tif",
+   18777800,
+   1790765316060325885
+  ],
+  [
+   "data/landfire/VT_2019_tcc.tif",
+   39796782,
+   1790762987565053933
+  ],
+  [
+   "data/landfire/VT_2019_tpa_live.tif",
+   48609316,
+   1790762985464958361
+  ],
+  [
+   "data/landfire/VT_2019_tsd.tif",
+   1928242,
+   1790762985174945163
+  ],
+  [
+   "data/landfire/VT_2020_balive.tif",
+   47253718,
+   1790762987285041190
+  ],
+  [
+   "data/landfire/VT_2020_carbon_dwn.tif",
+   45477968,
+   1790762988345089432
+  ],
+  [
+   "data/landfire/VT_2020_nlcd.tif",
+   13640502,
+   1789904016846261097
+  ],
+  [
+   "data/landfire/VT_2020_qmd.tif",
+   45580282,
+   1790762989365135853
+  ],
+  [
+   "data/landfire/VT_2020_road_dist.tif",
+   18777800,
+   1790765317650397984
+  ],
+  [
+   "data/landfire/VT_2020_tcc.tif",
+   39840744,
+   1790762992655285583
+  ],
+  [
+   "data/landfire/VT_2020_tpa_live.tif",
+   48609316,
+   1790762991065213222
+  ],
+  [
+   "data/landfire/VT_2020_tsd.tif",
+   1993082,
+   1790762990075168165
+  ],
+  [
+   "data/landfire/VT_2021_balive.tif",
+   47253718,
+   1790762992175263739
+  ],
+  [
+   "data/landfire/VT_2021_carbon_dwn.tif",
+   45477968,
+   1790762993905342476
+  ],
+  [
+   "data/landfire/VT_2021_nlcd.tif",
+   13632833,
+   1789904024916442725
+  ],
+  [
+   "data/landfire/VT_2021_qmd.tif",
+   45580282,
+   1790762994255358411
+  ],
+  [
+   "data/landfire/VT_2021_road_dist.tif",
+   18777800,
+   1790765319270471442
+  ],
+  [
+   "data/landfire/VT_2021_tcc.tif",
+   40015746,
+   1790762997735516848
+  ],
+  [
+   "data/landfire/VT_2021_tpa_live.tif",
+   48609316,
+   1790762996635466769
+  ],
+  [
+   "data/landfire/VT_2021_tsd.tif",
+   2153002,
+   1790762994995392103
+  ],
+  [
+   "data/landfire/VT_2022_balive.tif",
+   47384300,
+   1790762997125489078
+  ],
+  [
+   "data/landfire/VT_2022_carbon_dwn.tif",
+   45602242,
+   1790762999515597889
+  ],
+  [
+   "data/landfire/VT_2022_cc.tif",
+   19224554,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2022_ch.tif",
+   13662618,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2022_evc.tif",
+   50338566,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2022_evh.tif",
+   29480186,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2022_evt.tif",
+   21874452,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2022_fdist.tif",
+   3305100,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2022_nlcd.tif",
+   13649478,
+   1789904033086615889
+  ],
+  [
+   "data/landfire/VT_2022_qmd.tif",
+   45707650,
+   1790762999225584686
+  ],
+  [
+   "data/landfire/VT_2022_road_dist.tif",
+   18777800,
+   1790765320850543108
+  ],
+  [
+   "data/landfire/VT_2022_sclass.tif",
+   17784314,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2022_tcc.tif",
+   39883764,
+   1790763002505734017
+  ],
+  [
+   "data/landfire/VT_2022_tpa_live.tif",
+   48765762,
+   1790763001385683026
+  ],
+  [
+   "data/landfire/VT_2022_tsd.tif",
+   2244206,
+   1790763000585646603
+  ],
+  [
+   "data/landfire/VT_2023_balive.tif",
+   47384300,
+   1790763003385774080
+  ],
+  [
+   "data/landfire/VT_2023_carbon_dwn.tif",
+   45602242,
+   1790763004215811869
+  ],
+  [
+   "data/landfire/VT_2023_cc.tif",
+   19361082,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2023_ch.tif",
+   13944812,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2023_evc.tif",
+   52709648,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2023_evh.tif",
+   30376762,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2023_evt.tif",
+   21683946,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2023_fdist.tif",
+   3323712,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2023_nlcd.tif",
+   13652352,
+   1789904041326788203
+  ],
+  [
+   "data/landfire/VT_2023_qmd.tif",
+   45707650,
+   1790763004655831902
+  ],
+  [
+   "data/landfire/VT_2023_road_dist.tif",
+   18777800,
+   1790765322430614797
+  ],
+  [
+   "data/landfire/VT_2023_sclass.tif",
+   17845598,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2023_tcc.tif",
+   40167536,
+   1790763008576010371
+  ],
+  [
+   "data/landfire/VT_2023_tpa_live.tif",
+   48765762,
+   1790763006875932972
+  ],
+  [
+   "data/landfire/VT_2023_tsd.tif",
+   2362600,
+   1790763005405866047
+  ],
+  [
+   "data/landfire/VT_2024_balive.tif",
+   47384300,
+   1790763007575964841
+  ],
+  [
+   "data/landfire/VT_2024_carbon_dwn.tif",
+   45602242,
+   1790763009666059998
+  ],
+  [
+   "data/landfire/VT_2024_cc.tif",
+   19493910,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2024_ch.tif",
+   14078256,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2024_evc.tif",
+   52810916,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2024_evh.tif",
+   30358754,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2024_evt.tif",
+   21699912,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2024_fdist.tif",
+   3640902,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2024_nlcd.tif",
+   13675348,
+   1789904049526937810
+  ],
+  [
+   "data/landfire/VT_2024_qmd.tif",
+   45707650,
+   1790763009746063641
+  ],
+  [
+   "data/landfire/VT_2024_road_dist.tif",
+   18777800,
+   1790765324000686035
+  ],
+  [
+   "data/landfire/VT_2024_sclass.tif",
+   17967608,
+   1789713197391634941
+  ],
+  [
+   "data/landfire/VT_2024_tpa_live.tif",
+   48765762,
+   1790763011406139269
+  ],
+  [
+   "data/landfire/VT_2024_tsd.tif",
+   2478820,
+   1790763010736108743
+  ]
+ ]
+}

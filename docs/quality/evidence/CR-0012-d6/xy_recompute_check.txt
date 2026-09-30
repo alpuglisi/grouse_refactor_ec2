@@ -1,0 +1,6 @@
+CR-0012 deliverable 6 / code review F2: stored x_5070/y_5070 vs fresh transform
+pyproj 3.7.2 PROJ 9.5.1
+data/pipeline/thinned_positives_ME.csv: rows 3660, max|dx| 0 m, max|dy| 0 m, block changes 0
+data/pipeline/thinned_positives_NH.csv: rows 1079, max|dx| 0 m, max|dy| 0 m, block changes 0
+data/pipeline/thinned_positives_VT.csv: rows 1493, max|dx| 0 m, max|dy| 0 m, block changes 0
+TOTAL rows 6232, block changes 0: PASS

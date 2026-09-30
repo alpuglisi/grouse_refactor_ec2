@@ -1,6 +1,6 @@
 # CR-0013: Acceptance gates for the pooled split and draw, as a committed script
 
-**Status: APPROVED (v2.3 text; code at `3230262`), 2026-09-30.** Follow-ups (deliverable 5b) land before CR-0012's data run.
+**Status: IMPLEMENTED, 2026-09-30** (v2.3 text; code `3230262` + 5b `ba010a7`). Deliverable 6 passed inside CR-0012's real run: 18/18 GATEs; OBS calibrated.
 
 History, verdicts and dispositions are in `CR-0013-review-log.md`. This
 CR was split from CR-0007 v7's acceptance layer (commit `bb170ea`). This
@@ -489,7 +489,7 @@ A z-score is reported only for rows that have a null. Rows marked
       current one.
 
 **After approval:**
-- [ ] 6. Inside CR-0012 deliverable 6: the full run passes. Then run
+- [x] 6. Inside CR-0012 deliverable 6: the full run passes (18/18 GATEs, 2026-09-30; `docs/quality/evidence/CR-0012-d6/`; OBS file `docs/quality/acceptance_split_obs.json`; record copy in the evidence dir, sha256 66d63e1d…). O8 re-calibration after CR-0014: CR-0014 landed before this run, so this calibration already reflects it. Then run
       `--calibrate`, commit the OBS file and the evidence copy of the
       record. After CR-0014, re-calibrate O8.
 

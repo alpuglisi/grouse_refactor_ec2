@@ -1,0 +1,1 @@
+python train.py --epochs 10 --loss an_full --an-pos-weight 1.0 --embed-dropout 0.1 --dropout 0.4 --dynamic-dropout --dynamic-dropout-step 0.05 --dynamic-dropout-max 0.9 --weight-decay 1e-3 --seed 0 --save-path grouse_cr0009.pth --metrics-csv docs/quality/evidence/CR-0009/retrain/metrics.csv --tensorboard

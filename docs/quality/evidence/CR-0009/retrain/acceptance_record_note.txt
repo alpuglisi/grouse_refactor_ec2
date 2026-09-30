@@ -1,0 +1,6 @@
+CR-0009 retrain: acceptance record rewritten by CR-0013 --calibrate after the retrain started
+retrain start (standing check) record sha256: 72a364c0eb56cd564f08ae15d569fa2fcf5ec9bb4ac703a0570c894e50b905ca (acceptance_at_start.sha256)
+record after --calibrate sha256: 66d63e1da915529ed0f33bf4f152d6626d9843c9fa8185a55a9727f54489d478 created 2026-09-30T13:11:59.927715+00:00
+config sha256 in record: 1e3bfaa45655e005fd9258c842d080274431812d72f53ea4bbc165236b67bfc5 == file: True
+artifact+input digests checked against disk now: 307, mismatches 0
+All pipeline/negatives outputs have mtimes 13:03-13:05 UTC, before the retrain's start (13:09); --calibrate only rewrites the record and writes acceptance_split_obs.json.

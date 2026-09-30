@@ -52,6 +52,7 @@ import numpy as np
 import pandas as pd
 from pyproj import Transformer
 
+import regions
 # BUG-0001 / PA-0025: every spatial and split constant is defined once, in
 # regions.py; CR-0012 removed this script's *_DEFAULT copies and flags.
 from regions import (REGIONS, MIN_SPACING_M, BLOCK_SIZE_M, BUFFER_M,
@@ -90,19 +91,11 @@ def read_csv(path):
     return pd.read_csv(path, **READ_CSV_KW)
 
 
-_TO_5070 = {}
-
-
 def to_5070(lon, lat):
     """EPSG:4326 -> EPSG:5070 (always_xy), float64 arrays. Every distance
-    and block id is computed from these, never from an x_5070 column."""
-    if "t" not in _TO_5070:
-        _TO_5070["t"] = Transformer.from_crs("EPSG:4326", "EPSG:5070",
-                                             always_xy=True)
-    x, y = _TO_5070["t"].transform(np.asarray(lon, dtype=np.float64),
-                                   np.asarray(lat, dtype=np.float64))
-    return (np.atleast_1d(np.asarray(x, dtype=np.float64)),
-            np.atleast_1d(np.asarray(y, dtype=np.float64)))
+    and block id is computed from these, never from an x_5070 column.
+    Thin wrapper: the one transform is regions.to_5070 (CR-0015 section 1)."""
+    return regions.to_5070(lon, lat)
 
 
 def coord_keys(lon, lat, prefix=""):

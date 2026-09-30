@@ -109,3 +109,34 @@ new preventive action, since confirming the premise (does any feature use
 class 0 meaningfully) is a prerequisite to any corrective action or new
 rule being worth writing. Recorded here so it isn't lost, and so a future
 sweep for PA-0006 violations checks `dataset.py` explicitly.
+
+## 9. Re-examination (CR-0015 deliverable 4, PA-0006 re-sweep, 2026-09-30)
+**Premise answered.** A feature does use 0 as a real class. `fdist`
+code 0 covers about 92–96 % of in-coverage pixels (ME 2022: 9,219,880 of
+9,964,042 valid). `evt`, `evh`, `evc` and `sclass` have no zeros. The
+conflation described in §3 was therefore real for training data built
+before the fix below.
+
+**The quoted defect is gone.** `dataset.py` no longer contains
+`nan_to_num(..., nan=0.0)`. Both call sites now read
+`np.nan_to_num(..., nan=MISSING_CODE)` (`dataset.py:195-196`,
+`:360-361`). The patch cache key carries `b"nodata-format-v2"`
+(`:158-161`), so no v1 cache is reused. `MISSING_CODE` (-32768) is
+itself a sentinel. The model gets a validity channel per feature
+(`missing_mask`, default on in `train.py` and `pretrain.py`).
+
+**Fixed by** commit `51a4ad0` (2026-09-29, "Nodata validity channels,
+OOV-as-missing, dual branch by default, Platt calibration"), shown by
+`git log -S 'nan=0.0' -- dataset.py`. That commit predates this
+programme's CR cross-referencing, so no CR delivered it. CR-0008,
+CR-0009 and CR-0010 rely on it (e.g. CR-0009 retrains with the
+`--missing-mask` default).
+
+**Residual.** `missing_mask=False` (legacy checkpoints,
+`--no-missing-mask`) still sends nodata to the 0 representation. That
+is a separate defect with its own owner: **BUG-0059**.
+
+**Status: FIXED (by `51a4ad0`); CLOSED** per PA-0022, since nothing is
+left undetermined. The residual is owned by BUG-0059. The `BUG_LOG.md`
+row change is proposed in
+`docs/quality/evidence/CR-0015-bookkeeping-rows.md`.

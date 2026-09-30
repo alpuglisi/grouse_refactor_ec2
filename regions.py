@@ -155,6 +155,43 @@ def block_ids(x, y):
     return [f"{a}_{b}" for a, b in zip(bx.tolist(), by.tolist())]
 
 
+# The one EPSG:4326 -> EPSG:5070 transform (CR-0015 section 1; PA-0001).
+_TO_5070 = {}
+
+
+def to_5070(lon, lat):
+    """EPSG:4326 lon/lat -> EPSG:5070 (x, y), float64 arrays (always_xy).
+    The transform behind every x_5070/y_5070, distance and block id
+    (CR-0015 section 1). Accepts scalars or array-likes."""
+    if "t" not in _TO_5070:
+        from pyproj import Transformer
+        _TO_5070["t"] = Transformer.from_crs("EPSG:4326", "EPSG:5070",
+                                             always_xy=True)
+    x, y = _TO_5070["t"].transform(np.asarray(lon, dtype=np.float64),
+                                   np.asarray(lat, dtype=np.float64))
+    return (np.atleast_1d(np.asarray(x, dtype=np.float64)),
+            np.atleast_1d(np.asarray(y, dtype=np.float64)))
+
+
+def block_split(block_ids, assignments):
+    """"train"/"val" per block id (CR-0015 section 1): the block's split
+    in `assignments` (the block_assignments.csv DataFrame, columns
+    block_id and split) if the block is listed there; otherwise "val" iff
+    int(md5(f"{SPLIT_SEED}:{block_id}"), 16) % 10_000 < vf * 10_000, with
+    vf = (assignments.split == "val").mean(). No file I/O. Returns an
+    object array, one entry per block id."""
+    split = dict(zip(assignments["block_id"], assignments["split"]))
+    vf = float((assignments["split"] == "val").mean())
+    out = []
+    for b in block_ids:
+        if b in split:
+            out.append(split[b])
+            continue
+        h = int(hashlib.md5(f"{SPLIT_SEED}:{b}".encode()).hexdigest(), 16)
+        out.append("val" if (h % 10_000) < vf * 10_000 else "train")
+    return np.array(out, dtype=object)
+
+
 def coord_text(lon, lat):
     """The hash text of a coordinate: f"{lon:.6f},{lat:.6f}"."""
     return f"{float(lon):.6f},{float(lat):.6f}"

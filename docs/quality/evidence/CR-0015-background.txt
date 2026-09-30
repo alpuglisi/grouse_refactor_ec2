@@ -1,0 +1,41 @@
+CR-0015 deliverable 7b: V1-V3 on real data, plus V1 on the constructed wrong samplers
+date (UTC): 2026-09-30T14:36:40Z
+code: d567355de1ad16a44322e0f8efe62b2d5690f201 (worktree clean at start: `git status --porcelain --untracked-files=no` empty)
+cwd (data root): /tmp/claude-1000/cr0015-b1 (scratch tree: copied CSVs, symlinked rasters; its pipeline outputs are byte-identical to the main tree's, B1)
+command: GROUSE_REQUIRE_REAL_DATA=1 PYTHONPATH=<worktree> python -m unittest -v tests.test_cr0015_real
+exit code: 0
+
+--- stdout ---
+V1 ME: {'n': 5000, 'out_of_state': 0, 'val_block': 0, 'val_block_listed': 0, 'val_block_unassigned': 0}
+V1 NH: {'n': 5000, 'out_of_state': 0, 'val_block': 0, 'val_block_listed': 0, 'val_block_unassigned': 0}
+V1 VT: {'n': 5000, 'out_of_state': 0, 'val_block': 0, 'val_block_listed': 0, 'val_block_unassigned': 0}
+V1 on md5_fraction_018 ME: {'n': 5000, 'out_of_state': 0, 'val_block': 73, 'val_block_listed': 0, 'val_block_unassigned': 73}
+V1 on md5_fraction_018 NH: {'n': 5000, 'out_of_state': 0, 'val_block': 62, 'val_block_listed': 0, 'val_block_unassigned': 62}
+V1 on md5_fraction_018 VT: {'n': 5000, 'out_of_state': 0, 'val_block': 59, 'val_block_listed': 0, 'val_block_unassigned': 59}
+V1 on todays_sampler ME: {'n': 5000, 'out_of_state': 1770, 'val_block': 982, 'val_block_listed': 168, 'val_block_unassigned': 814}
+V1 on todays_sampler NH: {'n': 5000, 'out_of_state': 2653, 'val_block': 938, 'val_block_listed': 222, 'val_block_unassigned': 716}
+V1 on todays_sampler VT: {'n': 5000, 'out_of_state': 2413, 'val_block': 1012, 'val_block_listed': 246, 'val_block_unassigned': 766}
+V1 on unassigned_train ME: {'n': 5000, 'out_of_state': 0, 'val_block': 777, 'val_block_listed': 0, 'val_block_unassigned': 777}
+V1 on unassigned_train NH: {'n': 5000, 'out_of_state': 0, 'val_block': 745, 'val_block_listed': 0, 'val_block_unassigned': 745}
+V1 on unassigned_train VT: {'n': 5000, 'out_of_state': 0, 'val_block': 784, 'val_block_listed': 0, 'val_block_unassigned': 784}
+V2 ME (OBS): drawn 12,402; valid 0.7831; in-state | valid 0.6390; train-block | in-state 0.8058; overall acceptance 0.4032; rounds 4
+V2 NH (OBS): drawn 13,304; valid 0.9964; in-state | valid 0.4669; train-block | in-state 0.8110; overall acceptance 0.3773; rounds 6
+V2 VT (OBS): drawn 12,050; valid 1.0000; in-state | valid 0.5218; train-block | in-state 0.7963; overall acceptance 0.4155; rounds 4
+V3 ME (OBS): |share - ref| = 0.00466, bound 0.01795; reference {'stride': 22, 'centres': 420537, 'in_state_centres': 210341, 'subset_centres': 169417, 'share': 0.7759374797098284}
+V3 NH (OBS): |share - ref| = 0.00173, bound 0.01527; reference {'stride': 11, 'centres': 471000, 'in_state_centres': 222236, 'subset_centres': 180210, 'share': 0.7536651684146274}
+V3 VT (OBS): |share - ref| = 0.00015, bound 0.01536; reference {'stride': 11, 'centres': 434403, 'in_state_centres': 228665, 'subset_centres': 182671, 'share': 0.6760514805305714}
+
+--- stderr (unittest report) ---
+test_v1_zero_out_of_state_zero_val_block (tests.test_cr0015_real.V1.test_v1_zero_out_of_state_zero_val_block) ... ok
+test_md5_fraction_018_fails (tests.test_cr0015_real.V1OnWrongSamplers.test_md5_fraction_018_fails) ... ok
+test_todays_sampler_fails_both_counts (tests.test_cr0015_real.V1OnWrongSamplers.test_todays_sampler_fails_both_counts) ... ok
+test_unassigned_train_fails (tests.test_cr0015_real.V1OnWrongSamplers.test_unassigned_train_fails) ... ok
+test_v2_acceptance_report (tests.test_cr0015_real.V2.test_v2_acceptance_report) ... ok
+test_v3_unassigned_train_share (tests.test_cr0015_real.V3.test_v3_unassigned_train_share) ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 18.645s
+
+OK
+
+Reproducibility: stdout identical to the first 7b run (recorded at 1612543, harness then uncommitted); reviewer B reproduced it independently at 3add80b.

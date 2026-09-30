@@ -118,52 +118,109 @@ def discover_features(data, regions):
     return usable
 
 
-def sample_background_points(rd, features, n, seed=0):
+def sample_background_points(rd, features, n, seed=0, *, region,
+                             train_blocks_only, assignments=None,
+                             in_state=None):
     """n uniformly random locations inside the region's reference
-    raster, filtered to valid data at the center pixel - the random
-    "assumed negative" background locations of Cole et al.'s L_AN-full.
-    Deliberately NOT buffered away from known presences: assuming
-    negatives everywhere (and accepting the resulting label noise) is
-    the loss's design; its positive up-weighting is what absorbs the
-    false negatives this creates."""
+    raster, kept only where they are valid, in the region's own state
+    and - with train_blocks_only - in a training block (CR-0015 section 2):
+    the random "assumed negative" background locations of Cole et al.'s
+    L_AN-full. Deliberately NOT buffered away from known presences:
+    assuming negatives everywhere (and accepting the resulting label
+    noise) is the loss's design; its positive up-weighting is what
+    absorbs the false negatives this creates.
+
+    Validity is judged on features[0] as passed: a draw is rejected only
+    when that pixel is in NODATA_SENTINELS, equals the file's declared
+    nodata or is not finite - 0 is a reading (BUG-0032). A draw is kept
+    only if in_state(lon, lat, region) (default regions.in_state;
+    BUG-0029). With train_blocks_only, its lon/lat is transformed with
+    regions.to_5070 (never the raster's native x/y: the rasters are in
+    per-region Albers), its block id taken from regions.block_ids, and it
+    is kept only if regions.block_split(ids, assignments) is "train"
+    (BUG-0042); `assignments` (the block_assignments.csv DataFrame) is
+    then required, and must be None otherwise.
+
+    region and train_blocks_only are required keywords: a caller cannot
+    get an unconstrained draw by omission. Deterministic for a given seed
+    (one numpy default_rng stream per call). The returned frame's
+    attrs["acceptance"] holds the draw counts behind the acceptance rate.
+    """
     import numpy as np
     import pandas as pd
     import rasterio
     from pyproj import Transformer
+    import regions
     from dataset import NODATA_SENTINELS
 
-    feat = features[0]                     # spec order: categorical first
+    if train_blocks_only and assignments is None:
+        raise ValueError("train_blocks_only=True needs the block "
+                         "assignments (block_assignments.csv)")
+    if not train_blocks_only and assignments is not None:
+        raise ValueError("assignments must be None when "
+                         "train_blocks_only is False")
+    if in_state is None:
+        in_state = regions.in_state
+
+    feat = features[0]            # validity is judged on `features[0]` as passed
     path = rd.latest_raster_path(feat)
     year = max(rd.raster_years(feat))
     rng = np.random.default_rng(seed)
+    sentinels = np.asarray(NODATA_SENTINELS, dtype=np.float64)
     lons, lats = [], []
+    drawn = n_valid = n_in_state = n_kept = 0
     with rasterio.open(path) as src:
         to_lonlat = Transformer.from_crs(src.crs, "EPSG:4326",
                                          always_xy=True)
-        nodata = src.nodata if src.nodata is not None else -9999
-        bad = set(NODATA_SENTINELS) | {nodata, 0}
+        declared_nodata = src.nodata
         attempts = 0
         while len(lons) < n and attempts < 40:
             attempts += 1
             m = max(64, 2 * (n - len(lons)))
+            drawn += m
             rows = rng.integers(0, src.height, m)
             cols = rng.integers(0, src.width, m)
             xs, ys = rasterio.transform.xy(src.transform, rows, cols)
             vals = np.array([v[0] for v in
                              src.sample(zip(xs, ys))], dtype=np.float64)
-            ok = ~np.isin(vals, list(bad)) & np.isfinite(vals)
-            if ok.any():
-                glon, glat = to_lonlat.transform(
-                    np.asarray(xs)[ok], np.asarray(ys)[ok])
-                lons.extend(np.atleast_1d(glon)[:n - len(lons)])
-                lats.extend(np.atleast_1d(glat)[:n - len(lats)])
-        if len(lons) < n:
-            raise SystemExit(
-                f"Background sampling found only {len(lons)}/{n} valid "
-                f"locations in {path} after {attempts} rounds - the "
-                f"raster may be mostly nodata.")
-    return pd.DataFrame({"longitude": lons, "latitude": lats,
-                         "year": int(year), "label": 0.0, "weight": 1.0})
+            ok = np.isfinite(vals) & ~np.isin(vals, sentinels)
+            if declared_nodata is not None:
+                ok &= vals != declared_nodata
+            n_valid += int(ok.sum())
+            if not ok.any():
+                continue
+            glon, glat = to_lonlat.transform(np.asarray(xs)[ok],
+                                             np.asarray(ys)[ok])
+            glon = np.atleast_1d(np.asarray(glon, dtype=np.float64))
+            glat = np.atleast_1d(np.asarray(glat, dtype=np.float64))
+            keep = np.asarray(in_state(glon, glat, region), dtype=bool)
+            n_in_state += int(keep.sum())
+            if train_blocks_only and keep.any():
+                x, y = regions.to_5070(glon[keep], glat[keep])
+                split = regions.block_split(regions.block_ids(x, y),
+                                            assignments)
+                keep[np.flatnonzero(keep)] = split == "train"
+            n_kept += int(keep.sum())
+            take = n - len(lons)
+            lons.extend(glon[keep][:take].tolist())
+            lats.extend(glat[keep][:take].tolist())
+    acceptance = {"region": region, "drawn": drawn, "valid": n_valid,
+                  "in_state": n_in_state, "accepted": n_kept,
+                  "rounds": attempts,
+                  "train_blocks_only": bool(train_blocks_only)}
+    if len(lons) < n:
+        rate = n_kept / drawn if drawn else 0.0
+        raise SystemExit(
+            f"[{region}] background sampling found only {len(lons)}/{n} "
+            f"accepted locations in {path} after {attempts} rounds - "
+            f"observed acceptance rate {rate:.4f} ({n_kept}/{drawn} draws; "
+            f"valid {n_valid}, in-state {n_in_state}"
+            + (", training block " + str(n_kept) if train_blocks_only else "")
+            + ").")
+    out = pd.DataFrame({"longitude": lons, "latitude": lats,
+                        "year": int(year), "label": 0.0, "weight": 1.0})
+    out.attrs["acceptance"] = acceptance
+    return out
 
 
 def filter_by_year_gap(df, rd, features, tolerance, what, region):
@@ -302,8 +359,10 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
                 # seed + region index: each region draws its own RNG
                 # stream (same convention as pretrain.py) instead of
                 # every region replaying identical row/col sequences.
-                bg_df = sample_background_points(rd, features, n_bg,
-                                                 seed=seed + region_i)
+                bg_df = sample_background_points(
+                    rd, features, n_bg, seed=seed + region_i,
+                    region=region, train_blocks_only=True,
+                    assignments=data.block_assignments)
                 bg_tr = GrousePatchDataset(
                     bg_df, rd, cat_f, cont_f, img_size=img_size,
                     expand_rotations=True, label=0.0,
@@ -312,7 +371,8 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
                 train_labels.append(bg_tr.labels)
                 print(f"   {region}: +{n_bg:,} random background "
                       f"assumed-negatives (x{background_per_pos:g} per "
-                      f"positive; train only - validation unchanged).")
+                      f"positive; in-state, training blocks only - "
+                      f"validation unchanged).")
         # Validation is never augmented: the 4 fixed rotations are kept so
         # val scores stay comparable across runs (and so the evaluator can
         # average them per point as test-time augmentation).
@@ -751,7 +811,8 @@ def main():
                              "region's positive count (Cole et al. use "
                              "1 random location per data location -> "
                              "1.0). Sampled uniformly over the region's "
-                             "raster, valid-data filtered, NOT buffered "
+                             "raster, valid-data filtered, in-state, "
+                             "training blocks only, NOT buffered "
                              "away from presences (assumed negative is "
                              "the point). Validation is untouched so "
                              "metrics stay comparable. 0 = off. Usable "
@@ -889,14 +950,6 @@ def main():
                              "teachers' soft BCE (1 - this). 1.0 = "
                              "teachers ignored, 0.0 = true labels ignored.")
     args = parser.parse_args()
-
-    # CR-0015 interim guard (removed by its deliverable 8): the assumed-
-    # negative background path draws points out of state and inside
-    # validation blocks until CR-0015's fix lands.
-    if args.an_background > 0:
-        raise SystemExit("--an-background > 0 is disabled until CR-0015 lands "
-                         "(assumed negatives drawn out of state and in "
-                         "validation blocks; BUG-0029, BUG-0042).")
 
     if args.distill_from and args.ensemble > 1:
         raise SystemExit(

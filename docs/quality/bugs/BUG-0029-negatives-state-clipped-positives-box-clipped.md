@@ -137,7 +137,7 @@ from a state polygon — so the dataset's positive support and negative
 support do not coincide, and no check compares them.
 
 ## 6. Corrective action
-**Assigned: membership — CR-0007; split and draw — CR-0012.**
+**Assigned: membership — CR-0007; split and draw — CR-0012; assumed negatives — CR-0015.**
 - *Membership (the positive half), CR-0007 (implemented 2026-09-30,
   deliverables 2–5):* `state` is the only region-membership key for
   sighting records. `analyze_grouse.load_all_sightings` raises unless every
@@ -156,15 +156,17 @@ support do not coincide, and no check compares them.
   - E9 checks each cell's count against `n_pos`.
 
   **The positive-side part of this bug is fixed.**
-- *Assumed-negative background, CR-0015:* `sample_background_points`
-  (`pretrain.py`) still draws background points that are not restricted to the state
-  partition or to training blocks (CR-0015 § Scope). That
-  remainder, with BUG-0032 and BUG-0042, is CR-0015's.
+- *Assumed negatives, CR-0015 (2026-09-30):* `train.sample_background_points`
+  drew over the region's raster box, and 36.0 / 52.5 / 47.3 % (ME/NH/VT)
+  of accepted points were out of state. It now keeps only
+  `regions.in_state` draws (CR-0015 §2, deliverable 6, `2c23d7d`).
+  V1 finds 0 out-of-state points in every region, using an independent
+  polygon test on real data (deliverable 7b,
+  `docs/quality/evidence/CR-0015-background.txt`).
 
-Status: **OPEN — positive side fixed (CR-0007, CR-0012).** The bug is
-**FIXED when CR-0015 deliverable 7b passes**, and **CLOSED when CR-0009
-also closes**. This is the single closure rule in the tracker (CR-0015
-R1 B8), which replaces the earlier "fixed when CR-0012 lands".
+Status: **FIXED** (CR-0015 deliverable 9 closure rule: CR-0012 landed,
+and CR-0015 deliverable 7b passed). It becomes CLOSED when CR-0009
+closes.
 
 Original proposal (kept for the record):
 1. **Make both classes use one definition of a region.** Either is

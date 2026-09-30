@@ -1,6 +1,10 @@
 # CR-0015: Draw assumed-negative background points only in-state, only in training blocks, and without treating 0 as nodata
 
-**Status: APPROVED (v2.2), 2026-09-30. Deliverable 1 (interim guard) IMPLEMENTED;** the rest waits for CR-0012 (CR-0007 is implemented).
+**Status: APPROVED (v2.2), 2026-09-30. Deliverables 1–8 IMPLEMENTED on the
+implementation branch; deliverable 9 waits for the lead to apply the
+`BUG_LOG.md`/`PREVENTIVE_ACTIONS.md` rows in
+`docs/quality/evidence/CR-0015-bookkeeping-rows.md` and for the code
+review.**
 History, lineage, verdicts and dispositions: `CR-0015-review-log.md`. This
 document states only current intent.
 
@@ -359,8 +363,8 @@ not use the AN path.
 
 ## Deliverables (in execution order)
 - [x] 1. Interim guard (§4) and U7; can land before CR-0007/CR-0012.
-- [ ] 2. **Bug records.**
-  - [ ] **BUG-0032** (0 treated as nodata, `train.py`
+- [x] 2. **Bug records.**
+  - [x] **BUG-0032** (0 treated as nodata, `train.py`
         `set(NODATA_SENTINELS) | {nodata, 0}`), with all §2
         sections. §4 recurrence review:
         - Prior instances: BUG-0008 (`predict.py`); BUG-0017
@@ -379,7 +383,7 @@ not use the AN path.
           mechanical enforcement (§3.4).
         - Update PA-0006's Swept? cell from deliverable 4.
         - `BUG_LOG.md` row.
-  - [ ] **BUG-0042** (assumed-negative points drawn into validation
+  - [x] **BUG-0042** (assumed-negative points drawn into validation
         blocks, `train.py:290-306`). This is a new BUG, not an amendment
         of BUG-0027: it is a different code path (in memory, not the
         split files), and BUG-0027's corrective action (CR-0012) does not
@@ -400,11 +404,11 @@ not use the AN path.
           `smoke_test_training.py`, `diagnose_*`). Each finding gets its
           own BUG.
         - `BUG_LOG.md` row.
-- [ ] 3. Commit `tests/test_nodata_zero_lint.py` (L1 and its controls)
+- [x] 3. Commit `tests/test_nodata_zero_lint.py` (L1 and its controls)
       before approval (CLAUDE.md §1, CR-0011 A3). Written 2026-09-30
       (committed `da1484f`, count check fixed `05d4ce5`); passes and reports exactly the 4 pinned statements
       until deliverables 4 and 6 are done.
-- [ ] 4. **PA-0006 re-sweep, scoped by mechanism.**
+- [x] 4. **PA-0006 re-sweep, scoped by mechanism.**
   - **Scope:** every tracked, non-evidence file that reads
     `NODATA_SENTINELS` or a raster's declared nodata. That includes
     `analyze_grouse.py`, `check_raster_repair.py`, `check_road_dist.py`,
@@ -423,20 +427,20 @@ not use the AN path.
     re-examined in this pass; it is closed or its OPEN status re-owned,
     per PA-0022.
   - **Result:** goes in the Swept? cells of PA-0006 and the new PA.
-- [ ] 5. After CR-0007 and CR-0012 land: `regions.to_5070` and
+- [x] 5. After CR-0007 and CR-0012 land: `regions.to_5070` and
       `regions.block_split` (§1), and `generate_negatives.py`'s switch
       (`to_albers` delegates; pool step 10 calls `block_split`). Re-run `generate_negatives.py`
       and `acceptance_split.py`; B1 passes.
-- [ ] 6. §2 and §3; U1–U6 pass; L1 reports 0 matches outside the
+- [x] 6. §2 and §3; U1–U6 pass; L1 reports 0 matches outside the
       allowlist. `CHANGELOG.md` entry in the same commit: the AN-path
       and SSL changes, and that earlier AN-path models used out-of-state
       and validation-block negatives.
-- [ ] 7. Real data, with `GROUSE_REQUIRE_REAL_DATA=1`:
-  - [ ] 7a. V3 calibration (100 seeds × 3 regions, plus the
+- [x] 7. Real data, with `GROUSE_REQUIRE_REAL_DATA=1`:
+  - [x] 7a. V3 calibration (100 seeds × 3 regions, plus the
         constructed samplers); record the bound or the demotion to OBS.
-  - [ ] 7b. V1–V3, plus the constructed-sampler runs for V1. Save the
+  - [x] 7b. V1–V3, plus the constructed-sampler runs for V1. Save the
         output to `docs/quality/evidence/CR-0015-background.txt`.
-- [ ] 8. Remove the interim guard and U7.
+- [x] 8. Remove the interim guard and U7.
 - [ ] 9. Close-out:
   - BUG-0032: FIXED.
   - BUG-0042: FIXED.

@@ -212,3 +212,140 @@ passes the guard. 2 tests OK; `train.py --help` works; L1 lint unchanged
 (4 statements). No other live caller of the flag (`losses.py` mentions it
 in a docstring only). Deleted with the guard by deliverable 8.
 
+
+## Implementation record — deliverables 2–8 (2026-09-30)
+Branch `worktree-agent-a74570e35615ea5e3`, based on `00c0b6f`. The
+implementer's interpretations and results, for the code review:
+
+- **Deliverable 5, transform home.** The CR names
+  `generate_negatives.to_albers` (`:93-95`) as "the transform that
+  produces `x_5070`/`y_5070` in CR-0012's pool". After CR-0012 landed,
+  that function no longer exists. The pool's transform is
+  `prepare_training_data.to_5070`, which `generate_negatives.py`
+  imports. So that function is now the thin wrapper that delegates to
+  `regions.to_5070`, and its callers are unchanged. B1 covers the
+  switch. It was also run on the positives, because that wrapper feeds
+  them too.
+- **Deliverable 5, other changes.** `split_for_unassigned` was deleted,
+  and `tests/test_cr0012.py`'s md5-rule test now exercises
+  `regions.block_split`. `acceptance_split.py` keeps its own copy of the
+  rule, as the CR requires.
+- **B1: PASS.** In a scratch tree, all 20 manifest outputs are
+  byte-identical to the latest CR-0012 deliverable 6 run (the
+  candidate pool, every negatives file, block assignments and every
+  positives file), and `acceptance_split.py` passes 18/18. Evidence:
+  `docs/quality/evidence/CR-0015-B1/`.
+- **Deliverable 6.** U1–U6 are in `tests/test_cr0015_sampler.py`.
+  - The sampler also records its draw counts in
+    `DataFrame.attrs["acceptance"]` for V2. This does not change the
+    output columns.
+  - `pretrain.py` checks its new dependency by loading the county
+    polygons immediately after `parse_args`.
+- **PA-0021(a), wrong samplers.** They were built by an independent
+  agent in `tests/cr0015_wrong_samplers.py`. The original round-2
+  reviewer could not be resumed.
+  - U2 fails on the today's, unassigned-excluded (shortfall at n =
+    30,000; kinds (iv)/(v) = 0 at n = 50), unassigned-train,
+    `VAL_FRACTION` and native-x/y samplers.
+  - U1 fails on today's sampler.
+- **L1.** Allowlist: the three deliverable-4 statements plus the
+  deliberate pre-CR copy in the wrong-samplers module.
+  `EXPECTED_UNCLASSIFIED` is empty.
+- **7a, V3 calibration → OBS.**
+  - Fair p99 over 100 seeds: ME 0.0179, NH 0.0153, VT 0.0154.
+  - Minimum broken statistic, per region:
+
+    | sampler | ME | NH | VT |
+    |---|---|---|---|
+    | today's | 0.081 | 0.130 | 0.071 |
+    | unassigned-excluded | 0.776 | 0.754 | 0.676 |
+    | unassigned-train | 0.107 | 0.108 | 0.091 |
+    | md5-0.18 | 0.0053 | 0.0059 | 0.0003 |
+
+  - md5-0.18 does not separate. The CR says "if it does not separate
+    every broken sampler, V3 is demoted to OBS", so V3 is recorded as
+    **OBS** (`docs/quality/cr0015_v3_calibration.json`,
+    `v3_status`).
+  - **Open question for the lead:** under PA-0021(c)'s reading, V3's
+    broken pipeline is the one it exists to catch (over-exclusion). That
+    one separates by about 40× the bound. The md5-0.18 sampler is V1's
+    target, and V1 catches it (59–73 points per region). Under that
+    reading, V3 would be a GATE.
+- **7b (`docs/quality/evidence/CR-0015-background.txt`).**
+  `GROUSE_REQUIRE_REAL_DATA=1`: 6 tests OK, no `skipped=`.
+  - **V1:** 0 out-of-state points and 0 validation-block points in ME,
+    NH and VT (n = 5,000, seed 0).
+  - **V1 on the wrong samplers** fails as required:
+
+    | sampler | failing count | ME | NH | VT |
+    |---|---|---|---|---|
+    | today's | out-of-state | 1,770 | 2,653 | 2,413 |
+    | today's | validation-block | 982 | 938 | 1,012 |
+    | unassigned-train | validation-block | 777 | 745 | 784 |
+    | md5-0.18 | validation-block | 73 | 62 | 59 |
+
+  - **V2** acceptance: ME 0.403, NH 0.377, VT 0.416.
+  - **V3** statistic: 0.0047 / 0.0017 / 0.0002, all within the bounds.
+- **Deliverable 8.** The guard and `tests/test_cr0015_guard.py` were
+  removed after 7b. The full suite passes: 239 tests OK. The 6
+  real-data tests skip without a data root, by design.
+- **Sweep findings** (ids allocated by the lead): BUG-0058 (`predict.py` Edge
+  metric), BUG-0059 (`missing_mask=False` embed), BUG-0060 (no split
+  provenance on checkpoints). BUG-0017 was re-examined and is FIXED by
+  `51a4ad0`.
+- **Handed to the lead:** the `BUG_LOG`/PA rows, the Swept? cells and the
+  tracker items in `docs/quality/evidence/CR-0015-bookkeeping-rows.md`
+  (deliverable 9).
+
+## Implementation code review (head `3add80b`, 2026-09-30)
+Two independent reviewers re-derived the change from the diff
+`00c0b6f..3add80b`, re-ran the synthetic suite, applied mutations to
+scratch copies, and re-ran V1–V3 on real data (read-only). Full reviews:
+`/tmp/claude-1000/-home-ec2-user-grouse2/cr0015-review-A.md` and
+`cr0015-review-B.md` (scratch; their findings are recorded below).
+
+| reviewer | head | verdict | blocking / major |
+|---|---|---|---|
+| A — code review | `3add80b` | **APPROVE WITH FOLLOW-UPS** | 0 / 0 |
+| B — code review | `3add80b` | **APPROVE WITH FOLLOW-UPS** | 0 / 0 |
+
+Reviewer B reproduced the 7b numbers digit for digit, using the exported
+code at `3add80b` against the main tree's `data/` (read-only).
+
+### Dispositions
+| id | severity | disposition + where |
+|---|---|---|
+| A-1 | MEDIUM | **Tracked.** V3 stays OBS (see V3 below), so the 5-draw broken side decides nothing. Before any GATE re-reading: ≥ 50 seeds per broken sampler, or a recorded analytic argument for the deterministic unassigned-excluded statistic. Tracker: "CR-0015 implementation code review", owner the lead. |
+| A-2 | MEDIUM | **Fixed.** 7b and 7a re-run at `d567355` from a clean tree (`git status --porcelain --untracked-files=no` empty, checked by the run scripts before starting). The hash and clean status are recorded in `docs/quality/evidence/CR-0015-background.txt` and `docs/quality/evidence/CR-0015-V/calibration_7a.log`. The 7b stdout is identical to the earlier run, and the 7a calibration JSON is identical except for the wall-clock `seconds` fields. Evidence commit: `8a686a6`. |
+| A-3 = B-2 | MEDIUM | **Fixed** in `d567355`. `tests/test_cr0015_real.py` `_setup` now catches only `FileNotFoundError`, `ImportError` and `MissingDataError`. Verified: a patched `TypeError` in `train.discover_features` gives `errors 1, skipped 0`, and no data root still skips with `FileNotFoundError`. Filed as **BUG-0063** (PA-0027 recurrence of BUG-0049, with the prior-PA failure analysis); the PA-0027 Swept? correction is in `docs/quality/evidence/CR-0015-bookkeeping-rows.md`. |
+| A-4 | LOW | **Fixed** in `d567355`. The rows file no longer says "allocate from BUG-0050". It names BUG-0058..0060 as allocated and warns that BUG-0050..0057 are taken. |
+| A-5 | LOW | **Tracked** (call-site test for `build_datasets`), owner the lead. |
+| A-6 | LOW | **Tracked** together with B-7 (NH acceptance 0.3773 < the budget premise of 0.38; converged in 6 rounds), owner the lead. |
+| B-1 | LOW | **Fixed** in `d567355`. U1's raster is in `ALBERS_OTHER`, the "state" line is in lon, and `in_state` asserts that it receives lon/lat. Verified by applying the mutation `in_state(np.asarray(xs)[ok], np.asarray(ys)[ok], region)` to a `git archive` copy under `/tmp/claude-1000/cr0015-mut`: U1 FAILS. |
+| B-3 | LOW | **Tracked.** `block_split` input validation is a production-code validation change, out of this CR's scope. Owner the lead (CR or trivial-fix record). |
+| B-4 | LOW | **Tracked** (optional re-scope of V3's separation requirement), owner the lead. |
+| B-5 | LOW | **Accepted as the deliverable-5 disposition.** The CR's §1 names `generate_negatives.to_albers`, which CR-0012 had already removed. The operative wrapper is `prepare_training_data.to_5070`, which `generate_negatives.py` imports and which now delegates to `regions.to_5070`. B1 covers it: 20/20 manifest outputs byte-identical, including `block_assignments.csv` and every positives file, and `acceptance_split.py` 18/18 (`docs/quality/evidence/CR-0015-B1/`). |
+| B-6 | LOW | **Tracked** (the `pretrain.py` preflight uses the private `regions._state_polygons`), owner the lead. |
+| B-7 | INFO | **Tracked** together with A-6. |
+
+**V3 status: OBS.** This is the CR's literal rule (md5-0.18 does not
+separate). It is the lead's decision, and both reviewers concur. The
+optional re-scope is tracker item B-4.
+
+**Sweep ids.** The lead allocated BUG-NEW-1/2/3 as **BUG-0058**,
+**BUG-0059** and **BUG-0060**. The files are renamed and the references
+replaced. The lead allocated BUG-0063 as **BUG-0063**.
+
+### Sign-off
+- Reviewer A: APPROVE WITH FOLLOW-UPS (`3add80b`).
+- Reviewer B: APPROVE WITH FOLLOW-UPS (`3add80b`).
+- Author/implementer: **signed off.** Follow-ups applied as dispositioned
+  above.
+
+The author and both reviewers approved, and the user pre-authorised the
+autonomous review → approve → implement cycle (2026-09-30).
+
+### Follow-up commits
+- `d567355`: A-3/B-2 fix (BUG-0063), B-1, A-4, id renames and tracker
+  items.
+- `8a686a6`: the A-2 re-run evidence, the BUG-0063 id, and this log.

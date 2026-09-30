@@ -11,12 +11,10 @@ nested inside another matched node is not reported separately, and each
 match is keyed by (path, ast.unparse(outermost matched node)) - never by
 line number.
 
-Until CR-0015 deliverables 4 (PA-0006 re-sweep) and 6 (the train.py fix)
-are done, the test pins today's match set: it passes only if the matches
-equal EXPECTED_UNCLASSIFIED exactly, so any NEW match fails. Deliverable 4
-moves each entry either to ALLOWLIST (with its not-a-defect justification)
-or removes it with the fix; after deliverable 6 EXPECTED_UNCLASSIFIED is
-empty.
+CR-0015 deliverables 4 (PA-0006 re-sweep) and 6 (the train.py fix) are
+done: every match must be in ALLOWLIST, each entry with its reviewed
+not-a-defect justification, and EXPECTED_UNCLASSIFIED is empty, so any new
+match fails. This is PA-0028's mechanical enforcement (extends PA-0006).
 """
 import ast
 import os
@@ -33,19 +31,36 @@ EXCLUDES_ZERO = (ast.NotEq, ast.Gt, ast.Lt)     # under `&` / `and`
 INCLUDES_ZERO = (ast.Eq, ast.LtE, ast.GtE)      # under `|` / `or`
 DISPLAYS = (ast.Set, ast.List, ast.Tuple)
 
-# (path, statement text) -> justification citing the deliverable-4 sweep.
-# Reviewed as part of CR-0015. Empty until deliverable 4.
-ALLOWLIST = {}
-
-# Today's matches, pinned until deliverable 4 classifies them (CR-0015
-# "Expected result on today's tree"). Keyed by statement text.
-EXPECTED_UNCLASSIFIED = {
-    ("train.py", "set(NODATA_SENTINELS) | {nodata, 0}"),
+# (path, statement text) -> justification citing the deliverable-4 sweep
+# (CR-0015 deliverable 4, 2026-09-30; BUG-0032 section 8). Reviewed as part
+# of CR-0015.
+ALLOWLIST = {
     ("find_tsd_contrast_points.py",
-     "~np.isin(nlcd_arr, NODATA_SENTINELS) & (nlcd_arr != 0)"),
-    ("generate_time_since_disturbance.py", "(arr > 0) & ~sentinel"),
-    ("check_road_dist.py", "(state != 0) & ~home"),
+     "~np.isin(nlcd_arr, NODATA_SENTINELS) & (nlcd_arr != 0)"):
+        "CR-0015 d4 sweep: NLCD 0 is not a land-cover class (codes 11-95; "
+        "download_tcc_nlcd.py maps 0/250 to -9999, and 0 occurs in no pixel "
+        "of the ME/NH/VT 2025 rasters), so != 0 only rejects a WarpedVRT "
+        "0-fill; diagnostic script that writes nothing.",
+    ("generate_time_since_disturbance.py", "(arr > 0) & ~sentinel"):
+        "CR-0015 d4 sweep: 0 is the disturbance VAT's 'Background' class "
+        "(covered, undisturbed); it stays in cov (only NODATA_SENTINELS are "
+        "removed at cov &= ~sentinel), and hit is the disturbance predicate, "
+        "not a validity mask.",
+    ("check_road_dist.py", "(state != 0) & ~home"):
+        "CR-0015 d4 sweep: state is a rasterised county STATEFP with fill=0; "
+        "FIPS codes are >= 1, so 0 is 'no US county', not a raster reading, "
+        "and other is a zone mask, not a nodata mask.",
+    ("tests/cr0015_wrong_samplers.py", "set(NODATA_SENTINELS) | {nodata, 0}"):
+        "CR-0015 PA-0021(a): todays_sampler is a deliberate verbatim copy of "
+        "the pre-CR sampler (BUG-0032 included), used only to show the "
+        "CR-0015 checks fail on it; never called by production code.",
 }
+
+# Unclassified matches. Empty since CR-0015 deliverables 4 (the three
+# statements above classified) and 6 (train.py's
+# "set(NODATA_SENTINELS) | {nodata, 0}", BUG-0032, fixed): any match not in
+# ALLOWLIST fails the test.
+EXPECTED_UNCLASSIFIED = set()
 
 # Files that must always be in scope (the mechanism's known homes). The
 # set grows as code is added, so there is no exact count to pin.

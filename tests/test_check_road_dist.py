@@ -19,8 +19,7 @@ sys.path.insert(0, ROOT)
 import check_road_dist as c  # noqa: E402
 
 TR = from_origin(0, 30 * 400, 30, 30)
-T_ = {"rd1_median_abs_m": 20.0, "rd2_p99_abs_m": 60.0,
-      "rd3_max_abs_m": 60.0, "rd4_signed_band_m": [-20.0, 5.0]}
+T_ = {"rd2_p99_abs_m": 60.0, "rd3_max_abs_m": 60.0}
 
 
 class CanadaRule(unittest.TestCase):
@@ -69,7 +68,7 @@ class RDStats(unittest.TestCase):
         rng = np.random.default_rng(0)
         err = rng.uniform(-21, 5, 400) - 5
         r = c.rd_stats(err, 0, T_)
-        self.assertTrue(all(ok for _, ok in r.values()), r)
+        self.assertTrue(all(ok for _, ok in r.values() if ok is not None), r)
 
     def test_home_state_only_fails(self):
         err = np.concatenate([np.full(300, -8.0), np.full(100, 600.0)])
@@ -80,6 +79,33 @@ class RDStats(unittest.TestCase):
     def test_excluded_points_fail(self):
         r = c.rd_stats(np.zeros(10), 3, T_)
         self.assertFalse(r["RD5"][1])
+
+    # CR-0016 T1: RD1/RD4 are observations - reported, never pass/fail.
+    def gate_failures(self, err):
+        rows = c.rd_rows(c.rd_stats(err, 0, T_), "x",
+                         {"RD1": 20.0, "RD4": [-20.0, 5.0]})
+        return rows, [g for g, k, *_, ok in rows if k == "GATE" and ok is False]
+
+    def test_rd1_rd4_are_obs_without_verdict(self):
+        rows, _ = self.gate_failures(np.full(400, -8.0))
+        kinds = {g: (k, ok) for g, k, *_, ok in rows}
+        self.assertEqual(kinds["RD1"], ("OBS", None))
+        self.assertEqual(kinds["RD4"], ("OBS", None))
+        self.assertEqual({g for g, (k, _) in kinds.items() if k == "GATE"},
+                         {"RD2", "RD3", "RD5"})
+
+    def test_median_30m_is_not_a_gate_failure(self):
+        _, failed = self.gate_failures(np.full(400, 30.0))
+        self.assertEqual(failed, [])            # RD1 was 20 m; now OBS
+
+    def test_signed_median_plus_10_is_not_a_gate_failure(self):
+        _, failed = self.gate_failures(np.full(400, 10.0))
+        self.assertEqual(failed, [])            # RD4 band was [-20, +5]
+
+    def test_home_state_vector_still_fails_gates(self):
+        err = np.concatenate([np.full(300, -8.0), np.full(100, 600.0)])
+        _, failed = self.gate_failures(err)
+        self.assertEqual(set(failed), {"RD2", "RD3"})
 
 
 class Download(unittest.TestCase):

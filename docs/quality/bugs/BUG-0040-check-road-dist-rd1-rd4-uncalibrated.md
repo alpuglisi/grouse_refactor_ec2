@@ -103,8 +103,15 @@ Out of scope for this bug:
    another CR.
 
 ## 6. Corrective action
-**Decided (user, 2026-09-30): demote RD1 and RD4 to OBS — CR-0016**
-(written, awaiting review). The dropped-finding mechanism is BUG-0041.
+**FIXED by CR-0016 (2026-09-30).** Operative location (PA-0024(a)):
+`check_road_dist.py` `RD_KIND` (RD1, RD4 → "OBS") and `rd_rows` (OBS rows
+carry `ok=None`); `rd_stats` returns RD1/RD4 with no verdict; references
+moved to `cr0014_pins.json` `rd_obs_references`. RD2/RD3's derived 60 m
+bound is accepted in place of a fair-side quantile, with its preconditions
+reported (X3) and the broken side measured on the real pre-CR-0014
+rasters (T3). Evidence `docs/quality/evidence/CR-0016-check.txt`.
+
+Status: **FIXED.** The dropped-finding mechanism is BUG-0041.
 
 Original analysis follows.
 

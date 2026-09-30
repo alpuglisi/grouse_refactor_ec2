@@ -82,3 +82,16 @@ Author: **signed off** — user approved 2026-09-30. **CR-0016 APPROVED (v2.1).*
 
 ## Author sign-off
 Pending.
+
+## Implementation record (2026-09-30)
+- T1: 14 unit tests OK (new: RD1/RD4 OBS with `ok=None`; +30 m and +10 m
+  vectors no gate failure; home-state vector fails exactly RD2, RD3).
+- T2: 0 gate failures in VT, NH, ME; RD1/RD4 values identical to
+  CR-0014's evidence, 30/30 rows.
+- T3 (pre-registered state-line requirement): RD2 and RD3 FAIL on
+  state-line in ME (p99 8,288 m; 219/400 > 60 m) and VT (p99 7,263 m;
+  184/400); grid-edge, recorded as measured, FAILS in both too.
+- Bookkeeping: BUG-0040 FIXED with operative location; PA-0021 Swept?
+  cell; CR-0014 log entry, status pointer and note under its table;
+  tracker.
+

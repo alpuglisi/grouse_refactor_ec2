@@ -106,3 +106,11 @@ Reviewer A: APPROVE WITH FOLLOW-UPS (v3). Reviewer B: APPROVE WITH FOLLOW-UPS (v
 - Bookkeeping: BUG-0037 filed; BUG-0023 FIXED; PA-0023 added; PA-0017/0018
   Swept? cells; `BUG_LOG.md` rows.
 
+## Post-implementation change (2026-09-30)
+CR-0016 demoted RD1 and RD4 from gates to observations in
+`check_road_dist.py` (BUG-0040: fitted to one run; the round-7 concern had
+been dropped in the CR-0008 → CR-0014 split, BUG-0041). CR-0014's accepted
+result is unchanged: re-run T2 gave 0 gate failures and identical RD1/RD4
+values. Affected rows: RD1, RD4. Evidence
+`docs/quality/evidence/CR-0016-check.txt`.
+

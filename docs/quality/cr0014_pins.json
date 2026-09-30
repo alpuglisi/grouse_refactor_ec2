@@ -1,5 +1,5 @@
 {
-  "_comment": "CR-0014 pinned recipe and constants. T pins from CR-0008 v7 G0 (reproduced by two reviewers). C pins are written by `check_road_dist.py pin` from the verifier's own TIGER copy, before regeneration. Do not edit without a CR.",
+  "_comment": "CR-0014 pinned recipe and constants. T pins from CR-0008 v7 G0 (reproduced by two reviewers). C pins are written by `check_road_dist.py pin` from the verifier's own TIGER copy, before regeneration. RD1/RD4 references moved to rd_obs_references by CR-0016. Do not edit without a CR.",
   "tiger_year": 2023,
   "mtfcc": [
     "S1100",
@@ -23,9 +23,12 @@
   "rd_points_per_stratum": 400,
   "rd_seed": 20260930,
   "rd_thresholds": {
-    "rd1_median_abs_m": 20.0,
     "rd2_p99_abs_m": 60.0,
-    "rd3_max_abs_m": 60.0,
+    "rd3_max_abs_m": 60.0
+  },
+  "rd_obs_references": {
+    "_comment": "Reported beside RD1/RD4, not limits (CR-0016, BUG-0040): fitted to one run, uncalibrated.",
+    "rd1_median_abs_m": 20.0,
     "rd4_signed_band_m": [
       -20.0,
       5.0

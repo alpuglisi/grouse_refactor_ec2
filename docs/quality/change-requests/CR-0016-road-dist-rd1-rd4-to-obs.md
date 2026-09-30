@@ -1,6 +1,6 @@
 # CR-0016: Demote `check_road_dist.py` RD1 and RD4 from gates to observations
 
-**Status: APPROVED (v2.1), 2026-09-30 — implementation in progress.**
+**Status: IMPLEMENTED (v2.1), 2026-09-30 — T1 14 tests OK; T2 0 gate failures, RD1/RD4 values identical to CR-0014 (30/30); T3 RD2/RD3 fail on state-line and grid-edge in ME and VT (`docs/quality/evidence/CR-0016-check.txt`).**
 History and dispositions: `CR-0016-review-log.md`. Current intent only.
 
 ## Scope
@@ -86,9 +86,9 @@ grid — no such input exists; the analytic bound's preconditions (X3,
 `d`) are what guard it.
 
 ## Deliverables
-- [ ] 1. Code, pins and test changes; T1.
-- [ ] 2. T2 and T3; save to `docs/quality/evidence/CR-0016-check.txt`.
-- [ ] 3. Bookkeeping:
+- [x] 1. Code, pins and test changes; T1.
+- [x] 2. T2 and T3; save to `docs/quality/evidence/CR-0016-check.txt`.
+- [x] 3. Bookkeeping:
       - BUG-0040 → FIXED, corrective action naming CR-0016 and
         `check_road_dist.py`'s `RD_KIND`/`rd_rows` (PA-0024(a));
         `BUG_LOG.md` row.

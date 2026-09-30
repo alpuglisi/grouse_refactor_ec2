@@ -1,6 +1,6 @@
 # CR-0014: Regenerate `road_dist` from every intersecting county at TIGER 2023, with nodata where Canadian roads could be nearer
 
-**Status: IMPLEMENTED (v3), 2026-09-30 — all deliverables complete; 153 gate rows, 0 failures (`docs/quality/evidence/CR-0014-gates.txt`).**
+**Status: IMPLEMENTED (v3), 2026-09-30 — all deliverables complete; 153 gate rows, 0 failures (`docs/quality/evidence/CR-0014-gates.txt`). RD1/RD4 later demoted to OBS by CR-0016.**
 History and dispositions: `CR-0014-review-log.md`. This document states
 only current intent.
 
@@ -126,6 +126,8 @@ of the grid edge; within 5 km of the coverage boundary `∂T`.
 | RD3 | `count(|err| > 60 m)` | 0 |
 | RD4 | median signed err | in [−20, +5] m |
 | RD5 | points in `T \ C` whose raster is nodata | 0 |
+
+*Post-implementation (CR-0016, 2026-09-30): RD1 and RD4 are now reported as observations, not gates; this table records what CR-0014 accepted.*
 
 The thresholds and their derivation live in `cr0014_pins.json` and the
 script's docstring: truth is measured from the pixel centre, so the EDT

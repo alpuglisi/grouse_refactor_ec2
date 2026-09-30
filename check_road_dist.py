@@ -24,8 +24,10 @@ Canada rule (the recipe, identical in the generator):
     C       T & (D_can < D_road)          (strict)
 The raster must be -9999 exactly on ~T | C.
 
-Gates: R0 R0b R1 R2 R3 RD1-RD5 R6 R7 R8 B0 (exit 1 if any fails).
-Observations: X1 |C| and records with centre in C; X2 pixels in T\\C
+Gates: R0 R0b R1 R2 R3 RD2 RD3 RD5 R6 R7 R8 B0 (exit 1 if any fails).
+Observations: RD1 (median |err|) and RD4 (median signed err) per stratum,
+reported beside an uncalibrated reference (CR-0016, BUG-0040); X1 |C| and
+records with centre in C; X2 pixels in T\\C
 closer to a Canada-adjacent grid edge (within 20 km of Canadian land)
 than to any road - the unseen-land residual, an upper bound; X3 sample points whose
 nearest road lies outside grid + pad.
@@ -36,9 +38,12 @@ differs from it by at most the road's in-pixel offset (<= 21.2 m, half
 the 30 m diagonal, either sign) plus log1p encoding (0.5 * (1 + d) /
 1000 m, < 18 m below 35 km; max in-coverage distance is 17.2 km): 60 m
 for p99 and the exceedance count leaves headroom (observed max 21.4 m
-over 4,000 points per region in review). all_touched widens each road,
-so correct rasters read slightly LOW - hence the signed-median band
-[-20, +5] m (observed -8.8 m).
+over 4,000 points per region in review). This derived bound is accepted
+in place of a fair-side quantile (CR-0016), under two preconditions that
+are reported, not gated: every truth road lies inside grid + pad (X3 = 0)
+and d < ROAD_DIST_MAX_M (the encoder caps it); a violation makes RD3
+false-fail, never false-pass. RD1 and RD4 are reported, not gated
+(BUG-0040): their references were fitted to one run.
 """
 import argparse
 import glob
@@ -242,20 +247,44 @@ def sample(mask, n, seed):
     return rng.choice(idx, size=min(n, idx.size), replace=False)
 
 
+# RD1 and RD4 are observations (CR-0016, BUG-0040): their references were
+# fitted to one run and showed no power against any construction the gates
+# below do not already catch.
+RD_KIND = {"RD1": "OBS", "RD2": "GATE", "RD3": "GATE", "RD4": "OBS",
+           "RD5": "GATE"}
+
+
 def rd_stats(err, excluded, t):
-    """RD1-RD5 for one stratum. err in metres (raster - truth)."""
+    """RD1-RD5 for one stratum: {id: (value, ok)}. err in metres (raster -
+    truth). ok is None for the observations RD1/RD4, which read no
+    threshold."""
     a = np.abs(err)
     return {
-        "RD1": (float(np.median(a)), float(np.median(a)) <= t["rd1_median_abs_m"]),
+        "RD1": (float(np.median(a)), None),
         "RD2": (float(np.percentile(a, 99)),
                 float(np.percentile(a, 99)) <= t["rd2_p99_abs_m"]),
         "RD3": (int((a > t["rd3_max_abs_m"]).sum()),
                 int((a > t["rd3_max_abs_m"]).sum()) == 0),
-        "RD4": (float(np.median(err)),
-                t["rd4_signed_band_m"][0] <= float(np.median(err))
-                <= t["rd4_signed_band_m"][1]),
+        "RD4": (float(np.median(err)), None),
         "RD5": (int(excluded), int(excluded) == 0),
     }
+
+
+def rd_rows(stats, subject, refs=None):
+    """Report rows (gid, kind, subject, value, required, ok) for one
+    stratum. OBS rows carry ok=None, so they never print PASS/FAIL and
+    never count toward the exit status."""
+    refs = refs or {}
+    out = []
+    for gid, (v, ok) in stats.items():
+        kind = RD_KIND[gid]
+        val = f"{v:.1f}" if isinstance(v, float) else v
+        if kind == "OBS":
+            req = f"report (reference, uncalibrated: {refs.get(gid, '-')})"
+            out.append((gid, kind, subject, str(val), req, None))
+        else:
+            out.append((gid, kind, subject, str(val), "see pins", ok))
+    return out
 
 
 # ---- subcommands --------------------------------------------------------------
@@ -403,10 +432,10 @@ def cmd_check(args, pins):
             excluded = int((enc == NODATA).sum())
             val = road_dist_decode(enc[enc != NODATA])
             err = val - truth[enc != NODATA]
-            for gid, (v, ok) in rd_stats(err, excluded, t).items():
-                add(gid, "GATE", f"{r} {name} (n={len(idx)})",
-                    f"{v:.1f}" if isinstance(v, float) else v,
-                    "see pins", ok)
+            obs_refs = {"RD1": pins["rd_obs_references"]["rd1_median_abs_m"],
+                        "RD4": pins["rd_obs_references"]["rd4_signed_band_m"]}
+            rows.extend(rd_rows(rd_stats(err, excluded, t),
+                                f"{r} {name} (n={len(idx)})", obs_refs))
             outside = int(sum(not geoms[j].intersects(padbox)
                               for j in near[1]))
             add("X3", "OBS", f"{r} {name}", outside, "report")
@@ -486,7 +515,8 @@ def main():
     ap.add_argument("--gates", nargs="+",
                     default=["B0", "R0b", "R8"],
                     help="Optional gates to include besides the per-region "
-                         "ones (R0-R3, RD1-RD5, R6, R7 always run).")
+                         "ones (R0-R3, RD2, RD3, RD5, R6, R7 always run; "
+                         "RD1/RD4 are always reported as observations).")
     ap.add_argument("--pins", default=PINS)
     ap.add_argument("--out", default=None)
     args = ap.parse_args()

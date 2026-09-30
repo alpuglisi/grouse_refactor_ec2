@@ -1,6 +1,6 @@
 # CR-0013: Acceptance gates for the pooled split and draw, as a committed script
 
-**Status: IMPLEMENTED, 2026-09-30** (v2.3 text; code `3230262` + 5b `ba010a7`). Deliverable 6 passed inside CR-0012's real run: 18/18 GATEs; OBS calibrated.
+**Status: APPROVED; deliverables 3–6 done, 2026-09-30** (v2.3 text; code `3230262` + 5b `ba010a7`; deliverable 6 passed inside CR-0012's real run, 18/18 GATEs, OBS calibrated). Open: deliverables 0, 1 and 2a (bookkeeping, evidence scripts, PA-0021 sweep) — to verify and close.
 
 History, verdicts and dispositions are in `CR-0013-review-log.md`. This
 CR was split from CR-0007 v7's acceptance layer (commit `bb170ea`). This

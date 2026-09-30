@@ -1,6 +1,6 @@
 # CR-0007: Partition sighting records by state and centralise the shared spatial constants
 
-**Status: APPROVED (v9; v9.1 amendment pending bounded re-review), 2026-09-30 — IMPLEMENTED except deliverable 7:** `check_partition.py` P1–P8 all PASS (`docs/quality/evidence/CR-0007-gates-v9.1.txt`); deliverable 7 waits (road files). History, verdicts, dispositions and the v8 split:
+**Status: APPROVED (v9; v9.1 amendment pending bounded re-review), 2026-09-30 — IMPLEMENTED (all deliverables):** `check_partition.py` P1–P8 all PASS after deliverable 7 (`docs/quality/evidence/CR-0007-gates-d7.txt`). History, verdicts, dispositions and the v8 split:
 `CR-0007-review-log.md`. This document states only current intent.
 
 ## Scope
@@ -281,7 +281,7 @@ county file (specified, not exercised).
       - PA-0018's Swept? cell: KDE source box-sourced, checked by P8.
       - BUG-0027, BUG-0029: corrective action "membership: CR-0007; split
         and draw: CR-0012"; fixed when CR-0012 lands, closed after CR-0009.
-- [ ] 7. After CR-0014 closes: the road-file re-points (last table row);
+- [x] 7. After CR-0014 closes: the road-file re-points (last table row);
       remove their two P6 exemptions; P6 and P7 pass. CR-0007 closes after
       this deliverable.
 

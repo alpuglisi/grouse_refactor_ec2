@@ -65,6 +65,7 @@ from scipy.ndimage import distance_transform_edt
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from grouse_data import NODATA_SENTINELS  # noqa: E402
+import regions as R  # noqa: E402
 
 PINS = os.path.join(HERE, "docs/quality/cr0014_pins.json")
 CACHE = os.path.expanduser("~/.cache/grouse_cr0014")
@@ -498,7 +499,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("command", choices=["fetch", "pin", "backup", "check"])
-    ap.add_argument("--regions", nargs="+", default=["ME", "NH", "VT"])
+    ap.add_argument("--regions", nargs="+", default=list(R.REGIONS))
     ap.add_argument("--root", default=os.path.join(HERE, "data/landfire"),
                     help="Directory holding the road_dist rasters to check.")
     ap.add_argument("--mask-root", default=os.path.join(HERE, "data/landfire"),

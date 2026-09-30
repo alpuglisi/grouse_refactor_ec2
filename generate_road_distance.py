@@ -104,7 +104,8 @@ import rasterio.features
 from scipy.ndimage import distance_transform_edt
 from rasterio.transform import Affine, array_bounds
 
-from grouse_data import GrouseData, NODATA_SENTINELS
+import regions as R
+from grouse_data import GrouseData, NODATA_SENTINELS, PATH_TEMPLATES
 from models import ROAD_DIST_MAX_M, road_dist_encode
 
 CACHE_DIR = "data/roads"
@@ -113,13 +114,13 @@ CACHE_DIR = "data/roads"
 # verifier pins its truth to the same vintage. Changing the vintage
 # changes road_dist's VALUES (not its geometry) and needs a CR: re-run
 # this script and re-pin check_road_dist.py.
-TIGER_YEAR = 2023
+TIGER_YEAR = R.TIGER_YEAR
 # LANDFIRE evt vintage that decides which pixels outside US counties are
 # LAND (Canada) for the Canada rule in build_distance_raster. Pinned, not
 # "latest": CR-0014's verifier pins this file by sha256.
 LAND_EVT_YEAR = 2024
 OPEN_WATER_EVT = 7292
-STATE_FIPS = {"ME": "23", "NH": "33", "VT": "50"}
+STATE_FIPS = R.STATE_FIPS
 # Margin around the region grid for road loading and the distance
 # transform: a road this far outside the grid still sets the distance of
 # the pixels at its edge.
@@ -170,7 +171,7 @@ def load_counties(tiger_year=TIGER_YEAR):
     """TIGER's national county polygons (one ~80MB download, cached,
     shared by all regions)."""
     import geopandas as gpd
-    path = os.path.join(CACHE_DIR, f"tl_{tiger_year}_us_county.zip")
+    path = PATH_TEMPLATES["tiger_county"].format(year=tiger_year)
     _download(f"https://www2.census.gov/geo/tiger/TIGER{tiger_year}/COUNTY/"
               f"tl_{tiger_year}_us_county.zip", path)
     return gpd.read_file(path)
@@ -380,8 +381,8 @@ def main():
     ap = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--regions", nargs="+", default=list(STATE_FIPS),
-                    choices=list(STATE_FIPS))
+    ap.add_argument("--regions", nargs="+", default=list(R.REGIONS),
+                    choices=list(R.REGIONS))
     ap.add_argument("--mtfcc", nargs="+", default=PAVED_MTFCC_DEFAULT,
                     help="TIGER MTFCC road classes to treat as paved. "
                          "Default: %(default)s. Use S1100 S1200 for a "

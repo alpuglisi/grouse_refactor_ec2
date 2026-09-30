@@ -608,10 +608,6 @@ P6_EXEMPT = {
     "legacy/audit.py": "stale copy; runtime guard is CR-0007 section 3",
     "legacy/download.py": "stale copy; runtime guard is CR-0007 section 3",
     "legacy/download_more.py": "stale copy; runtime guard is CR-0007 section 3",
-    "generate_road_distance.py": "re-pointed after CR-0014 closes "
-                                 "(CR-0007 deliverable 7)",
-    "check_road_dist.py": "CR-0014's gate script; re-pointed after CR-0014 "
-                          "closes (CR-0007 deliverable 7)",
 }
 
 

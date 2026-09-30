@@ -876,3 +876,25 @@ marker is removed from `tests/test_shared_constants.py`, which passes.
 F2 (count 20 files, not 21) noted. Needs a bounded re-review of the
 amendment (text + gate code) by the round-9 reviewers.
 
+## v9.1 bounded review
+| reviewer | verdict |
+|---|---|
+| A — correctness | **APPROVE WITH FOLLOW-UPS** — exclusion removes exactly the 9 evidence files; no live module imports from `docs/`; P1–P8 pass in a clean clone |
+| B — implementability | **APPROVE WITH FOLLOW-UPS** — amendment correct; F2–F4, F6 acceptable implementer choices |
+
+Follow-ups (LOW unless noted), tracked for v9.2: stale italic notes on
+deliverables 2 and 5 (B); synthetic test for the evidence exclusion (B);
+a P7/P6 assertion that no scanned module imports from `docs/` (A);
+F3.3 — `nonveg_flagged_*` now also carries `spatial_density`/`spatial_zone`,
+one line in §2 (B); **BUG-0048** — the three `legacy/download_landfire*`
+guards found by PA-0026's sweep: remediate in v9.2 or record an accepted
+deferral (B, MEDIUM in substance).
+
+## Deliverable 7 (2026-09-30)
+`generate_road_distance.py`: `TIGER_YEAR`/`STATE_FIPS` from `regions`, county
+path from `PATH_TEMPLATES["tiger_county"]`, region choices from
+`R.REGIONS`; `check_road_dist.py`: region default `list(R.REGIONS)`; both
+P6 exemptions removed (`check_partition.py` and
+`tests/test_shared_constants.py` `EXPECTED_EXEMPT`, as reviewer A flagged).
+P1–P8 all PASS (`docs/quality/evidence/CR-0007-gates-d7.txt`).
+

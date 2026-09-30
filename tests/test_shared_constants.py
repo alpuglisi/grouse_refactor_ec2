@@ -46,8 +46,7 @@ EXPECTED_PATH_TEMPLATES = {
 # The only exemptions CR-0007 names; growth of this set is a review item.
 EXPECTED_EXEMPT = {"regions.py", "clean.py", "legacy/gen_negs.py",
                    "legacy/audit.py", "legacy/download.py",
-                   "legacy/download_more.py", "generate_road_distance.py",
-                   "check_road_dist.py"}
+                   "legacy/download_more.py"}   # road files re-pointed (d7)
 
 CODES = EXPECTED_REGIONS["REGIONS"]
 

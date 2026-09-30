@@ -8,8 +8,9 @@
 
 ## 1. Description
 `analyze_region` has five designed skip paths (no box overlap, no
-rasters for a feature, every record dropped at extraction, every record
-non-vegetated) that `return None` after printing "Skipping". The
+rasters for a feature, every record dropped at extraction, no record of
+the region's own state after the `state == region` restriction, every
+record non-vegetated) that `return None` after printing "Skipping". The
 region's two output CSVs are written only at the very end of the
 function, after the diagnostic map. `__main__` loops over every region
 without a `try`, prints "skipped (see log above)" in the summary and
@@ -20,8 +21,12 @@ exits 0. A skipped region therefore keeps whatever
 those files as if they were current.
 
 ## 2. Where encountered
-- Skip paths: `analyze_grouse.py:251-252`, `:758-759`, `:786-787`,
-  `:882-884` (returns `valid, None` before the writes).
+- Skip paths: `analyze_grouse.py:251-252` (inside `clip_to_region`,
+  reached from `:741`), `:758-759`, `:786-787`, `:836-837` (no record of
+  the region's own state after the `state == region` restriction),
+  `:882-884` (returns `valid, None` before the writes). *Correction
+  2026-09-30 (CR-0025 review, A1/B1): the `:836-837` path was missing
+  from this list, and `:251` was cited without its call site.*
 - Writes: `analyze_grouse.py:1095` (map), `:1099-1100` (the two CSVs).
 - Loop: `analyze_grouse.py:1117-1126`.
 - Consumers: `prepare_training_data.py:371-373` (reads and digests

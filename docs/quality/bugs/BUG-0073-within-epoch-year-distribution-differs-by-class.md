@@ -180,4 +180,8 @@ concrete mechanism: **BUG-0077** (the rollover loop at
 `get_negatives.py:311-333` hands each species' whole unmet quota to the
 first non-exhausted year in ascending order, so 2020 absorbs the
 shortfall). Still a candidate under PA-0016 until the fix CR re-measures;
-PA-0034 (extends PA-0020) records the rule.
+PA-0034 (extends PA-0020) records the rule. The user decided on
+2026-09-30 not to re-fetch the negatives (CR-0022 v3 is a latent code
+fix); the standing measurement of this defect (year-only AUC and
+total-variation distance with a permutation null, O11) is CR-0030, so the
+harmonisation CR can show before/after from the acceptance run.

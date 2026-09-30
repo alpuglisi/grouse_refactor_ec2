@@ -1,0 +1,67 @@
+# CR-0025 review log
+
+## Lineage
+From BUG-0081 (2026-09-30 static review). Author: the review session
+that filed BUG-0081. Reviewers: two fresh agents, each re-deriving from
+the code before reading the CR (CLAUDE.md §1.2, §1.4 agent-only quorum).
+Review logs were not read by the reviewers. Both found the fifth skip
+path that BUG-0081 §2 also omitted; BUG-0081 §1–2 corrected the same day.
+
+## Rounds
+| round | version | reviewer | verdict | blocking |
+|---|---|---|---|---|
+| 1 | v1 | A (agent, fresh) | REVISE | 1 |
+| 1 | v1 | B (agent, fresh) | REVISE | 0 |
+
+## Round 1, reviewer A
+- **A1 BLOCKING:** §2 lists four skip paths; the code has a fifth at
+  `analyze_grouse.py:836-837` ("No {region} records survived
+  extraction"). Scenario: no `nh_sightings_*.csv` on disk, the NH box
+  still holds ME/VT records → `:837` → the previous
+  `evaluated_sightings_NH.csv` / `envelope_metrics_NH.csv` remain and
+  are digested (PA-0038(a) unmet).
+- A2 MAJOR: the `:884` path returns `(valid, None)`, so `__main__`
+  (`:1123-1130`) prints it as complete and exits 0 while the metrics file
+  is removed (PA-0038(b) unmet).
+- A3 MAJOR (PA-0021(a)): the fixture test as written passes on today's
+  code if no files pre-exist; it must pre-seed stale files and assert
+  removal and exit 1, plus a `:884` case.
+- A4 MEDIUM: "the map keeps its own `try` (BUG-0069 handlers)" is false;
+  the only handlers are in `load_state_boundaries` (`:653-672`).
+- A5 MEDIUM: the writes stay non-atomic (`:551`, `:876`, `:1099-1100`);
+  adopt temp+`os.replace` or record against BUG-0079/CR-0023.
+- A6 LOW: the helper derives paths from `PATH_TEMPLATES` while `:876` and
+  `:1099-1100` remain literals (PA-0003).
+
+## Round 1, reviewer B
+- B1 MAJOR: same as A1 (`:836-837`; BUG-0081 §2 has the same omission).
+- B2 MAJOR: the `:882` provision is wrong on three counts: (a) today that
+  path writes only `nonveg_flagged` (`:877`), not `evaluated`; (b)
+  `valid` at `:884` lacks `env_zone`/`envelope_id` (added at ~`:1011`),
+  so writing it creates a second schema for the `evaluated` entry
+  (PA-0045) that `prepare_training_data.py:395-398` cannot see on the
+  pooled concat; (c) `__main__` counts only `r is None` as skipped.
+- B3 MEDIUM: same as A4 (an implementer citing the sentence could add a
+  swallow-all handler, PA-0027).
+- B4 LOW: `:251` is inside `clip_to_region` (the call is `:741`); an
+  unhandled exception mid-region leaves the same stale files; removal at
+  region start covers both.
+- B5 LOW: test-plan honesty confirmed (module-level rasterio); no action.
+
+## v2 dispositions (both reviewers)
+| # | sev | disposition (operative location) |
+|---|---|---|
+| A1 / B1 | BLOCKING / MAJOR | **Accept** — §2 second bullet lists `:837`; § 3 has its case; BUG-0081 §1–2 corrected |
+| A2 / B2 | MAJOR | **Accept** — §2 third bullet: `:884` becomes a full skip (returns `None`, removes the four outputs including the just-written `nonveg_flagged`); no second `evaluated` schema; `__main__`'s `r is None` now covers it |
+| A3 | MAJOR | **Accept** — § 3: pre-seeded stale files in every case; exit code and `INCOMPLETE` asserted; `:884` case; injected map exception case |
+| A4 / B3 | MEDIUM | **Accept** — sentence removed; §2 fifth bullet states that a plotting exception propagates after the CSVs are complete and what that leaves |
+| A5 | MEDIUM | **Accept** — §2 fourth bullet: `write_csv_atomic` for all four writes (PA-0036(a)); Scope and deliverable 4 updated |
+| A6 | LOW | **Accept** — §2 fourth bullet: paths from `PATH_TEMPLATES` |
+| B4 | LOW | **Accept** — §2 second bullet: `remove_region_outputs` is the first statement of `analyze_region`, so exceptions are covered too; `:251` cited as reached via `:741` |
+| B5 | LOW | noted; no change |
+
+## Versions
+| version | change |
+|---|---|
+| v1 | initial draft (removal at each of four skip paths) |
+| v2 | removal at region start; fifth path; `:884` full skip; atomic writes; pre-seeded fixture test; dispositions above |

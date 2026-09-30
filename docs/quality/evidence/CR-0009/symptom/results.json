@@ -1,0 +1,624 @@
+{
+ "calibration": {
+  "path": "/home/ec2-user/grouse2/data/calibration/calibration.json",
+  "sha256": "b1925e051ab5dac31977a6959b59a2943353e0f4e3ab1826a293c0a65b5eb775",
+  "model_path": "/home/ec2-user/grouse2/grouse_cr0009.pth",
+  "fitted_at": "2026-09-30T14:05:16",
+  "temperature": 0.8308964063952589,
+  "shift": -0.51542958651963,
+  "kind": "Platt scale 1.203519 bias -0.515430",
+  "fitted_on_this_model": true
+ },
+ "maps": [
+  {
+   "role": "box",
+   "region": "NH",
+   "path": "docs/quality/evidence/CR-0009/symptom/map_box_NH_grouse_cr0009.tif",
+   "origin": "scored in-process by predict.py's functions (stride 4)",
+   "sha256": "4d999fe301f9b336ebbadaf9185bd38fbc25185ec4af90835955d5f119ca3ac5",
+   "spot_check": {
+    "n": 20,
+    "tol": 0.001,
+    "max_abs_diff": 2.3305416107177734e-05,
+    "median_abs_diff": 9.387731552124023e-06
+   }
+  },
+  {
+   "role": "region",
+   "region": "ME",
+   "path": "docs/quality/evidence/CR-0009/symptom/map_region_ME_grouse_cr0009.tif",
+   "origin": "scored in-process by predict.py's functions (stride 8)",
+   "sha256": "c72ce9aafe3cacf40a46f55864b0b7510bb980c427d6e09506416dfe8c4ce310",
+   "spot_check": {
+    "n": 20,
+    "tol": 0.001,
+    "max_abs_diff": 3.740191459655762e-05,
+    "median_abs_diff": 8.046627044677734e-06
+   }
+  }
+ ],
+ "item1": {
+  "ME": {
+   "n": 17320,
+   "mean": 0.6584428223484469,
+   "p01": 0.06657703451812268,
+   "p10": 0.48264929354190833,
+   "median": 0.7097944915294647,
+   "p90": 0.8090723156929016,
+   "p99": 0.8619816309213639,
+   "ge05_pct": 89.51501154734412,
+   "ge08_pct": 12.85796766743649
+  },
+  "NH": {
+   "n": 34394,
+   "mean": 0.6766909148542232,
+   "p01": 0.07857265733182431,
+   "p10": 0.5483296573162079,
+   "median": 0.7175902128219604,
+   "p90": 0.809048593044281,
+   "p99": 0.8611566799879073,
+   "ge05_pct": 92.24864802000349,
+   "ge08_pct": 12.903413386055707
+  },
+  "nan_cells": {
+   "ME": 0,
+   "NH": 0
+  },
+  "other_cells": 0,
+  "p_me_gt_nh": 0.4777380960694444,
+  "gap08_pp": -0.045445718619216535,
+  "mean_diff": -0.018248092505776303
+ },
+ "item2": {
+  "n_pairs": 8,
+  "n_pairs_finite_road": 8,
+  "n_pairs_finite_prob": 8,
+  "cells_missing_input": 0,
+  "diff_road_m": [
+   -548.2766950832977,
+   -185.22772676738623,
+   489.29862571190466,
+   1153.696967667463,
+   202.78734809197283,
+   -155.14595398506424,
+   834.8880715084538,
+   -170.61368252535505
+  ],
+  "diff_road_m_recorded": [
+   -549.0,
+   -185.0,
+   490.0,
+   1154.0,
+   203.0,
+   -155.0,
+   835.0,
+   -171.0
+  ],
+  "diff_prob": [
+   -0.11156034469604492,
+   0.02883744239807129,
+   -0.005421757698059082,
+   -0.30326227098703384,
+   -0.04786926507949829,
+   -0.03548496961593628,
+   -0.001819610595703125,
+   0.15494275093078613
+  ],
+  "diff_prob_recorded": [
+   -0.11159999999999992,
+   0.028900000000000037,
+   -0.005400000000000071,
+   -0.30319999999999997,
+   -0.047900000000000054,
+   -0.035499999999999976,
+   -0.0017999999999999128,
+   0.15500000000000003
+  ],
+  "mean_diff_road_m": 202.6758693273364,
+  "mean_diff_road_m_recorded": 202.75,
+  "mean_diff_prob": -0.040204753167927265,
+  "mean_diff_prob_recorded": -0.04018749999999998,
+  "boot_2b": {
+   "n_pairs": 8,
+   "n_boot": 100000,
+   "seed": 0,
+   "mean": -0.040204753167927265,
+   "lo95": -0.13095254357904196,
+   "hi95": 0.0388287678360939
+  }
+ },
+ "rematch": {
+  "n": 8,
+  "same_cells": true,
+  "cells": [
+   [
+    [
+     1974,
+     4445
+    ],
+    [
+     1903,
+     4212
+    ]
+   ],
+   [
+    [
+     2374,
+     4348
+    ],
+    [
+     1976,
+     4115
+    ]
+   ],
+   [
+    [
+     2439,
+     4464
+    ],
+    [
+     2047,
+     4226
+    ]
+   ],
+   [
+    [
+     2319,
+     4299
+    ],
+    [
+     1919,
+     4244
+    ]
+   ],
+   [
+    [
+     2238,
+     4436
+    ],
+    [
+     2107,
+     4245
+    ]
+   ],
+   [
+    [
+     2235,
+     4438
+    ],
+    [
+     2264,
+     4033
+    ]
+   ],
+   [
+    [
+     1964,
+     4413
+    ],
+    [
+     1890,
+     4069
+    ]
+   ],
+   [
+    [
+     2160,
+     4430
+    ],
+    [
+     1890,
+     3945
+    ]
+   ]
+  ]
+ },
+ "item3": [
+  {
+   "point_set": "region files ME+NH+VT",
+   "points": 65,
+   "on_map": 65,
+   "off_map_by_side": {
+    "ME": 0,
+    "NH": 0
+   },
+   "blocks": {
+    "all/all": {
+     "n": 65,
+     "pos": 57,
+     "neg": 8,
+     "mean_pos": 0.6469555161893368,
+     "mean_neg": 0.59464306011796,
+     "auc": 0.5723684210526315,
+     "ap": 0.8996531556113514
+    },
+    "all/train": {
+     "n": 50,
+     "pos": 44,
+     "neg": 6,
+     "mean_pos": 0.6610177785835483,
+     "mean_neg": 0.5663673430681229,
+     "auc": 0.5909090909090909,
+     "ap": 0.903157644256311
+    },
+    "all/val": {
+     "n": 15,
+     "pos": 13,
+     "neg": 2,
+     "mean_pos": 0.5993601665473901,
+     "mean_neg": 0.6794702112674713,
+     "auc": 0.42307692307692313,
+     "ap": 0.8827572000648922
+    },
+    "ME/all": {
+     "n": 23,
+     "pos": 17,
+     "neg": 6,
+     "mean_pos": 0.653492287677877,
+     "mean_neg": 0.5431273827950159,
+     "auc": 0.6862745098039216,
+     "ap": 0.8324057885514181
+    },
+    "ME/train": {
+     "n": 15,
+     "pos": 11,
+     "neg": 4,
+     "mean_pos": 0.6157700013030659,
+     "mean_neg": 0.4749559685587883,
+     "auc": 0.6363636363636364,
+     "ap": 0.7794178044178044
+    },
+    "ME/val": {
+     "n": 8,
+     "pos": 6,
+     "neg": 2,
+     "mean_pos": 0.7226498126983643,
+     "mean_neg": 0.6794702112674713,
+     "auc": 0.75,
+     "ap": 0.915079365079365
+    },
+    "NH/all": {
+     "n": 42,
+     "pos": 40,
+     "neg": 2,
+     "mean_pos": 0.6441773883067071,
+     "mean_neg": 0.749190092086792,
+     "auc": 0.3,
+     "ap": 0.9372373034771275
+    },
+    "NH/train": {
+     "n": 35,
+     "pos": 33,
+     "neg": 2,
+     "mean_pos": 0.6761003710103758,
+     "mean_neg": 0.749190092086792,
+     "auc": 0.34848484848484845,
+     "ap": 0.9334599036093927
+    },
+    "NH/val": {
+     "n": 7,
+     "pos": 7,
+     "neg": 0,
+     "mean_pos": 0.4936833269894123
+    }
+   }
+  }
+ ],
+ "item4": [
+  {
+   "region": "ME",
+   "map": "docs/quality/evidence/CR-0009/symptom/map_region_ME_grouse_cr0009.tif",
+   "shape": [
+    2164,
+    1458
+   ],
+   "stride_px": 8.0,
+   "all": {
+    "n": 2475256,
+    "mean": 0.48625608690410804,
+    "p01": 0.005678406450897455,
+    "p10": 0.06276530399918556,
+    "median": 0.537459671497345,
+    "p90": 0.7634732723236084,
+    "p99": 0.8382843583822255,
+    "ge05_pct": 53.874063935205086,
+    "ge08_pct": 4.12349268116106,
+    "cells": 3155112,
+    "nan_pct": 21.547761220520858,
+    "degraded_pct_of_scored": 32.94418839909892
+   },
+   "coverage": {
+    "outside_US": {
+     "n": 802828,
+     "mean": 0.3359448657745607,
+     "p01": 0.005678406450897455,
+     "p10": 0.10010349452495579,
+     "median": 0.36340148746967316,
+     "p90": 0.5034369051456452,
+     "p99": 0.6013948726654053,
+     "ge05_pct": 10.63191617631672,
+     "ge08_pct": 0.00024911936305161255,
+     "cells": 1481252,
+     "nan_pct": 45.8007145306808,
+     "degraded_pct_of_scored": 99.99738424668796
+    },
+    "inside_US": {
+     "n": 1672428,
+     "mean": 0.5584110956919257,
+     "p01": 0.014781645527109505,
+     "p10": 0.06025207601487638,
+     "median": 0.6546201705932617,
+     "p90": 0.7815087139606476,
+     "p99": 0.8465304762125015,
+     "ge05_pct": 74.63191240519771,
+     "ge08_pct": 6.102803827728309,
+     "cells": 1673860,
+     "nan_pct": 0.08555076290729213,
+     "degraded_pct_of_scored": 0.7561461539749395
+    }
+   },
+   "by_state": {
+    "outside_US": {
+     "n": 802828,
+     "mean": 0.3359448657745607,
+     "p01": 0.005678406450897455,
+     "p10": 0.10010349452495579,
+     "median": 0.36340148746967316,
+     "p90": 0.5034369051456452,
+     "p99": 0.6013948726654053,
+     "ge05_pct": 10.63191617631672,
+     "ge08_pct": 0.00024911936305161255,
+     "cells": 1481252,
+     "nan_pct": 45.8007145306808,
+     "degraded_pct_of_scored": 99.99738424668796
+    },
+    "ME": {
+     "n": 1589426,
+     "mean": 0.5628191279413163,
+     "p01": 0.016942809335887432,
+     "p10": 0.0613873191177845,
+     "median": 0.6573775708675385,
+     "p90": 0.7821959555149078,
+     "p99": 0.8468803912401199,
+     "ge05_pct": 75.57061480056322,
+     "ge08_pct": 6.209537279495868,
+     "cells": 1590858,
+     "nan_pct": 0.0900143193169975,
+     "degraded_pct_of_scored": 0.7951298141593255
+    },
+    "STATEFP_25": {
+     "n": 46,
+     "mean": 0.17833298207868054,
+     "p01": 0.010543858958408236,
+     "p10": 0.020405694842338562,
+     "median": 0.1787348836660385,
+     "p90": 0.3315071165561676,
+     "p99": 0.4260333865880964,
+     "ge05_pct": 0.0,
+     "ge08_pct": 0.0,
+     "cells": 46,
+     "nan_pct": 0.0,
+     "degraded_pct_of_scored": 0.0
+    },
+    "NH": {
+     "n": 82956,
+     "mean": 0.4741645376033775,
+     "p01": 0.007146528060548008,
+     "p10": 0.05220707878470421,
+     "median": 0.5617940127849579,
+     "p90": 0.7642167806625366,
+     "p99": 0.8368570446968079,
+     "ge05_pct": 56.687882733015094,
+     "ge08_pct": 4.061189064082164,
+     "cells": 82956,
+     "nan_pct": 0.0,
+     "degraded_pct_of_scored": 0.009643666522011669
+    }
+   }
+  }
+ ],
+ "provenance": {
+  "utc": "2026-09-30T14:36:50+00:00",
+  "git": {
+   "head": "fc52728046f4d1891edb0e8dc116ca6b572cf134",
+   "dirty_tracked": "M tests/test_pa0027_lint.py"
+  },
+  "device": "cuda",
+  "argv": [
+   "symptom_check.py",
+   "--model",
+   "grouse_cr0009.pth",
+   "--predict",
+   "--calibration",
+   "data/calibration/calibration.json",
+   "--pairs",
+   "docs/quality/evidence/CR-0009/baseline/inv_matched_pairs.csv",
+   "--region-map",
+   "ME=predict",
+   "--out",
+   "docs/quality/evidence/CR-0009/symptom"
+  ],
+  "model": "/home/ec2-user/grouse2/grouse_cr0009.pth",
+  "sha256": {
+   "/home/ec2-user/grouse2/grouse_cr0009.pth": "b2570c31c7bfbc49996313143da782930b111d11e863edd9c1d2f95ad9acfc25",
+   "/home/ec2-user/grouse2/data/calibration/calibration.json": "b1925e051ab5dac31977a6959b59a2943353e0f4e3ab1826a293c0a65b5eb775",
+   "/home/ec2-user/grouse2/docs/quality/evidence/CR-0009/baseline/inv_matched_pairs.csv": "0840b46e1906af9bd1393605cfe2fedd9d5e227dbed60b04d94b9d427c2f6eae",
+   "/home/ec2-user/grouse2/data/roads/tl_2023_us_county.zip": "692e12c30c83adcaabdbac0d3954fafa55e1c89a24b36d95e72e02dff938652e",
+   "/home/ec2-user/grouse2/data/landfire/NH_2024_evt.tif": "92133c1931767538e43d87f96690c297acd3d103d72592a5af383c2aac556ac9",
+   "/home/ec2-user/grouse2/data/landfire/NH_2024_evh.tif": "0210282a4a2225f83191dcbfa6b14604c167452138647220e6b209b11ddadde5",
+   "/home/ec2-user/grouse2/data/landfire/NH_2024_evc.tif": "8d7ba7b50975ae381754e0b6fee60b1de8f95388d121fc3986704e422be0e382",
+   "/home/ec2-user/grouse2/data/landfire/NH_2024_sclass.tif": "5020eb356a84cbc7484bbdb764af53fa562fe389ca3af1fc69387749175b4988",
+   "/home/ec2-user/grouse2/data/landfire/NH_2024_fdist.tif": "fdd838d8df6699ae668643a9f151d6b73181c85fef9f85455b1aa9865d27b466",
+   "/home/ec2-user/grouse2/data/landfire/NH_2025_nlcd.tif": "fa0f31f9b72569a5cab66b19723b02d6ce14ec7971cbbd8d0b5e01c73a81b73e",
+   "/home/ec2-user/grouse2/data/landfire/NH_2024_ch.tif": "5e759aea6d553f7e2d6fe8712a48cf4b1a55cf4075f2bd6cab9e2505e9280750",
+   "/home/ec2-user/grouse2/data/landfire/NH_2024_cc.tif": "76876507843188c1ea1bf854a6a491472360dcd928e06063a84d6d90e4d847ec",
+   "/home/ec2-user/grouse2/data/landfire/NH_2023_tcc.tif": "7ec71f127ab055ec8044f6dcd8acac2c7a6623a5b1300f2dbcf066b89d7f2648",
+   "/home/ec2-user/grouse2/data/landfire/NH_2025_road_dist.tif": "8e44166d0e43ed265432fc6688152a5e31b6f0c1de2e559cefc182d296ddd2bf",
+   "/home/ec2-user/grouse2/data/landfire/NH_2025_tsd.tif": "75f496fe392202f301da91ada29d594154773711ae515d8654930a3701505c15",
+   "/home/ec2-user/grouse2/data/landfire/NH_2025_balive.tif": "58471fcd307803cefe90350529ca4e3c9a3f7dfea73fb448f235bb9b6162ddc5",
+   "/home/ec2-user/grouse2/data/landfire/NH_2025_tpa_live.tif": "9bb17fb6a4c21bacb1bcff9f01c604080d102687fa9cbe330729355958e72b2a",
+   "/home/ec2-user/grouse2/data/landfire/NH_2025_qmd.tif": "3182ded517636e002cdf32d8bf2e5871cb81ba2ced9292fed18557b659b11ffc",
+   "/home/ec2-user/grouse2/data/landfire/NH_2025_carbon_dwn.tif": "8f09b856f24f4fde3abdd61da86897d1d023e941d8e6afbaba0a4e914959989f",
+   "/home/ec2-user/grouse2/docs/quality/evidence/CR-0009/symptom/map_box_NH_grouse_cr0009.tif": "4d999fe301f9b336ebbadaf9185bd38fbc25185ec4af90835955d5f119ca3ac5",
+   "./data/pipeline/thinned_positives_ME.csv": "6c3dcdca88c92b2c3ddc51227a4f797d75f3af7d786053910720330e3bb44a2f",
+   "./data/negatives/negatives_ME.csv": "8d1ed7653f0a6d30c51d9cb14287551f5c6ee49c9bd785740d8197718e7de52c",
+   "./data/pipeline/thinned_positives_NH.csv": "586a0e9799fd27930ec73df4cb660610d500540d9d041a1f71b5c93c2c0801db",
+   "./data/negatives/negatives_NH.csv": "8430ae8a9ebc7c185b5f9f8c3bcf4cc73bc59ed40a3efb0e092bb694e883c69b",
+   "./data/pipeline/thinned_positives_VT.csv": "45e6f58b768eaa24977c720fcb2beec8488f242d918b3ad8a34d9fe8953cb05c",
+   "./data/negatives/negatives_VT.csv": "ba449de5bc2181aefcbb60c14af994c237d72b61a546455c25793a57036f987b",
+   "/home/ec2-user/grouse2/data/landfire/ME_2024_evt.tif": "96047bc6c9ac78c7180892d2c9674c8dff24547a1874f4b71730d34c22b57a74",
+   "/home/ec2-user/grouse2/data/landfire/ME_2024_evh.tif": "4b8b601e1077bb7f0c3e59118e84cfcdf936306e247e95d28866bdc628939118",
+   "/home/ec2-user/grouse2/data/landfire/ME_2024_evc.tif": "3ae21975f3d059634b26572cd8b9320e968d0a6815e5fd41dd808a1a6156018e",
+   "/home/ec2-user/grouse2/data/landfire/ME_2024_sclass.tif": "439aad25e65bf64fa4c1800d5ca09d869d6e328abc5f426c8ec4ff6555a47ec6",
+   "/home/ec2-user/grouse2/data/landfire/ME_2024_fdist.tif": "13f0f1d22efc1015e2da1c92b291e513f07303c883773ffe1488d32f967d1282",
+   "/home/ec2-user/grouse2/data/landfire/ME_2025_nlcd.tif": "0d6241e775f66ee4484636a4c7c328403f06b6e84d99427be016d1924d4c9884",
+   "/home/ec2-user/grouse2/data/landfire/ME_2024_ch.tif": "e70d37d6c00b846e1042a8f513f0ce27f94dc7547f381304dccba11b1fa2a1eb",
+   "/home/ec2-user/grouse2/data/landfire/ME_2024_cc.tif": "4129f4d41c62ed26ce16e585beb7e2bde9443dc069afa004e2e921710ace082e",
+   "/home/ec2-user/grouse2/data/landfire/ME_2023_tcc.tif": "4176379d5d48a785f2fa58256a0c2c289b2ca6f986df49c2cfe24fd0e75521e9",
+   "/home/ec2-user/grouse2/data/landfire/ME_2025_road_dist.tif": "2c19e3281df72e7fdd3c1958f42ab41b58ebc8e50908ad309aca030a04c9b272",
+   "/home/ec2-user/grouse2/data/landfire/ME_2025_tsd.tif": "0e589bad694862231168fe2f08b5517eafa09856d3f1c4f2f920a8ee9f95369e",
+   "/home/ec2-user/grouse2/data/landfire/ME_2025_balive.tif": "bd5f01ae8d6b2426098b3175a72716234e63ab1248d169f68a9e5ed4a4e45028",
+   "/home/ec2-user/grouse2/data/landfire/ME_2025_tpa_live.tif": "82cc3ae3b58bc711fa04adf04e4f583b921285f02a30ae84ab6505810e8ab084",
+   "/home/ec2-user/grouse2/data/landfire/ME_2025_qmd.tif": "f596e61cf882daaf8568b67dc1804d168ef84250c3c7f96852192e80ff053864",
+   "/home/ec2-user/grouse2/data/landfire/ME_2025_carbon_dwn.tif": "eb0c5de08b27655ec329d8fdead42a86d60ce721d35559d0d96582d9ccd93fdf",
+   "/home/ec2-user/grouse2/docs/quality/evidence/CR-0009/symptom/map_region_ME_grouse_cr0009.tif": "c72ce9aafe3cacf40a46f55864b0b7510bb980c427d6e09506416dfe8c4ce310"
+  }
+ },
+ "rows": [
+  {
+   "id": "1a",
+   "type": "OBS",
+   "statistic": "P(ME pixel > NH pixel), Mann-Whitney U / (n_ME n_NH)",
+   "value": "0.4777",
+   "investigate_if": "outside [0.44, 0.56]",
+   "beyond_reference": false,
+   "class": "calibrated pixel scores of one map (rank statistic, so calibration-invariant)",
+   "subset": "finite pixels in the box, ME vs NH side by TIGER 2023 county (other/none excluded)",
+   "null_population": "none: two post-fix values from two recipes, not a seed null",
+   "calibration": "/home/ec2-user/grouse2/data/calibration/calibration.json (Platt scale 1.203519 bias -0.515430; model_path /home/ec2-user/grouse2/grouse_cr0009.pth)",
+   "counts": "ME 17320 scored + 0 NaN; NH 34394 scored + 0 NaN; other/none 0 excluded",
+   "detail": []
+  },
+  {
+   "id": "1b",
+   "type": "OBS",
+   "statistic": "ME >=0.8 share - NH >=0.8 share (pp)",
+   "value": "-0.05",
+   "investigate_if": "> 15.0 pp",
+   "beyond_reference": false,
+   "class": "same map, thresholded at 0.8 (depends on calibration)",
+   "subset": "as 1a",
+   "null_population": "none, as 1a",
+   "calibration": "/home/ec2-user/grouse2/data/calibration/calibration.json (Platt scale 1.203519 bias -0.515430; model_path /home/ec2-user/grouse2/grouse_cr0009.pth)",
+   "counts": "ME 17320 scored + 0 NaN; NH 34394 scored + 0 NaN; other/none 0 excluded",
+   "detail": [
+    "baselines (pre-fix / post-fix, \u00a7 Why now), then this run:",
+    "  map                  ME mean  NH mean  P(ME>NH)  ME>=.8  NH>=.8  gap pp",
+    "  gap3.pth before      0.7949   0.6289   0.8513     67.93    5.05   62.88",
+    "  gap3.pth after       0.6333   0.6277   0.5400     10.24    4.88    5.36",
+    "  bce.pth before       0.6887   0.4228   0.8235     45.68    0.11   45.57",
+    "  bce.pth after        0.4217   0.4220   0.5089      0.18    0.10    0.08",
+    "  this run             0.6584   0.6767   0.4777     12.86   12.90   -0.05",
+    "  (both rows used data/calibration/calibration.json, fitted on gap3.pth (so the bce.pth rows carry gap3's calibration))",
+    "  ME: mean=0.6584 median=0.7098 p10=0.4826 p90=0.8091 >=0.5=89.52% >=0.8=12.86%",
+    "  NH: mean=0.6767 median=0.7176 p10=0.5483 p90=0.8090 >=0.5=92.25% >=0.8=12.90%"
+   ]
+  },
+  {
+   "id": "2a",
+   "type": "OBS",
+   "statistic": "mean ME-NH road_dist (m) over the frozen pairs, NH grid",
+   "value": "+202.68 (sides rounded to whole metres as recorded: +202.75)",
+   "investigate_if": "|.| > 600 m",
+   "beyond_reference": false,
+   "class": "road_dist raster values at pair centres (model-independent)",
+   "subset": "the 8 frozen pairs, NH region grid",
+   "null_population": "none needed for a deterministic raster read; the value changes only if a raster changes",
+   "calibration": "n/a (raster read)",
+   "counts": "8 pairs; finite road_dist 8, finite prob 8; cells with an input missing at the centre 0",
+   "detail": [
+    "per pair, as recorded: ['-549', '-185', '490', '1154', '203', '-155', '835', '-171']",
+    "re-run of inv_matched_pairs.py's matching on the current NH rasters: 8 pairs; same cells as the frozen pairs: yes"
+   ]
+  },
+  {
+   "id": "2b",
+   "type": "OBS",
+   "statistic": "mean ME-NH calibrated probability over the frozen pairs",
+   "value": "-0.0402 (sides rounded to 4 decimals as recorded: -0.0402)",
+   "investigate_if": "> +0.20",
+   "beyond_reference": false,
+   "class": "calibrated probability of a single 64x64 window at each pair centre, D4 TTA (as inv_matched_pairs.py)",
+   "subset": "the 8 frozen pairs, NH region grid",
+   "null_population": "none for retrain seeds; an 8-pair bootstrap is reported as pair-sampling spread only (95 % interval of the mean)",
+   "calibration": "/home/ec2-user/grouse2/data/calibration/calibration.json (Platt scale 1.203519 bias -0.515430; model_path /home/ec2-user/grouse2/grouse_cr0009.pth)",
+   "counts": "8 pairs; finite road_dist 8, finite prob 8; cells with an input missing at the centre 0",
+   "detail": [
+    "per pair, as recorded: ['-0.112', '0.029', '-0.005', '-0.303', '-0.048', '-0.035', '-0.002', '0.155']",
+    "pair-sampling spread: 95 % interval of the mean over 8 pairs [-0.1310, +0.0388] (n_boot=100000, seed=0); not a retrain-seed null"
+   ]
+  },
+  {
+   "id": "3",
+   "type": "OBS",
+   "statistic": "AUC and AP of the item-1 map at in-box records",
+   "value": "all points AUC 0.5724, NH side AUC 0.3000",
+   "investigate_if": "report",
+   "beyond_reference": null,
+   "class": "map value sampled at each record",
+   "subset": "point set 'region files ME+NH+VT': in-box records of the named point set, by split x side",
+   "null_population": "none; few negatives, mostly training points",
+   "calibration": "/home/ec2-user/grouse2/data/calibration/calibration.json (Platt scale 1.203519 bias -0.515430; model_path /home/ec2-user/grouse2/grouse_cr0009.pth)",
+   "counts": "65 records, 65 on scored pixels; off the map by side {'ME': 0, 'NH': 0}",
+   "detail": [
+    "all/all   n=  65 pos=  57 neg=  8 AUC=0.5724 AP=0.8997 mean_pos=0.6470 mean_neg=0.5946   ref post-fix 0.7273 (pre-fix 0.757)",
+    "all/train n=  50 pos=  44 neg=  6 AUC=0.5909 AP=0.9032 mean_pos=0.6610 mean_neg=0.5664",
+    "all/val   n=  15 pos=  13 neg=  2 AUC=0.4231 AP=0.8828 mean_pos=0.5994 mean_neg=0.6795",
+    "ME/all    n=  23 pos=  17 neg=  6 AUC=0.6863 AP=0.8324 mean_pos=0.6535 mean_neg=0.5431",
+    "ME/train  n=  15 pos=  11 neg=  4 AUC=0.6364 AP=0.7794 mean_pos=0.6158 mean_neg=0.4750",
+    "ME/val    n=   8 pos=   6 neg=  2 AUC=0.7500 AP=0.9151 mean_pos=0.7226 mean_neg=0.6795",
+    "NH/all    n=  42 pos=  40 neg=  2 AUC=0.3000 AP=0.9372 mean_pos=0.6442 mean_neg=0.7492   ref post-fix 0.6918 (pre-fix 0.6918)",
+    "NH/train  n=  35 pos=  33 neg=  2 AUC=0.3485 AP=0.9335 mean_pos=0.6761 mean_neg=0.7492",
+    "NH/val    n=   7 pos=   7 neg=  0 AUC=n/a AP=n/a mean_pos=0.4937 mean_neg=n/a",
+    "references: GrouseData()['NH'] positives('all') + negatives('all') inside the box (66 points: 55 positives, 11 negatives; NH side 41/11, ME side 14/0); bce.pth, calibration on (inv_before/before_cal.tif, inv_after/after_cal.tif)"
+   ]
+  },
+  {
+   "id": "4",
+   "type": "OBS",
+   "statistic": "whole-ME-region map summaries",
+   "value": "see detail",
+   "investigate_if": "report",
+   "beyond_reference": null,
+   "class": "calibrated pixel scores of a whole-region map",
+   "subset": "ME the region grid, split into state sides (TIGER 2023 county, pixel centre) and outside US counties (Canada, water)",
+   "null_population": "none (descriptive)",
+   "calibration": "/home/ec2-user/grouse2/data/calibration/calibration.json (Platt scale 1.203519 bias -0.515430; model_path /home/ec2-user/grouse2/grouse_cr0009.pth)",
+   "counts": "3155112 cells",
+   "detail": [
+    "map docs/quality/evidence/CR-0009/symptom/map_region_ME_grouse_cr0009.tif shape=[2164, 1458] stride=8 px",
+    "all          cells=  3155112 NaN= 21.55% degraded= 32.94% mean=0.4863 p01=0.0057 p10=0.0628 median=0.5375 p90=0.7635 p99=0.8383 >=0.8=4.12%",
+    "outside_US   cells=  1481252 NaN= 45.80% degraded=100.00% mean=0.3359 p01=0.0057 p10=0.1001 median=0.3634 p90=0.5034 p99=0.6014 >=0.8=0.00%",
+    "inside_US    cells=  1673860 NaN=  0.09% degraded=  0.76% mean=0.5584 p01=0.0148 p10=0.0603 median=0.6546 p90=0.7815 p99=0.8465 >=0.8=6.10%",
+    "outside_US   cells=  1481252 NaN= 45.80% degraded=100.00% mean=0.3359 p01=0.0057 p10=0.1001 median=0.3634 p90=0.5034 p99=0.6014 >=0.8=0.00%",
+    "ME           cells=  1590858 NaN=  0.09% degraded=  0.80% mean=0.5628 p01=0.0169 p10=0.0614 median=0.6574 p90=0.7822 p99=0.8469 >=0.8=6.21%",
+    "STATEFP_25   cells=       46 NaN=  0.00% degraded=  0.00% mean=0.1783 p01=0.0105 p10=0.0204 median=0.1787 p90=0.3315 p99=0.4260 >=0.8=0.00%",
+    "NH           cells=    82956 NaN=  0.00% degraded=  0.01% mean=0.4742 p01=0.0071 p10=0.0522 median=0.5618 p90=0.7642 p99=0.8369 >=0.8=4.06%"
+   ]
+  },
+  {
+   "id": "5",
+   "type": "OBS",
+   "statistic": "1a/1b/2a/2b beside bf8d31a's before/after (\u00a7 Why now; the 1b row's detail)",
+   "value": "stated",
+   "investigate_if": "stated",
+   "beyond_reference": null,
+   "class": "- (not distributional)",
+   "subset": "-",
+   "null_population": "-",
+   "calibration": "n/a",
+   "counts": "n/a",
+   "detail": []
+  }
+ ]
+}

@@ -17,18 +17,25 @@ Rule (CR-0018 section "Lint rule"):
     `except*` handlers are included, and so is a call
     `suppress(<broad type>)` (contextlib), which never conforms.
   * A broad handler CONFORMS MECHANICALLY if its body always ends the
-    operation abnormally: every path reaches a `raise` (other than
-    `raise SystemExit()` / `SystemExit(0)` / `SystemExit(None)`), or a
-    call to `sys.exit` / `os._exit` / `exit` / `quit` whose argument is
-    not absent / 0 / None / False. `if`/`else`, `with` and nested
-    `try` are followed; anything else (return, continue, break, pass,
-    falling off the end, a conditional raise without an else) does not
+    operation abnormally. Statements are taken in order: the first one
+    that can leave the handler normally (a `return` anywhere in it, or a
+    `break`/`continue` not inside a loop nested in it; nested def/class/
+    lambda ignored, `finally` included) makes it non-conforming; the
+    first one that always aborts makes it conform. Always aborts: a
+    `raise` (a `SystemExit` only with a non-falsy constant or f-string
+    argument), a `sys.exit` / `os._exit` / `exit` / `quit` call with such
+    an argument, an `if` whose body and `else` both abort, a `with` (not
+    `suppress(...)`) whose body aborts, a `try` whose `finally` aborts or
+    whose body and every handler abort. Anything else (pass, falling off
+    the end, a conditional raise without an else, `exit(var)`) does not
     conform mechanically.
   * Every other broad handler must be classified by review, keyed by
     (path, enclosing qualname, ordinal of the broad handler within that
-    scope) and pinned by a digest of the handler's AST (no line
-    numbers). A classified handler whose code changes no longer matches
-    its digest and fails the test until it is re-reviewed.
+    scope) and pinned by a digest of the handler's AST and of its whole
+    enclosing scope (innermost def/class, or the module-level statement;
+    no line numbers). A classified handler whose code, or whose
+    enclosing function, changes no longer matches its digest and fails
+    the test until it is re-reviewed.
 
 Three classified sets, disjoint:
   ALLOWLIST             conforming by PA-0027's fail-closed / visible-
@@ -70,113 +77,90 @@ FALLBACK = "fallback"                # falls back to an equivalent source,
 # key -> (digest, class, justification). Reviewed as part of CR-0018.
 # Each justification cites the PA-0027 sweep (BUG-0049 section 8), whose
 # line numbers predate 4683e3c; current lines are printed by the test.
+# A VISIBLE_UNKNOWN entry must record or print the exception type
+# (PA-0027 text); entries that do not are candidate C5 instead.
 ALLOWLIST = {
-    ('acceptance_split.py', 'git_commit', 0): (
-        '8297606919db', VISIBLE_UNKNOWN,
-        'commit/dirty recorded as None (unknown) in the acceptance record; PA-0027 sweep (BUG-0049 s.8) acceptance_split.py:152'),
     ('acceptance_split.py', 'Rasters.is_valid', 0): (
-        '21aa48dc4ce9', FAIL_CLOSED,
+        '0cc887bcc1ab', FAIL_CLOSED,
         'validity probe -> invalid; PA-0027 sweep (BUG-0049 s.8) acceptance_split.py:454'),
     ('acceptance_split.py', 'Replay.run', 0): (
-        '8e7d784f7860', FAIL_CLOSED,
+        'f351b68afde2', FAIL_CLOSED,
         "error stored per stage and reported as the R gates' FAIL; PA-0027 sweep (BUG-0049 s.8) acceptance_split.py:852"),
     ('acceptance_split.py', 'gate_E0', 0): (
-        '32390b8090ca', FAIL_CLOSED,
+        '2da8dc93d34f', FAIL_CLOSED,
         "unreadable JSON appended to the gate's problems -> FAIL; PA-0027 sweep (BUG-0049 s.8) acceptance_split.py:1417"),
     ('acceptance_split.py', 'gate_E8', 0): (
-        'bd75afdc4d41', FAIL_CLOSED,
+        '2693e8caeee5', FAIL_CLOSED,
         'predicate not evaluable appended to problems -> FAIL; PA-0027 sweep (BUG-0049 s.8) acceptance_split.py:1675'),
     ('acceptance_split.py', 'gate_E10', 0): (
-        '956cfe5d5200', FAIL_CLOSED,
+        '9e412c9a3046', FAIL_CLOSED,
         'recomputation failure appended to problems -> FAIL; PA-0027 sweep (BUG-0049 s.8) acceptance_split.py:1749'),
     ('acceptance_split.py', 'parse_regions_py', 0): (
-        'd85c3794cdfe', FAIL_CLOSED,
+        '7366d2d3dfea', FAIL_CLOSED,
         "non-literal recorded as '<not a literal>' -> E11(e) mismatch; PA-0027 sweep (BUG-0049 s.8) acceptance_split.py:1782"),
     ('acceptance_split.py', 'gate_E12', 0): (
-        '0059962f0b9e', FAIL_CLOSED,
+        'cec413cccbe8', FAIL_CLOSED,
         'recomputation failure appended to problems -> FAIL; PA-0027 sweep (BUG-0049 s.8) acceptance_split.py:1928'),
     ('acceptance_split.py', 'evaluate', 0): (
-        '30b79a19b4f5', FAIL_CLOSED,
+        '07b1ccdefa8a', FAIL_CLOSED,
         "'gate not evaluable' problem with type -> FAIL; PA-0027 sweep (BUG-0049 s.8) acceptance_split.py:2067"),
     ('acceptance_split.py', 'compute_obs', 0): (
-        'a02a77f11663', VISIBLE_UNKNOWN,
+        'd10749a7a802', VISIBLE_UNKNOWN,
         'OBS note records type and message, row n/a; PA-0027 sweep (BUG-0049 s.8) acceptance_split.py:2370'),
     ('acceptance_split.py', 'compute_obs', 1): (
-        '57d659e339ea', VISIBLE_UNKNOWN,
+        '903eeb293b3c', VISIBLE_UNKNOWN,
         'OBS note records type and message, row n/a; PA-0027 sweep (BUG-0049 s.8) acceptance_split.py:2376'),
     ('acceptance_split.py', 'compute_obs', 2): (
-        '2b8de495f45d', VISIBLE_UNKNOWN,
+        '2192cc902d51', VISIBLE_UNKNOWN,
         'OBS note records type and message, row n/a; PA-0027 sweep (BUG-0049 s.8) acceptance_split.py:2382'),
-    ('acceptance_split.py', 'full_run', 0): (
-        '6345b0706c5d', VISIBLE_UNKNOWN,
-        'previous OBS record unreadable -> no comparison (OBS only); PA-0027 sweep (BUG-0049 s.8) acceptance_split.py:2620'),
     ('acceptance_split.py', 'full_run', 1): (
-        'cc057f7aa7dd', VISIBLE_UNKNOWN,
+        'f05faa9e642f', VISIBLE_UNKNOWN,
         'OBS failure printed with type, every O-row n/a; PA-0027 sweep (BUG-0049 s.8) acceptance_split.py:2625'),
-    ('analyze_grouse.py', 'load_state_boundaries', 0): (
-        'fd40acd39eba', VISIBLE_UNKNOWN,
-        'map decoration only, reason printed; PA-0027 sweep (BUG-0049 s.8) analyze_grouse.py:656'),
-    ('analyze_grouse.py', 'load_state_boundaries', 1): (
-        'dacab7e3d694', VISIBLE_UNKNOWN,
-        'map decoration only, reason printed; PA-0027 sweep (BUG-0049 s.8) analyze_grouse.py:669'),
-    ('check_exotic.py', 'check_sclass_meaning', 0): (
-        'ed8c86fd5ce8', VISIBLE_UNKNOWN,
-        'diagnostic, reason printed; PA-0027 sweep (BUG-0049 s.8) check_exotic.py:71'),
-    ('check_raster.py', 'check_one', 0): (
-        'e8d60ea711e8', VISIBLE_UNKNOWN,
-        "diagnostic, 'COULD NOT OPEN' printed; PA-0027 sweep (BUG-0049 s.8) check_raster.py:57"),
-    ('check_road_dist.py', 'cmd_check', 0): (
-        'ed46275d90ab', VISIBLE_UNKNOWN,
-        'OBS X1 recorded as skipped with reason; PA-0027 sweep (BUG-0049 s.8) check_road_dist.py:480'),
     ('dataset.py', 'GrousePatchDataset._close_handles', 0): (
-        '0913e0a61f66', CLEANUP,
+        '9966262b9480', CLEANUP,
         'best-effort close() of read handles; PA-0027 sweep (BUG-0049 s.8) dataset.py:208'),
-    ('diagnose_training.py', 'main', 0): (
-        'f4a5b4663eec', VISIBLE_UNKNOWN,
-        'diagnostic, region printed as FAILED; PA-0027 sweep (BUG-0049 s.8) diagnose_training.py:52'),
-    ('diagnose_water_bias.py', 'process_region', 0): (
-        'f2d3b562a8c1', VISIBLE_UNKNOWN,
-        'diagnostic, region skip printed with reason; PA-0027 sweep (BUG-0049 s.8) diagnose_water_bias.py:115'),
-    ('download_tcc_nlcd.py', 'ee_init', 0): (
-        '7568c1000e29', FALLBACK,
-        'falls back to ADC; that failing raises SystemExit naming both errors; PA-0027 sweep (BUG-0049 s.8) download_tcc_nlcd.py:146/159'),
     ('download_tcc_nlcd.py', 'resolve_collection', 0): (
-        'ba06144c4333', FALLBACK,
+        'a787e2e7fd57', FALLBACK,
         'next candidate, skipped ids printed with type; none readable -> SystemExit; PA-0027 sweep (BUG-0049 s.8) download_tcc_nlcd.py:189'),
     ('download_tcc_nlcd.py', 'collection_years', 0): (
-        '0913e0a61f66', FALLBACK,
-        'year parse falls back to system:index; PA-0027 sweep (BUG-0049 s.8) download_tcc_nlcd.py:209'),
-    ('download_treemap.py', 'ee_init', 0): (
-        '7568c1000e29', FALLBACK,
-        'falls back to ADC; that failing raises SystemExit naming both errors; PA-0027 sweep (BUG-0049 s.8) download_treemap.py:152/165'),
+        '8b990e09b590', FALLBACK,
+        'year parse falls back to system:index; empty result -> SystemExit in the caller (download_tcc_nlcd.py:507); PA-0027 sweep (BUG-0049 s.8) download_tcc_nlcd.py:209'),
     ('download_treemap.py', 'resolve_vintage_image', 0): (
-        '0913e0a61f66', FALLBACK,
-        'ImageCollection -> Image; that failing raises SystemExit; PA-0027 sweep (BUG-0049 s.8) download_treemap.py:194/200'),
-    ('generate_treemap_features.py', '_source_is_valid', 0): (
-        '4d64e7bcb844', FAIL_CLOSED,
-        'validity probe -> invalid; PA-0027 sweep (BUG-0049 s.8) generate_treemap_features.py:179'),
+        'b16648021b2b', FALLBACK,
+        'ImageCollection -> Image; that failing raises SystemExit with the error; PA-0027 sweep (BUG-0049 s.8) download_treemap.py:194/200'),
     ('grouse_data.py', 'RegionData._is_valid_raster', 0): (
-        '21aa48dc4ce9', FAIL_CLOSED,
-        'validity probe -> invalid; PA-0027 sweep (BUG-0049 s.8) grouse_data.py:327'),
-    ('symptom_check.py', 'region_point_frames', 0): (
-        '48fd5ad71386', VISIBLE_UNKNOWN,
-        "digest recorded as 'not hashed (<error>)'; PA-0027 sweep (BUG-0049 s.8) symptom_check.py:663"),
+        '7aa534a313f5', FAIL_CLOSED,
+        "validity probe -> invalid (the caller's nearest-year fallback is designed and recorded by E11(b)); PA-0027 sweep (BUG-0049 s.8) grouse_data.py:327"),
 }
 
 # key -> (digest, owning BUG). Open defects; removing the entry is part
 # of the owning BUG's fix.
 KNOWN_OPEN = {
-    ('download_rev.py', 'download_one', 0): ('c804ad76b079', 'BUG-0013'),
-    ('download_rev.py', 'download_one', 1): ('974b31cdb0bb', 'BUG-0013'),
-    ('ebird.py', 'main', 0): ('05e9710dec8f', 'BUG-0013'),
+    ('download_rev.py', 'download_one', 0): ('714a04258470', 'BUG-0013'),
+    ('download_rev.py', 'download_one', 1): ('11306fa01b42', 'BUG-0013'),
+    ('ebird.py', 'main', 0): ('8bc7ec3f45b2', 'BUG-0013'),
 }
 
-# key -> (digest, CR-0018 candidate id). CR-0018's BUG candidates,
-# pinned until each is filed and fixed or moved to ALLOWLIST.
+# key -> (digest, candidate id). CR-0018's BUG candidates (CR section 4),
+# pinned until each is filed and fixed or moved to ALLOWLIST by review;
+# the lead may replace a CR-0018-Cn id by the BUG id it is filed under.
 EXPECTED_UNCLASSIFIED = {
-    ('download_rev.py', 'published_products', 0): ('1397258c47ee', 'CR-0018-C1'),
-    ('download_tcc_nlcd.py', 'fetch_tile', 0): ('7f26ce72185e', 'CR-0018-C2'),
-    ('download_treemap.py', 'fetch_tile', 0): ('7f26ce72185e', 'CR-0018-C2'),
+    ('download_rev.py', 'published_products', 0): ('c64736437d46', 'CR-0018-C1'),
+    ('download_tcc_nlcd.py', 'fetch_tile', 0): ('9408667ddb10', 'CR-0018-C2'),
+    ('download_treemap.py', 'fetch_tile', 0): ('5bdafe0db0cf', 'CR-0018-C2'),
+    ('download_tcc_nlcd.py', 'ee_init', 0): ('f30ab3d84bc7', 'CR-0018-C3'),
+    ('download_treemap.py', 'ee_init', 0): ('f30ab3d84bc7', 'CR-0018-C3'),
+    ('acceptance_split.py', 'git_commit', 0): ('1bef1b004199', 'CR-0018-C4'),
+    ('acceptance_split.py', 'full_run', 0): ('5c01e691829a', 'CR-0018-C5'),
+    ('analyze_grouse.py', 'load_state_boundaries', 0): ('f60ef2b09228', 'CR-0018-C5'),
+    ('analyze_grouse.py', 'load_state_boundaries', 1): ('0d27d8305b05', 'CR-0018-C5'),
+    ('check_exotic.py', 'check_sclass_meaning', 0): ('52841f9f918f', 'CR-0018-C5'),
+    ('check_raster.py', 'check_one', 0): ('cab80fa34317', 'CR-0018-C5'),
+    ('check_road_dist.py', 'cmd_check', 0): ('6245b58398e9', 'CR-0018-C5'),
+    ('symptom_check.py', 'region_point_frames', 0): ('27faa6cca98a', 'CR-0018-C5'),
+    ('diagnose_training.py', 'main', 0): ('2139181fae8b', 'CR-0018-C6'),
+    ('diagnose_water_bias.py', 'process_region', 0): ('b97acb340971', 'CR-0018-C6'),
+    ('generate_treemap_features.py', '_source_is_valid', 0): ('7ce950d3d7c4', 'CR-0018-C7'),
 }
 
 # PA-0026 guarded files (not scanned). Growth is a review item.
@@ -211,12 +195,16 @@ def is_broad(handler):
     return any(_exc_name(e) in BROAD_NAMES for e in elts)
 
 
-def _falsy_exit_arg(args):
-    """True if an exit call/SystemExit with these args exits with status 0."""
+def _exit_arg_fails(args):
+    """True only if an exit call / SystemExit with these args certainly
+    exits non-zero: a non-falsy constant (1, "message") or an f-string.
+    Absent, 0/None/False, or any non-constant (may be 0) is not."""
     if not args:
-        return True
+        return False
     a = args[0]
-    return isinstance(a, ast.Constant) and a.value in (0, None, False)
+    if isinstance(a, ast.JoinedStr):
+        return True
+    return isinstance(a, ast.Constant) and a.value not in (0, None, False)
 
 
 def _is_abort_raise(stmt):
@@ -225,8 +213,7 @@ def _is_abort_raise(stmt):
         return True
     fn = exc.func if isinstance(exc, ast.Call) else exc
     if _exc_name(fn) == "SystemExit":
-        args = exc.args if isinstance(exc, ast.Call) else []
-        return not _falsy_exit_arg(args)
+        return isinstance(exc, ast.Call) and _exit_arg_fails(exc.args)
     return True
 
 
@@ -240,7 +227,35 @@ def _is_exit_call(stmt):
         name = (None, f.id)
     else:
         return False
-    return name in EXIT_CALLS and not _falsy_exit_arg(stmt.value.args)
+    return name in EXIT_CALLS and _exit_arg_fails(stmt.value.args)
+
+
+_SCOPES = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)
+_LOOPS = (ast.For, ast.AsyncFor, ast.While)
+
+
+def _escapes(node, in_loop=False):
+    """`node` can leave the handler normally: a `return` anywhere, or a
+    `break`/`continue` not inside a loop that is itself inside `node`
+    (nested def/class/lambda ignored; `finally` blocks included)."""
+    if isinstance(node, ast.Return):
+        return True
+    if isinstance(node, (ast.Break, ast.Continue)):
+        return not in_loop
+    if isinstance(node, _SCOPES):
+        return False
+    if isinstance(node, _LOOPS):
+        return (any(_escapes(c, True) for c in node.body)
+                or any(_escapes(c, in_loop) for c in node.orelse)
+                or _escapes(getattr(node, "test", None) or
+                            getattr(node, "iter", None), in_loop))
+    return any(_escapes(c, in_loop) for c in ast.iter_child_nodes(node))
+
+
+def _suppresses(withnode):
+    return any(isinstance(i.context_expr, ast.Call)
+               and _exc_name(i.context_expr.func) == "suppress"
+               for i in withnode.items)
 
 
 def _stmt_aborts(s):
@@ -251,7 +266,7 @@ def _stmt_aborts(s):
     if isinstance(s, ast.If):
         return always_aborts(s.body) and always_aborts(s.orelse)
     if isinstance(s, (ast.With, ast.AsyncWith)):
-        return always_aborts(s.body)
+        return not _suppresses(s) and always_aborts(s.body)
     if isinstance(s, (ast.Try, getattr(ast, "TryStar", ast.Try))):
         if always_aborts(s.finalbody):
             return True
@@ -261,22 +276,48 @@ def _stmt_aborts(s):
 
 
 def always_aborts(stmts):
-    """Every path through `stmts` ends in a re-raise or failing exit."""
-    return any(_stmt_aborts(s) for s in stmts)
+    """Every path through `stmts` ends in a re-raise or failing exit:
+    statements are taken in order; the first that can leave normally
+    (`_escapes`) fails the block, the first that always aborts passes it."""
+    for s in stmts:
+        if _escapes(s):
+            return False
+        if _stmt_aborts(s):
+            return True
+    return False
 
 
-def handler_digest(handler):
-    dump = ast.dump(handler, annotate_fields=False, include_attributes=False)
+def _dump(node):
+    kw = {"annotate_fields": False, "include_attributes": False}
+    if sys.version_info >= (3, 13):
+        kw["show_empty"] = True      # 3.12-compatible output (CR-0018 R-A6)
+    return ast.dump(node, **kw)
+
+
+def handler_digest(handler, scope):
+    """Digest of the handler AND its enclosing scope (the innermost
+    def/class, or the module-level statement): a classified handler's
+    meaning can depend on code after it in the same function (a
+    fallback, a final check), so any edit there is a re-review too."""
+    dump = _dump(handler) + "\n" + _dump(scope)
     return hashlib.sha256(dump.encode()).hexdigest()[:12]
 
 
 class _Collector(ast.NodeVisitor):
     def __init__(self):
-        self.stack, self.counts, self.out = [], {}, []
+        self.stack, self.nodes, self.counts, self.out = [], [], {}, []
+
+    def visit_Module(self, node):
+        for stmt in node.body:            # module scope: digest the stmt
+            self.nodes.append(stmt)
+            self.visit(stmt)
+            self.nodes.pop()
 
     def _scope(self, node):
         self.stack.append(node.name)
+        self.nodes.append(node)
         self.generic_visit(node)
+        self.nodes.pop()
         self.stack.pop()
 
     visit_FunctionDef = visit_AsyncFunctionDef = visit_ClassDef = _scope
@@ -285,7 +326,7 @@ class _Collector(ast.NodeVisitor):
         q = ".".join(self.stack) or "<module>"
         i = self.counts.get(q, 0)
         self.counts[q] = i + 1
-        self.out.append((q, i, node))
+        self.out.append((q, i, node, self.nodes[-1]))
 
     def visit_ExceptHandler(self, node):
         if is_broad(node):
@@ -309,8 +350,8 @@ def broad_handlers(source):
     for broad `except` handlers and `suppress(<broad>)` calls."""
     c = _Collector()
     c.visit(ast.parse(source))
-    return [(q, i, h.lineno, _conforms(h), handler_digest(h))
-            for q, i, h in c.out]
+    return [(q, i, h.lineno, _conforms(h), handler_digest(h, scope))
+            for q, i, h, scope in c.out]
 
 
 def violations(source):
@@ -382,6 +423,24 @@ POSITIVE_CONTROLS = {       # each must yield exactly one violation
     "retry_no_raise": "for a in range(3):\n try: return f()\n"
                       " except Exception: time.sleep(1)\n",
     "except_star": "try: f()\nexcept* Exception: pass\n",
+    # CR-0018 review round 1 (R-A1/B1, R-A5b, B7): early exit before
+    # the raise, dead raise, finally-return, suppressed raise, exit(var)
+    "cond_return_then_raise": "try: f()\nexcept Exception:\n"
+                              " if lenient: return\n raise\n",
+    "return_then_dead_raise": "def g():\n try: f()\n except Exception:\n"
+                              "  return\n  raise\n",
+    "loop_cond_continue": "for r in rs:\n try: f(r)\n except Exception:\n"
+                          "  if r not in REQUIRED:\n   continue\n  raise\n",
+    "continue_in_with": "for r in rs:\n try: f(r)\n except Exception:\n"
+                        "  with lock:\n   continue\n  raise\n",
+    "try_return_finally": "def g():\n try: f()\n except Exception:\n"
+                          "  try: return None\n  finally: pass\n  raise\n",
+    "finally_return": "def g():\n try: f()\n except Exception:\n"
+                      "  try: raise\n  finally: return\n",
+    "suppressed_raise": "try: f()\nexcept Exception:\n"
+                        " with suppress(RuntimeError):\n  raise\n",
+    "systemexit_var": "try: f()\nexcept Exception: raise SystemExit(rc)\n",
+    "sys_exit_var": "try: f()\nexcept Exception: sys.exit(rc)\n",
     "suppress": "with contextlib.suppress(Exception):\n f()\n",
     "suppress_base": "with suppress(OSError, BaseException):\n f()\n",
 }
@@ -391,6 +450,12 @@ NEGATIVE_CONTROLS = {      # each must yield no violation
                   " raise RuntimeError('x') from e\n",
     "narrow": "try: f()\nexcept ValueError: pass\n",
     "suppress_narrow": "with suppress(FileNotFoundError):\n f()\n",
+    "inner_loop_break": "try: f()\nexcept Exception:\n for x in xs:\n"
+                        "  if x: break\n raise\n",
+    "nested_def_return": "try: f()\nexcept Exception:\n"
+                         " def h(): return 1\n raise\n",
+    "systemexit_fstring": "try: f()\nexcept Exception as e:\n"
+                          " raise SystemExit(f'bad {e}')\n",
     "sys_exit_1": "try: f()\nexcept Exception:\n print('x')\n sys.exit(1)\n",
     "systemexit_msg": "try: f()\nexcept Exception as e:\n"
                       " raise SystemExit(f'failed: {e}')\n",
@@ -489,6 +554,20 @@ class TestMutations(unittest.TestCase):
         self.assertNotEqual(v[(q, i)][1], known[(path, q, i)])
 
 
+    def test_edit_after_handler_in_same_scope_detected(self):
+        # CR-0018 R-A4/B6: a FALLBACK entry's meaning depends on code
+        # after the handler; deleting that fallback must change the digest
+        known = classified()
+        path, q, i = ("download_tcc_nlcd.py", "collection_years", 0)
+        src = self._read(path)
+        old = "    if not years:\n        for idx in"
+        self.assertEqual(src.count(old), 1)
+        mutated = src.replace(old, "    if False:\n        for idx in")
+        v = violations(mutated)
+        self.assertIn((q, i), v)
+        self.assertNotEqual(v[(q, i)][1], known[(path, q, i)])
+
+
 class TestRepository(unittest.TestCase):
     def test_file_set_scope(self):
         scanned, guarded = file_sets()
@@ -526,6 +605,12 @@ class TestRepository(unittest.TestCase):
         changed = {k: v for k, v in found.items()
                    if k in known and known[k] != v[1]}
         stale = set(known) - set(found)
+        shifted = sorted({(p, q) for p, q, _ in new}
+                         & {(p, q) for p, q, _ in changed})
+        if shifted:     # CR-0018 B8
+            print("PA-0027 hint: new AND changed handlers in the same scope "
+                  f"{shifted} - an inserted handler may have shifted the "
+                  "ordinals; re-key the classified entries", file=sys.stderr)
         self.assertEqual(
             (new, changed, stale), ({}, {}, set()),
             "PA-0027 lint: new non-conforming broad handler(s), classified "

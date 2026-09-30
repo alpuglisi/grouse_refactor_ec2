@@ -179,7 +179,7 @@ MAJOR items (A1=B1, B2) and most MEDIUM/LOW items were revised into CR-0017 v2 (
 - [ ] LOW (A2): optional OBS row for the edge-band support asymmetry (positives within `BUFFER_M` of the domain edge per class: train 10 / 4,986, val 0 / 1,246 today; recorded in CR-0017 §3, not gated) — owner: CR-0017 deliverable 2 (replay author), decide and record
 - [ ] LOW (CR-0017 §4, retrain follow-up): `grouse_cr0009.pth` and earlier models were trained on pre-CR-0017 negatives (23 within 300 m of the domain edge); the next CR that retrains must train on the post-CR-0017 record and say so — owner: author of the next retrain CR
 - [ ] MEDIUM (A3=B4, process): CR-0017 deliverables 2–4 stay on an unmerged branch until deliverable 6; whoever merges branches must not merge it early (config sha change refuses all training until the new record) — owner: lead
-- [ ] BUG-NEW-a (NY/MA sibling of BUG-0050) and the proposed PA extending PA-0023 (review log § Proposed bookkeeping rows): allocate the BUG id — owner: lead; filing — owner: CR-0017 deliverable 8
+- [ ] BUG-0064 (NY/MA sibling of BUG-0050) and the proposed PA extending PA-0023 (review log § Proposed bookkeeping rows): allocate the BUG id — owner: lead; filing — owner: CR-0017 deliverable 8
 
 ## CR-0017 round 2 (2026-09-30)
 Round 2 approved v3. A8, B11 and B12 were applied in v3; there are no
@@ -190,3 +190,10 @@ open round-2 items beyond the CR-0017 round-1 list above.
       checks both in the same run. If MC is ever run without R4, extend
       MC4 to compare them with `gbif_negatives_R` by `gbif_id` — owner:
       CR-0017 deliverable 6 executor.
+
+## BUG-0056 bookkeeping / PA-0030 sweep (2026-09-30)
+- [ ] **BUG-0062** (needs a CR): `evaluate()` / `calibrate.collect_val_logits()` check the TTA grouping contract from the dataset (every leaf `GrousePatchDataset.expand_rotations`, sequential loader) and raise when `tta_group > 0`; drop `collect_val_logits`' per-rotation fallback. CR outline in BUG-0062 §6 — owner: lead
+- [ ] **BUG-0061** decision + trivial fix: `_log_metrics` header mismatch on append → raise `ValueError` (recommended) vs. new file; one function — owner: next change to `model_handler.py`
+- [ ] **PA-0030 enforcement** (needs a CR; `CLAUDE.md` §3.4): lint test from `docs/quality/evidence/BUG-0056/sweep_condkeys.py` with an allow-list seeded from `sweep_triage.md` — owner: lead
+- [ ] LOW: `fit()` always calls `evaluate()` with the default `tta_group=4` and cannot opt out; decide with BUG-0062's CR whether `fit()` forwards `tta_group` (signature change) — owner: BUG-0062 CR author
+- [x] CR-0012 deliverable 6 test plan item 7 (`smoke_test_training.py`) re-run after `40dbecf`: PASS, all 7 stages, scratch tree B (`docs/quality/evidence/CR-0012-d6/smoke_rerun.txt`)

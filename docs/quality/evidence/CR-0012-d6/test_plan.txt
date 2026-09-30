@@ -245,3 +245,5 @@ SUMMARY
   6 import smoke ................................... PASS (17/17)
   7 smoke_test_training.py runs .................... FAIL (KeyError 'tuned_tta_accuracy', model_handler.py:1339; pre-existing PA-0010-class defect)
   Real data/pipeline + data/negatives: unchanged (44 files, before = after).
+
+LEAD UPDATE 2026-09-30: item 7 FAIL -> PASS after 40dbecf (BUG-0056, BUG-0057), merged 10726a8; see smoke_rerun.txt. All 7 items now PASS.

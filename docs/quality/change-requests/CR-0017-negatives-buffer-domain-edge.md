@@ -15,7 +15,7 @@ CR-0013's acceptance to match, then regenerate the pool and negatives.
   border.
 - **A sibling instance, found while scoping this CR**: the same blindness
   at the NY and MA state lines. It gets its own BUG, placeholder
-  **BUG-NEW-a**; the lead allocates the id (deliverable 8). BUG-0050's evidence script
+  **BUG-0064**; the lead allocates the id (deliverable 8). BUG-0050's evidence script
   (`docs/quality/evidence/CR-0012-d8/canada_buffer.py`) included NY and
   MA counties in its boundary, as if sightings existed there. None do:
   every sighting was acquired by `stateProvince` ∈ {Maine, New Hampshire,
@@ -425,7 +425,7 @@ regeneration and bookkeeping. They cannot land separately:
 - [ ] 8. Bookkeeping:
       - **BUG-0050:** corrective action "CR-0017"; status FIXED;
         `BUG_LOG.md` row updated.
-      - **BUG-NEW-a** (placeholder; id allocated by the lead): the buffer is blind at the NY and MA
+      - **BUG-0064** (placeholder; id allocated by the lead): the buffer is blind at the NY and MA
         state lines (C 49, N 11). It carries the full §2 sections and a
         recurrence review against BUG-0050 and PA-0023, with a
         prior-preventive-action failure analysis. BUG-0050's evidence

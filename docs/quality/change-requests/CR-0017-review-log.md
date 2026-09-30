@@ -44,7 +44,7 @@ was applied.
 | A3 = B4 | MEDIUM | Nothing controls the refusal window between merging the config change and the new record. | Accepted and revised. Deliverables 2–4 stay on an unmerged branch, and the merge is step 1 of deliverable 6. | § Impact (refusal window); deliverables 2, 3, 6 |
 | B3 (+ A6) | MEDIUM (A6 LOW) | MC checks N by keys only, so the "weights ×2" tree passes. MC4's docstring overstates the check. The parts files are not read. | Accepted and revised. `check_must_change.py` v2: retained N lines must be byte-identical (MC3); added rows must equal their new C row on the shared columns, in the same region and cell, with no new cells (MC4); new MC5 checks the parts. Re-run on reviewer B's trees: W5 now FAILs, W2 (correct) PASSes, W4 (wrong replacements) PASSes, which is the stated limit covered by R4. | §3 MC; `mc_wrongtrees.txt`; `mc_selftest.txt` |
 | B5 | MEDIUM | There is no failure path if MC fails after the live write. | Accepted and revised. MC runs before `acceptance_split.py` writes the record. On any FAIL: restore from the backup (sha256-verified), record the failure, revert the merge, stop. | Deliverable 6 |
-| B6 | MEDIUM | The PA proposal for BUG-NEW-a is cited but missing. | Accepted. It is in § Proposed bookkeeping rows below. | this log |
+| B6 | MEDIUM | The PA proposal for BUG-0064 is cited but missing. | Accepted. It is in § Proposed bookkeeping rows below. | this log |
 | A4 | LOW | D is reached by different CRS paths (via 4326 in the pipeline, direct in the replay). | Accepted and revised. The pipeline builds D from the file CRS straight to EPSG:5070. B's measurement of the three paths is cited. | §2 Domain D; §3 Pre-registration validity |
 | A5 = B7 | LOW | The attacks need fixture rows the CR does not specify, and could pass vacuously. | Accepted and revised. Each attack names its required fixture rows, including the thinning pair (straddles the band, in-band member first in the thin order). The test asserts that the rows exist. | §3 attack table |
 | A7 | LOW | Stale surplus (119 → 116). Overlap counting in the log is unspecified. Mislabelled in-domain records are not listed as unvalidatable. | Accepted and revised: 116 (and the NonVeg surplus 554); the log prints (a), (b)-only and the overlap; added to § Not validatable. | § Risk; §2; § Test plan |
@@ -70,7 +70,7 @@ Round 2 was bounded (CR-0011 A2).
 ## Revision history
 - **v1** (`b043fb2`): first draft.
 - **v1** (`01e0605`): specified against CR-0015 head `3add80b` (lead
-  instruction). The NY/MA sibling BUG became placeholder BUG-NEW-a
+  instruction). The NY/MA sibling BUG became placeholder BUG-0064
   (the lead allocates ids).
 - **v2**: round-1 dispositions above. Evidence added:
   `mc_wrongtrees.txt` and `reviewB_build_trees.py` (reviewer B's tree
@@ -86,13 +86,13 @@ Round 2 was bounded (CR-0011 A2).
 
 ## Proposed bookkeeping rows (for deliverable 8; not yet filed)
 The author does not edit `BUG_LOG.md` or `PREVENTIVE_ACTIONS.md`. The lead
-allocates the BUG-NEW-a id.
+allocates the BUG-0064 id.
 
 **BUG_LOG.md, BUG-0050 row update:** "... remediation: CR-0017 (pool step 6
 also drops candidates within `BUFFER_M` of the sightings' acquisition-domain
 edge, ME∪NH∪VT); status FIXED".
 
-**BUG_LOG.md, new row BUG-NEW-a:**
+**BUG_LOG.md, new row BUG-0064:**
 - date: 2026-09-30;
 - symptom: the negatives' 300 m buffer is blind at the NY and MA state
   lines, affecting 49 pool candidates and 11 selected negatives;
@@ -101,7 +101,7 @@ edge, ME∪NH∪VT); status FIXED".
 - remediation: CR-0017;
 - status: FIXED at CR-0017 deliverable 6.
 
-**BUG-NEW-a recurrence review (draft).** It matches BUG-0050 / PA-0023
+**BUG-0064 recurrence review (draft).** It matches BUG-0050 / PA-0023
 (same mechanism) and BUG-0037.
 
 *Prior-preventive-action failure analysis:*
@@ -131,5 +131,7 @@ analysis box.
 
 **PA-0023 Swept? cell addendum:**
 - BUG-0050 FIXED (CR-0017);
-- NY and MA instance: BUG-NEW-a, FIXED (CR-0017);
+- NY and MA instance: BUG-0064, FIXED (CR-0017);
 - KDE: BUG-0051 (Canada, NY and MA edges), owned by its own CR.
+
+- 2026-09-30 lead: placeholder BUG-NEW-a allocated as **BUG-0064** (BUG-0063 is CR-0015's test-harness PA-0027 finding). The BUG-0064 investigation doc and its BUG_LOG/PA rows are produced with CR-0017's bookkeeping deliverable.

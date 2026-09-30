@@ -313,8 +313,9 @@ commit.
       `generate_negatives.py` §2–§3.
 - [x] 4. `grouse_data.py` §4. Update the readers and docs in Impact.
 - [x] 5. Standing-check call (§5) and guards (§6).
-- [ ] 6. Run `prepare_training_data.py`, then `generate_negatives.py`,
+- [x] 6. Run `prepare_training_data.py`, then `generate_negatives.py`,
       then `acceptance_split.py`; every GATE passes. Run the test plan.
+      Real run `1bc2df6` (18/18 GATEs); test plan 7/7 PASS (`docs/quality/evidence/CR-0012-d6/test_plan.txt`; item 7 after BUG-0056/0057 fix `40dbecf`).
       CR-0014 should have landed first; if it lands after, repeat this
       step.
 - [ ] 7. Delete `data/pipeline/block_assignments_{ME,NH,VT}.csv`.

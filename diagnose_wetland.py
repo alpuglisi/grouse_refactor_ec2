@@ -48,7 +48,7 @@ _here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _here)
 
 from grouse_data import (GrouseData, NLCD_NAMES, WETLAND_NLCD_CLASSES,
-                         MISSING_CODE)
+                         MISSING_CODE, MissingDataError)
 from models import FEATURE_SPEC
 from regions import REGIONS
 from dataset import GrousePatchDataset
@@ -66,7 +66,12 @@ def center_codes(rd, df, feature="nlcd"):
         mask = (df["year"].astype(int) == year).values
         try:
             path = rd.raster_path(feature, int(year))
-        except Exception:
+        except MissingDataError as e:
+            # BUG-0055 / PA-0027: only a missing raster is skipped, and
+            # loudly - these records stay -1 and are counted as such.
+            print(f"   [warn] [{rd.region}] {feature} {int(year)}: no "
+                  f"raster ({e}) - {int(mask.sum()):,} record(s) left "
+                  f"uncoded (-1)")
             continue
         with rasterio.open(path) as src:
             t = Transformer.from_crs("EPSG:4326", src.crs, always_xy=True)

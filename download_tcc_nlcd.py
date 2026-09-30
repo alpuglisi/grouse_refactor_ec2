@@ -73,7 +73,7 @@ sys.path.insert(0, _here)
 
 from regions import BOXES, REGIONS
 from grouse_data import (GrouseData, DataConfig, YEAR_MATCH_TOLERANCE,
-                         grid_mismatch)
+                         MissingDataError, grid_mismatch)
 
 NODATA = -9999
 PIXEL_M = 30
@@ -255,12 +255,18 @@ def coverage_violations(path, coverage_path):
 
 
 def sighting_years(rd):
-    """Every year appearing in this region's positives/negatives."""
+    """Every year appearing in this region's positives/negatives. A class
+    whose file is not on disk yet (MissingDataError - e.g. negatives not
+    generated before the first raster download) is skipped with a
+    printed notice; any other error propagates (BUG-0054, PA-0027)."""
     ys = set()
-    for getter in (rd.positives, rd.negatives):
+    for name, getter in (("positives", rd.positives),
+                         ("negatives", rd.negatives)):
         try:
             df = getter("all")
-        except Exception:
+        except MissingDataError as e:
+            print(f"   [warn] {rd.region}: {name} not on disk - their "
+                  f"years are not used to choose vintages ({e})")
             continue
         if "year" in df.columns:
             ys |= {int(y) for y in df["year"].dropna().astype(int)}

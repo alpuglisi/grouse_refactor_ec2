@@ -16,6 +16,45 @@ the diff.
 
 ---
 
+## Retrain on the leak-free split; Maine-side map symptom gone (CR-0009, 2026-09-30)
+
+**What:** `grouse_cr0009.pth` retrained from scratch on the CR-0012 global
+block split and pooled negatives (acceptance record `66d63e1d…`, 18/18
+CR-0013 GATEs), with the `bce.pth`/`gap3.pth` recipe (`an_full`) at
+**10 epochs** (user decision, not 50), seed 0. `--select-by rank` kept
+**epoch 3** (rank 0.7317 = mean of TTA AUC 0.7783 and TTA AP 0.6851);
+every later epoch ranked lower while train accuracy kept rising (82 % at
+epoch 10). Calibration refitted on it (scale 1.2035, bias −0.5154,
+ECE 0.032). Evidence: `docs/quality/evidence/CR-0009/`.
+
+**Pre-CR metrics are not comparable.** Every earlier validation number
+(~0.82 AUC, ~0.79 AP, 0.811 best rank; 0.8858/0.8744 in
+`grouse_model_results_summary.md`) came from a split whose train and
+validation records shared 3 km blocks (BUG-0027) and from different
+negatives. The new baseline
+(`docs/quality/evidence/CR-0009/validation_baseline.md`) is lower by
+construction; a lower number here is not a regression and not a rollback
+trigger.
+
+**BUG-0034 (open)** will move the footing again: the year-gap filter drops
+about 23.6 % of positives and 0 % of negatives, so raster vintage partly
+predicts the label. Its fix changes the training set and needs a new
+baseline. **BUG-0050/BUG-0064 (CR-0017):** this model was trained on
+negatives of which 23 lie within 300 m of the sightings' acquisition-domain
+edge; CR-0017 regenerates them after this CR closes, and the next retrain
+picks them up (no retrain under CR-0017: at most 5/1,246 validation rows).
+
+**Symptom (BUG-0022/BUG-0023):** re-measured with `symptom_check.py`
+(all rows OBS). P(Maine pixel > NH pixel) in the Errol box 0.478 (was
+0.85/0.82 before the `road_dist` fix); ≥0.8 share gap −0.05 pp (was
+62.9/45.6); matched-pair gap −0.040 (was +0.35). The Maine-side lift the
+user reported is absent. Whole-Maine map: outside US counties every cell
+is degraded (45.8 % NaN) — input to the pending `predict.py`
+validity-mask decision.
+
+**Hardware note:** training was data-loading bound; on 16 vCPUs (14
+loader workers) the 10 epochs took about 9 minutes.
+
 ## Assumed-negative background: in-state, training blocks only, 0 is a reading (CR-0015, 2026-09-30)
 
 **Defects (BUG-0029 assumed-negative part, BUG-0042, BUG-0032).**

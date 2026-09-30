@@ -1,0 +1,278 @@
+CR-0013 deliverable 5: first run of acceptance_split.py on today's pre-CR files
+===============================================================================
+
+Date: 2026-09-30. Author: the CR-0013 replay implementer (separate author,
+design rule 4). Script: acceptance_split.py (uncommitted working copy at the
+time of the run); config: docs/quality/acceptance_split.json (sha256 in the
+report header below).
+
+DATA ROOT (read-only)
+---------------------
+The run used the CR-0007 backup of the pre-CR files, per the coordinator's
+instruction: CR-0007 is being implemented concurrently and rewrites the live
+data/pipeline/. The script was NOT run on the live data/ tree.
+
+The backup (/home/ec2-user/grouse_backup/CR-0007/) holds pipeline/ and
+negatives/ directly, without the data/ prefix that CR-0013's path templates
+use, and holds no rasters, crosswalk or county file. So `--data-root`
+pointed at a scratch directory composed only of symlinks:
+  data/pipeline/<file>   -> /home/ec2-user/grouse_backup/CR-0007/pipeline/<file>   (per-file links)
+  data/negatives/<file>  -> /home/ec2-user/grouse_backup/CR-0007/negatives/<file>  (per-file links)
+  data/landfire          -> /home/ec2-user/grouse2/data/landfire   (rasters, crosswalk; untouched by CR-0007)
+  data/roads             -> /home/ec2-user/grouse2/data/roads      (county polygons)
+The CSV links are per file, so a record write (which only happens on a pass)
+could never land inside the backup. No file under data/ or the backup was
+written. regions.py (E11) is the repository's working copy, which the
+concurrent CR-0007 implementation was editing during the run.
+
+Command:
+  python acceptance_split.py --data-root <scratch>/d5root
+Exit code: 1 (REJECTED, no record written), as required.
+Runtime / memory (GNU time): 52.7 s wall, max RSS 345 MB (an earlier
+identical run: 77.5 s; the report text was identical apart from timestamps).
+`python acceptance_split.py --standing --data-root <scratch>/d5root` exit 1:
+the standing checks refuse the pre-CR files (no record; E0 and E1 failures).
+
+COMPARISON WITH CR-0013's EXPECTED-FAIL LIST
+--------------------------------------------
+Expected FAIL: E0 (no region, no B, C or M), E1, E4, E5, E6, E11, E12, R1-R4.
+  All of them FAIL.                                         -> as expected
+  E1p PASS                                                  -> as expected (not listed)
+Additional FAILs that the list does not name:
+  E2   1,690 pooled positive pairs < 30 m. These are box-clipped records filed
+       in two region files (distance 0), the same cause as E1/E4. Real
+       failure; the list should include E2.
+  E3, E7, E9, E10
+       FAIL only because C (candidate_pool.csv), a named input of each gate,
+       is missing ("missing artifact = named FAIL"). Their negative-file parts
+       produce no problem: N pooled has 0 duplicate keys and 0 pairs < 30 m
+       (E3); every negative is > 300 m from every sighting (E7); per-(R,
+       split) counts and the NonVeg cap hold (E9); evt_phys, envelope_id,
+       is_nonveg, weight and weight_basis of all 8,365 pre-CR negatives
+       equal the recomputation from the pinned normative functions (E10).
+  E8   C missing, and 4 thinned NH positives fail the 64 px window predicate
+       (pre-CR has no windowless drop). All 4 are box-clipped foreign records
+       filed in NH (1 with state ME, 3 with state VT) at the NH box edge, so
+       CR-0007's partition would remove them. Real failure.
+So the list is incomplete: E2 and E8 fail on substance, and E3, E7, E9 and
+E10 fail on the missing pool (recorded in the implementer findings, item F4).
+Every gate is reported once; every O-row is reported once and marked OBS.
+
+Cross-checks against figures CR-0012 states for today's files:
+  E4: "P: 522 keys in both train and val"  == CR-0012 "522 of 1,674 pooled
+      validation positives have a training positive at the identical coordinate".
+  E5: "882 recomputed blocks hold both train and val records" == CR-0012
+      "882 blocks hold both training and validation records".
+
+DIAGNOSTIC (not an acceptance run): replay on simulated CR-0007 inputs
+-----------------------------------------------------------------------
+In scratch only, evaluated_sightings_R was taken from the backup, restricted
+to state == R, and given a region column (CR-0007's intended output if the
+rasters are unchanged); every other input as above. The replay
+(acceptance_split.Replay, 23 s, 291 MB) reproduced every figure CR-0012
+states:
+  positives 6,232 (ME 3,660 / NH 1,079 / VT 1,493)       CR-0012: same
+  blocks 3,861; val blocks 759 holding 1,246 records     CR-0012: same
+  vf = 759/3,861 = 0.1966                                CR-0012: 0.197
+  dedup 265,212 -> 35,678 (18,045 + 7,639 + 9,994)       CR-0012: same
+  partition drops 6                                      CR-0012: 6
+  windowless positive drops (step 3): 0 in every region
+  pool 22,187 rows; draw targets ME 2,922/738, NH 840/239, VT 1,224/269,
+  every habitat pool above its target; 276 rasters read.
+This is evidence that the separately written replay and CR-0012's author
+read section 2 the same way on today's data; it is not CR-0012's acceptance.
+
+BACKUP FILES READ (sha256, as read during the run)
+--------------------------------------------------
+409c417001a2f60ddf7783938db77e24389462b9c76f32a7163a24bb48ba3bb8  data/pipeline/bin_tuning_ME.csv
+404b9d2c443816bce28029e431c05c1f0aff50d7c88a5808958795a35b42cca9  data/pipeline/bin_tuning_NH.csv
+b485a12609a7a8309d2d0f88dcad28f96efe44da0a800d476f198be2296e247d  data/pipeline/bin_tuning_VT.csv
+8eaa887e986942b183d272a6cc572e36095b17edeb7ef64c3c50ea4de9ddff8d  data/pipeline/block_assignments_ME.csv
+51497267cd18b1d8bd343d8c3e85723db819559fa7214af6ada07ebc35387e29  data/pipeline/block_assignments_NH.csv
+cc6d2ae46ba3665d253eac98ee14ff27cc2d2212a1b3d5169a7e1c91132f6f6b  data/pipeline/block_assignments_VT.csv
+14c1806ed6bb9d8e1fd5553f237539e420e0a9ef0cd8ad44c40c9b61aed183cf  data/pipeline/envelope_metrics_ME.csv
+5ae49fda5bc99bd611c2b7fdd3be9b276123c7b4502a7acbdf55e479ec6a014a  data/pipeline/envelope_metrics_NH.csv
+0b3a277bdfefea7a7a335d0281efc2422bc3fa9ff7dee5fa44aa6842c5cfcbba  data/pipeline/envelope_metrics_VT.csv
+f0e47b74f08d150f874597c90a5682a8674067f4e06d9d0dd0ea20b1077fdc9b  data/pipeline/evaluated_sightings_ME.csv
+d347e60c893af894b4aab980fcc99281456197232db0480cf324edac3ffbd4a5  data/pipeline/evaluated_sightings_NH.csv
+18ef4005af069311394a4140d3f0daa907a4909e40aeeb41bdb7a97c02741ba7  data/pipeline/evaluated_sightings_VT.csv
+52b6bcda015adf5e61d7213f163ae0babec140b5109ecac8ee8e2a94fc12afd9  data/pipeline/nonveg_flagged_ME.csv
+e73bfca8be4475d3bc6b55950c7c833c4edb052a69d277ed028db9b55a8e1f35  data/pipeline/nonveg_flagged_NH.csv
+ffcabe573da77008a1a85bea427e3861a1ab944bed92cffc2f5f37880d36d453  data/pipeline/nonveg_flagged_VT.csv
+d08d8ef0f6fdfcee7bd5f861343d847cf2f07ab94f9caf74753b67fff79109e9  data/pipeline/thinned_positives_ME.csv
+0eacf6dbb1d0abb895ac32e3d3a04daaaac9fe3e396ec7b89635d2bfcd8fe0f8  data/pipeline/thinned_positives_NH.csv
+c12b684608109bfaff1b3d66f925792fbaa813e3690de4e8e003bf86c07d3aa2  data/pipeline/thinned_positives_VT.csv
+4f7d90a60bf01691f10e0e077c4bffef5b4f128a9d83de50aff2e979e8f7fd5f  data/pipeline/train_positives_ME.csv
+df357f143a3842d3e8febcfdb15e468a22d43e0f21390f4ea9c69888548277f4  data/pipeline/train_positives_NH.csv
+24aae3c8a69d0b44cda0a68b120470c3e793f7688de725818a03f6d1b8bc7760  data/pipeline/train_positives_VT.csv
+823f270df33fbc335edb2aad7c5a5d431fcff337b60b1ebb6bc5897d1295bdf1  data/pipeline/val_positives_ME.csv
+4f60b160abe8dae50eed0fef2f5dddd4334ba390faf663a16b235e14bf8bb5e2  data/pipeline/val_positives_NH.csv
+c618d2e44c0486d99a0d43ae2eea42ce47c1bd25cb4f9fb1751c3c1269d942f9  data/pipeline/val_positives_VT.csv
+8306d34296a79dae6e3aaa67f467b189d801fd0f6a753cf76e7b1b49e8329aa3  data/negatives/gbif_negatives_ME.csv
+7f04aa41d9f0433e79bfb0c8e85f9a8a194fa82cf5b3affa445cbf6122ba9000  data/negatives/gbif_negatives_NH.csv
+cce1ebdc4508f3559a5cf8babb93582ecc653ae7b4e17e6f0d94a8645f59c362  data/negatives/gbif_negatives_VT.csv
+11862fbfe55306844933a7baa520d45c5c24d6860ddc433b34eccf4011b2283b  data/negatives/negatives_ME.csv
+b153ac1d719ca42ab16ca3f179fc67c85eff7d5e12fccddd4a2707aa168095be  data/negatives/negatives_NH.csv
+e9a08da6f410f4c84ab3cb7dcbdeac61f4dd7091cad0ed22269b224bee11bdf1  data/negatives/negatives_VT.csv
+a697bb2d8c637dadf353de68580a3df0ebccce049df89b1c1ca3f5454f30590f  data/negatives/train_negatives_ME.csv
+feab5a20fa81cbbf10c2b940c6aa1419773b14acedcbcde97d0f5f606c81b2d9  data/negatives/train_negatives_NH.csv
+81f898ba7a84fd0fa9895a73f9646ab9173d43e4eceeb56bd96b5dc43ffdd606  data/negatives/train_negatives_VT.csv
+310914091a292269cc9c030a176590a21567e5a059e77afe28f7c4c71dce0179  data/negatives/val_negatives_ME.csv
+626f937a7c572e86d20cba5a155abf32ddf1a251bb74d24843c035e2d2b38548  data/negatives/val_negatives_NH.csv
+68d74e85b20fa0f38c5e214029aa11216e504ce8acd81ebe8590254fbf536958  data/negatives/val_negatives_VT.csv
+
+FULL REPORT
+-----------
+CR-0013 acceptance_split.py report
+data root : /tmp/claude-1000/-home-ec2-user-grouse2/f462782e-8989-4c4d-919a-db7e5946838a/scratchpad/acceptance_split/d5root
+config    : /home/ec2-user/grouse2/docs/quality/acceptance_split.json (sha256 bd710c72ef978ff9206648e794ce61f13c9083a074233d9c46e21cdbdbac6f03)
+commit    : 2f63be4faf65be887e974235e539cc601fd551f7 (dirty tracked .py: True)
+started   : 2026-09-30T11:46:55.537760+00:00
+
+GATES (exact)
+E0   FAIL  (missing data/pipeline/block_assignments.csv +2 more)
+       missing data/negatives/candidate_pool.csv
+       missing data/pipeline/split_manifest.json
+       - data/pipeline/thinned_positives_ME.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+       - data/pipeline/train_positives_ME.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+       - data/pipeline/val_positives_ME.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+       - data/negatives/negatives_ME.csv: missing ['region']
+       - data/negatives/train_negatives_ME.csv: missing ['region']
+       - data/negatives/val_negatives_ME.csv: missing ['region']
+       - data/pipeline/thinned_positives_NH.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+       - data/pipeline/train_positives_NH.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+       - data/pipeline/val_positives_NH.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+       - data/negatives/negatives_NH.csv: missing ['region']
+       - data/negatives/train_negatives_NH.csv: missing ['region']
+       - data/negatives/val_negatives_NH.csv: missing ['region']
+       ... 6 more
+E1   FAIL  (missing data/negatives/candidate_pool.csv)
+       - data/pipeline/thinned_positives_ME.csv: 137 rows with state != ME
+       - data/pipeline/thinned_positives_ME.csv: no 'region' column
+       - data/pipeline/train_positives_ME.csv: 110 rows with state != ME
+       - data/pipeline/train_positives_ME.csv: no 'region' column
+       - data/pipeline/val_positives_ME.csv: 27 rows with state != ME
+       - data/pipeline/val_positives_ME.csv: no 'region' column
+       - data/negatives/negatives_ME.csv: no 'region' column
+       - data/negatives/train_negatives_ME.csv: no 'region' column
+       - data/negatives/val_negatives_ME.csv: no 'region' column
+       - data/pipeline/thinned_positives_NH.csv: 1128 rows with state != NH
+       - data/pipeline/thinned_positives_NH.csv: no 'region' column
+       - data/pipeline/train_positives_NH.csv: 902 rows with state != NH
+       ... 17 more
+E1p  PASS
+E2   FAIL
+       - 1690 positive pairs closer than 30 m (pooled), e.g. NH (-72.62392, 43.34378) - VT (-72.62392, 43.34378)
+E3   FAIL  (missing data/negatives/candidate_pool.csv)
+E4   FAIL
+       - P: 522 keys in both train and val, e.g. [(-72.6221, 44.50429), (-72.61997, 43.20136)]
+E5   FAIL
+       - 882 recomputed blocks hold both train and val records, e.g. ['594_869', '594_884', '595_869']
+E6   FAIL  (missing data/negatives/candidate_pool.csv +1 more)
+       missing data/pipeline/block_assignments.csv
+       - data/pipeline/thinned_positives_ME.csv: 3860 rows whose block_id differs from the recomputed id
+       - data/pipeline/thinned_positives_NH.csv: 2244 rows whose block_id differs from the recomputed id
+       - data/pipeline/thinned_positives_VT.csv: 2261 rows whose block_id differs from the recomputed id
+       - data/negatives/negatives_ME.csv: 3860 rows whose block_id differs from the recomputed id
+       - data/negatives/negatives_NH.csv: 2244 rows whose block_id differs from the recomputed id
+       - data/negatives/negatives_VT.csv: 2261 rows whose block_id differs from the recomputed id
+E7   FAIL  (missing data/negatives/candidate_pool.csv)
+E8   FAIL  (missing data/negatives/candidate_pool.csv)
+       - data/pipeline/thinned_positives_NH.csv: 4 rows fail the 64 px window predicate, e.g. (-70.6155, 42.98926)
+E9   FAIL  (missing data/negatives/candidate_pool.csv)
+E10  FAIL  (missing data/negatives/candidate_pool.csv)
+E11  FAIL  (missing data/pipeline/split_manifest.json)
+       - regions.py: BLOCK_ORIGIN_5070 not defined (config BLOCK_ORIGIN_5070 = [0.0, 0.0])
+       - regions.py: VAL_FRACTION not defined (config VAL_FRACTION = 0.2)
+       - regions.py: SPLIT_SEED not defined (config SPLIT_SEED = 42)
+       - regions.py: WINDOW_PX not defined (config WINDOW_PX = 64)
+       - regions.py: COUNTY_POLYGONS not defined
+E12  FAIL  (missing data/negatives/candidate_pool.csv +1 more)
+       missing data/pipeline/split_manifest.json
+       - data/negatives/negatives_ME.csv: verify_partition returns 1 rows, e.g. ME (-67.10082, 44.501766)
+       - data/negatives/negatives_NH.csv: verify_partition returns 1 rows, e.g. NH (-70.92538, 43.3258)
+R1   FAIL  (missing data/pipeline/split_manifest.json)
+       - replay stage 'positives' raised ReplayError: data/pipeline/evaluated_sightings_ME.csv has no 'region' column (CR-0012 positives step 1 requires state == region == ME)
+R2   FAIL
+       - replay stage 'positives' raised ReplayError: data/pipeline/evaluated_sightings_ME.csv has no 'region' column (CR-0012 positives step 1 requires state == region == ME)
+R3   FAIL  (missing data/pipeline/split_manifest.json)
+       - replay stage 'positives' raised ReplayError: data/pipeline/evaluated_sightings_ME.csv has no 'region' column (CR-0012 positives step 1 requires state == region == ME)
+R4   FAIL  (missing data/pipeline/split_manifest.json)
+       - replay stage 'positives' raised ReplayError: data/pipeline/evaluated_sightings_ME.csv has no 'region' column (CR-0012 positives step 1 requires state == region == ME)
+
+OBSERVATIONS (reported, never blocking)
+OBS references: no references (not calibrated); flags |z| > 4: 4
+O1   OBS   median_m=1634
+O2   OBS   records_per_val_block=1.462; share_gap=0.08128
+O3   OBS   moran_k4.positive_blocks=0.06989 (z=+6.63 FLAG); moran_k8.positive_blocks=0.04511 (z=+6.14 FLAG)
+O4   OBS   moran_k4.selected-record_blocks=0.08179 (z=+10.18 FLAG); moran_k8.selected-record_blocks=0.04901 (z=+8.28 FLAG)
+O5   OBS   Exc.ME=1.238; Exc.NH=10.37; Exc.VT=9.17; Excws_val.ME=3.824; Excws_val.NH=14.53; Excws_val.VT=10.59; S.ME=0.5326; S.NH=0.6863; S.VT=0.5294; Sws_val.ME=0.6826; Sws_val.NH=0.7933; Sws_val.VT=0.6128
+O6   OBS   basis_tv_train_val.ME=0.01425; basis_tv_train_val.NH=0.01827; basis_tv_train_val.VT=0.03094; nonveg_val_minus_train.ME=0.0006477; nonveg_val_minus_train.NH=0.0001115; nonveg_val_minus_train.VT=0.0007191
+O7   OBS   n/a (missing: data/negatives/candidate_pool.csv)
+O8   OBS   neg_ks.ME=0.04194; neg_ks.NH=0.06554; neg_ks.VT=0.08046; neg_ks.pooled=0.02994; neg_smd.ME=0.06727; neg_smd.NH=0.07273; neg_smd.VT=0.1086; neg_smd.pooled=0.04472; neghab_ks.ME=0.06562; neghab_ks.NH=0.0879; neghab_ks.VT=0.104; neghab_ks.pooled=0.04279; pos_ks.ME=0.05149; pos_ks.NH=0.06085; pos_ks.VT=0.06724; pos_ks.pooled=0.03062; pos_smd.ME=0.06597; pos_smd.NH=0.08863; pos_smd.VT=0.1523; pos_smd.pooled=0.04237
+O9   OBS   year_hist.neg.ME={"2020":1523,"2021":987,"2022":833,"2023":306,"2024":211}; year_hist.neg.NH={"2020":639,"2021":645,"2022":509,"2023":223,"2024":228}; year_hist.neg.VT={"2020":668,"2021":693,"2022":446,"2023":236,"2024":218}; year_hist.pos.ME={"2016":122,"2017":119,"2018":310,"2019":311,"2020":626,"2021":759,"2022":822,"2023":379,"2024":412}; year_hist.pos.NH={"2016":124,"2017":123,"2018":170,"2019":150,"2020":310,"2021":319,"2022":322,"2023":296,"2024":430}; year_hist.pos.VT={"2016":136,"2017":129,"2018":138,"2019":141,"2020":299,"2021":289,"2022":327,"2023":321,"2024":481}
+O10  OBS   val_fraction.neg.ME=0.2; val_fraction.neg.NH=0.2005; val_fraction.neg.VT=0.1999; val_fraction.pos.ME=0.2; val_fraction.pos.NH=0.2005; val_fraction.pos.VT=0.1999
+
+SUMMARY: 1/18 GATEs pass; FAIL: E0, E1, E2, E3, E4, E5, E6, E7, E8, E9, E10, E11, E12, R1, R2, R3, R4
+REJECTED. no record written.
+runtime: 52.5 s
+
+STANDING CHECK OUTPUT (--standing on the same root)
+---------------------------------------------------
+standing checks failed (CR-0013):
+  no acceptance record at /tmp/claude-1000/-home-ec2-user-grouse2/f462782e-8989-4c4d-919a-db7e5946838a/scratchpad/acceptance_split/d5root/data/pipeline/acceptance_record.json: run acceptance_split.py
+  E0: data/pipeline/thinned_positives_ME.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+  E0: data/pipeline/train_positives_ME.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+  E0: data/pipeline/val_positives_ME.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+  E0: data/negatives/negatives_ME.csv: missing ['region']
+  E0: data/negatives/train_negatives_ME.csv: missing ['region']
+  E0: data/negatives/val_negatives_ME.csv: missing ['region']
+  E0: data/pipeline/thinned_positives_NH.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+  E0: data/pipeline/train_positives_NH.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+  E0: data/pipeline/val_positives_NH.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+  E0: data/negatives/negatives_NH.csv: missing ['region']
+  E0: data/negatives/train_negatives_NH.csv: missing ['region']
+  E0: data/negatives/val_negatives_NH.csv: missing ['region']
+  E0: data/pipeline/thinned_positives_VT.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+  E0: data/pipeline/train_positives_VT.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+  E0: data/pipeline/val_positives_VT.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+  E0: data/negatives/negatives_VT.csv: missing ['region']
+  E0: data/negatives/train_negatives_VT.csv: missing ['region']
+  E0: data/negatives/val_negatives_VT.csv: missing ['region']
+  E1: data/pipeline/thinned_positives_ME.csv: 137 rows with state != ME
+  E1: data/pipeline/thinned_positives_ME.csv: no 'region' column
+  E1: data/pipeline/train_positives_ME.csv: 110 rows with state != ME
+  E1: data/pipeline/train_positives_ME.csv: no 'region' column
+  E1: data/pipeline/val_positives_ME.csv: 27 rows with state != ME
+  E1: data/pipeline/val_positives_ME.csv: no 'region' column
+  E1: data/negatives/negatives_ME.csv: no 'region' column
+  E1: data/negatives/train_negatives_ME.csv: no 'region' column
+  E1: data/negatives/val_negatives_ME.csv: no 'region' column
+  E1: data/pipeline/thinned_positives_NH.csv: 1128 rows with state != NH
+  E1: data/pipeline/thinned_positives_NH.csv: no 'region' column
+  E1: data/pipeline/train_positives_NH.csv: 902 rows with state != NH
+  E1: data/pipeline/train_positives_NH.csv: no 'region' column
+  E1: data/pipeline/val_positives_NH.csv: 226 rows with state != NH
+  E1: data/pipeline/val_positives_NH.csv: no 'region' column
+  E1: data/negatives/negatives_NH.csv: no 'region' column
+  E1: data/negatives/train_negatives_NH.csv: no 'region' column
+  E1: data/negatives/val_negatives_NH.csv: no 'region' column
+  E1: data/pipeline/thinned_positives_VT.csv: 717 rows with state != VT
+  E1: data/pipeline/thinned_positives_VT.csv: no 'region' column
+  E1: data/pipeline/train_positives_VT.csv: 586 rows with state != VT
+  E1: data/pipeline/train_positives_VT.csv: no 'region' column
+  E1: data/pipeline/val_positives_VT.csv: 131 rows with state != VT
+  E1: data/pipeline/val_positives_VT.csv: no 'region' column
+  E1: data/negatives/negatives_VT.csv: no 'region' column
+  E1: data/negatives/train_negatives_VT.csv: no 'region' column
+  E1: data/negatives/val_negatives_VT.csv: no 'region' column
+  E1: P: regions present [] != REGIONS ['ME', 'NH', 'VT']
+  E1: N: regions present [] != REGIONS ['ME', 'NH', 'VT']
+  E4: P: 522 keys in both train and val, e.g. [(-72.6221, 44.50429), (-72.61997, 43.20136)]
+  E5: 882 recomputed blocks hold both train and val records, e.g. ['594_869', '594_884', '595_869']
+  E6: data/pipeline/thinned_positives_ME.csv: 3860 rows whose block_id differs from the recomputed id
+  E6: data/pipeline/thinned_positives_NH.csv: 2244 rows whose block_id differs from the recomputed id
+  E6: data/pipeline/thinned_positives_VT.csv: 2261 rows whose block_id differs from the recomputed id
+  E6: data/negatives/negatives_ME.csv: 3860 rows whose block_id differs from the recomputed id
+  E6: data/negatives/negatives_NH.csv: 2244 rows whose block_id differs from the recomputed id
+  E6: data/negatives/negatives_VT.csv: 2261 rows whose block_id differs from the recomputed id

@@ -50,19 +50,54 @@ a change request.
    (including what can't be validated in this environment and why), an
    explicit deliverables checklist (each item starts pending), and explicit
    out-of-scope items.
+   - **Clean document (CR-0011 A4).** A CR states only current intent.
+     Revision notes, superseded text, verdicts and dispositions go in a
+     companion `CR-XXXX-review-log.md`. Each fact (a count, threshold,
+     citation) appears once in the CR; other sections refer to it. On
+     revision, superseded text is deleted from the CR, not annotated.
+   - **One change per CR (CR-0011 A5).** A CR should cover one
+     independently landable change. If its deliverables span more than one
+     of {data repair, generator/pipeline code, acceptance design,
+     bookkeeping}, split it unless the parts cannot land separately, and
+     say why.
+   - **Gate and test code before approval (CR-0011 A3).** Acceptance checks
+     for a CR (verification scripts, tests, pinned constants) may be
+     written and committed on an unmerged branch **before** approval, and
+     are reviewed as part of the CR. Production code, data changes and
+     anything that writes to `data/` still wait for approval. A CR whose
+     acceptance depends on a statistical threshold must reference the
+     committed script that computes it rather than restate its numbers in
+     prose.
 2. Get independent review: at minimum one reviewer who did not write the
    proposal re-derives the diagnosis and fix from the current state of the
    thing being changed, not from the proposal's prose. Two independent
    reviewers is stronger than one.
-3. Every reviewer concern gets a disposition recorded in the CR: accepted
-   and revised, or explicitly justified as not applicable. Never silently
-   drop a finding. Verify a reviewer's claimed correction against the real
-   system before applying it.
+   - **Bounded re-review (CR-0011 A2).** The first review of a CR is
+     unrestricted. A re-review of a revised CR examines (a) whether each
+     prior BLOCKING and MAJOR concern is resolved in the operative text,
+     and (b) the text that changed since the last round. New findings
+     outside the changed text are raised only if BLOCKING. After three
+     rounds without approval, the author must split the CR or escalate the
+     open blocking items to the user for a decision before a fourth round.
+3. Every reviewer concern gets a disposition recorded in the CR's review
+   log: accepted and revised, or explicitly justified as not applicable.
+   Never silently drop a finding. Verify a reviewer's claimed correction
+   against the real system before applying it.
+   - **Severity-gated approval (CR-0011 A1).** Each concern carries a
+     severity: **BLOCKING** (the change as written would produce a wrong
+     result, lose data, or cannot be implemented — stated with a concrete
+     failure scenario), **MAJOR**, **MEDIUM** or **LOW**. Only BLOCKING
+     concerns prevent approval. MAJOR concerns must be dispositioned before
+     approval but may be dispositioned as a tracked follow-up. MEDIUM/LOW
+     concerns are recorded in the review log and in the open-issues
+     tracker with an owner; they do not reopen the CR. Any reviewer may
+     escalate a concern to BLOCKING by stating its failure scenario.
 4. **Approval quorum for this project: all reviewers who commented, plus
    the author, must sign off.** For AI-agent-only workflows (no human
    reviewer available), a second independent agent review satisfies this;
-   record both verdicts in the CR. Record each reviewer's verdict and each
-   concern's disposition in the CR itself.
+   record both verdicts. Record each reviewer's verdict and each concern's
+   disposition in the CR's review log. A reviewer may sign off with open
+   non-blocking concerns ("APPROVE WITH FOLLOW-UPS").
 5. Only after approval: implement, validate against the test plan, and
    close out the deliverables checklist. The CR stays open until every
    deliverable — including the bug log and preventive-action bookkeeping
@@ -165,6 +200,9 @@ None of the three bookkeeping artifacts substitutes for the others.
   API/schema/CLI-flag change, no behavior change beyond the defect itself.
   Bug logging (§2) is still required even for trivial fixes — only the CR
   is skippable.
+- Open review follow-ups (MEDIUM/LOW and tracked MAJOR concerns) live in
+  `docs/quality/CR-0007-0008-OPEN-ISSUES.md` until a general tracker
+  replaces it.
 - No CI is configured in this repository yet; mechanical enforcement of
   `PREVENTIVE_ACTIONS.md` rules (§3.4) is currently manual review only.
   Adding CI/lint enforcement is itself a candidate change (open a CR).

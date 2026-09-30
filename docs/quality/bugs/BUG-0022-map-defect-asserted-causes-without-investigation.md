@@ -150,6 +150,32 @@ bug's finding: the defect here is that it was stated as the cause, with
 a fix proposed, before the symptom was known or any check could have
 failed it.
 
+**CR-0009 re-measurement (2026-09-30, deliverable 9).** Retrained model
+`grouse_cr0009.pth` (sha256 `b2570c31…`, epoch 3) with its own calibration,
+on the CR-0012 split and negatives, scored in-process by `symptom_check.py`
+(`docs/quality/evidence/CR-0009/symptom/report.txt`; provenance spot checks
+max |diff| 2.3e-5 box, 3.7e-5 region). Every row is OBS (BUG-0039):
+
+| item | value | reference (investigate if) | reading |
+|---|---|---|---|
+| 1a P(ME pixel > NH pixel) | 0.4777 | [0.44, 0.56]; pre-fix 0.8513/0.8235 | within: no Maine-side lift |
+| 1b ME ≥0.8 − NH ≥0.8 share | −0.05 pp (12.86 % vs 12.90 %) | > 15 pp; pre-fix 62.9/45.6 | within |
+| 2a mean ME−NH `road_dist`, frozen pairs | +202.68 m (per-pair values identical to R) | \|·\| > 600 m; pre-fix +4,255 | unchanged raster, as expected |
+| 2b mean ME−NH calibrated prob., frozen pairs | −0.0402 (pair-sampling 95 % [−0.131, +0.039]) | > +0.20; pre-fix +0.3484 | within |
+| 3 AUC at in-box records | all 0.5724 (57 pos / 8 neg); NH side 0.3000 (40 / 2) | report; `bce.pth` post-fix 0.7273 / 0.6918 on 55/11, 41/11 | not comparable (below) |
+| 4 whole-ME map, stride 8 | inside US: mean 0.558, ≥0.8 6.10 %, NaN 0.09 %; outside US: NaN 45.8 %, degraded 100 %, mean 0.336 | report | input to the `predict.py` validity-mask decision |
+
+ME and NH box means: 0.6584 / 0.6767 (a uniform shift is invisible to 1a/1b/2b; stated limit). Item 3 is not comparable with its reference: after
+CR-0012 the in-box point set is the union of the three region files
+(65 records; 8 negatives, 2 on the NH side) rather than the NH region
+files' 66 (11 negatives), and most records are training points, so its AUC
+has no power; the NH-side value rests on 2 negatives. Recorded, not
+investigated further (no row is past an "investigate if" limit, PA-0016).
+
+Reading: the reported symptom (Maine side ranked well above
+same-habitat NH) is absent in the retrained model on every OBS row that
+measures it (1a, 1b, 2b). Closure is CR-0009 deliverable 10.
+
 ## 7. Recurrence review
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md` for (a) the same
 failure and (b) a different failure with the same root cause (a

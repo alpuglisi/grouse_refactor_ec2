@@ -1,0 +1,3 @@
+name, driver_version
+NVIDIA L40S, 560.35.03
+16

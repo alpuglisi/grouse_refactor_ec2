@@ -271,3 +271,13 @@ is needed (no BLOCKING/MAJOR raised; A1).
 - Deliverable 1: R reproduced every published value exactly (see
   `docs/quality/evidence/CR-0009/symptom_check-R-deliverable1-run.txt`);
   23 unit tests OK; `data/predictions/` md5 unchanged.
+- 2026-09-30 retrain restart: the retrain ran on the new instance type
+  (NVIDIA L40S, driver 560.35.03, 16 vCPU, 124 GB RAM; was 4 vCPU / 30 GB).
+  This is a hardware change, not a recipe change: `argv.txt` is unchanged,
+  and `train.py` sizes DataLoader workers from `os.cpu_count()` (14 now,
+  was 2). The L40S/4-vCPU run was aborted in epoch 1 with no checkpoint;
+  its evidence is under `retrain/aborted_*` and
+  `retrain/train_aborted_instance_change.log`.
+  `retrain/acceptance_record_note.txt` described the aborted start and is
+  superseded by the new `retrain/acceptance_at_start.sha256` (record
+  sha256 `66d63e1d…`, unchanged). Started 2026-09-30T13:49:44Z.

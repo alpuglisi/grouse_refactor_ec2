@@ -1,0 +1,30 @@
+Traceback (most recent call last):
+  File "/home/ec2-user/grouse2/generate_negatives.py", line 500, in main
+    run(".")
+  File "/home/ec2-user/grouse2/generate_negatives.py", line 479, in run
+    outputs, section, manifest = build(data, root)
+                                 ^^^^^^^^^^^^^^^^^
+  File "/home/ec2-user/grouse2/generate_negatives.py", line 338, in build
+    verify_positive_outputs(manifest, root)
+  File "/home/ec2-user/grouse2/generate_negatives.py", line 327, in verify_positive_outputs
+    raise RuntimeError(f"positive outputs differ from the manifest's "
+RuntimeError: positive outputs differ from the manifest's positives section (re-run prepare_training_data.py): ['data/pipeline/train_positives_ME.csv']
+[!] generate_negatives failed: RuntimeError: positive outputs differ from the manifest's positives section (re-run prepare_training_data.py): ['data/pipeline/train_positives_ME.csv']
+Traceback (most recent call last):
+  File "/home/ec2-user/grouse2/generate_negatives.py", line 510, in <module>
+    main()
+  File "/home/ec2-user/grouse2/generate_negatives.py", line 500, in main
+    run(".")
+  File "/home/ec2-user/grouse2/generate_negatives.py", line 479, in run
+    outputs, section, manifest = build(data, root)
+                                 ^^^^^^^^^^^^^^^^^
+  File "/home/ec2-user/grouse2/generate_negatives.py", line 338, in build
+    verify_positive_outputs(manifest, root)
+  File "/home/ec2-user/grouse2/generate_negatives.py", line 327, in verify_positive_outputs
+    raise RuntimeError(f"positive outputs differ from the manifest's "
+RuntimeError: positive outputs differ from the manifest's positives section (re-run prepare_training_data.py): ['data/pipeline/train_positives_ME.csv']
+
+real	0m1.618s
+user	0m4.154s
+sys	0m0.161s
+neg exit 1

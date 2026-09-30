@@ -1,0 +1,7 @@
+$ python /home/ec2-user/grouse2/clean.py   (cwd /tmp/claude-1000/-home-ec2-user-grouse2/cr0012-d6/G)
+clean.py is a stale copy of prepare_training_data.py (BUG-0031); use prepare_training_data.py
+exit 1
+$ python /home/ec2-user/grouse2/legacy/gen_negs.py   (cwd /tmp/claude-1000/-home-ec2-user-grouse2/cr0012-d6/G)
+legacy/gen_negs.py is a stale copy of generate_negatives.py (BUG-0031); use generate_negatives.py
+exit 1
+files created in cwd: 0

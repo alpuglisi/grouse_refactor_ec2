@@ -1,0 +1,20 @@
+IMPORT OK   regions
+IMPORT OK   grouse_data
+IMPORT OK   prepare_training_data
+IMPORT OK   generate_negatives
+IMPORT OK   acceptance_split
+IMPORT OK   train
+IMPORT OK   calibrate
+IMPORT OK   bench_pipeline
+IMPORT OK   dataset
+IMPORT OK   smoke_test_training
+IMPORT OK   diagnose_training
+IMPORT OK   diagnose_wetland
+IMPORT OK   get_negatives
+IMPORT OK   organize_project
+IMPORT OK   tune
+IMPORT OK   diagnose_road_bias
+IMPORT OK   diagnose_water_bias
+17/17 imported
+GUARD fires on import clean.py: SystemExit(clean.py is a stale copy of prepare_training_data.py (BUG-0031); use prepare_training_data.py)
+GUARD fires on import legacy/gen_negs.py: SystemExit(legacy/gen_negs.py is a stale copy of generate_negatives.py (BUG-0031); use generate_negatives.py)

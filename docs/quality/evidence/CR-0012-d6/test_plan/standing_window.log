@@ -1,0 +1,7 @@
+standing_checks(64, 0, False): accepted  [expected accept] PASS
+standing_checks(64, 8, False): accepted  [expected accept] PASS
+standing_checks(64, 0, True): accepted  [expected accept] PASS
+standing_checks(64, 8, True): REFUSED:   window: img_size 64 + 2 x pad 8 > WINDOW_PX 64  [expected refuse] PASS
+standing_checks(62, 1, True): accepted  [expected accept] PASS
+standing_checks(66, 0, False): REFUSED:   window: img_size 66 + 2 x pad 0 > WINDOW_PX 64  [expected refuse] PASS
+ALL AS EXPECTED

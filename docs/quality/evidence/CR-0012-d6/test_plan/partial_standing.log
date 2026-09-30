@@ -1,0 +1,3 @@
+standing_checks(64, 0, False): REFUSED:   no acceptance record at /tmp/claude-1000/-home-ec2-user-grouse2/cr0012-d6/A/data/pipeline/acceptance_record.json: run acceptance_split.py  [expected accept] FAIL
+standing_checks(64, 8, False): REFUSED:   no acceptance record at /tmp/claude-1000/-home-ec2-user-grouse2/cr0012-d6/A/data/pipeline/acceptance_record.json: run acceptance_split.py  [expected accept] FAIL
+standing_checks(64, 0, True): REFUSED:   no acceptance record at /tmp/claude-1000/-home-ec2-user-grouse2/cr0012-d6/A/data/pipeline/acceptance_record.json: run acceptance_split.py  [expected accept] FAIL

@@ -1,0 +1,131 @@
+--- variant (a) backup as-is, no record: standing_checks(64, 0, False, data_root=C)
+RESULT: REFUSED, 56 failure line(s)
+   standing checks failed (CR-0013):
+     no acceptance record at /tmp/claude-1000/-home-ec2-user-grouse2/cr0012-d6/C/data/pipeline/acceptance_record.json: run acceptance_split.py
+     E0: data/pipeline/thinned_positives_ME.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/train_positives_ME.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/val_positives_ME.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/negatives/negatives_ME.csv: missing ['region']
+     E0: data/negatives/train_negatives_ME.csv: missing ['region']
+     E0: data/negatives/val_negatives_ME.csv: missing ['region']
+     E0: data/pipeline/thinned_positives_NH.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/train_positives_NH.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/val_positives_NH.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/negatives/negatives_NH.csv: missing ['region']
+     E0: data/negatives/train_negatives_NH.csv: missing ['region']
+     E0: data/negatives/val_negatives_NH.csv: missing ['region']
+     E0: data/pipeline/thinned_positives_VT.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/train_positives_VT.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/val_positives_VT.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/negatives/negatives_VT.csv: missing ['region']
+     E0: data/negatives/train_negatives_VT.csv: missing ['region']
+     E0: data/negatives/val_negatives_VT.csv: missing ['region']
+     E1: data/pipeline/thinned_positives_ME.csv: 137 rows with state != ME
+     E1: data/pipeline/thinned_positives_ME.csv: no 'region' column
+     E1: data/pipeline/train_positives_ME.csv: 110 rows with state != ME
+     E1: data/pipeline/train_positives_ME.csv: no 'region' column
+     E1: data/pipeline/val_positives_ME.csv: 27 rows with state != ME
+     E1: data/pipeline/val_positives_ME.csv: no 'region' column
+     E1: data/negatives/negatives_ME.csv: no 'region' column
+     E1: data/negatives/train_negatives_ME.csv: no 'region' column
+     E1: data/negatives/val_negatives_ME.csv: no 'region' column
+     E1: data/pipeline/thinned_positives_NH.csv: 1128 rows with state != NH
+     E1: data/pipeline/thinned_positives_NH.csv: no 'region' column
+     E1: data/pipeline/train_positives_NH.csv: 902 rows with state != NH
+     E1: data/pipeline/train_positives_NH.csv: no 'region' column
+     E1: data/pipeline/val_positives_NH.csv: 226 rows with state != NH
+     E1: data/pipeline/val_positives_NH.csv: no 'region' column
+     E1: data/negatives/negatives_NH.csv: no 'region' column
+     E1: data/negatives/train_negatives_NH.csv: no 'region' column
+     E1: data/negatives/val_negatives_NH.csv: no 'region' column
+     E1: data/pipeline/thinned_positives_VT.csv: 717 rows with state != VT
+     E1: data/pipeline/thinned_positives_VT.csv: no 'region' column
+   ... 17 more
+--- variant (b) backup + real acceptance record: standing_checks(64, 0, False, data_root=C)
+RESULT: REFUSED, 73 failure line(s)
+   standing checks failed (CR-0013):
+     data/pipeline/thinned_positives_ME.csv: sha256 differs from the acceptance record
+     data/pipeline/train_positives_ME.csv: sha256 differs from the acceptance record
+     data/pipeline/val_positives_ME.csv: sha256 differs from the acceptance record
+     data/negatives/negatives_ME.csv: sha256 differs from the acceptance record
+     data/negatives/train_negatives_ME.csv: sha256 differs from the acceptance record
+     data/negatives/val_negatives_ME.csv: sha256 differs from the acceptance record
+     data/pipeline/thinned_positives_NH.csv: sha256 differs from the acceptance record
+     data/pipeline/train_positives_NH.csv: sha256 differs from the acceptance record
+     data/pipeline/val_positives_NH.csv: sha256 differs from the acceptance record
+     data/negatives/negatives_NH.csv: sha256 differs from the acceptance record
+     data/negatives/train_negatives_NH.csv: sha256 differs from the acceptance record
+     data/negatives/val_negatives_NH.csv: sha256 differs from the acceptance record
+     data/pipeline/thinned_positives_VT.csv: sha256 differs from the acceptance record
+     data/pipeline/train_positives_VT.csv: sha256 differs from the acceptance record
+     data/pipeline/val_positives_VT.csv: sha256 differs from the acceptance record
+     data/negatives/negatives_VT.csv: sha256 differs from the acceptance record
+     data/negatives/train_negatives_VT.csv: sha256 differs from the acceptance record
+     data/negatives/val_negatives_VT.csv: sha256 differs from the acceptance record
+     E0: data/pipeline/thinned_positives_ME.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/train_positives_ME.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/val_positives_ME.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/negatives/negatives_ME.csv: missing ['region']
+     E0: data/negatives/train_negatives_ME.csv: missing ['region']
+     E0: data/negatives/val_negatives_ME.csv: missing ['region']
+     E0: data/pipeline/thinned_positives_NH.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/train_positives_NH.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/val_positives_NH.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/negatives/negatives_NH.csv: missing ['region']
+     E0: data/negatives/train_negatives_NH.csv: missing ['region']
+     E0: data/negatives/val_negatives_NH.csv: missing ['region']
+     E0: data/pipeline/thinned_positives_VT.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/train_positives_VT.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/val_positives_VT.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/negatives/negatives_VT.csv: missing ['region']
+     E0: data/negatives/train_negatives_VT.csv: missing ['region']
+     E0: data/negatives/val_negatives_VT.csv: missing ['region']
+     E1: data/pipeline/thinned_positives_ME.csv: 137 rows with state != ME
+     E1: data/pipeline/thinned_positives_ME.csv: no 'region' column
+     E1: data/pipeline/train_positives_ME.csv: 110 rows with state != ME
+   ... 34 more
+forged record: 18 artifact digests matching the backup files
+--- variant (c) backup + forged record matching its files: standing_checks(64, 0, False, data_root=C)
+RESULT: REFUSED, 55 failure line(s)
+   standing checks failed (CR-0013):
+     E0: data/pipeline/thinned_positives_ME.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/train_positives_ME.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/val_positives_ME.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/negatives/negatives_ME.csv: missing ['region']
+     E0: data/negatives/train_negatives_ME.csv: missing ['region']
+     E0: data/negatives/val_negatives_ME.csv: missing ['region']
+     E0: data/pipeline/thinned_positives_NH.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/train_positives_NH.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/val_positives_NH.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/negatives/negatives_NH.csv: missing ['region']
+     E0: data/negatives/train_negatives_NH.csv: missing ['region']
+     E0: data/negatives/val_negatives_NH.csv: missing ['region']
+     E0: data/pipeline/thinned_positives_VT.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/train_positives_VT.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/pipeline/val_positives_VT.csv: missing ['fdist', 'ch', 'cc', 'region']; unexpected ['slope', 'aspect_gradient']
+     E0: data/negatives/negatives_VT.csv: missing ['region']
+     E0: data/negatives/train_negatives_VT.csv: missing ['region']
+     E0: data/negatives/val_negatives_VT.csv: missing ['region']
+     E1: data/pipeline/thinned_positives_ME.csv: 137 rows with state != ME
+     E1: data/pipeline/thinned_positives_ME.csv: no 'region' column
+     E1: data/pipeline/train_positives_ME.csv: 110 rows with state != ME
+     E1: data/pipeline/train_positives_ME.csv: no 'region' column
+     E1: data/pipeline/val_positives_ME.csv: 27 rows with state != ME
+     E1: data/pipeline/val_positives_ME.csv: no 'region' column
+     E1: data/negatives/negatives_ME.csv: no 'region' column
+     E1: data/negatives/train_negatives_ME.csv: no 'region' column
+     E1: data/negatives/val_negatives_ME.csv: no 'region' column
+     E1: data/pipeline/thinned_positives_NH.csv: 1128 rows with state != NH
+     E1: data/pipeline/thinned_positives_NH.csv: no 'region' column
+     E1: data/pipeline/train_positives_NH.csv: 902 rows with state != NH
+     E1: data/pipeline/train_positives_NH.csv: no 'region' column
+     E1: data/pipeline/val_positives_NH.csv: 226 rows with state != NH
+     E1: data/pipeline/val_positives_NH.csv: no 'region' column
+     E1: data/negatives/negatives_NH.csv: no 'region' column
+     E1: data/negatives/train_negatives_NH.csv: no 'region' column
+     E1: data/negatives/val_negatives_NH.csv: no 'region' column
+     E1: data/pipeline/thinned_positives_VT.csv: 717 rows with state != VT
+     E1: data/pipeline/thinned_positives_VT.csv: no 'region' column
+     E1: data/pipeline/train_positives_VT.csv: 586 rows with state != VT
+   ... 16 more
+ALL REFUSED

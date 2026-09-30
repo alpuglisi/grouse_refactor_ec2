@@ -1,0 +1,247 @@
+CR-0012 deliverable 6: test plan execution (scratch trees only)
+================================================================
+Date: 2026-09-30, 13:53-14:13 UTC. Host: 16 vCPU, Python 3.12.9, torch 2.6.0+cu124.
+Code: HEAD moved 00c0b6f -> d1c8b34 -> c1b4801 during the session because other
+agents made commits. Between 00c0b6f and HEAD the only tracked .py change was
+the new file docs/quality/evidence/CR-0012-d8/canada_buffer.py, an evidence
+script. No pipeline code and no docs/quality/acceptance_split.json changed.
+Every manifest reports dirty=false. No production code was edited.
+The real run (commit 1bc2df6) was not redone on the real data/.
+
+Scratch root: /tmp/claude-1000/-home-ec2-user-grouse2/cr0012-d6/
+  A  copies of the 9 input CSVs (evaluated_sightings_R, envelope_metrics_R,
+     gbif_negatives_R) and of data/landfire/attribute_tables/*.csv;
+     every file under data/landfire symlinked one by one (the directories
+     are real); data/roads/tl_2023_us_county.zip symlinked; data/models
+     is a real, empty directory. Used for run 1, run 2, the window test,
+     the positives-only test and the tamper test.
+  B  the same as A, but every copied CSV has its rows randomly permuted
+     (numpy default_rng, seed 20260930+i). The header is kept, every row's
+     text is byte-identical, and CRLF line endings are kept where the
+     original has them. Checked per file: equal byte length, same header,
+     same multiset of lines, different order. Rows: evaluated ME 7,924,
+     NH 2,303, VT 3,725; envelope_metrics 57/58/57; gbif_negatives ME
+     91,917, NH 69,219, VT 104,076; LF2025_EVT 1,069.
+  C  copies of /home/ec2-user/grouse_backup/CR-0012/{pipeline,negatives}.
+     These are the pre-CR files; they were checked equal to the backup by
+     sha256. Rasters are symlinked as in A.
+  G  an empty working directory for the guard, import and unit-test runs.
+Scripts are in test_plan/: make_tree.py builds the trees and
+run_pipeline.sh runs the pipeline. Before every pipeline step,
+run_pipeline.sh checks that none of TREE, data/, data/pipeline,
+data/negatives, data/models or any of the 22 output files is a symlink,
+and that those directories contain no symlinks at all. It aborts
+otherwise. Every step logged "symlink check OK".
+Every command ran with cwd = the scratch tree, as
+`python /home/ec2-user/grouse2/<script>`. acceptance_split.py was always
+given `--data-root <tree>` and was never given --calibrate.
+All logs, checksum lists and helper scripts are in test_plan/ next to this file.
+
+Real data checksums (sha256 of every file under data/pipeline and data/negatives, 44 files)
+-------------------------------------------------------------------------------------------
+before (13:53Z): test_plan/real_data_before.sha256, list digest 401dca1d7104eb44167fb6009e5cd95bd6e4f4e49c77bfd6f2eba68e5b936a2c
+after  (14:13Z): test_plan/real_data_after.sha256,  list digest 401dca1d7104eb44167fb6009e5cd95bd6e4f4e49c77bfd6f2eba68e5b936a2c
+Result: IDENTICAL. The real data/pipeline/acceptance_record.json is still
+66d63e1da915529ed0f33bf4f152d6626d9843c9fa8185a55a9727f54489d478.
+Size and mtime of every top-level file in data/landfire and data/roads:
+test_plan/real_rasters_{before,after}.stat, IDENTICAL.
+Pre-CR backup /home/ec2-user/grouse_backup/CR-0012: test_plan/backup_before.sha256; unchanged after.
+Note: data/calibration/{calibration.json,reliability.*} have mtime 14:05:16Z.
+They were written by the CR-0009 deliverable 7 calibration refit, which
+another agent committed at 14:05:30Z (d1c8b34). This session never ran
+calibrate.py and wrote nothing under the real data/.
+
+------------------------------------------------------------------------
+ITEM 1. A second run gives byte-identical outputs                  PASS
+------------------------------------------------------------------------
+cmd  (cwd A): run_pipeline.sh A run1 prep neg acc
+     = python prepare_training_data.py; python generate_negatives.py;
+       python acceptance_split.py --data-root A
+     then the same again as run2.
+key output (run1 and run2 are the same):
+  ME: 7,924 loaded, 3,740 habitat, 3,740 window in bounds, 3,660 kept after pooled thinning
+  NH: 2,303 loaded, 1,119 habitat, 1,119 window in bounds, 1,079 kept after pooled thinning
+  VT: 3,725 loaded, 1,552 habitat, 1,552 window in bounds, 1,493 kept after pooled thinning
+  Wrote 10 files and the manifest's positives section (6,232 positives).
+  Pool: 22,187 candidates; 6 partition exception(s) dropped; 9,720 within 300 m of a grouse location dropped.
+  ME: train 2,922 (2,045 habitat + 877 NonVeg); val 738 (517 habitat + 221 NonVeg)
+  NH: train 840 (588 habitat + 252 NonVeg); val 239 (167 habitat + 72 NonVeg)
+  VT: train 1,224 (857 habitat + 367 NonVeg); val 269 (188 habitat + 81 NonVeg)
+  acceptance_split: SUMMARY: 18/18 GATEs pass; FAIL: none; ACCEPTED (both runs)
+expected: all 20 outputs byte-identical between run 1 and run 2.
+observed: all 20 are identical (test_plan/A_run1_outputs.sha256 = A_run2_outputs.sha256).
+  split_manifest.json is identical apart from the two "commit" fields
+  (00c0b6f in run 1; d1c8b34 and 33ef2d9 in run 2). Other agents made
+  docs-only commits between the runs; see Code above. With "commit"
+  removed, the manifests are equal.
+  The acceptance record differs only by design, because it carries
+  created_utc.
+Additionally: all 20 scratch outputs are byte-identical to the real
+outputs of the 1bc2df6 run (test_plan/real_outputs.sha256). The scratch
+manifest differs from the real one only in "commit".
+
+------------------------------------------------------------------------
+ITEM 2. Order test (permuted input CSVs, rasters symlinked)        PASS
+------------------------------------------------------------------------
+cmd  (cwd B): run_pipeline.sh B order prep neg acc
+expected: outputs byte-identical to the unpermuted run.
+observed: all 20 outputs are byte-identical to run 1 in A
+  (B_order_outputs.sha256 = A_run1_outputs.sha256) and to the real
+  outputs. The counts printed are the same as in item 1.
+  split_manifest.json differs from A's only in the sha256 of the 10
+  permuted input files (positives/inputs and negatives/inputs). All
+  outputs, counts, the draw, the dropped list, the constants and the
+  environment are equal.
+note (expected, not a failure of this item): acceptance_split.py on B
+  REJECTS with 15/18 GATEs; E10, R3 and R4 fail with
+  "ReplayError: data/landfire/attribute_tables/LF2025_EVT.csv sha256
+  df9099d30475... differs from the config pin 5ccc130b250d...".
+  The CR-0013 config pins the crosswalk file's sha256, so a
+  row-permuted crosswalk is refused by design. The order criterion is
+  output identity, and it holds.
+
+------------------------------------------------------------------------
+ITEM 3a. Standing checks refuse the pre-CR backup                  PASS
+------------------------------------------------------------------------
+cmd  (cwd C): python test_plan/standing_precr.py
+     calls acceptance_split.standing_checks(64, 0, False, data_root=C)
+     on three variants:
+  (a) the backup as it is, with no acceptance record:
+      REFUSED, 56 failure lines: "no acceptance record ...", then E0
+      (e.g. "thinned_positives_ME.csv: missing ['fdist','ch','cc','region'];
+      unexpected ['slope','aspect_gradient']"; negatives "missing ['region']")
+      and E1 (e.g. "thinned_positives_NH.csv: 1128 rows with state != NH")
+  (b) the backup plus the real acceptance record copied in:
+      REFUSED, 73 lines: 18 "sha256 differs from the acceptance record",
+      plus the E0 and E1 failures from (a)
+  (c) the backup plus a forged record, with the right config_sha256 and
+      artifact digests matching the backup's own 18 files, so that only
+      the content gates can refuse:
+      REFUSED, 55 lines, all from the E0/E1 content gates
+expected: refused. observed: refused in all three variants
+  (test_plan/standing_precr.log).
+
+------------------------------------------------------------------------
+ITEM 3b. Standing checks refuse (64, 8, True) (--jitter 8 with augmentation)   PASS
+------------------------------------------------------------------------
+cmd  (cwd A, after run 2 was accepted): python test_plan/standing_window.py A
+  standing_checks(64, 0, False): accepted            [expected accept]
+  standing_checks(64, 8, False): accepted            [expected accept]
+  standing_checks(64, 0, True):  accepted            [expected accept]
+  standing_checks(64, 8, True):  REFUSED: window: img_size 64 + 2 x pad 8 > WINDOW_PX 64   [expected refuse]
+  standing_checks(62, 1, True):  accepted            [expected accept]
+  standing_checks(66, 0, False): REFUSED: window: img_size 66 + 2 x pad 0 > WINDOW_PX 64   [expected refuse]
+  python acceptance_split.py --standing --data-root A  ->  "standing checks: pass", exit 0
+The call site is train.build_datasets -> standing_checks(img_size, jitter,
+augment, data_root=data.config.base_dir). It is covered by
+tests/test_cr0012.py::test_build_datasets_calls_standing_checks_first.
+The whole file (38 tests) passed, cwd G:
+`PYTHONPATH=repo:repo/tests python -m unittest test_cr0012` -> "Ran 38 tests ... OK".
+
+------------------------------------------------------------------------
+ITEM 4. A partial run (positives only) is refused                  PASS
+------------------------------------------------------------------------
+cmd  (cwd A, starting from the accepted state): run_pipeline.sh A partial prep
+  -> prep exit 0; data/pipeline/acceptance_record.json deleted;
+     manifest sections: ['positives'] (test_plan/partial_split_manifest.json)
+Then:
+  standing_checks(64, 0, False, data_root=A) -> REFUSED: "no acceptance record at .../A/data/pipeline/acceptance_record.json: run acceptance_split.py"
+  acceptance_split.py --standing --data-root A -> exit 1, same message
+  train.build_datasets(GrouseData(base_dir=A), [ME,NH,VT], [evt], 64) -> AcceptanceError, same message (the real call site)
+  acceptance_split.py --data-root A (full) -> REJECTED, 13/18; FAIL: E0 (manifest
+     sections ['negatives'] absent), E11, E12, R3, R4; "no record written"
+Plus the digest check in generate_negatives.py (CR-0012 § Risk,
+"generate_negatives.py checks the positive digests"): one byte was
+appended to A/data/pipeline/train_positives_ME.csv, then:
+  python generate_negatives.py -> exit 1:
+  "[!] generate_negatives failed: RuntimeError: positive outputs differ from the
+   manifest's positives section (re-run prepare_training_data.py):
+   ['data/pipeline/train_positives_ME.csv']"
+  The error type and traceback were logged and the error re-raised, as
+  PA-0011 requires. No negatives file changed (sha256 compared before and
+  after). No temp file was left behind. The file was then restored and
+  checked by cmp.
+expected: refused. observed: refused at every level (test_plan/partial*.log, tamper.neg.log).
+
+------------------------------------------------------------------------
+ITEM 5. Both guards fire                                           PASS
+------------------------------------------------------------------------
+cmd  (cwd G, an empty directory):
+  python /home/ec2-user/grouse2/clean.py
+    -> "clean.py is a stale copy of prepare_training_data.py (BUG-0031); use prepare_training_data.py", exit 1
+  python /home/ec2-user/grouse2/legacy/gen_negs.py
+    -> "legacy/gen_negs.py is a stale copy of generate_negatives.py (BUG-0031); use generate_negatives.py", exit 1
+  Both also raise SystemExit when loaded by runpy with run_name != "__main__",
+  i.e. the guard is the first statement, not under __main__.
+  G was still empty afterwards. (test_plan/guards.log, import_smoke.log)
+
+------------------------------------------------------------------------
+ITEM 6. Import smoke of every module named in section 3-6           PASS
+------------------------------------------------------------------------
+cmd  (cwd G): importlib.import_module for each of
+  regions, grouse_data, prepare_training_data, generate_negatives,
+  acceptance_split, train, calibrate, bench_pipeline, dataset,
+  smoke_test_training, diagnose_training, diagnose_wetland,
+  and also the Impact readers get_negatives, organize_project, tune,
+  diagnose_road_bias, diagnose_water_bias.
+  Each was checked beforehand for a __main__ guard and no top-level side effects.
+observed: 17/17 IMPORT OK. The two guarded copies raise SystemExit, as
+  item 5 expects. (test_plan/import_smoke.log)
+
+------------------------------------------------------------------------
+ITEM 7. smoke_test_training.py runs                                FAIL
+------------------------------------------------------------------------
+cmd  (cwd B, which holds outputs byte-identical to the accepted outputs):
+     python /home/ec2-user/grouse2/smoke_test_training.py   (defaults: --region ME
+     --n-train 40 --n-val 10 --epochs 2 --img-size 64); cuda was used
+observed: exit 1. Stages 1-4 passed (imports; data discovery: 2,922 train
+  pos, 2,922 train neg, 738 val pos, 738 val neg; patch dataset; model
+  construction). Stage 5/7 (training loop) crashed at the end of epoch 1:
+    File "/home/ec2-user/grouse2/model_handler.py", line 1339, in fit
+      f"tuned acc: {metrics['tuned_tta_accuracy']:.2f}% | "
+    KeyError: 'tuned_tta_accuracy'
+  (test_plan/smoke.log)
+defect (not patched; to be filed as a BUG by the bookkeeping owner):
+  model_handler.py:1318-1322 fills the key only conditionally:
+      for src, dst in (("_logits", "tuned_accuracy"),
+                       ("_tta_logits", "tuned_tta_accuracy")):
+          if src in metrics:
+  and "_tta_logits" exists only if model_handler.py:1888 holds:
+      if tta_group and len(logits) % tta_group == 0:
+  The status line at model_handler.py:1339 indexes the key
+  unconditionally. Its neighbours tta_auc, strict_accuracy and
+  hedged_pct use .get(..., nan).
+  smoke_test_training.py builds validation positives with
+  expand_rotations=True and negatives with expand_rotations=False. With
+  the defaults that gives 10x4 + 10 = 50 samples, and 50 % 4 != 0, so
+  the TTA metrics are skipped and the status line raises.
+  This is the mechanism of PA-0010/PA-0013 (a key populated
+  conditionally and consumed unconditionally), the same class as
+  BUG-0012/BUG-0014. git blame puts lines 1318-1320, 1339 and 1888 in
+  the initial commit 29c194a. It is pre-existing and not introduced by
+  CR-0012.
+  train.py is not affected on this path: it builds both validation
+  classes with expand_rotations=True (train.py:288-324), so the length
+  is always a multiple of 4. The CR-0009 retrain log shows
+  "tuned acc: 69.60%".
+  A second issue for the same BUG: when the smoke test's length happens
+  to be divisible by 4, TTA groups 4 distinct unrotated negatives
+  together.
+diagnostic only (does not change the verdict):
+  `python smoke_test_training.py --n-val 12` (12x4 + 12 = 60, divisible
+  by 4) exits 0 with "ALL 7 STAGES PASSED". So the rest of the stack
+  runs on the CR-0012 outputs: training, weighted loss, checkpoint round
+  trip and both prediction paths. (test_plan/smoke_diag_nval12.log;
+  checkpoints were written only to B/data/models.)
+
+========================================================================
+SUMMARY
+  1 second run byte-identical ...................... PASS (20/20 outputs; manifest differs only in "commit")
+  2 order test (permuted CSVs) ..................... PASS (20/20 outputs identical to run 1 and to the real run)
+  3a standing checks refuse pre-CR backup ........... PASS (3/3 variants refused)
+  3b standing checks refuse (64, 8, True) ........... PASS
+  4 positives-only run refused ..................... PASS
+  5 both guards fire ............................... PASS
+  6 import smoke ................................... PASS (17/17)
+  7 smoke_test_training.py runs .................... FAIL (KeyError 'tuned_tta_accuracy', model_handler.py:1339; pre-existing PA-0010-class defect)
+  Real data/pipeline + data/negatives: unchanged (44 files, before = after).

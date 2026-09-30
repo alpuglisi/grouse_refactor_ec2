@@ -1,0 +1,50 @@
+
+=== 1/7 Imports (torch, torchvision, the new ml files, grouse_data) ===
+    torch 2.6.0+cu124 | cuda available: True
+
+=== 2/7 Data discovery for ME ===
+    features: ['evt', 'evh', 'evc', 'sclass', 'fdist', 'ch', 'cc', 'tcc', 'nlcd', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn']
+    categorical: ['evt', 'evh', 'evc', 'sclass', 'fdist', 'nlcd'] | continuous: ['ch', 'cc', 'tcc', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn']
+    on disk: 2,922 train pos, 2,922 train neg, 738 val pos, 738 val neg
+
+=== 3/7 Patch dataset construction + one sample inspection ===
+   [warn] [ME] evt: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] evh: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] evc: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024, 2025]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] sclass: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] fdist: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024, 2025]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] ch: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024, 2025]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] cc: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024, 2025]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+    train=200 samples, val=50 samples
+    sample shapes: cat_x=(6, 64, 64) (torch.int64), cont_x=(9, 64, 64) (torch.float32), y=1.0, weight=1.00
+    a negative sample: label=0.0, weight=10.00 (envelope-derived if != 1.0)
+
+=== 4/7 Model construction (dynamic geometry) ===
+GrouseModelHandler: device=cuda, categorical=['evt', 'evh', 'evc', 'sclass', 'fdist', 'nlcd'], continuous=['ch', 'cc', 'tcc', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn'], stem input channels=121 (derived, not hardcoded)
+
+=== 5/7 Training loop (2 epochs, unweighted - original behavior) ===
+   Init sanity (train-mode forward, 32 spread samples): logit std = 0.1012 - input-dependent. Watch the per-epoch 'logit std' in the status line: it should GROW as training progresses.
+   Differential LR: backbone 3.0e-05 (11,167,104 params) | fresh layers 3.0e-04 (929,161 params)
+   Warmup: alpha-weighted BCE (gamma=0) for the first 3 epoch(s), then FocalLoss(gamma=2.0).
+Epoch 1/2 [Training]:   0%|          | 0/25 [00:00<?, ?it/s]Epoch 1/2 [Training]:   4%|▍         | 1/25 [00:02<00:51,  2.13s/it]Epoch 1/2 [Training]:   8%|▊         | 2/25 [00:03<00:33,  1.46s/it]Epoch 1/2 [Training]:  12%|█▏        | 3/25 [00:04<00:26,  1.22s/it]Epoch 1/2 [Training]:  16%|█▌        | 4/25 [00:05<00:26,  1.27s/it]Epoch 1/2 [Training]:  28%|██▊       | 7/25 [00:05<00:09,  1.98it/s]Epoch 1/2 [Training]:  40%|████      | 10/25 [00:05<00:04,  3.48it/s]Epoch 1/2 [Training]:  52%|█████▏    | 13/25 [00:05<00:02,  5.27it/s]Epoch 1/2 [Training]:  64%|██████▍   | 16/25 [00:05<00:01,  7.36it/s]Epoch 1/2 [Training]:  72%|███████▏  | 18/25 [00:06<00:01,  5.73it/s]Epoch 1/2 [Training]:  84%|████████▍ | 21/25 [00:06<00:00,  7.82it/s]Epoch 1/2 [Training]:  96%|█████████▌| 24/25 [00:06<00:00, 10.14it/s]                                                                     Epoch 1/2 [Validation]:   0%|          | 0/1 [00:00<?, ?it/s]Epoch 1/2 [Validation]: 100%|██████████| 1/1 [00:00<00:00,  1.15it/s]                                                                     Traceback (most recent call last):
+  File "/home/ec2-user/grouse2/smoke_test_training.py", line 118, in main
+    handler.fit(train_ds, val_ds, epochs=args.epochs,
+  File "/home/ec2-user/grouse2/model_handler.py", line 1339, in fit
+    f"tuned acc: {metrics['tuned_tta_accuracy']:.2f}% | "
+                  ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'tuned_tta_accuracy'
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+FAILED during: 5/7 Training loop (2 epochs, unweighted - original behavior)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+Stages completed before failure:
+  [ok] 1/7 Imports (torch, torchvision, the new ml files, grouse_data)
+  [ok] 2/7 Data discovery for ME
+  [ok] 3/7 Patch dataset construction + one sample inspection
+  [ok] 4/7 Model construction (dynamic geometry)
+
+real	1m39.879s
+user	1m34.190s
+sys	0m12.226s
+smoke exit 1

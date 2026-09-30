@@ -1,6 +1,7 @@
 # CR-0015: Draw assumed-negative background points only in-state, only in training blocks, and without treating 0 as nodata
 
-**Status: PROPOSED (v2) — awaiting round-2 review.** Nothing implemented.
+**Status: PROPOSED (v2.1) — awaiting round-3 review.** Nothing implemented
+except the pre-approval L1 test (deliverable 3).
 History, lineage, verdicts and dispositions: `CR-0015-review-log.md`. This
 document states only current intent.
 
@@ -53,7 +54,7 @@ pairs over the region's first-feature raster. Three defects:
    gate can see this, because the points are drawn in memory and never
    written to a file.
 3. **0 treated as nodata (BUG-0032).** `bad = set(NODATA_SENTINELS) |
-   {nodata, 0}` (`:143`) rejects a pixel whose first feature reads `0`.
+   {nodata, 0}` (in `sample_background_points`) rejects a pixel whose first feature reads `0`.
    With discovered features the first is `evt`, where 0 does not occur
    (0.0000 % in all three regions). But `features` is taken as passed
    when `--features` is given (`:897`), so the `# spec order:
@@ -90,7 +91,8 @@ Returns a `"train"`/`"val"` array, one entry per block id:
   fixed to `regions.SPLIT_SEED` and `vf` as CR-0012 §2 defines it.
 
 `assignments` is the DataFrame read from `block_assignments.csv` through
-`PATH_TEMPLATES` (the `GrouseData` accessor CR-0012 §4 adds; PA-0003).
+`PATH_TEMPLATES` through whichever accessor CR-0012 §4 implements
+(today `RegionData.block_assignments`, `grouse_data.py:444`; PA-0003).
 The function does no file I/O.
 
 `generate_negatives.py`'s pool step 10 calls `block_split`, and
@@ -139,7 +141,8 @@ New signature:
 
 ### 3. Call sites
 - **`train.build_datasets`** (`:296`) passes `region=region,
-  train_blocks_only=True, assignments=data.block_assignments`.
+  train_blocks_only=True, assignments=<CR-0012's block_assignments
+  accessor>` (§1).
 - **`pretrain.py:179`** passes `region=region, train_blocks_only=False`.
   - SSL tiles carry no labels, so tiles in validation blocks leak no
     label.
@@ -188,23 +191,25 @@ untracked, so this CR does not edit them.
 | id | type | check | required |
 |---|---|---|---|
 | U1 | GATE | Synthetic raster split into two "states" by a line, `in_state` injected: every returned point is in-state, and `in_state` was called with the given `region` | all |
-| U2 | GATE | Synthetic raster in a non-5070 Albers CRS, with assignments whose native-x/y block ids differ from the 5070 ids. The fixture has all four block kinds: **(i)** in the file as `val`, md5 would say `train`; **(ii)** in the file as `train`, md5 would say `val`; **(iii)** unassigned, md5 `val`; **(iv)** unassigned, md5 `train`. With `train_blocks_only`: 0 points in (i) or (iii); ≥ 1 point in each of (ii) and (iv). Fixture sizes are chosen so that (ii) and (iv) each expect ≥ 50 points | 0 / ≥1 / ≥1 |
+| U2 | GATE | Synthetic raster in a non-5070 Albers CRS, with assignments whose native-x/y block ids differ from the 5070 ids. The fixture has five block kinds: **(i)** in the file as `val`, md5 would say `train`; **(ii)** in the file as `train`, md5 would say `val`; **(iii)** unassigned, md5 `val`; **(iv)** unassigned, md5 `train`; **(v)** unassigned, hashed in `[vf, VAL_FRACTION)` (md5 `train` under `vf`, `val` under `VAL_FRACTION`), with the fixture's `vf` chosen so such a block exists. With `train_blocks_only`: 0 points in (i) or (iii); ≥ 1 point in each of (ii), (iv) and (v). Fixture sizes are chosen so that (ii), (iv) and (v) each expect ≥ 50 points | 0 / ≥1 / ≥1 / ≥1 |
 | U3 | GATE | A pixel reading `0` is eligible; each sentinel, the declared nodata and NaN are not | pass |
 | U4 | GATE | Exactly `n` points, and identical points for the same seed | pass |
 | U5 | GATE | Shortfall raises `SystemExit` naming the acceptance rate | pass |
 | U6 | GATE | Calling without `region` or `train_blocks_only` raises `TypeError`; `train_blocks_only=True` without `assignments` raises `ValueError` | pass |
 | U7 | GATE | Guard (deliverable 1): `train.main` with `--an-background 1` exits naming CR-0015 before `GrouseData` is constructed; with `--an-background 1 --an-background 0` it passes the guard. Deleted with the guard | pass |
-| B1 | GATE | `to_5070`/`block_split` refactor (deliverable 5): after `generate_negatives.py` is switched (`to_albers` delegates to `to_5070`; pool step 10 calls `block_split`), a re-run gives `candidate_pool.csv` and every `negatives_*` file byte-identical to CR-0012 deliverable 6's manifest digests, and `acceptance_split.py` passes unchanged | identical / pass |
+| B1 | GATE | `to_5070`/`block_split` refactor (deliverable 5): after `generate_negatives.py` is switched (`to_albers` delegates to `to_5070`; pool step 10 calls `block_split`), a re-run gives `candidate_pool.csv` and every `negatives_*` file byte-identical to the digests in the manifest of the latest CR-0012 deliverable 6 run, and `acceptance_split.py` passes unchanged | identical / pass |
 | L1 | GATE | Lint rule below, over the file set below: 0 matches outside the allowlist | 0 |
 | V1 | GATE | Real data, n = 5,000 per region, AN path, seed 0. An **independent** re-check finds 0 out-of-state points and 0 validation-block points. The re-check uses its own polygon test on the county file (not `regions.in_state`), its own 4326→5070 transformer and floor formula (not `regions.block_ids`), and a re-typed md5 rule (not `block_split`) | 0 / 0 |
 | V2 | OBS | Acceptance rate per region, split into in-state × validity × train-block | report |
 | V3 | GATE (calibrated) | Real data. **Statistic:** per region, \|share of accepted points in unassigned-train blocks − reference area share\|. **Class:** unassigned-train blocks. **Subset:** valid, in-state, train-block area. **Null population:** the fair sampler over 100 seeds. **Reference:** an independent pixel-centre enumeration of the first-feature raster, at a fixed stride giving ≥ 100,000 in-state centres per region, classified with V1's re-check. **Threshold:** set by the calibration in deliverable 7a | ≤ calibrated bound |
 
-**V1 cannot pass by skipping.** Before CR-0012 lands, V1 and V3 skip with
-a message when `block_assignments.csv` is absent. At deliverable 7 they
-run with `GROUSE_REQUIRE_REAL_DATA=1`; with that variable set, a missing
-input is `pytest.fail`, not a skip, and the evidence file records
-`pytest -rs` showing no skips.
+**V1 cannot pass by skipping.** The tests use `unittest` (pytest is not
+installed). Before CR-0012 lands, V1 and V3 call `self.skipTest` with a
+message when `block_assignments.csv` is absent. At deliverable 7 they run
+with `GROUSE_REQUIRE_REAL_DATA=1`; with that variable set, a missing input
+is `self.fail`, not a skip. The evidence file records the
+`python -m unittest -v` output, whose summary line must show no
+`skipped=`.
 
 **PA-0021 conformance.**
 - **(a)** V1 and V3 are also run on constructed wrong samplers, built by
@@ -214,19 +219,34 @@ input is `pytest.fail`, not a skip, and the evidence file records
     excluded (V3 must fail: its share is 0);
   - an under-excluding sampler that treats every unassigned block as
     train (V1 must fail on the (iii)-kind points);
-  - a sampler using `VAL_FRACTION` instead of `vf` (V1 must fail on
-    blocks hashed in `[vf, 0.2)`).
+  - an under-excluding sampler using a fraction **below** `vf` (0.18) in
+    the md5 rule: V1 must fail, on points in unassigned blocks hashed in
+    `[0.18, vf)` (about 85 of 5,000 per reviewer A's estimate).
+
+  A sampler using `VAL_FRACTION` (0.2) instead of `vf` **over**-excludes
+  (blocks hashed in `[vf, 0.2)`, about 0.3 % of the area), so neither V1
+  nor V3 can see it. **U2 kind (v)** catches it: that sampler puts 0
+  points there. Which check catches which wrong sampler:
+
+  | wrong sampler | caught by |
+  |---|---|
+  | today's (no in-state, no block rule) | V1 (both counts), U1, U2 |
+  | unassigned treated as excluded | V3, U2 (iv) |
+  | unassigned treated as train | V1, U2 (iii) |
+  | md5 fraction 0.18 (< `vf`) | V1 |
+  | `VAL_FRACTION` instead of `vf` | U2 (v) |
+  | native x/y instead of 5070 | U2 |
 - **(b)** U4's exact `n` is the cardinality gate, so both a no-op and a
   deletion fail.
 - **(c)** V3 is the only non-exact row. The reviewer A1 suggestion of
   ±3 pp is not pinned. Deliverable 7a computes the fair distribution
-  (100 seeds × 3 regions) and the four broken samplers' values. The bound
+  (100 seeds × 3 regions) and the broken samplers' values. The bound
   is the fair p99. If it does not separate every broken sampler, V3 is
   demoted to OBS and the demotion is recorded.
 
 ### L1 rule (committed as `tests/test_nodata_zero_lint.py`)
 **File set:** `git ls-files '*.py'`, minus `inv_*`, `res_*` and
-`docs/quality/evidence/**`. That is 60 files today.
+`docs/**` (the evidence scripts). That is 60 files today.
 
 **Rule.** Parse each file with `ast`. A node is *nodata-bearing* if its
 subtree contains a `Name` or `Attribute` whose identifier matches
@@ -250,8 +270,11 @@ subtree contains a `Name` or `Attribute` whose identifier matches
 - **(d)** A `BoolOp` `or` with a nodata-bearing operand and a zero
   operand (`nodata or 0`).
 
-**Allowlist.** In the test file, keyed by `(path, ast.unparse(node))`,
-not by line. Each entry cites the deliverable-4 sweep result that
+**One match per statement.** A matched node nested inside another matched
+node is not reported (the `|` and its `{nodata, 0}` are one match).
+
+**Allowlist.** In the test file, keyed by `(path, ast.unparse(node))` of
+the outermost matched node, never by line. Each entry cites the deliverable-4 sweep result that
 justifies it. Entries are reviewed as part of this CR.
 
 **Positive controls.** The test also asserts that the rule matches each
@@ -265,20 +288,29 @@ of these snippets, including reviewer A's patterns:
 - `(v == 0) | (v == nodata)`
 - `list(NODATA_SENTINELS) + [0]`
 
-It asserts that the rule does not match `(a < 0) | ~np.isfinite(a)`.
+It asserts that the rule does not match `(a < 0) | ~np.isfinite(a)`,
+`n == 0 and declared == nodata` or `vals[vals == src.nodata] = np.nan`.
 
-**Expected result on today's tree** (prototype run by the author,
-2026-09-30): 4 matches.
-1. `train.py:143` `set(NODATA_SENTINELS) | {nodata, 0}` — BUG-0032, fixed
+**Until deliverable 4.** The allowlist is empty and the test pins the
+match set to exactly the 4 statements below (`EXPECTED_UNCLASSIFIED`),
+so any new match fails it. Deliverable 4 moves each to the allowlist
+(with its justification) or removes it with a fix; after deliverable 6
+the pinned set is empty.
+
+**Expected result on today's tree** (`python -m unittest
+tests.test_nodata_zero_lint -v`, 2026-09-30: 6 tests OK, 60 files):
+4 statements, cited by text (line numbers move).
+1. `train.py`: `set(NODATA_SENTINELS) | {nodata, 0}` — BUG-0032, fixed
    by §2; no allowlist entry.
-2. `find_tsd_contrast_points.py:121`
+2. `find_tsd_contrast_points.py`:
    `~np.isin(nlcd_arr, NODATA_SENTINELS) & (nlcd_arr != 0)` — known
    sibling; classified by deliverable 4.
-3. `generate_time_since_disturbance.py:330` `(arr > 0) & ~sentinel` —
+3. `generate_time_since_disturbance.py`: `(arr > 0) & ~sentinel` —
    classified by deliverable 4. Author's reading: 0 is the VAT
-   "Background" class. It stays in `cov` (`:329`), and `hit` is a
-   disturbance predicate, not a validity mask.
-4. `check_road_dist.py:221` `(state != 0) & ~home` — classified by
+   "Background" class. It stays in `cov` (the preceding
+   `cov &= ~sentinel`), and `hit` is a disturbance predicate, not a
+   validity mask.
+4. `check_road_dist.py`: `(state != 0) & ~home` — classified by
    deliverable 4. Author's reading: 0 is "no state" in a rasterised state
    id.
 
@@ -327,7 +359,8 @@ not use the AN path.
 ## Deliverables (in execution order)
 - [ ] 1. Interim guard (§4) and U7; can land before CR-0007/CR-0012.
 - [ ] 2. **Bug records.**
-  - [ ] **BUG-0032** (0 treated as nodata, `train.py:143`), with all §2
+  - [ ] **BUG-0032** (0 treated as nodata, `train.py`
+        `set(NODATA_SENTINELS) | {nodata, 0}`), with all §2
         sections. §4 recurrence review:
         - Prior instances: BUG-0008 (`predict.py`); BUG-0017
           (`dataset.py`, **still OPEN, unconfirmed**); BUG-0036
@@ -367,8 +400,9 @@ not use the AN path.
           own BUG.
         - `BUG_LOG.md` row.
 - [ ] 3. Commit `tests/test_nodata_zero_lint.py` (L1 and its controls)
-      before approval (CLAUDE.md §1, CR-0011 A3). It reports the 4
-      expected matches until deliverables 4 and 6 are done.
+      before approval (CLAUDE.md §1, CR-0011 A3). Written 2026-09-30
+      (uncommitted); passes and reports exactly the 4 pinned statements
+      until deliverables 4 and 6 are done.
 - [ ] 4. **PA-0006 re-sweep, scoped by mechanism.**
   - **Scope:** every tracked, non-evidence file that reads
     `NODATA_SENTINELS` or a raster's declared nodata. That includes
@@ -384,7 +418,7 @@ not use the AN path.
   - **Outcome:** each finding gets its own BUG (next free id,
     cross-referencing this sweep) or a written not-a-defect
     justification, which becomes its allowlist entry.
-    `find_tsd_contrast_points.py:121` is the known sibling. BUG-0017 is
+    The `find_tsd_contrast_points.py` statement is the known sibling. BUG-0017 is
     re-examined in this pass; it is closed or its OPEN status re-owned,
     per PA-0022.
   - **Result:** goes in the Swept? cells of PA-0006 and the new PA.
@@ -397,7 +431,7 @@ not use the AN path.
       and SSL changes, and that earlier AN-path models used out-of-state
       and validation-block negatives.
 - [ ] 7. Real data, with `GROUSE_REQUIRE_REAL_DATA=1`:
-  - [ ] 7a. V3 calibration (100 seeds × 3 regions, plus the four
+  - [ ] 7a. V3 calibration (100 seeds × 3 regions, plus the
         constructed samplers); record the bound or the demotion to OBS.
   - [ ] 7b. V1–V3, plus the constructed-sampler runs for V1. Save the
         output to `docs/quality/evidence/CR-0015-background.txt`.

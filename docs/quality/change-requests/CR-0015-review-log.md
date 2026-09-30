@@ -131,3 +131,47 @@ Impact, deliverable 5, Out of scope).
 v2 written by the author, 2026-09-30. Awaiting round-2 review (bounded
 per CLAUDE.md §1.2: resolution of A1, A2, B1 and B2, plus the text changed
 in v2).
+
+## Round 2 (bounded re-review of v2)
+| reviewer | verdict |
+|---|---|
+| B — implementability | **APPROVE WITH FOLLOW-UPS** — B1–B10 resolved; L1's 4 matches confirmed (60 files); BUG-0042 id free and correctly separate |
+| A — correctness | **REJECT** — 1 new BLOCKING (below); A1–A10 resolved; L1 prototyped independently: same 4 statements, 8/8 positive controls |
+
+Reviewer B round-2 follow-ups:
+- B-R2-1 MAJOR: `tests/test_nodata_zero_lint.py` (L1 + allowlist) is a
+  pre-approval deliverable and does not exist yet — approval waits for it
+  to be committed and briefly reviewed (rule + 4-match run).
+- B-R2-2 LOW: `check_road_dist.py:221` is `:226` in the working tree
+  (CR-0016 edit) — harmless, allowlist keyed by statement text.
+- B-R2-3 LOW: `data.block_assignments` accessor name — use whatever
+  CR-0012 implements (`RegionData` property today, `grouse_data.py:444`).
+- B-R2-4 LOW: B1 compares to "the latest CR-0012 deliverable 6 run".
+
+Reviewer A round-2 findings:
+- A-R2-1 BLOCKING: the conformance step requires V1 to fail a sampler
+  using `VAL_FRACTION` (0.2) instead of `vf` (0.197) — that sampler
+  OVER-excludes, so V1 (counts val-block points) is 0 and can never fail
+  it; V3 cannot see ~0.3 % of area either. Fix: construct the wrong
+  sampler with a fraction below `vf` (e.g. 0.18 → ~85 val-block points of
+  5,000), and/or add a fifth U2 block kind (unassigned, hashed in
+  [vf, VAL_FRACTION), ≥ 1 point).
+- A-R2-2 LOW: L1 must de-duplicate matches per statement (the `BinOp` and
+  its nested `{nodata, 0}` set both match → 5, not 4); line numbers
+  `:226` and `:144` in the working tree.
+- A-R2-3 LOW: the A3/B1 v2 dispositions still name `to_albers`; note they
+  are superseded by the `regions.to_5070` decision.
+
+
+## v2.1 dispositions (2026-09-30)
+| id | severity | disposition + where |
+|---|---|---|
+| A-R2-1 | BLOCKING | Accept, both fixes. **(1)** The V1 conformance sampler now uses md5 fraction 0.18 (< `vf`), so it under-excludes and V1 must fail (Acceptance, PA-0021(a)). **(2)** U2 gains kind **(v)**: an unassigned block hashed in `[vf, VAL_FRACTION)` that must get ≥ 1 point, which catches the `VAL_FRACTION` sampler (it over-excludes, so V1/V3 cannot see it). A "wrong sampler → caught by" table is added to the CR. |
+| B-R2-1 | MAJOR | Accept. `tests/test_nodata_zero_lint.py` is written (unittest; uncommitted, per the no-commit instruction). It implements the exact v2 rule (a/b/b′/c/d) over the 60-file set, with an empty statement-keyed allowlist and `EXPECTED_UNCLASSIFIED` pinning today's 4 statements, so any new match fails. It de-duplicates per statement and includes the 8 positive and 3 negative controls. Run: `python -m unittest tests.test_nodata_zero_lint -v` → 6 tests OK; matches `check_road_dist.py:226`, `find_tsd_contrast_points.py:121`, `generate_time_since_disturbance.py:330`, `train.py:144` (working-tree lines). The CR's pytest wording is replaced by unittest (`skipTest`/`self.fail` under `GROUSE_REQUIRE_REAL_DATA=1`; the summary must show no `skipped=`). |
+| A-R2-2 | LOW | Accept. One match per statement (the nested match is dropped); stated in the CR's L1 section and tested (`test_one_match_per_statement`). Statements are cited by text, not line. |
+| A-R2-3 | LOW | Accept. The A3 and B1 v2 dispositions that name `generate_negatives.to_albers` are **superseded** by the user's `regions.to_5070` decision (v2 amendment note above); the CR text already uses `regions.to_5070`. |
+| B-R2-2 | LOW | Accept. The CR cites the four L1 statements (and BUG-0032's) by statement text, not line. |
+| B-R2-3 | LOW | Accept. The accessor is "whichever CR-0012 implements (today `RegionData.block_assignments`, `grouse_data.py:444`)" (§1, §3). |
+| B-R2-4 | LOW | Accept. B1 compares against the manifest of the latest CR-0012 deliverable 6 run. |
+
+Author: v2.1 signed off, 2026-09-30. Awaiting round 3 (bounded: A-R2-1 and the v2.1 changes, including the L1 test file).

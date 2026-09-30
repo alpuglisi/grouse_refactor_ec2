@@ -92,7 +92,7 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 - [ ] CR-0007 B-9 (`TIGER_YEAR` value is a behaviour change) moved to CR-0014, which sets 2023 (CR-0014 B6)
 - [ ] CR-0014 residual: Canadian land beyond the grid edge is unseen (NH 6,884 px, VT 1,881 px at the top edges). Closes only with Canadian road data (Statistics Canada NRN) (CR-0014 A4)
 - [ ] CR-0009: remove dependence on CR-0007 escape mode; capture additional baselines before CR-0012 lands — text done in CR-0009 v4 (§ Baselines, deliverable 2); the capture itself is pending and is CR-0012 deliverable 0 (0007 A-8/B-2)
-- [ ] `DRAFT_BUG-0034` says "DECIDED … fixed in CR-0007": correct to "open; fix owned by a future CR" on promotion (CR-0007 v8 deliverable 7) (0007 FC-C5)
+- [ ] `DRAFT_BUG-0034` says "DECIDED … fixed in CR-0007": correct to "open; fix owned by a future CR" on promotion (CR-0007 v9 deliverable 6) (0007 FC-C5)
 - [ ] BUG-0034 fix CR (not yet written): per-class drop-rate assert at dataset build (BUG-0034 §8) and mechanism-scoped sweep (e.g. `predict.py:164`); re-calibrate CR-0013 OBS references on the new footing (0007 FA-Q4, FA-Q5)
 - [ ] `old_road_dist/`, `new_road_dist/` are untracked and unprotected; decide ownership (CR-0014 or CR-0009) — not CR-0007 (`INVESTIGATION_REPORT_errol_map.md` is in git) (0007 H-X7)
 
@@ -113,3 +113,13 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 - [x] `legacy/download.py` and `download_more.py` deprecation guards → **CR-0007 v9** (same mechanism as BUG-0031)
 - [x] `acceptance_split.py` authorship: **a fresh agent given only CR-0013 + the pinned commit**, never CR-0012's implementation; CR-0012 implemented by a different fresh agent; both transcript ids recorded in the review logs
 - [ ] BUG-0034 scope must include `filter_by_year_gap` running after the split (drops 23.1 % of positives, effective neg:pos ≈ 1.3) and the thin-order interaction (CR-0012 A9)
+- [x] CR-0015 written (v1, 2026-09-30): assumed-negative background — in-state, training blocks only, 0 not nodata (BUG-0032), interim `--an-background` guard. Awaiting review
+
+## CR-0007 v9 (round-8 follow-ups, 2026-09-30)
+- [ ] Commit CR-0007 deliverable 0 (pre-approval): `check_partition.py`, `tests/test_check_partition.py`, `tests/test_shared_constants.py`, `docs/quality/evidence/CR-0007-check-today.txt`, `DRAFT_BUG-0034-…md`, `res_qms_PA-0019-0020-0021-draft-rows.md` — owner: coordinator (0007 R8 B3)
+- [ ] Analysis-CRS constant (`"EPSG:5070"`: 16 code literals in 7 files; also the `x_5070`/`y_5070` schema and CR-0012's `BLOCK_ORIGIN_5070`): deferred PA-0001-extension sweep item (d), its own BUG at CR-0007 deliverable 6 — owner: CR-0007's author, opens a CR after CR-0012 lands (0007 R8 B7)
+- [ ] CR-0014 `:12`, `:146` say "CR-0007's I17"; it is CR-0013 O8 since the split — owner: CR-0014's author (0007 R8 B10)
+- [ ] CR-0009 `:64` says "when CR-0007/CR-0012 land"; the baselines are affected only by CR-0012 — owner: CR-0009's author (0007 R8 B10)
+- [ ] CR-0012: when `VAL_FRACTION`/`SPLIT_SEED` join `regions.py`, add them (and `_DEFAULT` aliases) to `check_partition.P6_NAMES` and pin them in `tests/test_shared_constants.py` — owner: CR-0012's author (0007 v9 C1)
+- [ ] CR-0013 v2 `:296` cites "CR-0007 (P1–P7)"; v9 has P1–P8 — owner: CR-0013's author (0007 v9 C2)
+- [ ] NH `ch`/`cc` rasters (mtime 2026-09-20 11:32) postdate `evaluated_sightings_NH.csv` (2026-09-18): 1,040 `ch` / 1,265 `cc` values differ. Find what rewrote them (untested, PA-0016; provenance, PA-0019 draft). CR-0007's re-run supersedes the values (O4) — owner: CR-0007's author (0007 v9 C3)

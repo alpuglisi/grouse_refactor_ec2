@@ -678,6 +678,7 @@ which the user must confirm:
 | version | date | change |
 |---|---|---|
 | v8 | 2026-09-30 | Split three ways. CR-0007 keeps membership and constants, with exact checks P1–P7 only. The split and draw go to CR-0012; the acceptance gates to CR-0013 (exact predicates and replay; statistics as OBS). No escape mode. `TIGER_YEAR` value owned by CR-0014. |
+| v9 | 2026-09-30 | Round-8 findings dispositioned (below). P6 scan set, rules and exemptions enumerated; P5 envelope predicates; P8 KDE-source check; guards are first statements and P7 checks them instead of importing; full re-point table; `STATE_NAMES`, `COUNTY_POLYGONS_YEAR`, two `PATH_TEMPLATES` entries; `legacy/download*.py` guards moved in (user); gate code written (`check_partition.py`, two test files, evidence). The v8 "Split (user decision)" paragraph was history and is now only here and in § v8 dispositions. |
 
 ## Round 8 (v8, fresh first review, 2026-09-30) — dispositions pending
 | reviewer | verdict | blocking |
@@ -716,3 +717,39 @@ Other findings (to disposition in v9):
 - B10 LOW: `PATH_TEMPLATES` for `availability_sample`; `:778-780` not
   `:787`; `verify_partition` after the longitude flip; cache county
   file; A4 duplicates; sibling references to "CR-0007's I17".
+
+## v9 dispositions (author, 2026-09-30)
+
+Every round-8 finding (reports: this session,
+`agent-adcfa17f160fdbf6b.jsonl` = A, `agent-ac2b76b407fb0fdf8.jsonl` = B),
+plus the items the coordinator relayed. "§" means CR-0007 v9. "Tracked"
+means an item in `docs/quality/CR-0007-0008-OPEN-ISSUES.md`.
+
+| id | sev | disposition |
+|---|---|---|
+| A1 / B1 | BLOCKING | **Accept.** §Acceptance "P6 scan": scanned set = `git ls-files '*.py'` minus basenames `inv_*`/`res_*` (so the tracked `inv_review*` scripts are out) minus `tests/`; exemptions named (`regions.py`; `clean.py`, `legacy/gen_negs.py` as CR-0012 §6 guards them; the three §3 copies; the two road files until deliverable 7). `repair_coverage_rasters.py:53` is re-pointed (§1 table); the v8 claim that `REGIONS` was "implicit" is corrected. Count corrected and measured by the committed scanner: 24 violation lines in 21 files outside the exemptions, 8 in exempt files. The reviewers' 13 counted named assignments to the §1 names only; applying v8's own "`_DEFAULT` aliases" clause adds seven `REGIONS_DEFAULT` literals, and the value rules (ii)–(iii) add inline region lists and code/name maps. All are re-pointed (§1 table). Mechanised in `check_partition.scan_repository` / `tests/test_shared_constants.py`. |
+| A2 | MAJOR | **Accept.** §2 availability file = all `BACKGROUND_N` in-state points before raster sampling, with `used` and `envelope_id`; P5(a)–(d) are the reviewer's predicates plus uniqueness. Both constructions fail in `tests/test_check_partition.py` (`test_avail_from_box_draw_while_file_holds_in_state_draw`, `test_sightings_from_box_habitat`), as do a post-filter file and a box-drawn file. `background_nonveg_rate` left unchecked (print-only), as the reviewer allowed. Stated limit: `used`/`envelope_id` per point is not recomputed. |
+| A3 | MEDIUM | **Accept.** P8 recomputes every own-state `spatial_density`/`spatial_zone` from the box source S_R; `test_kde_restricted_to_own_state` fails P8 only. On today's box-sourced files P8 reproduces all 18,407 rows, validating the re-implementation. Map choice stated in §2: surface on the box KDE source, markers restricted; not checked. The "Hotspot 10%" consequence is stated as intended. |
+| A4 | MEDIUM | **Accept, reviewer's second option.** Guards are the first statement (matching CR-0012 v2 §6). P7 does not import guarded copies; it checks by AST that the guard is first and that running the file exits non-zero naming BUG-0031 (it never runs an unguarded copy). P7 list enumerated; `inv_*` excluded. |
+| A5 | LOW | **Accept.** §2: `load_all_sightings` raises if a key is filed under two states; P3 reports that count and names the case. 0 today. |
+| A6 | LOW | **Accept.** §Acceptance "Definitions" states the sampling semantics (`sample_raster` `:276-295`: inclusive bounds, file nodata, `NODATA_SENTINELS` read from `grouse_data.py`), `available_years` and `pick_raster_year`; P3 adds an exact feature-agreement sub-check. Today: ME and VT 0 mismatches; NH 2,305, all `ch`/`cc`, because the NH `ch`/`cc` rasters postdate the file (O4). |
+| A7 | LOW | **Accept.** §1 re-point table, `generate_negatives.py:60,70,71,241`. |
+| B2 | MAJOR | **Accept; the v8 row E-1 was false when written.** Verified 2026-09-30: CR-0013 v2 deliverable 0 (line 352) now reads "Include the §2.4 statement (E-1)". Corrected disposition of E-1: Resolved — moved to CR-0013 v2 deliverable 0. |
+| B3 | MAJOR | **Accept.** `check_partition.py`, `tests/test_check_partition.py`, `tests/test_shared_constants.py` and `docs/quality/evidence/CR-0007-check-today.txt` now exist (uncommitted per instruction; the coordinator commits them). Deliverable 0 is the pre-approval item, listed first. |
+| B4 | MEDIUM | **Accept.** Constant sources named in §Acceptance: `ast.literal_eval` of the single definitions, no copies. The polygon check is independent (own dissolve, `shapely.contains_xy`). `test_shared_constants.py` reads `regions.py` by AST, so today it fails with a problem list, not an ImportError. The analysis CRS is read from the `x_<epsg>` column; the checker's only CRS literal is the GBIF lon/lat encoding (4326), listed under sweep item (d). |
+| B5 | MEDIUM | **Accept.** As A2. |
+| B6 | MEDIUM | **Accept.** §1 re-point table and P7 list. |
+| B7 | MEDIUM | **Accept.** (a) BUG-0031's new PA (extends PA-0002 and PA-0012) is written out in deliverable 6. (b) The PA-0001 extension's sweep has four items, each its own BUG. The CRS item is deferred with an owner and a reason (tracked). It has 16 code literals in 7 files; the reviewer's 10 files included 3 that contain the string only in comments (`dataset.py`, `grouse_data.py`, `realign_rasters.py`). The county path is remediated via `PATH_TEMPLATES["tiger_county"]` (+ deliverable 7); `check_road_dist.py:127` is justified as CR-0014's pin-driven verifier. (c) The drafts are committed at deliverable 0. (d) PA-0020's Rule has no `coord_uncertainty_m` example; its Swept? cell keeps the measured-inert finding. |
+| B8 | MEDIUM | **Accept.** "One change (§1.1 A5)" paragraph. BUG-0034 stays only as PA-0020's filing prerequisite, stated. |
+| B9 | MEDIUM | **N/A — decided by the user (2026-09-30):** round 8 was the fresh first review. The quorum for v9 is round-8 A and B plus the author; round 9 is a bounded re-review (§1.2). |
+| B10 | LOW | **Accept**, item by item: <br>• Impact names `grouse_data`'s `.evaluated` accessor (`generate_negatives.py:148`). <br>• `PATH_TEMPLATES` gets `availability_sample` and `tiger_county`. <br>• KDE cited as `:778-795`. <br>• `verify_partition` runs after the flip (`:187-193`). <br>• County polygons are cached. <br>• 4,455 and 43,024 appear once each (P1 and P4). <br>• The split paragraph is in this log only. <br>• F2-C15 correction: `scripts_backup/check_raster.py:70` is not in CR-0012's text; the claim itself stands. <br>• Sibling references are **Tracked** (the other CRs cannot be edited here): CR-0014 `:12`, `:146` "CR-0007's I17" should read CR-0013 O8; CR-0009 `:64` "CR-0007/CR-0012 land" should read CR-0012. |
+| U1 | user decision | **Accept.** Guards on `legacy/download.py` and `legacy/download_more.py` moved from CR-0012 into v9: §3, deliverable 4, P6 exemptions, P7 guard checks. |
+| C1 | coordinator | **Verified, no conflict.** CR-0012 v2 §1 (`:52-54`) deletes `REGIONS_DEFAULT`, `MIN_SPACING_M_DEFAULT`, `BLOCK_SIZE_M_DEFAULT`, `VAL_FRACTION_DEFAULT` and `RANDOM_SEED_DEFAULT` from `prepare_training_data.py`. CR-0007 binds the first three to `regions` in the meantime (§1 table), and the scan accepts either state. `VAL_FRACTION`/`SPLIT_SEED` are CR-0012's constants and are not in CR-0007's P6 names. **Tracked:** CR-0012 adds them, with pins, to `P6_NAMES` and `EXPECTED_REGIONS` when it adds them to `regions.py`. |
+| C2 | author | **Tracked.** CR-0013 v2 `:296` cites "CR-0007 (P1–P7)"; v9 adds P8. |
+| C3 | author, new | **Tracked** as an observation (O4): NH `ch`/`cc` rasters rewritten 2026-09-20, after `evaluated_sightings_NH.csv`. Cause untested (PA-0016). The CR-0007 re-run supersedes the stale values. |
+
+**Tests (2026-09-30):** `python -m unittest tests.test_check_partition
+tests.test_shared_constants`: 26 tests, OK (1 expected failure: the
+repository-tree P6 test, by design until deliverable 2).
+
+**Author sign-off on v9:** pending round-9 review.

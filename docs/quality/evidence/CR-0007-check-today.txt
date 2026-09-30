@@ -1,0 +1,192 @@
+CR-0007 v9 — check_partition.py on today's tree and data (read-only)
+=====================================================================
+Date: 2026-09-30. Repository HEAD: ba240fb (branch claude/quality-records-cr0006-0009).
+regions.py, analyze_grouse.py and grouse_data.py are unmodified at HEAD.
+check_partition.py and the two test files are uncommitted (CR-0007 deliverable 0).
+Inputs (sha256, first 16 hex):
+  f0e47b74f08d150f  data/pipeline/evaluated_sightings_ME.csv
+  d347e60c893af894  data/pipeline/evaluated_sightings_NH.csv
+  18ef4005af069311  data/pipeline/evaluated_sightings_VT.csv
+  14c1806ed6bb9d8e  data/pipeline/envelope_metrics_ME.csv
+  5ae49fda5bc99bd6  data/pipeline/envelope_metrics_NH.csv
+  0b3a277bdfefea7a  data/pipeline/envelope_metrics_VT.csv
+  52b6bcda015adf5e  data/pipeline/nonveg_flagged_ME.csv
+  e73bfca8be4475d3  data/pipeline/nonveg_flagged_NH.csv
+  ffcabe573da77008  data/pipeline/nonveg_flagged_VT.csv
+  692e12c30c83adca  data/roads/tl_2023_us_county.zip
+
+Purpose: the round-8 reviewers asked that the gate code exist and be shown
+to fail on today's files before approval (B3; PA-0021(a)).
+
+------------------------------------------------------------------------
+1. Acceptance run, exactly as deliverable 5 will run it
+   $ python check_partition.py
+   regions.py does not yet define REGIONS, so P1-P5 and P8 cannot be
+   evaluated and fail; P6 lists every problem; P7 finds no guards.
+------------------------------------------------------------------------
+P1: FAIL
+    cannot evaluate: regions.py defines no literal REGIONS
+P2: FAIL
+    cannot evaluate: regions.py defines no literal REGIONS
+P3: FAIL
+    cannot evaluate: regions.py defines no literal REGIONS
+P4: FAIL
+    cannot evaluate: regions.py defines no literal REGIONS
+P5: FAIL
+    cannot evaluate: regions.py defines no literal REGIONS
+P6: FAIL
+    34 problem(s)
+    regions.REGIONS not defined as a literal
+    regions.STATE_FIPS not defined as a literal
+    regions.STATE_NAMES not defined as a literal
+    regions.TIGER_YEAR not defined as a literal
+    regions.COUNTY_POLYGONS_YEAR not defined as a literal
+    regions.MIN_SPACING_M not defined as a literal
+    regions.BLOCK_SIZE_M not defined as a literal
+    regions.BUFFER_M not defined as a literal
+    grouse_data.PATH_TEMPLATES['tiger_county'] = None, pinned 'data/roads/tl_{year}_us_county.zip'
+    grouse_data.PATH_TEMPLATES['availability_sample'] = None, pinned 'data/pipeline/availability_sample_{region}.csv'
+    bench_pipeline.py:66: region-code sequence literal
+    calibrate.py:310: region-code sequence literal
+    check_exotic.py:31: literal assigned to REGIONS_DEFAULT; region-code sequence literal
+    check_raster.py:71: region-code sequence literal
+    diagnose_road_bias.py:71: literal assigned to STATE_FIPS; region-keyed or region-valued dict literal
+    diagnose_road_bias.py:72: literal assigned to TIGER_YEAR
+    diagnose_training.py:35: region-code sequence literal
+    diagnose_water_bias.py:58: literal assigned to REGIONS_DEFAULT; region-code sequence literal
+    diagnose_wetland.py:138: region-code sequence literal
+    download_tcc_nlcd.py:460: region-code sequence literal
+    dupe_check.py:27: literal assigned to REGIONS_DEFAULT; region-code sequence literal
+    ebird.py:16: region-keyed or region-valued dict literal
+    generate_negatives.py:70: literal assigned to BUFFER_M
+    generate_negatives.py:71: literal assigned to MIN_SPACING_M
+    get_negatives.py:45: region-keyed or region-valued dict literal
+    prepare_training_data.py:42: literal assigned to REGIONS_DEFAULT; region-code sequence literal
+    prepare_training_data.py:49: literal assigned to MIN_SPACING_M_DEFAULT
+    prepare_training_data.py:52: literal assigned to BLOCK_SIZE_M_DEFAULT
+    pretrain.py:118: region-code sequence literal
+    repair_coverage_rasters.py:53: literal assigned to REGIONS; region-code sequence literal
+    sightings.py:123: region-keyed or region-valued dict literal
+    train.py:394: region-code sequence literal
+    tune.py:40: literal assigned to REGIONS_DEFAULT; region-code sequence literal
+    tune_bins.py:40: literal assigned to REGIONS_DEFAULT; region-code sequence literal
+P7: FAIL
+    28 of 28 modules import; 3 guarded copies checked
+    legacy/audit.py: guard first statement False; run exits non-zero naming BUG-0031 False
+    legacy/download.py: guard first statement False; run exits non-zero naming BUG-0031 False
+    legacy/download_more.py: guard first statement False; run exits non-zero naming BUG-0031 False
+P8: FAIL
+    cannot evaluate: regions.py defines no literal REGIONS
+exit status: 1
+
+------------------------------------------------------------------------
+2. Demonstration run: the data checks, with the section-1 values that
+   deliverable 2 will add supplied by --assume (never an acceptance run)
+   $ python check_partition.py --only P1 P2 P3 P4 P5 P8 \
+       --assume 'regions.REGIONS=["ME","NH","VT"]' \
+       --assume 'regions.STATE_FIPS={"ME":"23","NH":"33","VT":"50"}' \
+       --assume regions.COUNTY_POLYGONS_YEAR=2023 \
+       --assume 'path.tiger_county=data/roads/tl_{year}_us_county.zip' \
+       --assume 'path.availability_sample=data/pipeline/availability_sample_{region}.csv'
+------------------------------------------------------------------------
+P1: FAIL
+    evaluated_ME: no 'region' column (8,207 rows)
+    evaluated_ME: 283 of 8,207 rows with state or region != ME
+    nonveg_flagged_ME: no 'region' column (4,332 rows)
+    nonveg_flagged_ME: 148 of 4,332 rows with state or region != ME
+    evaluated_NH: no 'region' column (4,999 rows)
+    evaluated_NH: 2,696 of 4,999 rows with state or region != NH
+    nonveg_flagged_NH: no 'region' column (2,729 rows)
+    nonveg_flagged_NH: 1,545 of 2,729 rows with state or region != NH
+    evaluated_VT: no 'region' column (5,201 rows)
+    evaluated_VT: 1,476 of 5,201 rows with state or region != VT
+    nonveg_flagged_VT: no 'region' column (2,924 rows)
+    nonveg_flagged_VT: 751 of 2,924 rows with state or region != VT
+P2: FAIL
+    ME & NH: 1,184 shared keys
+    ME & VT: 0 shared keys
+    NH & VT: 3,271 shared keys
+P3: FAIL
+    keys filed under two states: 0 (a representative could then be the foreign record; CR-0007 A5)
+    ME: |K_R|=7,924 |E_R|=7,924 evaluated=8,207 extra=283 missing=0 own-state keys outside BOXES[ME]=0 duplicate keys=0 feature mismatches=0 (K_R keys with nodata, correctly absent: 0)
+    NH: |K_R|=2,303 |E_R|=2,303 evaluated=4,999 extra=2,696 missing=0 own-state keys outside BOXES[NH]=0 duplicate keys=0 feature mismatches=2,305 (K_R keys with nodata, correctly absent: 0)
+    VT: |K_R|=3,725 |E_R|=3,725 evaluated=5,201 extra=1,476 missing=0 own-state keys outside BOXES[VT]=0 duplicate keys=0 feature mismatches=0 (K_R keys with nodata, correctly absent: 0)
+P4: PASS
+    0 of 43,024 raw records violate the partition (state not in REGIONS 0, inside no state polygon 0, inside another state's polygon 0)
+P5: FAIL
+    ME P5c: 0 envelopes whose Sightings != evaluated habitat value_counts (56 envelope rows)
+    ME P5a/P5b: /home/ec2-user/grouse2/data/pipeline/availability_sample_ME.csv does not exist
+    NH P5c: 0 envelopes whose Sightings != evaluated habitat value_counts (59 envelope rows)
+    NH P5a/P5b: /home/ec2-user/grouse2/data/pipeline/availability_sample_NH.csv does not exist
+    VT P5c: 0 envelopes whose Sightings != evaluated habitat value_counts (57 envelope rows)
+    VT P5a/P5b: /home/ec2-user/grouse2/data/pipeline/availability_sample_VT.csv does not exist
+P8: PASS
+    ME: KDE source 8,207 rows (own-state 7,924); evaluated rows not in source 0; evt_phys mismatches 0; density mismatches 0; zone mismatches 0
+    NH: KDE source 4,999 rows (own-state 2,303); evaluated rows not in source 0; evt_phys mismatches 0; density mismatches 0; zone mismatches 0
+    VT: KDE source 5,201 rows (own-state 3,725); evaluated rows not in source 0; evt_phys mismatches 0; density mismatches 0; zone mismatches 0
+NOT AN ACCEPTANCE RUN (--only or --assume used)
+exit status: 1
+
+Reading of run 2:
+- P1, P2, P3 fail as designed (box membership). P3's own-state keys equal
+  E_R exactly in all three regions (0 missing), so O1 is predicted 0.
+- P3's NH "feature mismatches=2,305" are 1,040 `ch` and 1,265 `cc` values
+  (706 NH-state, 481 VT-state, 176 ME-state rows). The NH ch/cc rasters
+  (data/landfire/NH_{2022..2025}_{ch,cc}.tif) have mtime 2026-09-20 11:32;
+  evaluated_sightings_NH.csv has mtime 2026-09-18 06:33. ME and VT show 0
+  mismatches. CR-0007's run regenerates the file (O4). What rewrote the NH
+  ch/cc rasters is not investigated (PA-0016: untested).
+- P4 passes: 0 of 43,024 raw records violate the partition, computed by the
+  checker's own dissolve + shapely.contains_xy (not regions.verify_partition).
+- P5(c) passes on today's files (Sightings equals the evaluated habitat
+  value_counts); P5(a)/(b) fail because availability_sample_R does not
+  exist yet.
+- P8 passes: the checker's independent re-implementation (collapse, raster
+  sampling at the vintage rule, EVT crosswalk, stratified numpy Gaussian
+  KDE) reproduces every spatial_density (rtol 1e-6) and spatial_zone in
+  today's box-sourced files, for 18,407 rows. This validates the KDE and
+  sampling re-implementation against the real pipeline.
+
+------------------------------------------------------------------------
+3. Risk-table figure (CR-0007 Risk, row 1), verified 2026-09-30
+------------------------------------------------------------------------
+gbif_negatives_R candidates within 300 m of a foreign-state row of today's
+evaluated_R but not within 300 m of an own-state row (EPSG:5070, cKDTree):
+  ME 1 row / 1 key; NH 6 rows / 2 keys; VT 0.  Total 3 keys.
+
+------------------------------------------------------------------------
+4. Unit tests
+   $ python -m unittest tests.test_check_partition tests.test_shared_constants -v
+------------------------------------------------------------------------
+test_correct_partition_passes (tests.test_check_partition.CorrectPartition.test_correct_partition_passes) ... ok
+test_fixture_exercises_the_edge_cases (tests.test_check_partition.CorrectPartition.test_fixture_exercises_the_edge_cases) ... ok
+test_guard_first_statement (tests.test_check_partition.GuardDetection.test_guard_first_statement) ... ok
+test_guard_not_first (tests.test_check_partition.GuardDetection.test_guard_not_first) ... ok
+test_avail_from_box_draw_while_file_holds_in_state_draw (tests.test_check_partition.WrongConstructions.test_avail_from_box_draw_while_file_holds_in_state_draw) ... ok
+test_availability_drawn_over_box (tests.test_check_partition.WrongConstructions.test_availability_drawn_over_box) ... ok
+test_availability_file_post_filter (tests.test_check_partition.WrongConstructions.test_availability_file_post_filter) ... ok
+test_box_membership (tests.test_check_partition.WrongConstructions.test_box_membership) ... ok
+test_box_membership_state_overwritten (tests.test_check_partition.WrongConstructions.test_box_membership_state_overwritten) ... ok
+test_dropped_record (tests.test_check_partition.WrongConstructions.test_dropped_record) ... ok
+test_kde_restricted_to_own_state (tests.test_check_partition.WrongConstructions.test_kde_restricted_to_own_state) ... ok
+test_no_op (tests.test_check_partition.WrongConstructions.test_no_op) ... ok
+test_record_filed_under_wrong_state (tests.test_check_partition.WrongConstructions.test_record_filed_under_wrong_state) ... ok
+test_sightings_from_box_habitat (tests.test_check_partition.WrongConstructions.test_sightings_from_box_habitat) ... ok
+test_repository_tree (tests.test_shared_constants.RepositoryTree.test_repository_tree) ... expected failure
+test_attribute_and_annotated_targets_flagged (tests.test_shared_constants.ScannerRules.test_attribute_and_annotated_targets_flagged) ... ok
+test_default_alias_flagged (tests.test_shared_constants.ScannerRules.test_default_alias_flagged) ... ok
+test_exemptions_are_the_named_set (tests.test_shared_constants.ScannerRules.test_exemptions_are_the_named_set) ... ok
+test_import_bindings_accepted (tests.test_shared_constants.ScannerRules.test_import_bindings_accepted) ... ok
+test_literal_assignment_flagged (tests.test_shared_constants.ScannerRules.test_literal_assignment_flagged) ... ok
+test_region_dicts_flagged (tests.test_shared_constants.ScannerRules.test_region_dicts_flagged) ... ok
+test_region_sequences_flagged (tests.test_shared_constants.ScannerRules.test_region_sequences_flagged) ... ok
+test_correct_tree_has_no_problems (tests.test_shared_constants.SyntheticTree.test_correct_tree_has_no_problems) ... ok
+test_each_defect_reported (tests.test_shared_constants.SyntheticTree.test_each_defect_reported) ... ok
+test_missing_constant_and_template_reported (tests.test_shared_constants.SyntheticTree.test_missing_constant_and_template_reported) ... ok
+test_untracked_file_not_scanned (tests.test_shared_constants.SyntheticTree.test_untracked_file_not_scanned) ... ok
+
+----------------------------------------------------------------------
+Ran 26 tests in 2.482s
+
+OK (expected failures=1)
+exit 0

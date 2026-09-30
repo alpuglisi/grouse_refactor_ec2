@@ -50,7 +50,6 @@ Usage (no flags; always every region in regions.REGIONS):
     python generate_negatives.py
 """
 import argparse
-import hashlib
 import json
 import math
 import os
@@ -70,7 +69,7 @@ from prepare_training_data import (
     canonical, csv_bytes, sha256_bytes, sha256_file, rel_path,
     atomic_write, json_bytes, section_common, raster_inputs)
 from regions import (REGIONS, BUFFER_M, COUNTY_POLYGONS_YEAR, MIN_SPACING_M,
-                     SPLIT_SEED, block_ids, verify_partition)
+                     block_ids, block_split, verify_partition)
 from analyze_grouse import (ENVELOPE_SCHEME, build_envelope_id,
                             fit_scheme_binners, load_evt_crosswalk,
                             sample_raster, NON_VEG_SCLASS_CODES,
@@ -131,14 +130,6 @@ def compute_block_ids(df):
     a negative and a positive at the same spot share a block id."""
     x, y = to_5070(df["longitude"].to_numpy(), df["latitude"].to_numpy())
     return pd.Series(block_ids(x, y), index=df.index, dtype=object)
-
-
-def split_for_unassigned(block_id, val_fraction, seed=SPLIT_SEED):
-    """Deterministic train/val assignment for blocks that hold no
-    positives: hash the block id (stable across runs/machines) and put
-    ~val_fraction of them in validation."""
-    h = int(hashlib.md5(f"{seed}:{block_id}".encode()).hexdigest(), 16)
-    return 'val' if (h % 10_000) < val_fraction * 10_000 else 'train'
 
 
 def build_weight(env_id, metrics_map, nonveg_mask_value):
@@ -256,11 +247,8 @@ def assign_split(cand, blocks):
     positive-occupied blocks in validation."""
     cand = cand.copy()
     cand["block_id"] = compute_block_ids(cand)
-    block_split = dict(zip(blocks["block_id"], blocks["split"]))
-    vf = float((blocks["split"] == "val").mean())
-    cand["split"] = [block_split[b] if b in block_split
-                     else split_for_unassigned(b, vf, SPLIT_SEED)
-                     for b in cand["block_id"]]
+    # The one block-split rule (CR-0015 section 1; PA-0001).
+    cand["split"] = block_split(cand["block_id"], blocks).tolist()
     return cand
 
 

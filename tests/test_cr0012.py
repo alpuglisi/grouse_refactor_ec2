@@ -274,11 +274,19 @@ class Buffer(unittest.TestCase):
 
 class SplitForUnassigned(unittest.TestCase):
     def test_md5_rule(self):
-        for b in ["0_0", "-12_345", "600_1500", "7_-3"]:
-            for vf in (0.0, 0.197, 0.5, 1.0):
+        # The rule lives in regions.block_split since CR-0015 section 1;
+        # vf is the val share of the assignment rows.
+        for n_val, n_all in ((0, 4), (197, 1000), (2, 4), (4, 4)):
+            vf = n_val / n_all
+            assign = pd.DataFrame({
+                "block_id": [f"z{i}" for i in range(n_all)],
+                "split": ["val"] * n_val + ["train"] * (n_all - n_val)})
+            ids = ["0_0", "-12_345", "600_1500", "7_-3"]
+            want = []
+            for b in ids:
                 h = int(hashlib.md5(f"42:{b}".encode()).hexdigest(), 16)
-                want = "val" if h % 10000 < vf * 10000 else "train"
-                self.assertEqual(gn.split_for_unassigned(b, vf), want)
+                want.append("val" if h % 10000 < vf * 10000 else "train")
+            self.assertEqual(list(regions.block_split(ids, assign)), want)
 
     def test_assign_split(self):
         blocks = pd.DataFrame({"block_id": ["a", "b", "c", "d", "e"],

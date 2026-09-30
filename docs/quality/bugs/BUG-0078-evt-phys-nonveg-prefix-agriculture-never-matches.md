@@ -100,6 +100,8 @@ and `sclass != 180`, split by `nonveg_landcover`, and the same over
 `candidate_pool.csv`; record the counts in the CR. Status: **OPEN**.
 Owner: lead.
 
+**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0021-evt-phys-nonveg-prefixes-agricultural.md` (DRAFT v1, awaiting independent review under CLAUDE.md §1.2; nothing implemented).
+
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md` for "EVT_PHYS",
 "nonveg", "Agricultur", "vocabulary", "fixture", "label".

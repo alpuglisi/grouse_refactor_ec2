@@ -88,6 +88,8 @@ the list from a single `TRAINING_INPUTS` constant shared with
 `train.build_datasets`. Until then the BUG-0074 rule stands: no run with
 `--an-background > 0`. Status: **OPEN (latent)**. Owner: lead.
 
+**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0024-standing-checks-bind-block-assignments.md` (DRAFT v1, awaiting independent review under CLAUDE.md §1.2; nothing implemented).
+
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md` for "standing",
 "block_assignments", "an-background", "gate".

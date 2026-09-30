@@ -91,6 +91,8 @@ comparing the positive and negative per-year histograms. Any change
 requires a re-fetch and a rebuild of negatives (user decision recorded in
 BUG-0073). Status: **OPEN**. Owner: lead.
 
+**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0022-negatives-rollover-round-robin.md` (DRAFT v1, awaiting independent review under CLAUDE.md §1.2; nothing implemented).
+
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md` for "year",
 "rollover", "quota", "acquisition", "distribution".

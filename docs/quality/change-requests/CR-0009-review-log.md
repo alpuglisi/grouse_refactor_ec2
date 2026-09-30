@@ -63,3 +63,64 @@ machine has an NVIDIA L40S (46 GB), so the retrain runs here rather than
 manually. v4 committed at `6bb2e2d` for its first review; symptom_check.py
 (deliverable 1) being written in parallel.
 
+## Round 4 (v4, first review) — reviewer A (correctness): REJECT
+- **B1 BLOCKING:** the pinned command uses train.py defaults (focal loss,
+  30 epochs, dropout 0.2, wd 1e-4, no dynamic dropout, year gap 2), but
+  the baselines were trained with (`~/.bash_history`) gap3: `--epochs 12
+  --loss an_full --embed-dropout 0.1 --dropout 0.4 --dynamic-dropout
+  --dynamic-dropout-step 0.05 --dynamic-dropout-max 0.9 --weight-decay 1e-3
+  --max-year-gap 3`, seed 0; bce: same with `--epochs 50`, year gap 2. ~8
+  hyperparameters differ → recipe confounded with data. Checkpoint config
+  holds architecture + loss only (the "recorded in the checkpoint" claim is
+  false); gap3/bce differ by epochs and year gap (explicable). Fix: pin the
+  bce recipe + seed + save-path; record full argv in evidence.
+- M1 MAJOR: baselines "before CR-0012" not concrete and partly late (CR-0007
+  changed item 3's point set); name artefacts, snapshot (CR-0007 backup
+  and/or current), location; CR-0012 D0 circular.
+- M2 MAJOR: item 3's 0.6918 is NH-side (41 pos / 11 neg); all-points AUC
+  0.7570 → 0.7273; mostly training points — report by split and side.
+- M3 MAJOR: symptom_check.py unspecified (side assignment via TIGER 2023
+  counties, nodata, calibrated vs raw, frozen pairs); require it to
+  reproduce 0.5400 / 0.5089 / 5.36 pp / +203 m on current rasters (feasible:
+  NH-box pixels unchanged vs backups).
+- M4 MAJOR: map provenance — predict.py always overwrites
+  `data/predictions/NH_custom_suitability.tif`; score in-process or copy+hash;
+  record checkpoint sha256 and calibration model_path.
+- M5 MAJOR: PA-0021(f) fields missing on OBS rows.
+- M6 MAJOR: BUG-0034 (open acquisition-year asymmetry) makes "one retrain →
+  comparable numbers" false; stated limit.
+- D1–D4 MEDIUM: disk estimate (~2 GB per run; drop the backup-deletion
+  step); stated limit 3 wrong (2a is a raster property; road-blind model
+  passes 2b); 2a references are NH grid; pin `calibrate.py --model`, note
+  its fixed train_year_gap=2.
+- L1–L5 LOW: header; item 4 command; counts 6,232; back up data/predictions;
+  --missing-mask already default.
+
+## Round 4 (v4, first review) — reviewer B (implementability): REJECT
+- **B1 BLOCKING** (same as A's B1): `--loss` defaults to focal; both
+  baselines are `an_full`, `an_pos_weight=1.0`; checkpoint config holds
+  architecture + loss only. Pin the loss; record `vars(args)` + git SHA.
+- M1: item 3's reference is NH-side (n=52); pooling regions today
+  double-counts overlap records (97/16 vs 55/11); deliverable 2 must
+  enumerate measurements, location + SHA256SUMS + re-verify (CR-0012 D0),
+  which point set post-retrain uses, whether gap3/bce scores are captured,
+  and that capture may run before approval; items 1, 2, 4 depend only on
+  rasters + checkpoints (CR-0012 doesn't change them).
+- M2: symptom_check.py spec — NH grid for item 2; matching criteria
+  (identical evt/evh/evc/sclass/nlcd; |dch|≤2, |dcc|≤5, |dtcc|≤5; NPAIRS 8;
+  SEED 0); calibration from the new calibration.json; old_road_dist path;
+  predict output path; item 4 "per region"; unit-test assertions; 2a is
+  raster-only; drop "false-fail rate" for OBS.
+- M3: BUG-0029 closure must be conditional on CR-0015 (its d9 rule).
+- M4: stale markers: remove only when every file in the directory is
+  regenerated or deleted; list them (VT_custom_suitability, data/maps).
+- M5: cite CR-0013's acceptance_record.json and its config sha256.
+- M6: v3 dispositions #1, #2, #7 not landed / stale; no operative
+  locations (PA-0024(a)).
+- MEDIUM: disk (~1.5 GB per run; drop the backup-deletion step; 21 GB
+  free); stale header/log; pin `calibrate.py --model`; bookkeeping
+  (BUG-0039 closure, PA-0021 Swept?, PA-0016 cell content).
+- LOW: `:437`; counts 6,232; 62.9 pp; bce ≥0.8 cells (45.68/0.11,
+  0.18/0.10 %); item 5 must be GATE or OBS; A5 justification; source for
+  "40.1 pp"; backups of pipeline/negatives irrelevant.
+

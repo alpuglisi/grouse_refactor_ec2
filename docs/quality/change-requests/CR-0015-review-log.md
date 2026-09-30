@@ -200,5 +200,6 @@ at `05d4ce5`; deliverable 3 marked committed.
 Reviewer A: APPROVE WITH FOLLOW-UPS at `05d4ce5`. Reviewer B: APPROVE WITH
 FOLLOW-UPS at `05d4ce5`. Both LOW follow-ups applied: stale "60 files" text
 (v2.2) and the exclusion assertion now checks raw `git ls-files` output
-against the scanned set. Author: pending user.
+against the scanned set. Author: **signed off** — user approved 2026-09-30.
+**CR-0015 v2.2 APPROVED.**
 

@@ -1,7 +1,6 @@
 # CR-0015: Draw assumed-negative background points only in-state, only in training blocks, and without treating 0 as nodata
 
-**Status: PROPOSED (v2.2) — awaiting round-3 review.** Nothing implemented
-except the pre-approval L1 test (deliverable 3).
+**Status: APPROVED (v2.2), 2026-09-30.** Deliverable 1 (interim guard) may land now; the rest waits for CR-0007 and CR-0012.
 History, lineage, verdicts and dispositions: `CR-0015-review-log.md`. This
 document states only current intent.
 

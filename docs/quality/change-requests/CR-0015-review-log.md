@@ -203,3 +203,12 @@ FOLLOW-UPS at `05d4ce5`. Both LOW follow-ups applied: stale "60 files" text
 against the scanned set. Author: **signed off** — user approved 2026-09-30.
 **CR-0015 v2.2 APPROVED.**
 
+## Implementation record — deliverable 1 (2026-09-30)
+`train.py` `main()`: the guard sits immediately after `parse_args()`,
+before seeding or `GrouseData()`, with the §4 message verbatim.
+`tests/test_cr0015_guard.py` (U7): `--an-background 1` exits naming
+CR-0015 before the data load; `--an-background 1 --an-background 0`
+passes the guard. 2 tests OK; `train.py --help` works; L1 lint unchanged
+(4 statements). No other live caller of the flag (`losses.py` mentions it
+in a docstring only). Deleted with the guard by deliverable 8.
+

@@ -1,6 +1,6 @@
 # CR-0015: Draw assumed-negative background points only in-state, only in training blocks, and without treating 0 as nodata
 
-**Status: APPROVED (v2.2), 2026-09-30.** Deliverable 1 (interim guard) may land now; the rest waits for CR-0007 and CR-0012.
+**Status: APPROVED (v2.2), 2026-09-30. Deliverable 1 (interim guard) IMPLEMENTED;** the rest waits for CR-0012 (CR-0007 is implemented).
 History, lineage, verdicts and dispositions: `CR-0015-review-log.md`. This
 document states only current intent.
 
@@ -358,7 +358,7 @@ needs an AN-path retrain, which is out of scope; CR-0009's retrain does
 not use the AN path.
 
 ## Deliverables (in execution order)
-- [ ] 1. Interim guard (§4) and U7; can land before CR-0007/CR-0012.
+- [x] 1. Interim guard (§4) and U7; can land before CR-0007/CR-0012.
 - [ ] 2. **Bug records.**
   - [ ] **BUG-0032** (0 treated as nodata, `train.py`
         `set(NODATA_SENTINELS) | {nodata, 0}`), with all §2

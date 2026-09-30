@@ -882,6 +882,14 @@ def main():
                              "teachers ignored, 0.0 = true labels ignored.")
     args = parser.parse_args()
 
+    # CR-0015 interim guard (removed by its deliverable 8): the assumed-
+    # negative background path draws points out of state and inside
+    # validation blocks until CR-0015's fix lands.
+    if args.an_background > 0:
+        raise SystemExit("--an-background > 0 is disabled until CR-0015 lands "
+                         "(assumed negatives drawn out of state and in "
+                         "validation blocks; BUG-0029, BUG-0042).")
+
     if args.distill_from and args.ensemble > 1:
         raise SystemExit(
             "--distill-from trains a single student model - incompatible "

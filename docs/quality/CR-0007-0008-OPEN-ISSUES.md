@@ -123,3 +123,4 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 - [ ] CR-0012: when `VAL_FRACTION`/`SPLIT_SEED` join `regions.py`, add them (and `_DEFAULT` aliases) to `check_partition.P6_NAMES` and pin them in `tests/test_shared_constants.py` — owner: CR-0012's author (0007 v9 C1)
 - [ ] CR-0013 v2 `:296` cites "CR-0007 (P1–P7)"; v9 has P1–P8 — owner: CR-0013's author (0007 v9 C2)
 - [ ] NH `ch`/`cc` rasters (mtime 2026-09-20 11:32) postdate `evaluated_sightings_NH.csv` (2026-09-18): 1,040 `ch` / 1,265 `cc` values differ. Find what rewrote them (untested, PA-0016; provenance, PA-0019 draft). CR-0007's re-run supersedes the values (O4) — owner: CR-0007's author (0007 v9 C3)
+- [ ] CR-0012 implementation: confirm the `clean.py` and `legacy/gen_negs.py` guards before CR-0007's P6 exemption for them is relied on (CR-0007 B-R9-1)

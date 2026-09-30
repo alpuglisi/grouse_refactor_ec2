@@ -342,7 +342,8 @@ class WrongConstructions(Fixture):
                 ev.loc[~ev["nonveg_landcover"], "envelope_id"], box_draw)
         res, text = self.run_checks(outs)
         self.assertFails(res, text, "P5")
-        self.assertIn("P5b", text)
+        # P5b prints on every run; pin the failure to a nonzero mismatch.
+        self.assertRegex(text, r"P5b: .* [1-9]\d* envelopes whose Avail_N")
 
     def test_sightings_from_box_habitat(self):
         outs = correct_outputs(self.raw)

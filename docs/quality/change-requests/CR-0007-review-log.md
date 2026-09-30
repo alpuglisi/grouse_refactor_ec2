@@ -753,3 +753,21 @@ tests.test_shared_constants`: 26 tests, OK (1 expected failure: the
 repository-tree P6 test, by design until deliverable 2).
 
 **Author sign-off on v9:** pending round-9 review.
+
+## Round 9 (bounded re-review of v9, commit f8fafbc)
+| reviewer | verdict |
+|---|---|
+| A — correctness | **APPROVE** — A1–A7 resolved in text and code; P6 passable after a correct implementation (every flagged line is in the §1 re-point table); both envelope_metrics constructions fail P5; 26 tests OK (1 expected failure) |
+| B — implementability | **APPROVE WITH FOLLOW-UPS** — B1–B10 resolved; P6 scan (24 lines / 21 files) maps entirely onto the §1 re-point table; exempt files hold exactly 8 lines; deliverable order executable; bookkeeping complete |
+
+| # | sev | concern | disposition |
+|---|---|---|---|
+| A-R9-1 | LOW | `test_avail_from_box_draw…` asserted only that "P5b" appears (it always does) | **Accept** — now asserts a nonzero Avail_N mismatch count |
+| B-R9-1 | LOW | `clean.py` / `legacy/gen_negs.py` P6 exemption relies on CR-0012's guards | **Tracked** — CR-0012 implementation confirms its guards before the exemption is relied on |
+| B-R9-2 | LOW | Removing the road-file exemptions at deliverable 7 edits gate code after approval | **Accept** — deliverable 7's edit is reviewed when it lands |
+| B-R9-3 | LOW | Sibling-CR items and O4 remain open | **Tracked** (tracker) |
+
+## Quorum (§1.4)
+Round 9: reviewer A APPROVE, reviewer B APPROVE WITH FOLLOW-UPS (v9,
+`f8fafbc`; test fix A-R9-1 applied after). Author: pending user.
+

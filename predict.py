@@ -83,7 +83,8 @@ if not os.path.exists(os.path.join(_here, "grouse_data.py")):
     if os.path.exists(os.path.join(_parent, "grouse_data.py")):
         sys.path.insert(0, _parent)
 
-from grouse_data import GrouseData, NLCD_NAMES, NODATA_SENTINELS, MISSING_CODE
+from grouse_data import (GrouseData, NLCD_NAMES, NODATA_SENTINELS, MISSING_CODE,
+                         refuse_legacy_checkpoint_on_repaired)
 from models import (GrouseResNet, FEATURE_SPEC, split_features,
                     config_to_model_kwargs, d4_tta_logits,
                     spec_with_checkpoint_vocab, checkpoint_vocab_notes)
@@ -1002,6 +1003,8 @@ def main():
              f"logits shifted by {prior_shift:+.3f}. A displayed 0.5 now "
              f"requires a calibrated score of {needed:.3f}.")
 
+    refuse_legacy_checkpoint_on_repaired(
+        model, [rd.latest_raster_path(f) for f in cat_f + cont_f])
     srcs, ref = open_aligned_sources(rd, cat_f, cont_f)
     try:
         bounds = args.bounds or list(BOXES[args.region])

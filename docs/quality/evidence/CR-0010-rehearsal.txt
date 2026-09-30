@@ -1,0 +1,16 @@
+F1    GATE PASS requested files                  value=all present  required=all in manifest and on disk
+F1    GATE PASS stray temp files                 value=0  required=0
+B0    GATE PASS backup (1 files)                 value=all match  required=all match
+G0    GATE PASS VT nlcd year-invariant           value=10 years same=True  required=True
+G0    GATE PASS VT nlcd                          value=(50450696, '682ef390d584a2a7b30b3eed10c75e15')  required=(50450696, '682ef390d584a2a7b30b3eed10c75e15')
+G0    GATE PASS VT disturbance                   value=(50447193, '64677a7523a8b20e24f1e595dbf8c39a')  required=(50447193, '64677a7523a8b20e24f1e595dbf8c39a')
+X1    OBS       VT nlcd-vs-disturbance           value=nlcd_only=0.00681% dist_only=0.00015%  required=report
+G1    GATE PASS VT_2025_tsd.tif                  value=0  required=0
+G2    GATE PASS VT_2025_tsd.tif                  value=0 (declared -9999.0)  required=0
+G2p   GATE PASS VT_2025_tsd.tif                  value=2104152  required=2104152
+G6    GATE PASS VT_2025_tsd.tif                  value=identical  required=identical, no sidecar
+G7    GATE PASS VT_2025_tsd.tif                  value=64677a7523a8b20e24f1e595dbf8c39a  required=64677a7523a8b20e24f1e595dbf8c39a
+G8.2  GATE PASS VT_2025_tsd.tif                  value=1790762418699253565  required=!= 1790762384377691965
+X4    OBS       VT_2025_tsd.tif before           value=zero=0 max=44833381  required=unchanged
+X4    OBS       VT_2025_tsd.tif after            value=zero=0 max=44833381  required=unchanged
+15 rows, 0 gate failure(s): ALL GATES PASS

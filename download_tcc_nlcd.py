@@ -72,7 +72,7 @@ sys.path.insert(0, _here)
 
 from prepare_training_data import BOXES
 from grouse_data import (GrouseData, DataConfig, YEAR_MATCH_TOLERANCE,
-                         grid_mismatch)
+                         grid_mismatch, refuse_if_repaired)
 
 NODATA = -9999
 PIXEL_M = 30
@@ -442,6 +442,11 @@ def main():
                              "standard data/landfire.")
     parser.add_argument("--force", action="store_true",
                         help="Re-download files that already exist.")
+    parser.add_argument("--overwrite-repaired", action="store_true",
+                        help="With --force, allow overwriting rasters "
+                             "repaired by CR-0010. This script still "
+                             "writes 0 outside coverage for tcc until "
+                             "CR-0008 lands.")
     args = parser.parse_args()
 
     ee = ee_init(args.project)
@@ -478,6 +483,12 @@ def main():
                       f"yet - output stays in EPSG:5070 and must be "
                       f"realigned (realign_rasters.py --apply) before "
                       f"training; dataset.py refuses mixed grids.")
+            # CR-0010: check every year's target before the first
+            # download. Only --force overwrites an existing file.
+            if args.force:
+                refuse_if_repaired(
+                    [os.path.join(out_dir, f"{region}_{y}_{feature}.tif")
+                     for y in years], allow=args.overwrite_repaired)
             for year in years:
                 out_path = os.path.join(out_dir,
                                         f"{region}_{year}_{feature}.tif")

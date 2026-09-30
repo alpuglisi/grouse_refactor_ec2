@@ -1,0 +1,23 @@
+{
+  "_comment": "CR-0010 pre-registered constants. G0: sha256(np.packbits(mask.ravel())) first 32 hex and inside-pixel count, full resolution. N_pre: pixels per file that must change. Do not edit without a CR.",
+  "nodata": -9999,
+  "n_files": 174,
+  "feature_mask": {
+    "tsd": "disturbance",
+    "balive": "nlcd", "tpa_live": "nlcd", "qmd": "nlcd", "carbon_dwn": "nlcd",
+    "tcc": "nlcd"
+  },
+  "masks": {
+    "ME": {"nlcd": {"inside": 107406613, "sha256": "59a7639b5fb0389d0955eb61e45ad3fc"},
+           "disturbance": {"inside": 107321500, "sha256": "9006374548fa58f4a59e3ff14c24130d"}},
+    "NH": {"nlcd": {"inside": 51384193, "sha256": "15375b62cca9ab85ec4c23869218a6d7"},
+           "disturbance": {"inside": 51379852, "sha256": "c10c46f12978de0e68fd1ded93b65a84"}},
+    "VT": {"nlcd": {"inside": 50450696, "sha256": "682ef390d584a2a7b30b3eed10c75e15"},
+           "disturbance": {"inside": 50447193, "sha256": "64677a7523a8b20e24f1e595dbf8c39a"}}
+  },
+  "n_pre": {
+    "ME": {"tsd": 96300932, "balive": 96215819, "tpa_live": 96215819, "qmd": 96215819, "carbon_dwn": 96215819, "tcc": 95946265},
+    "NH": {"tsd": 5663604, "balive": 5659263, "tpa_live": 5659263, "qmd": 5659263, "carbon_dwn": 5659263, "tcc": 5653164},
+    "VT": {"tsd": 2104152, "balive": 2100649, "tpa_live": 2100649, "qmd": 2100649, "carbon_dwn": 2100649, "tcc": 2096352}
+  }
+}

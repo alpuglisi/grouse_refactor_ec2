@@ -90,7 +90,7 @@ from rasterio.vrt import WarpedVRT
 from rasterio.enums import Resampling
 from rasterio.windows import Window
 
-from grouse_data import GrouseData
+from grouse_data import GrouseData, refuse_if_repaired
 from models import TSD_MAX_YEARS, tsd_encode
 
 CACHE_DIR = "data/disturbance"
@@ -245,7 +245,8 @@ def _report_codes(path):
     print(f"   (treating value > 0 and != nodata as 'disturbed')")
 
 
-def process_region(region, data, dist_paths, block_rows):
+def process_region(region, data, dist_paths, block_rows,
+                   overwrite_repaired=False):
     print(f"\n{'=' * 60}\n{region}\n{'=' * 60}")
     rd = data[region]
     others = [f for f in rd.available_features() if f != "tsd"]
@@ -275,6 +276,10 @@ def process_region(region, data, dist_paths, block_rows):
         ref_crs, ref_transform = ref.crs, ref.transform
 
     raster_dir = data.config.resolve(data.config.raster_dir)
+    # CR-0010: every year's output is opened "w" (truncated) together
+    # below, so check all of them before any is opened.
+    refuse_if_repaired([os.path.join(raster_dir, f"{region}_{y}_tsd.tif")
+                        for y in years], allow=overwrite_repaired)
     # TreeMap and the disturbance bundle are on the LANDFIRE CONUS grid;
     # these regions are LFPS clips in a per-request LOCAL Albers (see
     # dataset.py's CRS note). WarpedVRT does the reprojection lazily so
@@ -357,6 +362,10 @@ def main():
                          "roughly block_rows * width * 2 bytes per open "
                          "disturbance year; lower it if a large state "
                          "runs out. Default: %(default)s")
+    ap.add_argument("--overwrite-repaired", action="store_true",
+                    help="Allow overwriting rasters repaired by CR-0010. "
+                         "This generator still writes fabricated values "
+                         "outside coverage until CR-0008 lands.")
     args = ap.parse_args()
 
     print("Fetching LANDFIRE Annual Disturbance ...")
@@ -366,7 +375,8 @@ def main():
     data = GrouseData()
     regions = args.regions or data.discover_regions()
     for region in regions:
-        process_region(region, data, dist_paths, args.block_rows)
+        process_region(region, data, dist_paths, args.block_rows,
+                       args.overwrite_repaired)
     print("\nDone. Remember: a new feature is a GEOMETRY change - "
           "train.py needs a cold start, and --resume/--init-from are "
           "invalid against any older checkpoint.")

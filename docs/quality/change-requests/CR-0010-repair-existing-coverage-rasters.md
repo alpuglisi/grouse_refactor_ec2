@@ -1,6 +1,6 @@
 # CR-0010: Repair the 174 existing rasters that carry fabricated values outside coverage
 
-**Status: PROPOSED (v2) — awaiting review.** Nothing implemented.
+**Status: APPROVED (v3), 2026-09-30 — implementation in progress.**
 Review history and dispositions live in `CR-0010-review-log.md`, not here.
 This document states only what is currently true and intended.
 
@@ -44,7 +44,7 @@ own grid, never upsampled:
 
 | feature | mask | predicate |
 |---|---|---|
-| `tsd` | `disturbance∩` | intersection over the 26 disturbance vintages (Dist99–Dist24) of `value ∉ grouse_data.NODATA_SENTINELS`, each vintage read onto the region grid |
+| `tsd` | `disturbance∩` | intersection over the 26 disturbance vintages (Dist99–Dist24) of `value ∉ grouse_data.NODATA_SENTINELS`, each vintage read onto the region grid with `WarpedVRT(..., resampling=Resampling.nearest)` and default error threshold, as `generate_time_since_disturbance.py` does |
 | TreeMap ×4, `tcc` | `nlcd` | `{REGION}_{year}_nlcd.tif != -9999` (identical digest for every year) |
 
 Rules:
@@ -52,6 +52,10 @@ Rules:
    (ME 11,700 / NH 4,464 / VT 2,137 px), so "turn zeros into nodata" is
    wrong. In-coverage zeros are real readings (Branch A, user decision
    2026-09-30) and stay `0`.
+   The masks are deliberately conservative: later disturbance vintages
+   map some ground outside `disturbance∩` (e.g. VT 2023: 3,331 px), and
+   TreeMap bleeds 1–2 px past the NLCD edge. Those readings also become
+   nodata; one coverage per region is preferred over per-year edges.
 2. **One mask per region serves all `tsd` years.** `cov(vintages ≤ 2016)`
    is byte-identical to `cov(all 26)` in all three regions (verified by
    two independent reviewers). The repair script asserts this at run time
@@ -72,7 +76,7 @@ Rules:
    |---|---|---|
    | `generate_time_since_disturbance.py` | all target years opened `"w"` together (`:293-295`) | every target year's path, before the loop |
    | `generate_treemap_features.py` | representative year `rasterio.open(path, "w")` (`:294`) **and** the `shutil.copy2` year fan-out (`:444-448`) | the representative path **and every `copy2` destination**, before `write_vintage` runs |
-   | `download_tcc_nlcd.py` | `build_raster(...)` (`:488`) | the output path, before `build_raster` is called |
+   | `download_tcc_nlcd.py` | `build_raster(...)` (`:488`), once per year | every year's output path, before the first `build_raster` call |
 
    The guard lives in one helper (`grouse_data.refuse_if_repaired(paths)`)
    so all three call the same check. CR-0008 removes the calls when it
@@ -99,15 +103,18 @@ reported only.
 
 | id | type | check | required |
 |---|---|---|---|
-| B0 | GATE | Backup manifest sha256 of every file re-verified immediately before G1 | all match |
+| B0 | GATE | sha256 of every backup file vs the hashes of the **originals**, taken before copying and committed | all match |
 | G0 | GATE | Verifier re-derives each mask independently; `sha256(np.packbits(mask.ravel()))` and inside-pixel count | equal the pins below |
 | G1 | GATE | `count(pixels inside coverage whose value changed)` vs the backup | 0, per file |
 | G2 | GATE | `count(outside-coverage pixels != -9999)` | 0, per file |
 | G2′ | GATE | `count(changed pixels)` | `== N_pre` below, per file |
-| G6 | GATE | Full `rasterio` profile and `tags(ns='IMAGE_STRUCTURE')` vs backup | identical, per file |
+| G6 | GATE | Full `rasterio` profile, `tags(ns='IMAGE_STRUCTURE')`, `tags(1)`, `overviews(1)`, `mask_flag_enums` vs backup; no `.aux.xml` sidecar | identical, per file (originals have no overviews, band tags or sidecars) |
+| G7 | GATE | `tags()['GROUSE_REPAIR'] == 'CR-0010'` and the tagged mask digest equals the G0 pin | every file |
+| F1 | GATE | Checked file set equals the manifest's 174 entries; no stray temp files in `data/landfire/` | no missing, extra or temp files |
+| F2 | GATE | sha256 of every other `*.tif` in `data/landfire/` (out-of-scope features) vs a manifest taken before the repair | all unchanged |
 | G8.1 | GATE | `count(data/cache/patches_*)` after purge (no extension anchor) | 0 |
 | G8.2 | GATE | Each repaired file's mtime vs the pre-repair mtime recorded in the manifest | differs |
-| G8.3 | PROCESS | No prediction or calibration artifact published until CR-0009 lands. Checked by presence of `STALE_SEE_CR-0010.txt` in `data/predictions/` and `data/calibration/` (not scripted) | markers present |
+| G8.3 | PROCESS | No prediction, calibration or map artifact published until CR-0009 lands. Checked by presence of `STALE_SEE_CR-0010.txt` in `data/predictions/`, `data/calibration/` and `data/maps/` (not scripted) | markers present |
 | X1 | OBS | Disagreement between the three coverage lineages (NLCD, TIGER, disturbance) | report; today ≤ 0.06 % of grid |
 | X2 | OBS | Total repaired size / backup size | report |
 | X3 | OBS | Training records with any out-of-coverage pixel in a 64×64 window, and with an out-of-coverage centre pixel, on whatever record set exists | report, name the record set |
@@ -194,7 +201,7 @@ the repair); the manifest hashes (B0) are the restore guarantee.
 
 ## Deliverables (in execution order)
 - [ ] 1. `docs/quality/cr0010_pins.json` with the G0 and `N_pre` tables above.
-- [ ] 2. `check_raster_repair.py` implementing B0, G0–G8.2, X1–X4, with
+- [ ] 2. `check_raster_repair.py` implementing B0, F1, F2, G0–G8.2, X1–X4, with
       `--root` and `--files`; unit-tested against a synthetic 3-file
       fixture that includes a no-op, an inflated mask and an in-coverage
       edit, each of which must fail.
@@ -202,11 +209,14 @@ the repair); the manifest hashes (B0) are the restore guarantee.
 - [ ] 4. `grouse_data.refuse_if_repaired` and its calls at every write site
       in rule 5's table; unit test covering the TreeMap `copy2` path (an
       untagged representative year with a tagged `copy2` destination must
-      refuse).
+      refuse), plus a test that each of the three generators refuses on a
+      tagged scratch copy before opening anything for writing.
 - [ ] 5. Legacy-checkpoint refusal in `predict.py` and `calibrate.py` (rule
       6); unit test with a `missing_mask=False` model and a tagged raster.
 - [ ] 6. Single-file rehearsal (Test plan), in a scratch directory.
-- [ ] 7. Back up all 174 files to `/home/ec2-user/grouse_backup/CR-0010/`
+- [ ] 7. Hash the 174 originals and every other `*.tif` in `data/landfire/`;
+      commit both manifests (`docs/quality/evidence/CR-0010-manifest-*.txt`).
+      Then back up all 174 files to `/home/ec2-user/grouse_backup/CR-0010/`
       — outside `data/landfire/`, so the backup never matches
       `grouse_data`'s raster discovery globs — as real copies (not hard
       links); manifest with sha256, size and pre-repair mtime per file.
@@ -214,8 +224,8 @@ the repair); the manifest hashes (B0) are the restore guarantee.
       Save its output to `docs/quality/evidence/CR-0010-gates.txt`
       (create the directory).
 - [ ] 9. Purge `data/cache/patches_*` (including the `.tmp` stray); G8.1.
-- [ ] 10. Write `STALE_SEE_CR-0010.txt` in `data/predictions/` and
-      `data/calibration/` (G8.3).
+- [ ] 10. Write `STALE_SEE_CR-0010.txt` in `data/predictions/`,
+      `data/calibration/` and `data/maps/` (G8.3).
 - [ ] 11. Bookkeeping. CR-0010 is the sole owner of BUG-0030.
       - File BUG-0030 (`tcc` fabricated `0` outside coverage) with all §2
         sections and a `BUG_LOG.md` row.

@@ -24,7 +24,9 @@ Round-7 concerns carried into CR-0010 v1:
 | round | version | reviewer | verdict | blocking |
 |---|---|---|---|---|
 | 1 | v1 | B — implementability + §1 (fresh) | APPROVE WITH FOLLOW-UPS | 0 (3 MAJOR) |
-| 1 | v1 | A — correctness (fresh) | pending | — |
+| 1 | v1 | A — correctness (fresh) | APPROVE WITH FOLLOW-UPS | 0 (0 MAJOR) |
+| 2 (bounded) | v3 | A — correctness | **APPROVE** — A1–A8 resolved; no new blocking | 0 |
+| 2 (bounded) | v3 | B — implementability | **APPROVE WITH FOLLOW-UPS** — B1–B7 resolved; no new blocking | 0 |
 
 ## Dispositions
 Round 1, reviewer B. Checked against the live system before accepting.
@@ -43,11 +45,36 @@ recorded as such.
 | B6 | LOW | Backup path unnamed (in-tree copy would match `grouse_data.py:250` globs); checker needs a subset/scratch mode; `docs/quality/evidence/` missing. | **Accept** — v2 names a backup path outside `data/landfire/`, adds `--files`/`--root` to the checker, creates the directory. |
 | B7 | LOW | Disk units: 16,668,200,960 B free → 7.21 GB after backup. | **Accept** — corrected in v2. |
 
+Round 1, reviewer A (reviewed v1; checked against v2 before disposition).
+Reproduced independently: all file counts and bytes; all 6 G0 pins in all
+three regions; `nlcd` digest year-invariant; `cov(≤2016) == cov(all 26)`
+in every region; `N_pre` for all 174 files; 0 pre-existing `-9999` inside
+the masks. No attack produced wrong pixel values past the gates.
+
+| # | sev | concern | disposition |
+|---|---|---|---|
+| A1 | MEDIUM | No gate checks the provenance tag; an untagged repair passes and disables the guard. Guard untested. | **Accept** — v3 adds G7 (tag and digest on every file) and a per-generator refusal test. Also noted: guard must check before any `"w"` open (already in v2 rule 5; reviewer's `:287-289` cite is the source opens — the output opens are `:293-295`, verified). |
+| A2 | LOW-MED | Checker file set unspecified; a glob could skip a missing file. | **Accept** — v3 F1. |
+| A3 | LOW | Manifest origin unspecified; a corrupt backup would pass G1 against itself. | **Accept** — v3: hash originals before copying, commit, B0 compares backup to them. |
+| A4 | LOW | Nothing checks out-of-scope files are untouched. | **Accept** — v3 F2. |
+| A5 | LOW | G6 misses overviews, mask flags, band tags, sidecars. | **Accept** — v3 G6 extended. |
+| A6 | LOW | ∩ mask also blanks real later-vintage readings (VT 2023: 3,331 px) and 1–2 px TreeMap bleed. | **Accept** — v3 states this as a deliberate conservative choice (rule 1). |
+| A7 | LOW | `tsd` mask warp method unnamed. | **Accept** — v3 names WarpedVRT nearest, default error threshold. |
+| A8 | LOW | G8.3 not mechanical; `data/maps/` missing. | **Already resolved in v2** (process gate); **Accept** `data/maps/` in v3. |
+
+Round 2 follow-ups (reviewer B):
+| # | sev | concern | disposition |
+|---|---|---|---|
+| B8 | LOW | CR-0006 still claims BUG-0030 (`:615`). | **Tracked** — open-issues tracker item "CR-0006: drop BUG-0030 creation". |
+| B9 | LOW | Rule 5 says "before any download starts" but the tcc table row said "before `build_raster`", which runs per year. | **Accept** — table row clarified in v3 (text-only): every year's path checked before the first `build_raster` call. |
+
 ## Versions
 | version | date | change |
 |---|---|---|
 | v1 | 2026-09-30 | Split from CR-0008 |
+| v3 | 2026-09-30 | Reviewer A: G7 tag gate, F1 file set, F2 out-of-scope files, B0 against original hashes, G6 extended, conservative-mask statement, warp method named, `data/maps/` stale marker, generator refusal tests. |
 | v2 | 2026-09-30 | B1: guard covers every write site incl. `copy2` fan-out. B2: rule 6 refuses `missing_mask=False` checkpoints on repaired rasters; Impact corrected. B3: full BUG-0030 bookkeeping; sole owner. B5: G8.3 is a process gate. B6: backup path outside `data/landfire/`; checker `--root`/`--files`; evidence dir. B7: disk 7.21 GB. |
 
-## Author sign-off
-Pending.
+## Quorum (§1.4)
+Reviewer A: APPROVE (v3). Reviewer B: APPROVE WITH FOLLOW-UPS (v3).
+Author: **signed off** — user instructed implementation 2026-09-30. **CR-0010 APPROVED (v3).**

@@ -26,3 +26,14 @@
 #    this keeps them visible to `git add` if one is ever edited.
 !/legacy/
 !/legacy/*.py
+
+# 7. QMS evidence and pinned constants (CR-0010): acceptance gates read
+#    these, and the pre-repair manifests must be committed before a repair.
+!/docs/quality/*.json
+!/docs/quality/evidence/
+!/docs/quality/evidence/*.tsv
+!/docs/quality/evidence/*.txt
+
+# 8. Unit tests.
+!/tests/
+!/tests/*.py

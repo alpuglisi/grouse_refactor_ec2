@@ -68,7 +68,7 @@ from torch.utils.data import DataLoader
 _here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _here)
 
-from grouse_data import GrouseData
+from grouse_data import GrouseData, refuse_legacy_checkpoint_on_repaired
 from models import (GrouseResNet, FEATURE_SPEC, split_features,
                     config_to_model_kwargs, spec_with_checkpoint_vocab,
                     checkpoint_vocab_notes)
@@ -338,6 +338,10 @@ def main():
     disk_features = discover_features(data, args.regions)
     model, features, ckpt_cfg = load_model(args.model, device, args.pool,
                                            args.center_skip, disk_features)
+    refuse_legacy_checkpoint_on_repaired(model, [
+        data[r].raster_path(f, y, nearest=False, validate=False)
+        for r in args.regions for f in features
+        for y in data[r].raster_years(f)])
     bias = loss_logit_bias(ckpt_cfg)
     if bias is not None:
         reason, off = bias

@@ -123,7 +123,7 @@ from rasterio.vrt import WarpedVRT
 from rasterio.enums import Resampling
 from rasterio.windows import Window
 
-from grouse_data import GrouseData
+from grouse_data import GrouseData, refuse_if_repaired
 from models import (TREEMAP_FIXED, qmd_from_balive_tpa, tpa_live_encode,
                     treemap_encode)
 
@@ -390,6 +390,10 @@ def main():
                     help="Worker processes for the (region, vintage) "
                          "writes, which are independent of each other. "
                          "Default: one per vCPU (os.cpu_count()).")
+    ap.add_argument("--overwrite-repaired", action="store_true",
+                    help="Allow overwriting rasters repaired by CR-0010. "
+                         "This generator still writes fabricated values "
+                         "outside coverage until CR-0008 lands.")
     args = ap.parse_args()
 
     print(f"TreeMap source: {args.src_dir}")
@@ -405,6 +409,17 @@ def main():
         plan = plan_region(region, data, vintages)
         if plan is not None:
             plans[region] = plan
+
+    # CR-0010: check every path this run writes - each vintage's
+    # representative year AND every year its output is copy2'd onto -
+    # before any worker opens a file for writing.
+    refuse_if_repaired(
+        [os.path.join(plan["raster_dir"], f"{region}_{y}_{feat}.tif")
+         for region, plan in plans.items()
+         for years in plan["by_vintage"].values()
+         for y in years
+         for feat in ("balive", "tpa_live", "qmd", "carbon_dwn")],
+        allow=args.overwrite_repaired)
 
     # The unit of parallelism is one (region, vintage) pair: build the
     # full job list across every region up front, then hand it to a

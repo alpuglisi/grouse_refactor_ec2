@@ -1,0 +1,86 @@
+CR-0017 PA-0021(a) MC runs on wrong/correct trees built by reviewer B (round 1; script reviewB_build_trees.py), re-run by the author against check_must_change.py v2, 2026-09-30.
+
+== W1_every_us_county
+MC0: PASS 20 old artifacts equal the d6 record
+MC1: PASS P and B unchanged
+MC2: FAIL pre-registered 88, found in old C 88; old 22,187 -> new 22,148 rows (expected 22,099)
+MC3[ME]: PASS removed 9, pre-registered 9; unexpected [], kept []; retained rows with changed lines 0 []
+MC4[ME]: PASS train/hab 2045->2045 -6+6; train/nv 877->877 -1+1; val/hab 517->517 -0+0; val/nv 221->221 -2+2
+MC5[ME]: PASS train_/val_ parts equal the split subsets
+MC3[NH]: FAIL removed 0, pre-registered 1; unexpected [], kept [(-71.363304, 42.70035)]; retained rows with changed lines 0 []
+MC4[NH]: PASS train/hab 588->588 -0+0; train/nv 252->252 -0+0; val/hab 167->167 -0+0; val/nv 72->72 -0+0
+MC5[NH]: PASS train_/val_ parts equal the split subsets
+MC3[VT]: FAIL removed 3, pre-registered 13; unexpected [], kept [(-73.415794, 44.03201), (-73.38281, 43.59231), (-73.382385, 43.591824)]; retained rows with changed lines 0 []
+MC4[VT]: PASS train/hab 857->857 -0+0; train/nv 367->367 -3+3; val/hab 188->188 -0+0; val/nv 81->81 -0+0
+MC5[VT]: PASS train_/val_ parts equal the split subsets
+
+MC: FAIL MC2, MC3[NH], MC3[VT]
+exit 1
+
+== W2_correct
+MC0: PASS 20 old artifacts equal the d6 record
+MC1: PASS P and B unchanged
+MC2: PASS pre-registered 88, found in old C 88; old 22,187 -> new 22,099 rows (expected 22,099)
+MC3[ME]: PASS removed 9, pre-registered 9; unexpected [], kept []; retained rows with changed lines 0 []
+MC4[ME]: PASS train/hab 2045->2045 -6+6; train/nv 877->877 -1+1; val/hab 517->517 -0+0; val/nv 221->221 -2+2
+MC5[ME]: PASS train_/val_ parts equal the split subsets
+MC3[NH]: PASS removed 1, pre-registered 1; unexpected [], kept []; retained rows with changed lines 0 []
+MC4[NH]: PASS train/hab 588->588 -0+0; train/nv 252->252 -1+1; val/hab 167->167 -0+0; val/nv 72->72 -0+0
+MC5[NH]: PASS train_/val_ parts equal the split subsets
+MC3[VT]: PASS removed 13, pre-registered 13; unexpected [], kept []; retained rows with changed lines 0 []
+MC4[VT]: PASS train/hab 857->857 -4+4; train/nv 367->367 -6+6; val/hab 188->188 -2+2; val/nv 81->81 -1+1
+MC5[VT]: PASS train_/val_ parts equal the split subsets
+
+MC: PASS
+exit 0
+
+== W3_undissolved
+MC0: PASS 20 old artifacts equal the d6 record
+MC1: PASS P and B unchanged
+MC2: FAIL pre-registered 88, found in old C 88; old 22,187 -> new 21,819 rows (expected 22,099)
+MC3[ME]: FAIL removed 17, pre-registered 9; unexpected [(-71.03292, 44.704964), (-71.02448, 44.54916), (-70.96012, 43.472126)], kept []; retained rows with changed lines 0 []
+MC4[ME]: PASS train/hab 2045->2045 -11+11; train/nv 877->877 -4+4; val/hab 517->517 -0+0; val/nv 221->221 -2+2
+MC5[ME]: PASS train_/val_ parts equal the split subsets
+MC3[NH]: FAIL removed 12, pre-registered 1; unexpected [(-72.43917, 43.074055), (-72.43388, 43.25376), (-72.3889, 43.35752)], kept []; retained rows with changed lines 0 []
+MC4[NH]: PASS train/hab 588->588 -2+2; train/nv 252->252 -7+7; val/hab 167->167 -2+2; val/nv 72->72 -1+1
+MC5[NH]: PASS train_/val_ parts equal the split subsets
+MC3[VT]: FAIL removed 46, pre-registered 13; unexpected [(-72.55757, 42.8652), (-72.557014, 42.84973), (-72.546814, 42.819923)], kept []; retained rows with changed lines 0 []
+MC4[VT]: PASS train/hab 857->857 -22+22; train/nv 367->367 -16+16; val/hab 188->188 -6+6; val/nv 81->81 -2+2
+MC5[VT]: PASS train_/val_ parts equal the split subsets
+
+MC: FAIL MC2, MC3[ME], MC3[NH], MC3[VT]
+exit 1
+
+== W4_wrong_replacements
+MC0: PASS 20 old artifacts equal the d6 record
+MC1: PASS P and B unchanged
+MC2: PASS pre-registered 88, found in old C 88; old 22,187 -> new 22,099 rows (expected 22,099)
+MC3[ME]: PASS removed 9, pre-registered 9; unexpected [], kept []; retained rows with changed lines 0 []
+MC4[ME]: PASS train/hab 2045->2045 -6+6; train/nv 877->877 -1+1; val/hab 517->517 -0+0; val/nv 221->221 -2+2
+MC5[ME]: PASS train_/val_ parts equal the split subsets
+MC3[NH]: PASS removed 1, pre-registered 1; unexpected [], kept []; retained rows with changed lines 0 []
+MC4[NH]: PASS train/hab 588->588 -0+0; train/nv 252->252 -1+1; val/hab 167->167 -0+0; val/nv 72->72 -0+0
+MC5[NH]: PASS train_/val_ parts equal the split subsets
+MC3[VT]: PASS removed 13, pre-registered 13; unexpected [], kept []; retained rows with changed lines 0 []
+MC4[VT]: PASS train/hab 857->857 -4+4; train/nv 367->367 -6+6; val/hab 188->188 -2+2; val/nv 81->81 -1+1
+MC5[VT]: PASS train_/val_ parts equal the split subsets
+
+MC: PASS
+exit 0
+
+== W5_weights_corrupted
+MC0: PASS 20 old artifacts equal the d6 record
+MC1: PASS P and B unchanged
+MC2: PASS pre-registered 88, found in old C 88; old 22,187 -> new 22,099 rows (expected 22,099)
+MC3[ME]: FAIL removed 9, pre-registered 9; unexpected [], kept []; retained rows with changed lines 3651 [(-71.04085, 45.177345), (-71.03773, 45.174397)]
+MC4[ME]: FAIL train/hab 2045->2045 -6+6 BAD [(-69.31161, 43.7702), (-67.98582, 47.06632)]; train/nv 877->877 -1+1 BAD [(-70.35254, 43.929317)]; val/hab 517->517 -0+0; val/nv 221->221 -2+2 BAD [(-68.88106, 44.54682), (-68.01472, 46.436394)]
+MC5[ME]: PASS train_/val_ parts equal the split subsets
+MC3[NH]: FAIL removed 1, pre-registered 1; unexpected [], kept []; retained rows with changed lines 1078 [(-72.51206, 42.830624), (-72.49985, 42.806313)]
+MC4[NH]: FAIL train/hab 588->588 -0+0; train/nv 252->252 -1+1 BAD [(-71.91565, 43.110306)]; val/hab 167->167 -0+0; val/nv 72->72 -0+0
+MC5[NH]: PASS train_/val_ parts equal the split subsets
+MC3[VT]: FAIL removed 13, pre-registered 13; unexpected [], kept []; retained rows with changed lines 1480 [(-73.41635, 44.05456), (-73.40922, 43.637825)]
+MC4[VT]: FAIL train/hab 857->857 -4+4 BAD [(-72.70401, 43.405342), (-73.024994, 44.126522)]; train/nv 367->367 -6+6 BAD [(-72.76653, 43.792507), (-72.03871, 44.333313)]; val/hab 188->188 -2+2 BAD [(-72.93933, 43.61122), (-72.678795, 43.65201)]; val/nv 81->81 -1+1 BAD [(-73.183784, 44.456238)]
+MC5[VT]: PASS train_/val_ parts equal the split subsets
+
+MC: FAIL MC3[ME], MC4[ME], MC3[NH], MC4[NH], MC3[VT], MC4[VT]
+exit 1

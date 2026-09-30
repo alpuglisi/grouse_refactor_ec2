@@ -13,9 +13,15 @@ MC2  C: NEW's data lines == OLD's data lines minus exactly the
      pre-registered C rows (header equal; order preserved).
 MC3  N per region R: OLD keys minus NEW keys == the pre-registered N rows
      of R, exactly (a no-op or any other removal fails).
+     Every retained row (key in OLD and NEW) has a byte-identical line.
 MC4  N per (R, split, is_nonveg): row count NEW == OLD; the number of
      keys NEW adds equals the number removed in that cell; every added
-     key is a row of NEW's C that OLD did not select.
+     row is a row of NEW's C in the same (R, split, is_nonveg) cell, and
+     equals that C row, as text, on every column N and C share; no cell
+     exists in NEW that is absent from OLD.
+MC5  train_negatives_R / val_negatives_R: header + the combined file's
+     split == train / val lines, in order (NEW tree).
+MC does not check WHICH replacements are drawn: R4's replay does that.
 
 Exit 0 only if every check passes. Every check is reported.
 
@@ -95,29 +101,60 @@ def main():
           f"pre-registered {len(kc)}, found in old C {n_hit}; old {len(old_lines) - 1:,} "
           f"-> new {len(new_lines) - 1:,} rows (expected {len(expect):,})")
 
-    new_c_keys = keyset(new_c)
+    new_c_s = pd.read_csv(os.path.join(a.new, POOL), dtype=str,
+                          keep_default_na=False)
+    new_c_s.index = list(zip(new_c["longitude"], new_c["latitude"]))
+    new_c_keys = set(new_c_s.index)
+
+    def lines_by_key(root, rel):
+        df = read(root, rel)
+        with open(os.path.join(root, rel)) as f:
+            ls = f.read().splitlines()
+        return df, ls[0], dict(zip(zip(df["longitude"], df["latitude"]), ls[1:])), ls
+
     for r in REGIONS:
         rel = f"data/negatives/negatives_{r}.csv"
-        o, n = read(a.old, rel), read(a.new, rel)
+        o, _, o_lines, _ = lines_by_key(a.old, rel)
+        n, n_hdr, n_lines, n_all = lines_by_key(a.new, rel)
         kn = keys[(keys["set"] == "N") & (keys["region"] == r)]
         want = set(zip(kn["lon"], kn["lat"]))
         gone = keyset(o) - keyset(n)
-        check(f"MC3[{r}]", gone == want,
+        kept = keyset(o) & keyset(n)
+        changed = sorted(k for k in kept if o_lines[k] != n_lines[k])
+        check(f"MC3[{r}]", gone == want and not changed,
               f"removed {len(gone)}, pre-registered {len(want)}; "
-              f"unexpected {sorted(gone - want)[:3]}, kept {sorted(want - gone)[:3]}")
+              f"unexpected {sorted(gone - want)[:3]}, kept {sorted(want - gone)[:3]}; "
+              f"retained rows with changed lines {len(changed)} {changed[:2]}")
+        n_s = pd.read_csv(os.path.join(a.new, rel), dtype=str, keep_default_na=False)
+        n_s.index = list(zip(n["longitude"], n["latitude"]))
+        shared = [c for c in n_s.columns if c in new_c_s.columns]
         ok, det = True, []
-        added_all = keyset(n) - keyset(o)
-        for (s, nv), og in o.groupby(["split", "is_nonveg"]):
-            ng = n[(n["split"] == s) & (n["is_nonveg"] == nv)]
+        ocells = set(zip(o["split"], o["is_nonveg"]))
+        ncells = set(zip(n["split"], n["is_nonveg"]))
+        if not ncells <= ocells:
+            ok = False
+            det.append(f"new cells {sorted(ncells - ocells)}")
+        for (s_, nv), og in o.groupby(["split", "is_nonveg"]):
+            ng = n[(n["split"] == s_) & (n["is_nonveg"] == nv)]
             removed = len(keyset(og) - keyset(ng))
             added = keyset(ng) - keyset(og)
-            cell_ok = (len(ng) == len(og) and len(added) == removed
-                       and added <= new_c_keys)
+            bad_add = [k for k in added if k not in new_c_keys
+                       or not n_s.loc[[k], shared].iloc[0].equals(
+                           new_c_s.loc[[k], shared].iloc[0])
+                       or new_c_s.loc[[k], "region"].iloc[0] != r]
+            cell_ok = len(ng) == len(og) and len(added) == removed and not bad_add
             ok &= cell_ok
-            det.append(f"{s}/{'nv' if nv else 'hab'} {len(og)}->{len(ng)} "
-                       f"-{removed}+{len(added)}")
-        ok &= all(k in new_c_keys for k in added_all)
+            det.append(f"{s_}/{'nv' if nv else 'hab'} {len(og)}->{len(ng)} "
+                       f"-{removed}+{len(added)}"
+                       + (f" BAD {bad_add[:2]}" if bad_add else ""))
         check(f"MC4[{r}]", ok, "; ".join(det))
+        sp = n["split"].tolist()
+        ok5 = True
+        for s_ in ("train", "val"):
+            with open(os.path.join(a.new, f"data/negatives/{s_}_negatives_{r}.csv")) as f:
+                part = f.read().splitlines()
+            ok5 &= part == [n_hdr] + [ln for ln, x in zip(n_all[1:], sp) if x == s_]
+        check(f"MC5[{r}]", ok5, "train_/val_ parts equal the split subsets")
 
     print("\n".join(report))
     print(f"\nMC: {'PASS' if not fails else 'FAIL ' + ', '.join(fails)}")

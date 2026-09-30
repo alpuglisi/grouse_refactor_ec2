@@ -61,5 +61,24 @@ docstring `:27`, help `:487-489`; L2 CR-0014 table; L3 say "uncalibrated".
 | v1 | initial |
 | v2 | round-1 dispositions above |
 
+## Round 2 (bounded)
+| reviewer | verdict |
+|---|---|
+| A — correctness | **APPROVE** — all findings resolved |
+| B — implementability | **APPROVE WITH FOLLOW-UPS** — all findings resolved; T2/T3 executable |
+
+A's note (non-blocking): T3's grid-edge expectation for VT was never
+measured. **Applied before any T3 run (v2.1):** the requirement is the
+state-line stratum in ME and VT; grid-edge is recorded as measured and not
+adjusted afterwards.
+
+B's follow-ups applied (v2.1, text only): T3 runs one region at a time
+under T2's condition; the preconditions are "reported (X3) / capped by the
+encoder", not "checked" — a violation fails safe.
+
+## Quorum (§1.4)
+Reviewer A: APPROVE (v2). Reviewer B: APPROVE WITH FOLLOW-UPS (v2).
+Author: pending user.
+
 ## Author sign-off
 Pending.

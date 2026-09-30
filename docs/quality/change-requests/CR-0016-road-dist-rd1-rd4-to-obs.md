@@ -43,8 +43,9 @@ RD2 (p99 ≤ 60 m) and RD3 (0 points > 60 m) stay gates on a **derived
 bound, accepted as a substitute for a fair-side quantile**: the error is at
 most the road's in-pixel offset (21.2 m) plus log1p encoding
 (`0.5·(1 + d)/1000` m), about 30 m at the largest in-coverage distance
-(17.2 km). The bound holds under two preconditions, both stated in the
-script and checked by existing rows: every truth road lies inside grid +
+(17.2 km). The bound holds under two preconditions, stated in the script —
+X3 **reports** the first (OBS) and the encoder caps `d`; neither is a
+gate, and a violation makes RD3 false-fail, never false-pass: every truth road lies inside grid +
 pad (X3 = 0; if X3 > 0 the bound can fail and RD3 can false-fail), and
 `d < ROAD_DIST_MAX_M`. The **broken side** is measured, not asserted: T3
 runs the check on the real pre-CR-0014 home-state-only rasters.
@@ -68,7 +69,7 @@ R2 catches road-side constructions only while `C` is non-empty (ME
 |---|---|---|
 | T1 | Unit tests (`tests/test_check_road_dist.py`): `rd_rows` marks RD1/RD4 OBS with `ok=None`; a constant +30 m error vector passes RD2/RD3 and produces no gate failure; a signed-median +10 m vector produces no gate failure; the home-state vector still fails RD2 and RD3; the existing tests pass | pass |
 | T2 | `for r in VT NH ME: python check_road_dist.py check --regions $r --gates B0 R0b R8`, one region at a time, nothing else heavy running; outputs concatenated with `===== R` headers | 0 gate failures; RD1/RD4 values equal those in `docs/quality/evidence/CR-0014-gates.txt` (pinned seed) |
-| T3 | `python check_road_dist.py check --regions ME VT --root /home/ec2-user/grouse_backup/CR-0014` (the pre-CR-0014 home-state-only rasters) | RD2 or RD3 FAIL on the state-line and grid-edge strata in both regions (other rows may fail too; recorded, not required) |
+| T3 | `for r in ME VT: python check_road_dist.py check --regions $r --root /home/ec2-user/grouse_backup/CR-0014` (the pre-CR-0014 home-state-only rasters), one region at a time, nothing else heavy running | RD2 or RD3 FAIL on the **state-line** stratum in ME and in VT (pre-registered). The grid-edge stratum is recorded as measured, whatever it shows — it is not part of the requirement and is not adjusted after the run. Other rows may fail; recorded |
 
 ## Impact
 CR-0014's acceptance stands: its run passed every gate, and the table above

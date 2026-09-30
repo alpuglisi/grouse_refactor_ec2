@@ -1,6 +1,11 @@
 # CR-0012: One global block grid, one pooled train/val split, one pooled negative draw
 
-**Status: TEXT APPROVED (v2.1, commit `29f388b`), 2026-09-30.** Implementation waits for CR-0007 and CR-0013 (landing order).
+**Status:**
+- **v2.1 text approved** at commit `29f388b` (2026-09-30).
+- **v2.2 amendment** (bounded re-review pending): it cites CR-0013's
+  config for output column order and the manifest schema (CR-0013
+  implementer findings F2 and F3).
+- Implementation waits for CR-0007 and CR-0013 (landing order).
 History, verdicts and dispositions: `CR-0012-review-log.md`. Split from
 CR-0007 v7 (`bb170ea`). This document states only current intent.
 
@@ -92,10 +97,13 @@ Conventions:
 5. Assign `block_ids`. Visit blocks by ascending `order_key(block_id)`.
    Add whole blocks to validation until the running record count reaches
    `round(VAL_FRACTION × N)` (the `:105-111` rule).
-6. Write, per R, `thinned_/train_/val_positives_R.csv`, adding `region`,
-   `block_id` and `split`. The train and val files are exactly the
-   combined file's `split` rows. Write one `block_assignments.csv`
-   (`block_id`, `split`, `n`).
+6. Write, per R, `thinned_/train_/val_positives_R.csv`, adding
+   `block_id` and `split`. `region` already exists in S (CR-0007 §2).
+   The columns are exactly CR-0013's config `columns.positives`, in that
+   order, selected from S by name; so `region` follows `envelope_id`.
+   The train and val files are exactly the combined file's `split` rows.
+   Write one `block_assignments.csv` with columns
+   `columns.block_assignments`.
 
 **Candidate pool (`generate_negatives.py`):**
 1. Load `gbif_negatives_R` for every R. Raise unless `state == R`.
@@ -141,8 +149,10 @@ Conventions:
   Efraimidis–Spirakis sampling without
   replacement. It uses no index labels, which removes `weighted_take`'s
   `.loc` hazard (`:267-274`).
-- Write `negatives_R.csv` with the `:304-309` columns plus `region`. Its
-  train and val files are exactly its `split` rows.
+- Write `negatives_R.csv` with exactly CR-0013's config
+  `columns.negatives`: the `:304-309` columns, then `region`. Its train
+  and val files are exactly its `split` rows. The pool file uses
+  `columns.pool`.
 
 **Split manifest (`data/pipeline/split_manifest.json`).** It has two
 sections, one written by each script:
@@ -152,7 +162,11 @@ sections, one written by each script:
   unless the `positives` section's output digests match the files on
   disk.
 
-Each section records:
+The manifest's keys, the meaning of its counts (rows of a region
+remaining after each numbered step), the `draw` object and the format of
+the dropped list are defined by CR-0013's config `manifest_schema`
+(`docs/quality/acceptance_split.json`), which is normative. Each section
+records:
 - every constant in CR-0013's config list, one for one;
 - the hash spec;
 - the sha256 of every input read (including each raster) and every output
@@ -161,8 +175,8 @@ Each section records:
 - the dropped coordinates (pool step 4);
 - the git commit, and `dirty: true` if `git status --porcelain` lists any
   tracked `.py` file;
-- the pandas, numpy, scipy, pyproj and PROJ versions, and the 4326→5070
-  operation string.
+- the `environment` object of CR-0013's config (library versions and the
+  4326→5070 operation string).
 
 **Writes.** Each script builds all its outputs in memory, raises before
 writing anything, then writes each file to a temp file in the same

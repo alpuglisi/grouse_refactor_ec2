@@ -298,3 +298,34 @@ pre-approval under §1.1 and must be written and reviewed first; deliverable
   - whether a PA is needed for findings lost when a gate moves between
     CRs (BUG-0040 §7);
   - whether runtime guards belong in PA-0021's scope.
+
+## v2.3 dispositions — replay implementer findings F1–F18 (author, 2026-09-30)
+Source: `docs/quality/evidence/CR-0013-implementer-findings.md`, from the
+separate author at `8501b51`. The author did not read or change
+`acceptance_split.py` or its tests; only the config (data) was read.
+Each location below is the operative text (PA-0024(a)).
+
+| id | disposition and operative location |
+|---|---|
+| F1 | **Accept.** CR-0013 rule 4 lists CR-0007 at `6619bdd` (v9 approved) as a source. § Normative definitions adds its §1 names and `verify_partition` rule, and its §2 `region` column. The config still names v8's `COUNTY_POLYGONS`; it is re-pinned to v9's `COUNTY_POLYGONS_YEAR`/`PATH_TEMPLATES["tiger_county"]` by deliverable 5a. |
+| F2 | **Accept.** CR-0013 § Config: `manifest_schema` is normative. CR-0012 v2.2 § Split manifest cites it. |
+| F3 | **Accept; CR-0012 changes, CR-0007 does not.** CR-0012 v2.2 positives step 6 and Draw: outputs use the config's `columns` lists in order, so `region` is selected from S and placed after `envelope_id`. CR-0013 § Config `columns` states the derivation. E0 stays an ordered-list check. CR-0007 v9 (approved, being implemented) keeps `region` after `spatial_zone` in S. |
+| F4 | **Accept.** CR-0013 deliverable 5: every gate FAILs except E1p. E2 and E8 fail substantively; E3/E7/E9/E10 fail on the missing C. |
+| F5 | **Accept.** CR-0013 § CLI and report, `--data-root`: required layout, and the symlinked scratch-root composition for a backup. |
+| F6 | **Accept.** CR-0013 § Standing subset: file `x_5070`/`y_5070`, bound by digests, checked by R1/R4. The gate-table preamble limits "recomputed" to the full run. |
+| F7 | **Accept.** CR-0013 § Normative definitions: all 15 `FEATURE_SPEC` keys, including `nlcd`. |
+| F8 | **Accept.** CR-0013 § Normative definitions quotes the `generate_negatives.py:198-199` rule, giving `evh, evt, sclass`. |
+| F9 | **Accept in CR-0013; Tracked for CR-0012.** CR-0013 § Normative definitions, "Coordinates". CR-0012's text is not amended for this (v2.2 is limited to F2/F3); tracker item added. |
+| F10 | **Accept.** CR-0013 E11 (a)–(e): input listing rule; fallback rasters; running environment; `ast` parse with the eight names plus `STATE_FIPS`, `COUNTY_POLYGONS_YEAR`. |
+| F11 | **Accept as an exact GATE** (an exact predicate, not a statistic, so design rule 2 does not apply). CR-0013 § Replay gates: canonical order is required. The code change (NOTE → GATE) is deliverable 5a. |
+| F12 | **Accept.** CR-0013 § Config, Environment: adds rasterio, GDAL, geopandas, shapely and pyogrio. The config update is deliverable 5a. The manifest carries the same object (CR-0012 v2.2 § Split manifest). |
+| F13 | **Accept.** CR-0013 deliverable 2: no OBS file until `--calibrate`; settings in the config's `obs`. |
+| F14 | **Accept.** CR-0013 § Standing subset: signature and test hooks, a single `AcceptanceError`, missing or other-config record refused, `--standing` defaults. |
+| F15 | **Implementer's reasonable reading, recorded.** CR-0013 § Observations lists the choices; values are in the config's `obs` section. The rows are non-blocking. |
+| F16 | **Accept (a)–(d) as normative readings.** CR-0013 § Normative definitions, "Premises and ties". The (a) block tie-break for CR-0012's text is Tracked with F9. |
+| F17 | **Accept.** CR-0013 § Attacks: the positive-`weight` row also fails E0; ×20 is split into a replicated-rows row (E3, R4) and a weight-only row (R4; E10 if written). |
+| F18 | **Recorded; no change.** `--emit-reference` behaviour, record sha printed, missing-input reporting, replay staging and bounded-memory validation are the implementer's reasonable readings. The record's evidence copy is written by CR-0012's implementer (CR-0013 § Record). |
+
+| version | date | change |
+|---|---|---|
+| v2.3 | 2026-09-30 | Implementer findings F1–F18. <br>• Sources: CR-0007 at `6619bdd`; CR-0012 re-pinned to its v2.2 approval commit (to be filled). <br>• Definitions: coordinates, premises and ties; 15 features; envelope rule. <br>• Config: `columns`, `manifest_schema`, environment extended. <br>• Gates and checks: E11 (a)–(e); canonical-order gate; standing details. <br>• Runs: data-root layout; expected-FAIL list. <br>• Deliverable 5a added. |

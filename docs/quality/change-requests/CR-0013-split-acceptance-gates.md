@@ -1,7 +1,12 @@
 # CR-0013: Acceptance gates for the pooled split and draw, as a committed script
 
-**Status: REVISED (v2), 2026-09-30.** Awaiting round-2 review. Deliverables
-0–5 are pre-approval and are reviewed in round 2. The rest are pending.
+**Status: REVISED (v2.3), 2026-09-30.**
+- v2.2 text was signed off by both reviewers.
+- v2.3 answers the replay implementer's findings F1–F18
+  (`docs/quality/evidence/CR-0013-implementer-findings.md`). It awaits a
+  bounded re-review.
+- Deliverables 2–5 were done at `8501b51`. Deliverable 5a follows from
+  v2.3.
 
 History, verdicts and dispositions are in `CR-0013-review-log.md`. This
 CR was split from CR-0007 v7's acceptance layer (commit `bb170ea`). This
@@ -46,11 +51,16 @@ artifact row-for-row.
 3. **No escape mode.** No flag, environment variable or config key
    disables or downgrades a GATE. Pre-CR data fails.
 4. **Separate authorship** (user decision).
-   - A fresh agent writes `acceptance_split.py`, given only this CR, CR-0012
-     **at the commit where CR-0012 is approved — `29f388b` (CR-0012 v2.1,
-     text approved 2026-09-30)**, and the code at commit `05d788d`. CR-0013 is re-pinned whenever
-     CR-0012 is revised; the replay is written only after CR-0012's text
-     is approved.
+   - A fresh agent writes `acceptance_split.py`. Its only sources are:
+     - this CR;
+     - **CR-0012 at the commit where CR-0012 v2.2 is approved** (to be
+       filled in after its bounded re-review). v2.1 at `29f388b` was the
+       source for `8501b51`.
+     - **CR-0007 at `6619bdd`** (v9, approved), for its §1 table,
+       `verify_partition` and its §2 `region` column;
+     - the code at `05d788d`.
+   - CR-0013 is re-pinned whenever CR-0012 or CR-0007 is revised. The
+     replay is written only against approved text.
    - A different fresh agent implements CR-0012.
    - Both agents' transcript ids are recorded in the review log, and
      reviewers check them.
@@ -68,12 +78,32 @@ re-implements it; it does not import it.
 | `generate_negatives.build_weight` (including its four basis strings), `split_for_unassigned` | E10, R3 |
 | `grouse_data.RegionData.raster_path(feat, year)` (nearest valid year) | E8, R3 |
 | `dataset.py:98-102` year fill | E8 |
+| **CR-0007 v9 at `6619bdd`, §1:** `REGIONS`, `STATE_FIPS`, `COUNTY_POLYGONS_YEAR` (2023, read through `PATH_TEMPLATES["tiger_county"]`, i.e. `data/roads/tl_2023_us_county.zip`). `verify_partition`: pyogrio `STATEFP IN (<STATE_FIPS values>)`, dissolve by `STATEFP`, EPSG:4269 → 4326, `within`. It returns records in no polygon, or whose polygon's state ≠ `state`. | E1, E11, E12, R3 |
+| **CR-0007 v9 §2:** `evaluated_sightings_R` carries `region == state == R` | E1, R1 |
+
+**Coordinates.** Every distance, thin, buffer and block id is computed
+from EPSG:5070 coordinates **recomputed from lon/lat** with the pinned
+transform. The `x_5070`/`y_5070` columns are recorded values, checked by
+full-row equality. On today's files they differ from a fresh transform by
+at most 1.4e-9 m (F9). CR-0012's text does not yet say this (tracker).
+
+**Premises and ties.** Each is a normative reading, recorded as F16:
+- **Block-order ties.** A key collision between two blocks is broken by
+  the `block_id` string.
+- **`gbif_id` premise.** If `gbif_id` is null or not unique, the replay
+  raises, so R3 and its dependants FAIL.
+- **Crosswalk.** If the newest `LF*_EVT.csv` is not the pinned path, or
+  its sha256 differs, the replay raises.
+- **Year fill for E8.** The max is taken per checked file and region.
+  This is moot while no year is NaN, which pool step 7 guarantees.
 
 The config carries the values these need:
-- `FEATURE_SPEC` keys: evt, evh, evc, sclass, fdist, ch, cc and the
-  continuous features.
-- The envelope-feature list: `ENVELOPE_SCHEME` columns plus `sclass`
-  and `evt`.
+- `FEATURE_SPEC` keys, all 15 at `models.py:517`: evt, evh, evc,
+  sclass, fdist, ch, cc, tcc, nlcd, road_dist, tsd, balive, tpa_live,
+  qmd, carbon_dwn.
+- The envelope-feature list is
+  `sorted({c for c, _ in ENVELOPE_SCHEME if c not in ("evt_phys", "evt_group")} | {"sclass", "evt"})`
+  (`generate_negatives.py:198-199`), which gives `evh, evt, sclass`.
 - `ENVELOPE_SCHEME`, `NON_VEG_SCLASS_CODES` and the `EVT_PHYS` non-veg
   prefixes.
 - The crosswalk path (`data/landfire/attribute_tables/LF2025_EVT.csv`)
@@ -119,14 +149,23 @@ limit 2.
   `split_for_unassigned` spec, window predicate, dedup rule and the
   lists above.
 - **Paths.** The county file path and sha256.
-- **Environment.** pandas, numpy, scipy, pyproj and PROJ versions, plus
-  the 4326→5070 operation string.
+- **Environment.** Versions of pandas, numpy, scipy, pyproj, PROJ,
+  rasterio, GDAL, geopandas, shapely and pyogrio, plus the 4326→5070
+  operation string.
+- **`columns`.** The ordered column list for every output: P, N, C and
+  B. These are normative for CR-0012 (v2.2 cites them). The positives
+  list is the `evaluated_sightings` columns at `05d788d`, then `region`,
+  `block_id`, `split`. `region` is selected by name from S, where
+  CR-0007 §2 places it after `spatial_zone`. CR-0007 is unchanged.
+- **`manifest_schema`.** The manifest's keys, count meanings (rows of a
+  region remaining after each numbered step) and dropped-list format
+  (`[lon, lat]`, sorted). Normative; CR-0012 v2.2 cites it.
+- **`obs`.** OBS settings: `OBS_Z`, null sizes, seeds and cell sizes.
 - **Rounding and parsing.**
   - Every `round` is Python's `round()` on the float64 product (half to
     even).
   - CSVs are read with `float_precision="round_trip"`.
   - Canonical row order is as in CR-0012 §2.
-- `OBS_Z = 4`, a reporting level only.
 
 A config edit is a reviewed change. `acceptance_record.json` stores the
 config's sha256, and CR-0009 cites it. A coordinated edit of the config
@@ -150,8 +189,9 @@ Every path is under `--data-root` (default: the repository), for R in
 
 ## Gates (GATE, exact)
 Combined files (`thinned_positives_R`, `negatives_R`) are pooled over
-`REGIONS`. Parts are never pooled with their combined file. Block ids are
-recomputed from lon/lat, never read.
+`REGIONS`. Parts are never pooled with their combined file. In the full
+run, block ids and distances use coordinates recomputed from lon/lat,
+never read from a column.
 
 | id | set, pooling | predicate |
 |---|---|---|
@@ -167,13 +207,16 @@ recomputed from lon/lat, never read.
 | E8 | P, N combined; C | window predicate holds for every `FEATURE_SPEC` raster at `raster_path(feat, year)`, with `year` filled as `dataset.py:98-102` does |
 | E9 | N per (R, split) | count `= round(n_pos × NEG_RATIO)`, where `n_pos` is counted from P; NonVeg `≤ round(n × NONVEG_MAX_FRAC)`; habitat pool in C `≥` habitat target |
 | E10 | C, N | `evt_phys`, `envelope_id`, `is_nonveg`, `weight` and `weight_basis` equal the recomputed values (weight to relative 1e-12) |
-| E11 | M | M's constants, specs, environment and `REGIONS` equal the config. M's output digests equal the digested artifacts. M's input digests equal the files in I and S on disk. `regions.py`'s values equal the config. |
+| E11 | M | (a) Every S ∪ I file is listed in M's inputs, with a sha256 equal to the file on disk. A listed input outside S ∪ I passes only if it is a digested artifact that matches disk. <br>(b) "Every raster read" includes the fallback candidates that `raster_path`'s validation opens. <br>(c) M's constants, specs, `REGIONS` and environment equal the config, and so does the running environment. <br>(d) M's output digests equal the digested artifacts. <br>(e) `regions.py`, parsed with `ast`, holds literal values equal to the config for the eight CR-0012 names plus `STATE_FIPS` and `COUNTY_POLYGONS_YEAR`. |
 | E12 | C, N; M | `verify_partition`, reimplemented, finds 0. M's dropped list equals the recomputation on the deduplicated raw candidates. |
 
 **Replay gates.** From S, I and the config, the script produces P, B, C and
 N, the same files CR-0012 writes. Equality is **full-row**: every
 column, row sets matched on key, floats to relative 1e-12, everything
 else exact. The manifest's per-step counts must also match.
+
+Each R-gate also requires the shipped rows to be in CR-0012's canonical
+order (config `row_order`).
 
 | id | replayed | also checks |
 |---|---|---|
@@ -193,8 +236,19 @@ else exact. The manifest's per-step counts must also match.
 The record's own sha256 goes into the committed evidence file
 `docs/quality/evidence/CR-0012-acceptance.txt`.
 
-**Standing subset.** `standing_checks(img_size, jitter, augment)` is called by
-CR-0012 §5. It imports only numpy, pandas and scipy, at call time.
+**Standing subset.** `standing_checks(img_size, jitter, augment, *,
+data_root=None, config=None)` is called by CR-0012 §5.
+- The two keyword-only arguments are test hooks. Their defaults are the
+  repository and the default config, and they cannot disable a check.
+- It imports only numpy, pandas and scipy, at call time.
+- Without pyproj it takes `x_5070`/`y_5070` from the files. The standing
+  digests bind those columns to the accepted bytes, and R1/R4 checked them
+  against lon/lat at acceptance.
+- It collects every failure, then raises one `AcceptanceError` (a
+  `RuntimeError`).
+- It refuses a missing record, and a record made under a different config
+  sha256.
+- `--standing` uses the config's `standing` defaults (64, 0, False).
 - Checks: E0 (P and N only), E1, E1p, E3 (N), E4, E5 and E6 on the 18
   CSVs for every config region.
 - Digests: the 18 CSVs' sha256 must equal the record's.
@@ -202,7 +256,6 @@ CR-0012 §5. It imports only numpy, pandas and scipy, at call time.
   `(path, size, mtime_ns)`.
 - Window size: `img_size + 2·pad ≤ WINDOW_PX`, where `pad = jitter` if
   `augment` else 0.
-- Every failure uses `raise`.
 
 | gate | full run | `standing_checks` |
 |---|---|---|
@@ -212,7 +265,13 @@ CR-0012 §5. It imports only numpy, pandas and scipy, at call time.
 
 ## CLI and report
 `acceptance_split.py` takes these options:
-- `--data-root DIR` (for example `/home/ec2-user/grouse_backup/CR-0007/`)
+- `--data-root DIR`. The root must hold `data/pipeline/`,
+  `data/negatives/`, `data/landfire/` and `data/roads/`. A backup without
+  that layout (e.g. `/home/ec2-user/grouse_backup/CR-0007/`, which holds
+  `pipeline/` and `negatives/`) is run through a scratch root:
+  - each CSV is symlinked file by file, so no record can be written into
+    the backup;
+  - `data/landfire` and `data/roads` are linked to the live tree.
 - `--config`
 - `--emit-reference DIR` (writes the replay's own artifacts)
 - `--calibrate`
@@ -233,7 +292,7 @@ committed by deliverable 1.
 |---|---|---|
 | Box-clipped membership | `inv_reviewB_confirm.py` | E1, E4, E5 |
 | Train rows copied into `val_positives_ME.csv` | CR-0013 round-1 A | E1p |
-| Val-positive `year` set to NaN, or a positive `weight` set to 0.2 | CR-0013 round-1 A | R1 |
+| Val-positive `year` set to NaN, or a positive `weight` set to 0.2 (this adds a column, so it also fails E0) | CR-0013 round-1 A | R1 |
 | Column dropped or added | CR-0013 round-1 B | E0 |
 | Per-region thin, then pool | `inv_reviewB_pipeline.py` | E2, R1 |
 | Thin at 60 m | `inv_reviewF_i12.py` | R1, E11 |
@@ -253,7 +312,8 @@ committed by deliverable 1.
 | Weight collapse; NonVeg or species monoculture | `res_comp_attacks.py` | E10, R4 |
 | Pool weight suppression; `build_weight` changed | v7 stated limits 4–5 (`bb170ea`) | E10 |
 | No 300 m buffer | R7-A `attacks.py` A1; `inv_reviewF_attack_buffer.py` | E7, R3 |
-| With replacement; ×20 near grouse | R7-A `attacks.py` A2, A3p | E3, R4 |
+| With replacement; ×20 near grouse, as replicated rows | R7-A `attacks.py` A2, A3p | E3, R4 |
+| Weight ×20 near grouse, no replication | R7-A `attacks.py` A3p (variant) | R4; E10 if the weights are written |
 | Val candidates near val positives thinned | R7-A `valattack.py` | R3 |
 | Duplicate negatives, 5–10 % | R7-A `comp.py`, `inv_reviewH_negdup.py` | E3, R4 |
 | Partition exception kept (NH-filed record in ME); dropped list edited | CR-0013 round-1 B | E12 |
@@ -277,6 +337,17 @@ Null populations:
 - **N-draw:** 400 replays of R4 with the draw seed varied. The realised
   split and pool are fixed.
 - **N-perm:** 1,000 in-run permutations of the val labels over blocks.
+
+Operational choices are fixed in the config's `obs` section and recorded
+as F15:
+- null seeds are `null_seed_base + i`;
+- "records per val block" is the mean;
+- a block's val indicator means "holds any val record";
+- the weight-proportional pool is the pool's `weight_basis` histogram
+  weighted by `weight`;
+- the worst cell is taken over (R, split);
+- `d` uses the combined files;
+- "previous accepted run" means the previous record's `obs` values.
 
 A z-score is reported only for rows that have a null. Rows marked
 "none" report the value and its change from the previous accepted run.
@@ -379,8 +450,8 @@ A z-score is reported only for rows that have a null. Rows marked
       data-producing ones (`build.py`, `lib.py`, `feats.py`). Their CSV
       outputs are regenerable and not committed; they are labelled
       provenance-only.
-- [ ] 2. The config and OBS file (constants, specs and environment; no
-      references).
+- [x] 2. The config (constants, specs, environment and `obs` settings).
+      The OBS file is created only by `--calibrate`.
       E0's ordered column lists are derived and written out here:
       positives = the `evaluated_sightings` columns at the pinned commit
       plus `region`, `block_id`, `split`; negatives = `CSV_KEEP` plus the
@@ -390,15 +461,29 @@ A z-score is reported only for rows that have a null. Rows marked
       cell): the acceptance tables of CR-0007..0013 and live-code
       thresholds; each instance found gets its own BUG (§3.5); update the
       Swept? cell.
-- [ ] 3. `acceptance_split.py`, by a separate author (rule 4).
-- [ ] 4. `tests/test_acceptance_split.py`: every attack row, the unit
-      tests and the shuffle test. Run it; all pass.
-- [ ] 5. Run the script on today's pre-CR files (`--data-root` defaults to
+- [x] 3. `acceptance_split.py`, by a separate author (rule 4), at `8501b51`.
+- [x] 4. `tests/test_acceptance_split.py`: every attack row, the unit
+      tests and the shuffle test. 77 pass at `8501b51`.
+- [x] 5. Run the script on today's pre-CR files (`--data-root` defaults to
       the repository, read-only, with no record written on failure) and on
       `/home/ec2-user/grouse_backup/CR-0007/` if it exists. Commit the
       report.
-      - Expected FAIL: E0 (no `region`, no B, C or M), E1, E4, E5, E6,
-        E11, E12, R1–R4. Every gate must be reported.
+      - Expected: **every gate FAILs except E1p**. Every gate must be
+        reported.
+      - Substantive failures:
+        - E0, E1, E4, E5, E6, E11, E12 and R1–R4;
+        - **E2**: 1,690 positive pairs under 30 m;
+        - **E8**: 4 NH-filed foreign positives outside the window.
+      - E3, E7, E9 and E10 fail because C is missing (named FAIL); their
+        N parts are clean.
+      - Done at `8501b51` (`docs/quality/evidence/CR-0013-first-run.txt`).
+- [ ] 5a. v2.3 follow-ups, by the replay author:
+      - config: `pins.cr0007` → `6619bdd`; the `regions_py` extra name
+        `COUNTY_POLYGONS` → `COUNTY_POLYGONS_YEAR`, with the county path
+        from `PATH_TEMPLATES["tiger_county"]`; the environment additions;
+      - code: E11(e) names; the canonical-order check in R1–R4, promoted
+        from `NOTE` to GATE;
+      - tests for both. Re-run deliverable 5.
 
 **After approval:**
 - [ ] 6. Inside CR-0012 deliverable 6: the full run passes. Then run

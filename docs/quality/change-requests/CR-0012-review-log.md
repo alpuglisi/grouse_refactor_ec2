@@ -224,3 +224,17 @@ file is unchanged since). This is the version CR-0013's replay
 implements (CR-0013 rule 4). Implementation also waits for
 CR-0007 and CR-0013 (acceptance) per the landing order.
 
+
+## v2.2 amendment — from CR-0013 implementer findings (author, 2026-09-30)
+Scope limited to F2 and F3 (coordinator instruction). The bounded
+re-review examines only the changed text.
+
+| id | disposition and operative location |
+|---|---|
+| F2 | **Accept.** CR-0012 § Split manifest cites CR-0013's config `manifest_schema` as normative: keys, count meanings, `draw` and the dropped-list format. The environment bullet now reads "the `environment` object of CR-0013's config", which also carries F12's additions. |
+| F3 | **Accept.** CR-0012 positives step 6 no longer "adds" `region` (S already has it, CR-0007 §2). The columns are the config's `columns.positives`, in order, with `region` after `envelope_id`. Draw: `columns.negatives`, `region` last; the pool uses `columns.pool`. CR-0007 is unchanged. |
+| F9, F16(a) | **Tracked, not in v2.2.** "5070 coordinates are recomputed from lon/lat" and the block-order tie-break by `block_id` are normative in CR-0013 § Normative definitions. CR-0012's text is to follow at its next revision (tracker). |
+
+| version | date | change |
+|---|---|---|
+| v2.2 | 2026-09-30 | Cites CR-0013's config `columns` and `manifest_schema` (F2, F3). |

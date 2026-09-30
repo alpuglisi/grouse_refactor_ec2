@@ -530,6 +530,37 @@ class GrouseModelHandler:
             return obj["state_dict"], obj.get("config")
         return obj, None
 
+    @staticmethod
+    def _model_config(model, features):
+        return {"pool": model.pool_mode,
+                "center_skip": bool(model.center_skip),
+                "features": list(features),
+                "keep_early_resolution": bool(model.keep_early_resolution),
+                "early_attn": model.early_attn is not None,
+                "early_attn_kv_stride": model._early_attn_kv_stride}
+
+    @staticmethod
+    def check_checkpoint_config(model, features, cfg, source="checkpoint"):
+        """Raise if a checkpoint's stored config doesn't match the model
+        it's being loaded into. BUG-0010: config was saved but never
+        validated on load, allowing a checkpoint trained with one pooling
+        mode to silently load into a handler built with a different one -
+        mean/center/gauss pooling share identical parameter shapes, so
+        load_state_dict succeeds either way. cfg=None (legacy checkpoints
+        written before the config field existed) skips validation, matching
+        unwrap_checkpoint's documented backward-compatibility contract."""
+        if cfg is None:
+            return
+        actual = GrouseModelHandler._model_config(model, features)
+        mismatches = {k: (cfg[k], actual[k]) for k in actual
+                      if k in cfg and cfg[k] != actual[k]}
+        if mismatches:
+            raise ValueError(
+                f"{source}: checkpoint config does not match this model's "
+                f"construction - refusing to load a mismatched "
+                f"architecture (BUG-0010). Mismatched fields as "
+                f"(checkpoint, actual): {mismatches}.")
+
     def _set_dropout(self, value):
         """--dynamic-dropout's actuator: every plain nn.Dropout/
         nn.Dropout2d module in the network (self.drop, plus
@@ -1314,7 +1345,7 @@ class GrouseModelHandler:
             improved = (sel_ref is None
                         or sel > sel_ref + self.select_min_delta)
             best_loss = min(best_loss, metrics['val_loss'])
-            best_auc = max(best_auc, metrics['tta_auc'])
+            best_auc = max(best_auc, metrics.get('tta_auc', float('-inf')))
             best_strict = max(best_strict,
                               metrics.get('strict_accuracy', float('-inf')))
             best_rank = max(best_rank, metrics['rank_score'])
@@ -1401,8 +1432,12 @@ class GrouseModelHandler:
                         f"Saved at epoch {step} ({self.select_by} "
                         f"score={sel:.4f})", step)
 
+            # BUG-0012 (recurrence): this call site was missed in the
+            # original fix - same conditional-population-vs-unconditional-
+            # consumption defect as the other tta_auc usages above.
             if guard.update(metrics.get('strict_accuracy', float('-inf')),
-                            metrics['tta_auc'], metrics['ap']):
+                            metrics.get('tta_auc', float('-inf')),
+                            metrics['ap']):
                 streak_epochs = f"epochs {epoch - self._divergence_patience + 2}-{epoch + 1}"
                 if self.on_divergence == 'warn':
                     msg = (f"   [!] DIVERGENCE: strict accuracy rose while "
@@ -1929,8 +1964,11 @@ class GrouseModelHandler:
                    path or self.save_path)
 
     def load(self, path=None):
-        state, _cfg = self.unwrap_checkpoint(torch.load(
-            path or self.save_path, map_location=self.device,
-            weights_only=True))
+        load_path = path or self.save_path
+        state, cfg = self.unwrap_checkpoint(torch.load(
+            load_path, map_location=self.device, weights_only=True))
+        self.check_checkpoint_config(
+            self.model, list(self.cat_features) + list(self.cont_features),
+            cfg, source=load_path)
         self.model.load_state_dict(state)
         return self

@@ -18,11 +18,9 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # match the 'state' column directly. Values are (min_lon, min_lat, max_lon,
 # max_lat) with a ~0.1 deg buffer around each state's observed sighting
 # extent so points near the border still land inside a raster.
-BOXES_COORDINATES = {
-    "ME": (-71.158, 42.889, -66.852, 47.555),
-    "NH": (-72.626, 42.605, -70.614, 45.398),
-    "VT": (-73.510, 42.632, -71.422, 45.112),
-}
+# BUG-0001: was a manually-synced duplicate that drifted from its siblings;
+# now a single shared source of truth.
+from regions import BOXES as BOXES_COORDINATES
 
 EMAIL = "your.email@example.com"
 

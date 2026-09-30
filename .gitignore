@@ -7,7 +7,12 @@
 # 3. Explicitly allow essential configuration files in the root
 !/.gitignore
 
-# 4. Root-level docs (README.md, ARCHITECTURE.md, ...). Root only, so
+# 4. Allow the quality management system docs tree
+!/docs/
+!/docs/**/
+!/docs/**/*.md
+
+# 4b. Root-level docs (README.md, ARCHITECTURE.md, ...). Root only, so
 #    nothing under data/ or any other output directory sneaks in.
 !/*.md
 

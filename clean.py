@@ -41,13 +41,9 @@ from scipy.spatial import cKDTree
 
 REGIONS_DEFAULT = ["ME", "NH", "VT"]
 
-# Same boxes as analyze_grouse.py / download.py - kept in sync manually
-# since this script only reads evaluated_sightings CSVs, not the boxes.
-BOXES = {
-    "ME": (-71.158, 42.889, -66.852, 47.555),
-    "NH": (-72.626, 42.605, -70.614, 45.398),
-    "VT": (-73.510, 42.632, -71.422, 45.112),
-}
+# BUG-0001: was a manually-"kept in sync" duplicate that drifted from its
+# siblings; now a single shared source of truth.
+from regions import BOXES
 MIN_SPACING_M_DEFAULT = 30
 #MIN_SPACING_M_DEFAULT = 250     # ~grouse home-range scale; use 30 for
                                  # "guaranteed no shared raster pixel" instead

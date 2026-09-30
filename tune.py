@@ -198,6 +198,19 @@ def main():
                         help="How many top combos to print (default: %(default)s)")
     args = parser.parse_args()
 
+    # NEW-BUG (found in a follow-up review, same class as BUG-0002/0003/
+    # 0004: a fix/extension landed in tune_bins.py - which swept ch/cc/
+    # fdist and dropped the since-abandoned slope/aspect variants this
+    # file still carries - and was never reconciled back here. Both
+    # scripts write to the SAME data/pipeline/bin_tuning_{region}.csv, so
+    # whichever runs last silently overwrites the other's results with no
+    # indication of which variable set produced the file.
+    print("WARNING: tune_bins.py supersedes this script (adds ch/cc/fdist "
+         "sweeps, drops the abandoned slope variant) and writes to the "
+         "SAME output file (data/pipeline/bin_tuning_{region}.csv) - "
+         "running both will silently clobber whichever ran first. Prefer "
+         "tune_bins.py; see docs/quality/bugs/BUG-0016-tune-shared-output-path.md.")
+
     for region in args.regions:
         path = f"data/pipeline/evaluated_sightings_{region}.csv"
         print(f"\n##########################################")

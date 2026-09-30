@@ -129,8 +129,13 @@ def main():
     print("  Loading your trained checkpoint if present "
           "(grouse_single_best.pth)...")
     try:
+        # BUG-0011: mirror train.py's actual defaults (pool='attn',
+        # center_skip=True) instead of this class's generic library
+        # defaults, so a real checkpoint (trained via train.py's CLI)
+        # loads correctly instead of hitting a config mismatch.
         handler2 = GrouseModelHandler(feats, pretrained=False,
-                                      save_path="data/models/grouse_single_best.pth")
+                                      save_path="data/models/grouse_single_best.pth",
+                                      pool='attn', center_skip=True)
         handler2.load("data/models/grouse_single_best.pth")
         val_small = ConcatDataset([
             GrousePatchDataset(rd.positives("val").head(32), rd, cat_f,
@@ -169,6 +174,16 @@ def main():
     except FileNotFoundError:
         print("  grouse_single_best.pth not found in this directory - "
              "run from where train.py saved it, or skip this section.")
+    except (RuntimeError, ValueError) as e:
+        # BUG-0011: previously only FileNotFoundError was caught, so a
+        # config/shape mismatch (e.g. checkpoint trained with different
+        # --pool/--center-skip flags) crashed the whole script instead of
+        # reporting cleanly.
+        print(f"  Couldn't load grouse_single_best.pth into this section's "
+             f"handler (pool='attn', center_skip=True, matching train.py's "
+             f"defaults) - if you trained with different --pool/"
+             f"--center-skip flags, this diagnostic doesn't know that yet: "
+             f"{e}")
 
 
 if __name__ == "__main__":

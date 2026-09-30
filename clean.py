@@ -1,3 +1,4 @@
+raise SystemExit("clean.py is a stale copy of prepare_training_data.py (BUG-0031); use prepare_training_data.py")  # CR-0012 section 6, PA-0002/PA-0026
 """
 prepare_training_data.py
 

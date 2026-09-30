@@ -17,7 +17,7 @@ of constructing paths themselves:
     me.positives("val")                    # val_positives_ME.csv
     me.evaluated                           # evaluated_sightings_ME.csv
     me.envelope_metrics                    # envelope_metrics_ME.csv
-    me.block_assignments                   # block_assignments_ME.csv
+    data.block_assignments                 # block_assignments.csv (global)
     me.raster_path("sclass", 2024)         # exact year, must exist
     me.raster_path("sclass", 2025)         # -> nearest available (2024)
     me.raster_years("sclass")              # [2022, 2023, 2024]
@@ -119,7 +119,11 @@ PATH_TEMPLATES = {
     "train_negatives":   "data/negatives/train_negatives_{region}.csv",
     "val_negatives":     "data/negatives/val_negatives_{region}.csv",
     "gbif_candidates":   "data/negatives/gbif_negatives_{region}.csv",
-    "block_assignments": "data/pipeline/block_assignments_{region}.csv",
+    # CR-0012: one global block grid and split, and its bookkeeping.
+    "block_assignments": "data/pipeline/block_assignments.csv",
+    "candidate_pool":    "data/negatives/candidate_pool.csv",
+    "split_manifest":    "data/pipeline/split_manifest.json",
+    "acceptance_record": "data/pipeline/acceptance_record.json",
     "bin_tuning":        "data/pipeline/bin_tuning_{region}.csv",
     "diagnostic_map":    "data/maps/grouse_diagnostic_map_{region}.png",
     # CR-0007: in-state background points behind envelope_metrics' Avail_N.
@@ -254,6 +258,10 @@ class RegionData:
         self._cache = {}
         self._raster_validity_cache = {}
         self._year_gap_warned = set()
+        # CR-0012: every raster file this accessor resolved or opened for
+        # content validation (fallback candidates included), so a run can
+        # digest every raster it read.
+        self.rasters_touched = set()
 
     # ---- path machinery -------------------------------------------------
     def path(self, kind, must_exist=True, **kw):
@@ -305,6 +313,7 @@ class RegionData:
         released that vintage for this region yet) in case a bad file
         ever reaches disk through some other path. Cached per path since
         opening a full raster isn't free."""
+        self.rasters_touched.add(path)
         if path in self._raster_validity_cache:
             return self._raster_validity_cache[path]
         try:
@@ -371,6 +380,7 @@ class RegionData:
             year = chosen
 
         path = self.path("raster", feature=feature, year=year)
+        self.rasters_touched.add(path)
         if not validate or self._is_valid_raster(path):
             return path
 
@@ -439,10 +449,6 @@ class RegionData:
     @property
     def thinned(self):
         return self._load_csv("thinned")
-
-    @property
-    def block_assignments(self):
-        return self._load_csv("block_assignments")
 
     def positives(self, split="all"):
         """Thinned positive training data. split: 'train', 'val', or
@@ -546,6 +552,28 @@ class GrouseData:
     def __init__(self, config=None):
         self.config = config or DataConfig()
         self._regions = {}
+        self._cache = {}
+
+    def path(self, kind, must_exist=True, **kw):
+        """Resolve a region-free PATH_TEMPLATES entry (the global
+        CR-0012 files). Raises MissingDataError when must_exist and the
+        file is absent."""
+        rel = PATH_TEMPLATES[kind].format(
+            raster_dir=self.config.raster_dir,
+            attribute_dir=self.config.attribute_dir, **kw)
+        full = self.config.resolve(rel)
+        if must_exist and not os.path.exists(full):
+            raise MissingDataError(f"no '{kind}' file at {full}")
+        return full
+
+    @property
+    def block_assignments(self):
+        """The global block_id -> split table (CR-0012), written by
+        prepare_training_data.py."""
+        if "block_assignments" not in self._cache:
+            self._cache["block_assignments"] = pd.read_csv(
+                self.path("block_assignments"))
+        return self._cache["block_assignments"]
 
     def discover_regions(self):
         """Regions inferred from raster filenames ({REGION}_{year}_...)."""

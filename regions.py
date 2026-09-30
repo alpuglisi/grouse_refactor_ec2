@@ -61,6 +61,17 @@ SPLIT_SEED = 42
 # every feature raster (train.IMG_SIZE + 2 x default jitter 0).
 WINDOW_PX = 64
 
+# CR-0019 section 2: the one year floor for BOTH label classes, applied at
+# selection (positives step 2, before thinning; pool step 1). It is the
+# first year both classes were acquired (get_negatives.py fetches from it),
+# and the first year with every FEATURE_SPEC raster within train.py's
+# default --max-year-gap of 2. Positive ACQUISITION (sightings.py/ebird.py
+# START_YEAR) stays earlier: the buffer and the envelope metrics still use
+# every sighting year. train.filter_by_year_gap refuses, never drops, so a
+# tolerance change needs a reviewed change of this constant (which
+# regenerates the split files).
+YEAR_MIN = 2020
+
 BOXES = {
     "ME": (-71.158, 42.889, -66.852, 47.555),
     "NH": (-72.626, 42.605, -70.600, 45.398),

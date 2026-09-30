@@ -44,6 +44,8 @@ EOD_DATASET_KEY = "4fa7b334-ce0d-4e88-aaae-2e0c138d049e"
 
 # Region code -> GBIF stateProvince name (regions.STATE_NAMES).
 from regions import STATE_NAMES as STATES
+# CR-0019: the negatives' acquisition floor is the one selection floor.
+from regions import YEAR_MIN
 
 TARGET_SPECIES = {
     # Mature-upland-forest guild (original set).
@@ -226,7 +228,7 @@ def main():
     parser.add_argument("--states", nargs="+", default=list(STATES.keys()),
                         choices=list(STATES.keys()))
     parser.add_argument("--years", nargs="+", type=int,
-                        default=list(range(2020, dt.date.today().year + 1)))
+                        default=list(range(YEAR_MIN, dt.date.today().year + 1)))
     parser.add_argument("--needed-per-state", type=int, default=None)
     parser.add_argument("--headroom", type=float, default=HEADROOM_DEFAULT,
                         help="Multiplier on needed/species (default: "

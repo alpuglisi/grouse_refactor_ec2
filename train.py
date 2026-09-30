@@ -224,13 +224,18 @@ def sample_background_points(rd, features, n, seed=0, *, region,
 
 
 def filter_by_year_gap(df, rd, features, tolerance, what, region):
-    """Drop records (training and validation alike) whose sighting year
-    has no raster within +/-tolerance years for one or more features -
+    """CHECK (CR-0019; it no longer drops): refuse, with SystemExit, when
+    any record (training and validation alike) has a sighting year with
+    no raster within +/-tolerance years for one or more features -
     environmental data that far from the sighting date describes a
     different landscape, so the record is not evidence about its own
-    label. Records with no year are kept (the dataset assigns them the
-    latest vintage, i.e. they claim current conditions). tolerance < 0
-    disables."""
+    label. Years are SELECTED upstream, for both classes, by
+    regions.YEAR_MIN (prepare_training_data.py / generate_negatives.py);
+    dropping here would recreate a per-class asymmetry the split files'
+    acceptance (CR-0013 E14) never saw. Otherwise returns the frame
+    unchanged. Records with no year are kept (the dataset assigns them
+    the latest vintage, i.e. they claim current conditions). tolerance
+    < 0 disables."""
     if (tolerance < 0 or 'year' not in df.columns
             or df['year'].isna().all()):
         return df
@@ -248,10 +253,15 @@ def filter_by_year_gap(df, rd, features, tolerance, what, region):
     dropped = int((~keep).sum())
     if dropped:
         bad = sorted(y for y, v in verdict.items() if not v)
-        print(f"   {region}: EXCLUDED {dropped:,} {what} records - "
-              f"sighting years {bad} have no raster within "
-              f"+/-{tolerance} years for at least one feature "
-              f"({len(df) - dropped:,} kept).")
+        raise SystemExit(
+            f"[{region}] REFUSED: {dropped:,} {what} records have "
+            f"sighting years {bad} with no raster within +/-{tolerance} "
+            f"years for at least one feature. train.py no longer drops "
+            f"records (CR-0019): the split files are selected by "
+            f"regions.YEAR_MIN for both classes. Remedy: pass "
+            f"--max-year-gap -1 or a larger value, or make a reviewed "
+            f"regions.YEAR_MIN change (which regenerates the split "
+            f"files).")
     return df[keep].reset_index(drop=True)
 
 
@@ -318,15 +328,14 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
                                     flip_tta=flip_tta)
     for region_i, region in enumerate(regions):
         rd = data[region]
-        # Year-gap exclusion applies to training AND validation with the
-        # same tolerance: a validation point scored against a raster
-        # more than `train_year_gap` years from its sighting is not
-        # evidence about that landscape either, and predict.py's
-        # latest-vintage rule already means deployment never sees such
-        # a gap. (Validation was previously left unfiltered to keep
-        # metrics comparable across the policy's introduction; that
-        # comparability has been spent, and a val set holding records
-        # the training set would refuse measured the wrong thing.)
+        # Year-gap CHECK (CR-0019), training AND validation with the
+        # same tolerance: a record scored against a raster more than
+        # `train_year_gap` years from its sighting is not evidence about
+        # that landscape, and predict.py's latest-vintage rule means
+        # deployment never sees such a gap. regions.YEAR_MIN selects the
+        # years of both classes upstream; filter_by_year_gap only refuses
+        # (SystemExit) if a split file still holds such a record, so what
+        # trains is exactly what CR-0013 accepted.
         pos_df = filter_by_year_gap(rd.positives("train"), rd, features,
                                     train_year_gap, "train positive",
                                     region)
@@ -533,17 +542,19 @@ def main():
                              "augmentation (0 = off).")
     parser.add_argument("--max-year-gap", "--max-train-year-gap",
                         dest="max_train_year_gap", type=int, default=2,
-                        help="Training AND validation records are "
-                             "EXCLUDED when their sighting year has no "
-                             "raster within this many years for one or "
-                             "more features - environmental data that "
-                             "stale describes a different landscape than "
-                             "the sighting saw. Same rule for both sets, "
-                             "and predict.py's latest-vintage rule means "
+                        help="CHECK, not a filter (CR-0019): training "
+                             "is REFUSED if any training or validation "
+                             "record has a sighting year with no raster "
+                             "within this many years for one or more "
+                             "features - environmental data that stale "
+                             "describes a different landscape than the "
+                             "sighting saw. Years are selected for both "
+                             "classes by regions.YEAR_MIN when the split "
+                             "files are built; nothing is dropped here. "
+                             "predict.py's latest-vintage rule means "
                              "deployment never sees a larger gap either. "
                              "(--max-train-year-gap is the old name, kept "
-                             "as an alias.) -1 disables and restores "
-                             "nearest-year-whatever-the-gap.")
+                             "as an alias.) -1 disables the check.")
     parser.add_argument("--augment", action=argparse.BooleanOptionalAction,
                         default=True,
                         help="Random D4 orientation (+ jitter, if set) per "

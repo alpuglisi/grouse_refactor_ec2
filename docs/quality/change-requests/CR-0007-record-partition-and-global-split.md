@@ -1,6 +1,6 @@
 # CR-0007: Partition sighting records by state and centralise the shared spatial constants
 
-**Status: APPROVED (v9), 2026-09-30 — both round-9 reviewers signed off; author sign-off by user. IMPLEMENTATION BLOCKED AT P6 (2026-09-30):** deliverables 0, 1, 3, 4, 6 done; 2 done except removing the `expectedFailure` marker; 5 run with P1–P5, P7, P8 PASS and P6 FAIL, because three evidence scripts committed after approval are in the P6 scan set (implementer finding F1, `docs/quality/evidence/CR-0007-implementer-findings.md`; needs an amendment); 7 pending CR-0016/CR-0014. Implementation record: `CR-0007-review-log.md`. History, verdicts, dispositions and the v8 split:
+**Status: APPROVED (v9; v9.1 amendment pending bounded re-review), 2026-09-30 — IMPLEMENTED except deliverable 7:** `check_partition.py` P1–P8 all PASS (`docs/quality/evidence/CR-0007-gates-v9.1.txt`); deliverable 7 waits (road files). History, verdicts, dispositions and the v8 split:
 `CR-0007-review-log.md`. This document states only current intent.
 
 ## Scope
@@ -160,8 +160,10 @@ as in `sample_raster` (`:276-295`). *E_R*: the own-state rows of S_R.
 | P7 | the P7 list imports; each §3 copy's first statement is the guard and running it exits non-zero naming BUG-0031 | 28 of 28 import; 3 guards absent | holds |
 | P8 | per R, each `evaluated_R` row: `evt_phys` = crosswalk(`evt`); `spatial_density` (rtol 1e-6) and `spatial_zone` equal the `KDE_MODE` computation over S_R (a zone within rtol of p10/p90 is exempt) | holds (today's files are box-sourced) | holds |
 
-**P6 scan.** Scanned: `git ls-files '*.py'` minus basenames `inv_*`/`res_*`
-and `tests/`. Exempt by name, nothing else: `regions.py`; `clean.py` and
+**P6 scan.** Scanned: `git ls-files '*.py'` minus basenames `inv_*`/`res_*`,
+`tests/` and `docs/quality/evidence/` (frozen review evidence, never run
+as pipeline code; excluded by v9.1 after CR-0013 committed evidence copies
+there). Exempt by name, nothing else: `regions.py`; `clean.py` and
 `legacy/gen_negs.py` (CR-0012 §6 guards); the three §3 copies;
 `generate_road_distance.py` and `check_road_dist.py` until deliverable 7.
 A violation is (i) an assignment, at any depth, to a §1 name, `BOXES`, or
@@ -228,12 +230,12 @@ county file (specified, not exercised).
       `res_qms_PA-0019-0020-0021-draft-rows.md`).
 - [x] 1. Back up `data/pipeline/`, `data/negatives/` (24 + 27 MB) to
       `/home/ec2-user/grouse_backup/CR-0007/` with a sha256 manifest.
-- [ ] 2. §1 (all but deliverable 7's re-points); remove the
+- [x] 2. §1 (all but deliverable 7's re-points); remove the
       `expectedFailure` marker. *(2026-09-30: §1 done; the marker is kept
       because of implementer finding F1.)*
 - [x] 3. §2.
 - [x] 4. §3.
-- [ ] 5. Run `analyze_grouse.py`, then `check_partition.py` (acceptance
+- [x] 5. Run `analyze_grouse.py`, then `check_partition.py` (acceptance
       run): P1–P8 pass; record O1–O4. Do **not** run
       `prepare_training_data.py` or `generate_negatives.py` (CR-0012).
       *(2026-09-30: run; P1–P5, P7, P8 PASS, P6 FAIL (F1); O1–O4

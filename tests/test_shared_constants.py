@@ -147,7 +147,6 @@ class SyntheticTree(unittest.TestCase):
 
 
 class RepositoryTree(unittest.TestCase):
-    @unittest.expectedFailure   # removed by CR-0007 deliverable 2
     def test_repository_tree(self):
         probs = cp.p6_problems(REPO)
         self.assertEqual(probs, [], "\n" + "\n".join(probs))

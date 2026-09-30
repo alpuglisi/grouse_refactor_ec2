@@ -616,13 +616,16 @@ P6_EXEMPT = {
 
 
 def p6_scanned_files(root):
-    """git-tracked *.py, minus inv_*/res_* scratch, minus tests/."""
+    """git-tracked *.py, minus inv_*/res_* scratch, minus tests/, minus
+    docs/quality/evidence/ (frozen review evidence, never run as pipeline
+    code - CR-0007 v9.1)."""
     out = subprocess.run(["git", "ls-files", "*.py"], cwd=root,
                          capture_output=True, text=True, check=True).stdout
     files = []
     for p in out.split():
         base = os.path.basename(p)
-        if base.startswith(("inv_", "res_")) or p.startswith("tests/"):
+        if (base.startswith(("inv_", "res_")) or p.startswith("tests/")
+                or p.startswith("docs/quality/evidence/")):
             continue
         files.append(p)
     return sorted(files)

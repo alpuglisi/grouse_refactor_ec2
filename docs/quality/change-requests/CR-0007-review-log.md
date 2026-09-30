@@ -862,3 +862,17 @@ BUG-0042 is reserved by CR-0015, so the next free id was BUG-0043.
 **Deliverable status:** 0, 1, 3, 4, 6 done; 2 done except the marker; 5
 run, P6 fails (F1); 7 pending CR-0016/CR-0014. CR-0007 is **not**
 IMPLEMENTED until an amendment resolves F1 and P6 passes.
+
+## Amendment v9.1 (2026-09-30) — implementer finding F1
+P6 failed at deliverable 5 on 3 lines in `docs/quality/evidence/CR-0007-r7/`
+(`build.py:14`, `feats.py:9`, `lib.py:4`): round-7 reviewer evidence
+committed by CR-0013 deliverable 1 (`f5e5ee4`) after v9's approval, inside
+P6's scan set. Every file in §1's re-point table was clean.
+**Amendment:** P6's scanned set also excludes `docs/quality/evidence/`
+(frozen review evidence, never run as pipeline code) — CR text § P6 scan
+and `check_partition.py` `p6_scanned_files`. With it: P1–P8 all PASS
+(`docs/quality/evidence/CR-0007-gates-v9.1.txt`); the `expectedFailure`
+marker is removed from `tests/test_shared_constants.py`, which passes.
+F2 (count 20 files, not 21) noted. Needs a bounded re-review of the
+amendment (text + gate code) by the round-9 reviewers.
+

@@ -17,6 +17,7 @@ not read by the reviewer.
 | 1 | v1 | B (agent, fresh) | REVISE | 1 |
 | 2 | v2 | B2 (agent, fresh; bounded) | APPROVE WITH FOLLOW-UPS | 0 |
 | 2 | v2 | A (agent, fresh; unrestricted first review, fills the round-1 slot) | REVISE | 0 |
+| 3 | v3 | C (agent, fresh; bounded) | APPROVE WITH FOLLOW-UPS | 0 |
 
 ## Round 1, reviewer B
 - **B1 BLOCKING:** §2 places `TRAINING_INPUT_KINDS` in `grouse_data.py`
@@ -121,9 +122,42 @@ third-clause tracker item all confirmed.
 | B2-N4 | LOW | **Accept** — § 3 consumer-guard row: guard exercise only, no checkpoint |
 | B2-N6 | LOW | **Accept** — §2 second bullet: today's order kept |
 
+## Round 3 (v3), reviewer C (bounded, CR-0011 A2)
+B1–B3, A-1 and A-2/B2-N1 verified RESOLVED against the code (the
+config `standing` section and its pin unchanged; `gate_E0` accepts "B",
+`:1548`, `:1576-1577`; `gate_E6` skips silently at `:1790`; `Context._csv`
+keys are `rpath` rels; path namespaces identical; the guard cannot refuse
+a correct run). No BLOCKING or MAJOR.
+- C-N3-1 MEDIUM: "every CSV load in the module goes through `path()`" is
+  false: `GrouseData.evt_crosswalk` (`grouse_data.py:598-606`) reads from
+  a glob (a PA-0003 residual; not read at training time).
+- C-N3-2 LOW: E0 reads headers through `read_header(ctx.full(rel))`
+  (`:1556`), bypassing `_csv`.
+- C-N3-3 LOW: `digested_paths` is `:119-123`; `write_json_atomic` sorts
+  keys, so list order is not load-bearing.
+- C-N3-4 LOW (A4): 19/20 repeated.
+- C-N3-5 LOW: a region outside `cfg["constants"]["REGIONS"]` is now
+  refused by the guard; state it.
+- C-N3-6 LOW: BUG-0080 §3's restored file may or may not differ in
+  header; soften.
+- C-N3-7 LOW: `RegionData` has no back-reference to its `GrouseData`
+  (`:255-258`, `:588-592`).
+
+## v4 dispositions (round 3)
+| # | sev | disposition (operative location) |
+|---|---|---|
+| C-N3-1 | MEDIUM | **Accept** — §2 fourth bullet names the `evt_crosswalk` exception |
+| C-N3-2 | LOW | **Accept** — §2 third bullet: E0 bound by its tuple's source pin |
+| C-N3-3 | LOW | **Accept** — §2 second bullet: `:119-123`; order kept for readability only |
+| C-N3-4 | LOW | **Accept** — § 3 must-change row refers to §2 |
+| C-N3-5 | LOW | **Accept** — § Impact first bullet |
+| C-N3-6 | LOW | **Accept** — § 3 E0/E6 row softened |
+| C-N3-7 | LOW | **Accept** — §2 fourth bullet: `_data` back-reference set in `__getitem__` |
+
 ## Versions
 | version | change |
 |---|---|
 | v1 | initial draft (`TRAINING_INPUT_KINDS` in `grouse_data.py`) |
 | v2 | list in `acceptance_split.json`; run-time guard on kinds read; pins and record re-issue stated; round-1 dispositions |
-| v3 | list code-owned (`STANDING_KINDS`); path recording in `path()`; guard on relative paths; E0/E6 with B; gate-side assertion; no re-issue; round-2 dispositions above |
+| v3 | list code-owned (`STANDING_KINDS`); path recording in `path()`; guard on relative paths; E0/E6 with B; gate-side assertion; no re-issue; round-2 dispositions |
+| v4 | `evt_crosswalk` exception; E0 header reads; back-reference; round-3 dispositions above; approved by agent quorum |

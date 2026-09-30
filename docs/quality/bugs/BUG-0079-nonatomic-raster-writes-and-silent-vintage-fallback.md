@@ -118,7 +118,7 @@ ordinary interruption.
 3. `standing_checks` fails on any manifest fallback beyond tolerance.
 Status: **OPEN (latent)**. Owner: lead.
 
-**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0023-atomic-raster-writes-and-fallback-refusal.md` (v3, awaiting round-3 bounded re-review; nothing implemented).
+**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0023-atomic-raster-writes-and-fallback-refusal.md` (v4, approved by agent quorum after three review rounds; nothing implemented).
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** `BUG_LOG.md`, `PREVENTIVE_ACTIONS.md`, `CHANGELOG.md` for

@@ -17,6 +17,7 @@ not read by the reviewer.
 | 1 | v1 | B (agent, fresh) | REVISE | 2 |
 | 2 | v2 | B2 (agent, fresh; bounded) | APPROVE WITH FOLLOW-UPS (conditional on N1 text) | 0 |
 | 2 | v2 | A (agent, fresh; unrestricted first review, fills the round-1 slot) | REVISE | 0 |
+| 3 | v3 | C (agent, fresh; bounded) | APPROVE WITH FOLLOW-UPS (conditional on N3-1 text) | 0 |
 
 ## Round 1, reviewer B
 - **B1 BLOCKING:** §4 cannot be implemented: there are no "E11(b)
@@ -141,9 +142,47 @@ patch reads covered by the dataset refusal; PA-0027 lint digest untouched.
 | B2-N5 | LOW | **Accept** — §3: message carries the resolver's remedy; `if ys` kept |
 | B2-N7 | LOW | **Accept** — §3 first bullet |
 
+## Round 3 (v3), reviewer C (bounded, CR-0011 A2)
+Every round-1 and round-2 BLOCKING/MAJOR (B1–B4, B2-N1, A-1/B2-N3, A-2)
+verified RESOLVED against the code; the writer search re-run over
+tracked non-test `*.py` (every other hit is temp+replace, an
+intermediate, a backup, a meta file, a check-script output, a
+checkpoint or `legacy/`); `resolve_raster`'s keyword-only signature
+compatible with every caller; `.tmp` invisible to every raster glob.
+- **C-N3-1 MAJOR (PA-0021(a)):** G4 cannot fail on today's code at five
+  of seven sites: a `rasterio.open` mock creates no file and a
+  `shutil.copy*` patched to raise writes nothing, so today's code also
+  leaves no file; only the tsd and treemap injections follow real
+  writes. Remedy: the injection wraps the real call (real handle whose
+  `write` writes then raises; a truncated-prefix copy then raise).
+- C-N3-2 MEDIUM: the ordering rule's failure branch is unreachable as
+  written (a `try`/`finally` has nothing to re-raise after the
+  statement; `ok` is always True there); unlink inside the `finally`.
+- C-N3-3 MEDIUM: "validatable here: none" is wrong; `tests/test_pa0027_lint.py`
+  is stdlib-only and classifies the new handlers (bare re-raise, no
+  escape) as conforming; name it.
+- C-N3-4 LOW: `predict.py:1105` is a raster product, not a CSV writer;
+  `download_attribute_tables.py:120` is a direct CSV writer the list
+  omits (sha-pinned by `paths.crosswalk`).
+- C-N3-5 LOW: cites (`:256-264`, `:148`, `:359-363`, `:479-497`,
+  `:2151-2159`); state that only the new fallback `SystemExit` carries
+  the resolver's text, the gap refusal keeps its own.
+- C-N3-6 LOW: "validate" undefined for the copy sites.
+
+## v4 dispositions (round 3)
+| # | sev | disposition (operative location) |
+|---|---|---|
+| C-N3-1 | MAJOR | **Accept** — § 4 G4: injections wrap the real call (real handle, truncated-prefix copy); a no-write mock is stated invalid |
+| C-N3-2 | MEDIUM | **Accept** — §2 ordering rule: unlink inside the `finally`; `with` sites use `except BaseException: unlink; raise` |
+| C-N3-3 | MEDIUM | **Accept** — § Test plan and deliverable 3 name the lint; §2 states the handlers conform |
+| C-N3-4 | LOW | **Accept** — §2: `predict.py:1105` excluded with reason; `download_attribute_tables.py:120` listed with owner |
+| C-N3-5 | LOW | **Accept** — cites corrected; §3 `filter_by_year_gap` bullet distinguishes the two `SystemExit`s |
+| C-N3-6 | LOW | **Accept** — §2 ordering rule: copy sites compare shape to the source |
+
 ## Versions
 | version | change |
 |---|---|
 | v1 | initial draft (tolerance-conditioned refusal; manifest fallback records) |
 | v2 | unconditional refusal; §4 dropped; six dataset constructions; `download_tcc_nlcd.py` writer; GATE table; round-1 dispositions |
-| v3 | ordering rule; seven writer sites; `resolve_raster`; G3/G4 per site; producers' fallback stated; round-2 dispositions above |
+| v3 | ordering rule; seven writer sites; `resolve_raster`; G3/G4 per site; producers' fallback stated; round-2 dispositions |
+| v4 | G4 injections wrap real writes; unlink in `finally`; lint named; round-3 dispositions above; approved by agent quorum |

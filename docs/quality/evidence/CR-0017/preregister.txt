@@ -1,0 +1,128 @@
+county file data/roads/tl_2023_us_county.zip sha256 692e12c30c83adcaabdbac0d3954fafa55e1c89a24b36d95e72e02dff938652e
+domain D: STATEFP in ['23', '33', '50'], 40 counties, 1 polygon part(s), 0 interior ring(s)
+BUFFER_M = 300
+min |d - BUFFER_M| over every row of C and N: 1.802 m
+
+C (data/negatives/candidate_pool.csv, sha256 1ff4f933328ed03a...): rows 22,187; dropped (d <= 300 m) 88 by nearest outside {'CA/sea': 39, 'NY': 31, 'MA': 18}; <= 1 km 219
+   -70.271720,46.207695 ME train d=202.4 m  CA/sea
+   -69.268360,47.416653 ME train d=30.4 m  CA/sea
+   -69.265330,47.419594 ME train d=31.0 m  CA/sea
+   -69.262634,47.422210 ME train d=31.5 m  CA/sea
+   -69.246690,47.437680 ME train d=34.4 m  CA/sea
+   -69.240210,47.444060 ME train d=29.5 m  CA/sea
+   -69.237420,47.446693 ME train d=34.6 m  CA/sea
+   -69.237170,47.447037 ME train d=28.2 m  CA/sea
+   -68.661690,47.233765 ME train d=269.7 m  CA/sea
+   -68.614360,47.242348 ME train d=211.7 m  CA/sea
+   -68.592650,47.257010 ME val d=164.3 m  CA/sea
+   -68.513010,47.294323 ME train d=213.4 m  CA/sea
+   -68.504770,47.294025 ME train d=233.3 m  CA/sea
+   -68.379490,47.333500 ME train d=130.1 m  CA/sea
+   -68.306420,47.354553 ME train d=97.6 m  CA/sea
+   -68.288315,47.359047 ME val d=110.1 m  CA/sea
+   -68.272700,47.353485 ME val d=164.8 m  CA/sea
+   -68.227340,47.349310 ME train d=210.7 m  CA/sea
+   -68.151960,47.308384 ME train d=81.6 m  CA/sea
+   -68.057076,47.251700 ME val d=232.7 m  CA/sea
+   -68.020546,47.235760 ME train d=210.2 m  CA/sea
+   -67.932040,47.158676 ME val d=130.2 m  CA/sea
+   -67.892685,47.119020 ME val d=263.6 m  CA/sea
+   -67.791800,46.844864 ME train d=175.2 m  CA/sea
+   -67.721020,45.660526 ME val d=168.9 m  CA/sea
+   -67.438030,45.529144 ME train d=240.9 m  CA/sea
+   -67.315570,45.135770 ME train d=237.5 m  CA/sea
+   -71.738945,42.709007 NH train d=211.5 m  MA
+   -71.521680,42.703632 NH train d=154.6 m  MA
+   -71.494560,45.057560 NH train d=236.2 m  CA/sea
+   -71.493614,45.029156 NH train d=262.8 m  CA/sea
+   -71.491570,45.031220 NH train d=179.2 m  CA/sea
+   -71.363304,42.700350 NH train d=236.3 m  MA
+   -71.104780,45.285090 NH train d=260.0 m  CA/sea
+   -71.057650,42.830710 NH train d=208.5 m  MA
+   -71.053650,42.837870 NH train d=176.2 m  MA
+   -70.989800,42.867085 NH val d=169.6 m  MA
+   -70.987710,42.867542 NH val d=186.7 m  MA
+   -70.862270,42.869990 NH train d=59.3 m  MA
+   -70.857580,42.867146 NH train d=48.6 m  MA
+   -70.833930,42.867610 NH train d=116.0 m  MA
+   -73.421800,44.034500 VT train d=212.7 m  NY
+   -73.415794,44.032010 VT train d=195.0 m  NY
+   -73.404260,43.573326 VT train d=253.5 m  NY
+   -73.403740,43.573532 VT val d=298.2 m  NY
+   -73.403564,43.573288 VT val d=286.8 m  NY
+   -73.402985,43.572720 VT val d=255.9 m  NY
+   -73.402070,43.571370 VT val d=150.4 m  NY
+   -73.395610,43.569750 VT val d=38.4 m  NY
+   -73.391990,43.570286 VT val d=30.9 m  NY
+   -73.387350,43.585800 VT val d=276.2 m  NY
+   -73.384285,43.597378 VT val d=63.0 m  NY
+   -73.382810,43.592310 VT val d=71.6 m  NY
+   -73.382385,43.591824 VT val d=15.5 m  NY
+   -73.382340,43.592113 VT val d=28.9 m  NY
+   -73.375020,43.620464 VT train d=290.9 m  NY
+   -73.374540,43.603480 VT train d=80.4 m  NY
+   -73.370810,43.619255 VT train d=65.3 m  NY
+   -73.360780,43.624520 VT train d=20.9 m  NY
+   -73.351850,43.623913 VT train d=36.4 m  NY
+   -73.350685,43.623890 VT train d=111.1 m  NY
+   -73.275830,42.873676 VT train d=84.6 m  NY
+   -73.251915,43.379364 VT val d=13.9 m  NY
+   -73.251890,43.353413 VT train d=111.1 m  NY
+   -73.250880,43.352898 VT train d=194.6 m  NY
+   -73.250590,43.352486 VT train d=219.7 m  NY
+   -73.250250,43.352013 VT train d=249.0 m  NY
+   -73.249820,43.351440 VT train d=286.1 m  NY
+   -73.248184,43.406605 VT train d=221.5 m  NY
+   -73.247986,43.555176 VT train d=150.0 m  NY
+   -73.247360,42.746340 VT val d=90.9 m  MA
+   -73.246880,43.514538 VT train d=14.8 m  NY
+   -73.246056,43.521572 VT val d=38.0 m  NY
+   -73.242700,45.010178 VT val d=259.8 m  CA/sea
+   -73.212580,42.745712 VT train d=94.7 m  MA
+   -73.209720,42.745564 VT train d=83.9 m  MA
+   -73.204910,42.745120 VT train d=44.5 m  MA
+   -73.187805,42.744620 VT train d=24.4 m  MA
+   -73.155390,42.744144 VT train d=40.1 m  MA
+   -73.073940,42.744232 VT train d=230.4 m  MA
+   -73.048950,45.014015 VT train d=186.4 m  CA/sea
+   -72.676580,42.733322 VT train d=42.6 m  MA
+   -72.201860,45.004300 VT train d=125.1 m  CA/sea
+   -72.198030,45.003197 VT train d=253.9 m  CA/sea
+   -72.196976,45.004170 VT train d=147.4 m  CA/sea
+   -72.141720,45.004930 VT train d=103.6 m  CA/sea
+   -72.140800,45.004047 VT train d=200.9 m  CA/sea
+   -71.628150,45.011482 VT val d=108.5 m  CA/sea
+
+N_ME (data/negatives/negatives_ME.csv, sha256 8d1ed7653f0a6d30...): rows 3,660; dropped (d <= 300 m) 9 by nearest outside {'CA/sea': 9}; <= 1 km 26
+   by split/is_nonveg: {'train/False': 6, 'val/True': 2, 'train/True': 1}
+   -70.271720,46.207695 ME train d=202.4 m  CA/sea
+   -69.265330,47.419594 ME train d=31.0 m  CA/sea
+   -69.237170,47.447037 ME train d=28.2 m  CA/sea
+   -68.513010,47.294323 ME train d=213.4 m  CA/sea
+   -68.306420,47.354553 ME train d=97.6 m  CA/sea
+   -68.151960,47.308384 ME train d=81.6 m  CA/sea
+   -68.057076,47.251700 ME val d=232.7 m  CA/sea
+   -67.932040,47.158676 ME val d=130.2 m  CA/sea
+   -67.791800,46.844864 ME train d=175.2 m  CA/sea
+
+N_NH (data/negatives/negatives_NH.csv, sha256 8430ae8a9ebc7c18...): rows 1,079; dropped (d <= 300 m) 1 by nearest outside {'MA': 1}; <= 1 km 6
+   by split/is_nonveg: {'train/True': 1}
+   -71.363304,42.700350 NH train d=236.3 m  MA
+
+N_VT (data/negatives/negatives_VT.csv, sha256 ba449de5bc2181ae...): rows 1,493; dropped (d <= 300 m) 13 by nearest outside {'NY': 6, 'MA': 4, 'CA/sea': 3}; <= 1 km 25
+   by split/is_nonveg: {'train/True': 6, 'train/False': 4, 'val/False': 2, 'val/True': 1}
+   -73.415794,44.032010 VT train d=195.0 m  NY
+   -73.382810,43.592310 VT val d=71.6 m  NY
+   -73.382385,43.591824 VT val d=15.5 m  NY
+   -73.375020,43.620464 VT train d=290.9 m  NY
+   -73.374540,43.603480 VT train d=80.4 m  NY
+   -73.247360,42.746340 VT val d=90.9 m  MA
+   -73.246880,43.514538 VT train d=14.8 m  NY
+   -73.209720,42.745564 VT train d=83.9 m  MA
+   -73.155390,42.744144 VT train d=40.1 m  MA
+   -72.676580,42.733322 VT train d=42.6 m  MA
+   -72.201860,45.004300 VT train d=125.1 m  CA/sea
+   -72.198030,45.003197 VT train d=253.9 m  CA/sea
+   -72.140800,45.004047 VT train d=200.9 m  CA/sea
+
+wrote docs/quality/evidence/CR-0017/preregister_keys.csv: 111 rows

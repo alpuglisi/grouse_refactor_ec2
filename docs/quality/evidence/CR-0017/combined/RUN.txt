@@ -1,0 +1,90 @@
+CR-0017 deliverable 4, combined check: scratch-tree real-data run of the
+COMBINED code (pipeline side + acceptance side), 2026-09-30.
+
+Code: worktree /home/ec2-user/grouse2/.claude/worktrees/cr0017-combined,
+  branch cr0017-combined, HEAD b059624333ce125e6b305abae4e3f360793456db
+  (= 666474c integration head + ee59d12 pipeline side 46f30c9 + b059624
+  acceptance side c9c2c83). UNMERGED into main.
+  Clean tree: `git status --porcelain` empty before the runs; the
+  acceptance record says commit b059624, dirty tracked .py: False.
+  No code edited.
+Config: docs/quality/acceptance_split.json sha256
+  cd4b9b487a0076dac7a8f27858f682c51e5fcca5a174467a957f82282585f6e7.
+
+prepare_training_data.py: NOT run. The CR's sequence (§ Test plan,
+  deliverable 4; deliverable 6 steps 2-4) is generate_negatives.py ->
+  MC -> acceptance_split.py. CR-0017 does not change P/B/S (MC1), and
+  prepare_training_data.py is not in its code table.
+
+Scratch tree: /tmp/claude-1000/cr0017-combined-scratch, built by
+  mkscratch.sh (log mkscratch.log; rebuilt fresh for run 2,
+  mkscratch_run2.log):
+  - data/pipeline and data/negatives copied (cp -a), 44 regular files, no
+    symlink inside them;
+  - every other data/ directory recreated with symlinked FILES (cp -rs):
+    3,543 symlinks, no symlinked directory;
+  - output-path check before each run: PASS. The 10 generator outputs,
+    data/pipeline/split_manifest.json and data/pipeline/acceptance_record.json
+    are regular files; scratch, scratch/data, data/negatives and
+    data/pipeline are not symlinks.
+  (Writes are atomic os.replace in the target dir, so even a symlinked
+  target could only replace a link; none exists.)
+
+Live tree (/home/ec2-user/grouse2/data, read-only): sha256 of all 44 files
+  in data/pipeline + data/negatives taken before (live_before.sha256) and
+  after everything (live_after.sha256): byte-identical ("LIVE UNCHANGED").
+  data/pipeline/acceptance_record.json before and after:
+  66d63e1da915529ed0f33bf4f152d6626d9843c9fa8185a55a9727f54489d478.
+
+Commands (scripts in this directory):
+  1. bash mkscratch.sh
+  2. rungn.sh: cwd = scratch;
+       nice -n 10 python <worktree>/generate_negatives.py
+     -> generate_negatives_run1.log, exit 0, 132 s.
+     Step 6: (a) 9,720; (b only) 89; both 20. Pool 22,187 -> 22,099.
+     scratch_after_gn1.sha256.
+  3. cwd = worktree;
+       nice -n 10 python docs/quality/evidence/CR-0017/check_must_change.py \
+         --old /home/ec2-user/grouse2 --new /tmp/claude-1000/cr0017-combined-scratch
+     -> mc_live_vs_scratch.txt: MC0..MC5 all PASS, "MC: PASS", exit 0.
+     MC2: pre-registered 88 removed from C, 22,187 -> 22,099.
+     MC3: negatives removed ME 9, NH 1, VT 13 = the pre-registered 23;
+     no unexpected, none kept; 0 retained rows changed.
+  4. runacc.sh: cwd = scratch;
+       nice -n 10 python <worktree>/acceptance_split.py \
+         --data-root /tmp/claude-1000/cr0017-combined-scratch
+     (full run, OBS computed, no --calibrate) -> acceptance_run1.log:
+     SUMMARY 19/19 GATEs pass (E0..E13, R1..R4), exit 0, 55 s.
+     ACCEPTED; record written inside scratch only, sha256
+     6855deca58702f8a5462db7424df296f31c57a683f6d8baabcba283c7cd6997b
+     (copy: acceptance_record_run1.json). The acceptance run changed no
+     other scratch file (scratch_after_gn1 vs scratch_run1.sha256).
+     OBS (never blocking): references "current" (the pre-CR-0017
+     calibration; deliverable 6 step 5 recalibrates); 2 |z| > 4 flags,
+     both O6 basis_tv_sel_vs_wpool (ME -4.04, VT -14.38).
+  5. Run 2 (determinism): fresh scratch tree (mkscratch.sh again), then
+     steps 2-4 repeated -> generate_negatives_run2.log,
+     mc_live_vs_scratch_run2.txt, acceptance_run2.log.
+     - generator outputs + manifest: scratch_after_gn1.sha256 ==
+       scratch_after_gn2.sha256 (44 files): BYTE-IDENTICAL.
+     - generator logs identical except the timing line.
+     - MC output identical (cmp).
+     - acceptance: 19/19 again; log differs only in "started",
+       "record sha256" and "runtime" lines.
+     - acceptance_record.json differs run 1 vs run 2 ONLY in created_utc
+       (record_compare.txt; copies acceptance_record_run{1,2}.json). The
+       record embeds a timestamp by design, so it cannot be byte-identical
+       across runs; every other key, including all artifact/input digests
+       and obs values, is equal.
+     scratch_run1.sha256 vs scratch_run2.sha256: only
+     data/pipeline/acceptance_record.json differs.
+
+Files changed live -> scratch (live_vs_scratch_changed.txt): candidate_pool,
+  negatives_{ME,NH,VT}, train_negatives_{ME,NH,VT}, val_negatives_{ME,VT},
+  split_manifest.json, acceptance_record.json; 33 unchanged (incl.
+  val_negatives_NH: no NH val removal).
+
+RESULT: MC PASS on exactly the pre-registered 88 pool / 23 negative
+  removals; acceptance 19/19 GATEs PASS with the record written in scratch
+  only; second run byte-identical (generator outputs and manifest; record
+  equal except created_utc); live data unchanged.

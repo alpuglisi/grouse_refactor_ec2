@@ -17,9 +17,13 @@ Candidate pool (data/negatives/candidate_pool.csv), pooled over regions:
    4. drop (never relabel) every record regions.verify_partition returns;
       their coordinates go into the manifest
    5. thin at MIN_SPACING_M, exactly as the positives are thinned
-   6. 300 m BUFFER: drop candidates within BUFFER_M (squared distance
-      <= BUFFER_M**2) of ANY row of ANY evaluated_sightings_R - absence
-      of a record next to a real grouse is not evidence of absence
+   6. 300 m BUFFER: drop candidates (a) within BUFFER_M (squared
+      distance <= BUFFER_M**2) of ANY row of ANY evaluated_sightings_R -
+      absence of a record next to a real grouse is not evidence of
+      absence - or (b) within BUFFER_M of the edge of the sightings'
+      acquisition domain D (the union of the STATE_FIPS county polygons;
+      regions.domain_edge_m <= BUFFER_M): beyond D no sighting was
+      acquired, so (a) cannot be certified there (CR-0017; BUG-0050)
    7. extract the envelope features on the region's grid; drop nodata
    8. drop rows whose WINDOW_PX window is not inside every feature raster
    9. evt_phys, envelope_id, is_nonveg and the ENVELOPE WEIGHT: the
@@ -69,7 +73,7 @@ from prepare_training_data import (
     canonical, csv_bytes, sha256_bytes, sha256_file, rel_path,
     atomic_write, json_bytes, section_common, raster_inputs)
 from regions import (REGIONS, BUFFER_M, COUNTY_POLYGONS_YEAR, MIN_SPACING_M,
-                     block_ids, block_split, verify_partition)
+                     block_ids, block_split, domain_edge_m, verify_partition)
 from analyze_grouse import (ENVELOPE_SCHEME, build_envelope_id,
                             fit_scheme_binners, load_evt_crosswalk,
                             sample_raster, NON_VEG_SCLASS_CODES,
@@ -196,6 +200,19 @@ def buffer_drop_mask(cand_lon, cand_lat, sight_lon, sight_lat,
                 drop[i] = True
                 break
     return drop
+
+
+def domain_edge_drop_mask(lon, lat, domain=None):
+    """Pool step 6 (b) (CR-0017 section 2): True for candidates whose
+    EPSG:5070 distance (from lon/lat via to_5070) to the edge of the
+    sightings' acquisition domain D is <= BUFFER_M; a point outside D
+    has edge_m 0 and is dropped. `domain` is regions.domain_edge_m's
+    test seam (None = D from the county file)."""
+    lon = np.asarray(lon, dtype=np.float64)
+    if len(lon) == 0:
+        return np.zeros(0, dtype=bool)
+    x, y = to_5070(lon, np.asarray(lat, dtype=np.float64))
+    return domain_edge_m(x, y, domain=domain) <= BUFFER_M
 
 
 def extract_envelope(cand, rd):
@@ -377,7 +394,9 @@ def build(data, root):
     pool = thin_by_min_distance(pool, MIN_SPACING_M).reset_index(drop=True)
     count(5, pool)
 
-    # 6. buffer against every row of every region's sightings
+    # 6. (a) buffer against every row of every region's sightings;
+    #    (b) drop within BUFFER_M of the acquisition-domain edge (CR-0017).
+    #    Both are row filters on the step-5 pool.
     evaluated = {r: read_csv(digest(data[r].path("evaluated")))
                  for r in REGIONS}
     sights = pd.concat(list(evaluated.values()), ignore_index=True)
@@ -386,8 +405,13 @@ def build(data, root):
         pool["latitude"].to_numpy(dtype=np.float64),
         sights["longitude"].to_numpy(dtype=np.float64),
         sights["latitude"].to_numpy(dtype=np.float64))
+    at_edge = domain_edge_drop_mask(
+        pool["longitude"].to_numpy(dtype=np.float64),
+        pool["latitude"].to_numpy(dtype=np.float64))
     n_buffered = int(in_buffer.sum())
-    pool = pool[~in_buffer].reset_index(drop=True)
+    n_edge_only = int((at_edge & ~in_buffer).sum())
+    n_overlap = int((at_edge & in_buffer).sum())
+    pool = pool[~(in_buffer | at_edge)].reset_index(drop=True)
     count(6, pool)
 
     # 7-10 per region, on its own grid and envelope metrics
@@ -451,7 +475,9 @@ def build(data, root):
     section["dropped"] = dropped
     print(f"  Pool: {len(pool):,} candidates; {len(dropped)} partition "
           f"exception(s) dropped; {n_buffered:,} within {BUFFER_M} m of a "
-          f"grouse location dropped.")
+          f"grouse location dropped (a); {n_edge_only:,} more within "
+          f"{BUFFER_M} m of the acquisition-domain edge dropped (b only); "
+          f"{n_overlap:,} in both (a) and (b).")
     for r in REGIONS:
         print(f"  {r}: " + "; ".join(
             f"{s} {d['n']:,} ({d['n_hab']:,} habitat + {d['n_nv']:,} NonVeg)"

@@ -67,25 +67,39 @@ BOXES = {
     "VT": (-73.510, 42.632, -71.422, 45.112),
 }
 
-# CRS of the TIGER county file (NAD83) and of the lon/lat inputs (WGS84).
+# CRS of the TIGER county file (NAD83), of the lon/lat inputs (WGS84) and
+# of the analysis grid (CONUS Albers). _ANALYSIS_EPSG is used only for
+# domain D; to_5070 below still hard-codes its own "EPSG:5070" target, and
+# the two must stay equal (tests/test_cr0017.py pins this; wiring to_5070
+# to a shared constant is CR-0007 item (d)).
 _COUNTY_FILE_EPSG = 4269
 _LONLAT_EPSG = 4326
+_ANALYSIS_EPSG = 5070
 
 # Dissolved state polygons, {region: GeoDataFrame row}, read once.
 _STATE_POLYGONS = {}
+
+
+def _county_polygons():
+    """(path, GeoDataFrame) of the TIGER COUNTY_POLYGONS_YEAR county
+    polygons whose STATEFP is in STATE_FIPS, in the FILE CRS (EPSG:4269
+    if the file has none). The one reader of the county file: both
+    _state_polygons() and the CR-0017 domain D use it."""
+    import geopandas as gpd
+    from grouse_data import PATH_TEMPLATES
+    path = PATH_TEMPLATES["tiger_county"].format(year=COUNTY_POLYGONS_YEAR)
+    codes = ",".join(f"'{v}'" for v in sorted(STATE_FIPS.values()))
+    counties = gpd.read_file(path, where=f"STATEFP IN ({codes})")
+    if counties.crs is None:
+        counties = counties.set_crs(_COUNTY_FILE_EPSG)
+    return path, counties
 
 
 def _state_polygons():
     """GeoDataFrame, one dissolved (multi)polygon per STATEFP in
     STATE_FIPS, in EPSG:4326, with a `region` column. Cached."""
     if "gdf" not in _STATE_POLYGONS:
-        import geopandas as gpd
-        from grouse_data import PATH_TEMPLATES
-        path = PATH_TEMPLATES["tiger_county"].format(year=COUNTY_POLYGONS_YEAR)
-        codes = ",".join(f"'{v}'" for v in sorted(STATE_FIPS.values()))
-        counties = gpd.read_file(path, where=f"STATEFP IN ({codes})")
-        if counties.crs is None:
-            counties = counties.set_crs(_COUNTY_FILE_EPSG)
+        path, counties = _county_polygons()
         states = counties[["STATEFP", "geometry"]].dissolve(by="STATEFP")
         states = states.to_crs(_LONLAT_EPSG).reset_index()
         by_fips = {v: k for k, v in STATE_FIPS.items()}
@@ -111,6 +125,56 @@ def _polygon_region(lon, lat):
         raise RuntimeError("points inside two states' county polygons")
     reg = hit.sort_values("_i")["region"]
     return np.array([r if isinstance(r, str) else None for r in reg], dtype=object)
+
+
+# CR-0017 section 2: the sightings' acquisition domain D in EPSG:5070,
+# built once.
+_DOMAIN_5070 = {}
+
+
+def _domain_5070():
+    """Domain D (CR-0017 section 2): the union of the STATE_FIPS county
+    polygons, projected from the file CRS straight to EPSG:5070 (no
+    EPSG:4326 step). Raises if a STATE_FIPS state has no county or D has
+    no area. Cached."""
+    if "geom" not in _DOMAIN_5070:
+        import shapely
+        path, counties = _county_polygons()
+        missing = set(STATE_FIPS.values()) - set(counties["STATEFP"])
+        if missing:
+            raise RuntimeError(f"{path}: no county polygons for STATEFP "
+                               f"{sorted(missing)}")
+        geom = shapely.union_all(
+            counties.to_crs(_ANALYSIS_EPSG).geometry.to_numpy())
+        if geom.is_empty or geom.area <= 0:
+            raise RuntimeError(f"{path}: domain D is empty")
+        _DOMAIN_5070["geom"] = geom
+    return _DOMAIN_5070["geom"]
+
+
+def domain_edge_m(x, y, *, domain=None):
+    """edge_m of each EPSG:5070 point (CR-0017 section 2): its distance
+    to the boundary of domain D if D contains it, else 0.0. x, y must
+    come from to_5070 of lon/lat. `domain` (a shapely polygon in EPSG:5070
+    metres) replaces D - the test seam; None builds D from the county
+    file. Returns a float64 array."""
+    import shapely
+    x = np.atleast_1d(np.asarray(x, dtype=np.float64))
+    y = np.atleast_1d(np.asarray(y, dtype=np.float64))
+    if x.shape != y.shape:
+        raise ValueError(f"x and y differ in shape: {x.shape} vs {y.shape}")
+    geom = _domain_5070() if domain is None else domain
+    out = np.zeros(x.shape, dtype=np.float64)
+    if x.size == 0:
+        return out
+    shapely.prepare(geom)
+    inside = shapely.contains_xy(geom, x, y)
+    if inside.any():
+        edge = geom.boundary
+        shapely.prepare(edge)
+        pts = shapely.points(x[inside], y[inside])
+        out[inside] = shapely.distance(pts, edge)
+    return out
 
 
 def verify_partition(lon, lat, state):

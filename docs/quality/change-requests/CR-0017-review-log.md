@@ -67,6 +67,41 @@ Round 2 was bounded (CR-0011 A2).
 | B11 | MEDIUM | MC v2 passes W6 (added rows with `label=1` and junk `obs_date`/`coord_uncertainty_m`) and W7 (reordered N). "What fails MC" overstated this. R4 and the order checks catch both in the same run, so it is not BLOCKING. | Accepted and revised; both of B's options were taken in part. MC v3: MC4 requires `label` "0" on added rows, and canonical (lon, lat) order of the combined file. The text now says `obs_date` and `coord_uncertainty_m` on added rows are a stated limit, covered by R4. Verified against the real code: `canonical(sel, NEGATIVE_ORDER)` sorts by (longitude, latitude), and live `negatives_ME.csv` is sorted. Re-run on all 9 trees: W6 and W7 now FAIL; W2 and A's `tree2` PASS; W4 PASSes (the stated limit); the rest FAIL. | §3 MC; `check_must_change.py`; `mc_wrongtrees.txt`; `mc_selftest.txt` |
 | B12 | LOW | `regions.py` would hold two readers of the county file. | Accepted and revised. One private helper reads the filtered counties in the file CRS, and both D and `_state_polygons()` use it. The code review of deliverable 3 checks it. | §2 Code |
 
+## Implementation code review
+Code review of deliverables 2–4 on the unmerged branch `cr0017-combined`
+(diff `666474c..b059624`: pipeline side `ee59d12`, acceptance side
+`b059624`). Both reviewers were fresh agents, read-only, and ran tests
+and mutants in scratch copies.
+
+| reviewer | head | verdict | blocking |
+|---|---|---|---|
+| A (independent) | `b059624` | APPROVE WITH FOLLOW-UPS | 0 (1 MEDIUM, 3 LOW, 2 INFO) |
+| B (independent) | `b059624` | APPROVE WITH FOLLOW-UPS | 0 (5 LOW) |
+
+**Evidence at `c0d6997`** (`docs/quality/evidence/CR-0017/combined/RUN.txt`):
+scratch-tree real-data run of the combined code at `b059624` (clean
+tree): acceptance 19/19 GATEs, MC PASS (88 C / 23 N removed, as
+pre-registered), run 2 byte-identical to run 1 (the record differs only in
+`created_utc`), live `data/` unchanged.
+
+**Approval.** Author sign-off: APPROVE. Author and reviewers approved;
+user pre-authorised (2026-09-30). No BLOCKING or MAJOR finding. The branch
+stays unmerged until deliverable 6 step 1.
+
+| id | sev | finding (short) | disposition |
+|---|---|---|---|
+| A F1 | MEDIUM | The acceptance side's inclusive `<= BUFFER_M` at `Replay.domain_edge_mask` (`return e <= b`) and `gate_E13` (`bad = e <= b`) is untested: `<` at either site survives the suite. | Fixed in `c17c30d`: `TestDomainEdgeUnits.test_domain_edge_mask_threshold_inclusive` and `test_gate_e13_threshold_inclusive` (a row at exactly BUFFER_M is dropped / FAILs, BUFFER_M + 1e-6 is kept / passes; stub context, square D). Mutation check in a `git archive` copy with `git init`: unmutated 109/109 OK; `<` at `domain_edge_mask` killed by the first test only; `<` at `gate_E13` killed by the second test only. Test code only; `acceptance_split.py` unchanged. |
+| A F2 | LOW | "File CRS straight to 5070, never via 4326" is not observable here (null NAD83→WGS84 transform); an acceptance-side detour survives. | Tracker (`CR-0007-0008-OPEN-ISSUES.md` § CR-0017 implementation code review), owner lead. |
+| A F3 | LOW | `regions._ANALYSIS_EPSG` comment claims it is the target of `to_5070`, which still has its own literal. | Fixed in `c17c30d`: comment reworded (used only for D; must equal `to_5070`'s literal target; wiring is CR-0007 (d)) and `tests/test_cr0017.py` `DomainD.test_analysis_epsg_is_the_to_5070_target` pins the equality. No behaviour change. |
+| A F4 | LOW | D inherits the cwd-relative county read. | Tracker: added to the existing cwd-resolution item (§ CR-0012 code (20a52c1), owner BUG-0047 CR). Fail-closed (R3). |
+| A F5 | INFO | Merging before deliverable 6 would make `standing_checks` refuse training until a new record. | Process note: merge only at deliverable 6 step 1, after deliverable 5's preconditions. |
+| A F6 | INFO | CR-0012 §2 step 6 pointer line and `CHANGELOG.md` entry are pending. | Process note: they are deliverable 7. |
+| B B-1 | LOW | Pipeline and replay edge distances agree to ~1e-10 m, not bit-exactly, at `edge_m == BUFFER_M` on long diagonals. | Tracker, owner lead. Loud on disagreement (R3/R4); real margin 1.802 m. |
+| B B-2 | LOW | Pipeline (project, then union) and replay (dissolve in file CRS, then project) differ on non-noded inputs. | Tracker, owner lead: re-check D equality if the county file changes. Identical on the pinned file. |
+| B B-3 | LOW | The `combined/` evidence was untracked (ignored by `.gitignore` `*`). | Resolved by `c0d6997` (force-added `combined/`: scripts, logs, sha256 files, MC outputs, records). |
+| B B-4 | LOW | Misleading comment in `test_reference_has_no_row_in_the_edge_band` ("both step-6 rules bite ... separately"). | Fixed in `c17c30d`: comment now points to `TestDomainEdgeUnits.test_step6_drops_rule_a_or_rule_b`. |
+| B B-5 | LOW/INFO | CRS-less or non-EPSG NAD83 county file: pipeline accepts, replay refuses (loud). | Tracker, owner lead. File is sha-pinned. |
+
 ## Revision history
 - **v1** (`b043fb2`): first draft.
 - **v1** (`01e0605`): specified against CR-0015 head `3add80b` (lead

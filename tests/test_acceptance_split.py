@@ -302,6 +302,17 @@ def _write_candidates(root, S):
                            "state": R, "gbif_id": [next(ids) for _ in range(n)],
                            "how_many": rng.choice([1.0, 2.0, np.nan], n),
                            "coord_uncertainty_m": unc})
+        if R == "VT":                                    # CR-0017 attack rows (section 3)
+            pair = _edge_band_pair(S, df)
+            west = _west_edge_rows(S, df)
+            pts = pair + west
+            df = pd.concat([df, pd.DataFrame({
+                "common_name": ["Edge Pair"] * len(pair) + ["West Edge"] * len(west),
+                "scientific_name": "sci edge",
+                "longitude": [a for a, _ in pts], "latitude": [b for _, b in pts],
+                "obs_date": "2022-05-01", "year": 2022, "month": 5, "state": "VT",
+                "gbif_id": list(range(200001, 200001 + len(pts))), "how_many": 1.0,
+                "coord_uncertainty_m": 10.0})], ignore_index=True)
         # exact-key duplicates later in file order, some with SMALLER gbif_id
         dup = df.iloc[100:140].copy()
         dup["gbif_id"] = [next(ids) - (50000 if k % 2 else 0) for k in range(len(dup))]
@@ -309,6 +320,91 @@ def _write_candidates(root, S):
         dup["common_name"] = "Duplicate Pin"
         df = pd.concat([df, dup], ignore_index=True)[G_COLS]
         df.to_csv(os.path.join(root, "data", "negatives", f"gbif_negatives_{R}.csv"), index=False)
+
+
+def fixture_domain_5070(dissolve=True):
+    """The fixture's acquisition domain (ME, NH, VT county boxes; not the
+    non-domain county 36) in EPSG:5070, built with shapely/pyproj directly,
+    independently of acceptance_split's domain code."""
+    from pyproj import Transformer
+    from shapely.geometry import box
+    from shapely.ops import transform, unary_union
+    t = Transformer.from_crs("EPSG:4269", "EPSG:5070", always_xy=True)
+    mid = (LAT[0] + LAT[1]) / 2
+    states = []
+    for R, (lo0, lo1) in REG_LON.items():
+        polys = [transform(t.transform, box(lo0, LAT[0], lo1, mid)),
+                 transform(t.transform, box(lo0, mid, lo1, LAT[1]))]
+        states.append(unary_union(polys))
+    return unary_union(states) if dissolve else states
+
+
+def shapely_edge_m(lons, lats, dissolve=True):
+    """Reference edge_m (CR-0017 section 2) with shapely: distance to the
+    boundary for contained points, else 0."""
+    import shapely
+    x, y = A.to_5070(np.asarray(lons, float), np.asarray(lats, float))
+    pts = shapely.points(x, y)
+    geoms = [fixture_domain_5070(True)] if dissolve else fixture_domain_5070(False)
+    out = np.full(len(x), np.inf)
+    inside = np.zeros(len(x), bool)
+    for g in geoms:
+        inside |= shapely.contains(g, pts)
+        out = np.minimum(out, shapely.distance(g.boundary, pts))
+    return np.where(inside, out, 0.0)
+
+
+def _edge_band_pair(S, cand):
+    """Two VT candidates 20 m apart (< MIN_SPACING_M) straddling edge_m =
+    BUFFER_M at the south domain edge, the in-band one first in the seeded
+    thin order, > 400 m from every sighting and > 100 m from every other
+    candidate. Deterministic scan."""
+    import shapely
+    allS = pd.concat(list(S.values()))
+    sx, sy = A.to_5070(allS["longitude"].to_numpy(), allS["latitude"].to_numpy())
+    cx, cy = A.to_5070(cand["longitude"].to_numpy(), cand["latitude"].to_numpy())
+    edge = fixture_domain_5070().boundary
+    seed = 42
+    for lon in np.round(np.arange(-72.58, -72.42, 0.0007), 6):
+        pts = []
+        for target in (290.0, 310.0):
+            lat = LAT[0] + target / 111000.0
+            for _ in range(6):                      # Newton on the true edge distance
+                x, y = A.to_5070([lon], [lat])
+                d = shapely.distance(edge, shapely.points(x[0], y[0]))
+                lat = round(lat + (target - d) / 111000.0, 6)
+            pts.append((float(lon), float(lat)))
+        (a_lon, a_lat), (b_lon, b_lat) = pts
+        ka = A.order_key(A.coord_text(a_lon, a_lat), seed)
+        kb = A.order_key(A.coord_text(b_lon, b_lat), seed)
+        if ka >= kb:
+            continue
+        x, y = A.to_5070([a_lon, b_lon], [a_lat, b_lat])
+        if math.hypot(x[1] - x[0], y[1] - y[0]) >= 30:
+            continue
+        if np.hypot(sx - x[0], sy - y[0]).min() < 400 or np.hypot(sx - x[1], sy - y[1]).min() < 400:
+            continue
+        if np.hypot(cx - x[0], cy - y[0]).min() < 100:
+            continue
+        return pts
+    raise RuntimeError("fixture: no edge-band thin pair found")
+
+
+def _west_edge_rows(S, cand):
+    """VT candidates about 200 m inside the VT west domain edge, beyond
+    which lies only the non-domain county 36: > 400 m from every sighting,
+    > 100 m from every other candidate and from each other."""
+    allS = pd.concat(list(S.values()))
+    sx, sy = A.to_5070(allS["longitude"].to_numpy(), allS["latitude"].to_numpy())
+    cx, cy = A.to_5070(cand["longitude"].to_numpy(), cand["latitude"].to_numpy())
+    out = []
+    for lat in np.round(np.arange(LAT[0] + 0.012, LAT[1] - 0.011, 0.006), 6):
+        lon = REG_LON["VT"][0] + 0.0025
+        x, y = A.to_5070([lon], [lat])
+        if np.hypot(sx - x[0], sy - y[0]).min() < 400 or np.hypot(cx - x[0], cy - y[0]).min() < 100:
+            continue
+        out.append((float(lon), float(lat)))
+    return out
 
 
 def build_inputs(root):
@@ -635,8 +731,56 @@ class WeightScale(A.Replay):
 
 
 class NoBuffer(A.Replay):
-    def buffer_drop(self, cand):
-        return cand
+    def sighting_buffer_mask(self, cand):
+        return np.zeros(len(cand), bool)
+
+
+# --- CR-0017 section 3: domain-edge attack pipelines ------------------------
+class NoDomainEdge(A.Replay):
+    """No domain-edge filter (pool step 6 rule (b) absent)."""
+    def domain_edge_mask(self, cand):
+        return np.zeros(len(cand), bool)
+
+
+class EveryCountyDomain(A.Replay):
+    """D = every county in the file (no STATEFP filter): the edge is only
+    the outer (national) border, so the non-domain county 36 counts as data."""
+    def domain(self):
+        import geopandas as gpd
+        cp = self.cfg["paths"]["county_polygons"]
+        g = gpd.read_file(os.path.join(self.root, cp["path"]), engine="pyogrio")
+        g = g.to_crs("EPSG:5070")
+        return gpd.GeoSeries([g.geometry.union_all()], crs="EPSG:5070")
+
+
+class UndissolvedDomain(A.Replay):
+    """D not dissolved: per-state polygons, so the lines between states are edges."""
+    def domain(self):
+        import geopandas as gpd
+        g = A.county_dissolved(self.root, self.cfg).to_crs("EPSG:5070")
+        return gpd.GeoSeries(list(g.geometry), crs="EPSG:5070")
+
+
+class HalfEdgeRadius(A.Replay):
+    """Edge radius BUFFER_M / 2."""
+    def domain_edge_mask(self, cand):
+        b = float(self.C["BUFFER_M"]) / 2
+        e = A.domain_edge_within(cand["x_5070"].to_numpy(), cand["y_5070"].to_numpy(),
+                                 self.domain(), b)
+        return e <= b
+
+
+class EdgeBeforeThin(A.Replay):
+    """The edge filter applied before thinning (after step 4), not in step 6."""
+    def pool_until_partition(self):
+        cand = A.Replay.pool_until_partition(self)
+        x, y = A.to_5070(cand["longitude"].to_numpy(dtype=float),
+                         cand["latitude"].to_numpy(dtype=float))
+        at_edge = A.Replay.domain_edge_mask(self, cand.assign(x_5070=x, y_5070=y))
+        return cand[~at_edge].copy()
+
+    def domain_edge_mask(self, cand):
+        return np.zeros(len(cand), bool)
 
 
 class WithReplacement(A.Replay):
@@ -769,7 +913,7 @@ class TestReference(unittest.TestCase):
         lines = []
         code, res = A.full_run(root, CFG, do_obs=False, out=lines.append)
         self.assertEqual(code, 1)
-        for g in ("E0", "E1", "E3", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "R3"):
+        for g in ("E0", "E1", "E3", "E6", "E7", "E8", "E9", "E10", "E11", "E12", "E13", "R3"):
             self.assertEqual(res[g]["status"], "FAIL", g)
             self.assertIn(rel, res[g]["missing"], g)
         self.assertTrue(any(l.startswith("E0   FAIL  (missing") for l in lines))
@@ -1062,6 +1206,292 @@ class TestAttacks(unittest.TestCase):
         self.assertTrue(any("BUFFER_M" in x for x in res["E11"]["problems"]))
 
 
+BUF = 300.0
+
+
+def _pooled_neg(rep):
+    return pd.concat(list(rep.neg.values()), ignore_index=True)
+
+
+def _min_sighting_dist(df):
+    S = pd.concat([read(BASE, "sightings", R) for R in ("ME", "NH", "VT")], ignore_index=True)
+    sx, sy = A.to_5070(S["longitude"].to_numpy(), S["latitude"].to_numpy())
+    x, y = A.to_5070(df["longitude"].to_numpy(), df["latitude"].to_numpy())
+    return A.nearest_dist(x, y, sx, sy)
+
+
+def _county36_dist(df):
+    import shapely
+    from pyproj import Transformer
+    from shapely.geometry import box
+    from shapely.ops import transform
+    t = Transformer.from_crs("EPSG:4269", "EPSG:5070", always_xy=True)
+    c36 = transform(t.transform, box(-72.8, LAT[0], -72.6, LAT[1]))
+    x, y = A.to_5070(df["longitude"].to_numpy(), df["latitude"].to_numpy())
+    return shapely.distance(c36, shapely.points(x, y))
+
+
+class TestDomainEdgeAttacks(unittest.TestCase):
+    """CR-0017 section 3 attack rows. Each asserts the fixture rows it needs
+    exist (PA-0021(a): no attack may pass vacuously), then that it fails
+    the named gates for the intended reason. edge_m for the precondition is
+    the shapely reference (shapely_edge_m), not the code under test."""
+
+    assertFails = TestAttacks.assertFails
+
+    def test_reference_has_no_row_in_the_edge_band(self):
+        rep = A.Replay(BASE, CFG).run(stop_on_error=True)
+        for df in (rep.pool_full, _pooled_neg(rep)):
+            self.assertGreater(shapely_edge_m(df["longitude"], df["latitude"]).min(), BUF)
+        # step 6 removes rows on the fixture; that rules (a) and (b) each bite
+        # separately is asserted in TestDomainEdgeUnits.test_step6_drops_rule_a_or_rule_b
+        self.assertGreater(rep.counts["negatives"]["VT"]["5"] - rep.counts["negatives"]["VT"]["6"], 0)
+
+    def test_no_domain_edge_filter(self):
+        root = fresh()
+        rep = emit_attack(root, NoDomainEdge)
+        N = _pooled_neg(rep)
+        e = shapely_edge_m(N["longitude"], N["latitude"])
+        need = (e <= BUF) & (_min_sighting_dist(N) > BUF)
+        self.assertTrue(need.any(), "fixture: no selected candidate in the edge band, "
+                                    "> BUFFER_M from every sighting")
+        self.assertFails(root, {"E13": "acquisition-domain edge", "R3": "rows not in the replay",
+                                "R4": "rows not in the replay"})
+
+    def test_domain_is_every_us_county(self):
+        root = fresh()
+        rep = emit_attack(root, EveryCountyDomain)
+        N = _pooled_neg(rep)
+        e = shapely_edge_m(N["longitude"], N["latitude"])
+        d36 = _county36_dist(N)
+        need = (e <= BUF) & (np.abs(d36 - e) < 1e-6) & (_min_sighting_dist(N) > BUF)
+        self.assertTrue(need.any(), "fixture: no selected edge-band candidate whose nearest "
+                                    "outside point is in the non-domain county")
+        self.assertFails(root, {"E13": "acquisition-domain edge", "R3": "rows not in the replay",
+                                "R4": "rows not in the replay"})
+
+    def test_domain_not_dissolved(self):
+        root = fresh()
+        ref = A.Replay(BASE, CFG).run(stop_on_error=True)
+        C = ref.pool_full
+        need = ((shapely_edge_m(C["longitude"], C["latitude"], dissolve=False) <= BUF) &
+                (shapely_edge_m(C["longitude"], C["latitude"]) > BUF) & (_min_sighting_dist(C) > BUF))
+        self.assertTrue(need.any(), "fixture: no pool row within BUFFER_M of an internal state "
+                                    "line, clear of the domain edge and of every sighting")
+        emit_attack(root, UndissolvedDomain)
+        self.assertFails(root, {"R3": "replay rows absent"})
+        self.assertEqual(gates(root, only={"E13"})["E13"]["status"], "PASS")   # over-drop only
+
+    def test_edge_radius_half_buffer(self):
+        root = fresh()
+        rep = emit_attack(root, HalfEdgeRadius)
+        C = rep.pool_full
+        e = shapely_edge_m(C["longitude"], C["latitude"])
+        self.assertTrue(((e > BUF / 2) & (e <= BUF)).any(),
+                        "fixture: no candidate with BUFFER_M/2 < edge_m <= BUFFER_M")
+        self.assertFails(root, {"E13": "acquisition-domain edge", "R3": "rows not in the replay"})
+
+    def test_edge_filter_before_thinning(self):
+        root = fresh()
+        g = read(BASE, "gbif_candidates", "VT")
+        pair = g[g["common_name"] == "Edge Pair"]
+        self.assertEqual(len(pair), 2, "fixture: the edge-band thin pair is absent")
+        e = shapely_edge_m(pair["longitude"], pair["latitude"])
+        x, y = A.to_5070(pair["longitude"].to_numpy(), pair["latitude"].to_numpy())
+        self.assertLess(math.hypot(x[1] - x[0], y[1] - y[0]), CFG["constants"]["MIN_SPACING_M"])
+        inb = int(np.argmin(e))
+        self.assertTrue(e[inb] <= BUF < e[1 - inb], "fixture: the pair does not straddle the band edge")
+        keys = [A.order_key(A.coord_text(lo, la), CFG["constants"]["SPLIT_SEED"])
+                for lo, la in zip(pair["longitude"], pair["latitude"])]
+        self.assertLess(keys[inb], keys[1 - inb], "fixture: the in-band member is not first in "
+                                                  "the thin order")
+        rep = emit_attack(root, EdgeBeforeThin)
+        ref = A.Replay(BASE, CFG).run(stop_on_error=True)
+        out_key = A.key_list(pair.iloc[[1 - inb]], 5)[0]
+        self.assertIn(out_key, A.key_list(rep.pool_full, 5),
+                      "fixture: the out-of-band neighbour did not survive steps 7-10")
+        self.assertNotIn(out_key, A.key_list(ref.pool_full, 5))
+        self.assertFails(root, {"R3": "rows not in the replay"})
+
+
+class TestDomainEdgeUnits(unittest.TestCase):
+    def _square(self, *boxes):
+        import geopandas as gpd
+        from shapely.geometry import box
+        return gpd.GeoSeries([box(*b) for b in boxes], crs="EPSG:5070")
+
+    def test_inside_outside_on_boundary(self):
+        D = self._square((0, 0, 10000, 10000))
+        e = A.domain_edge_within([5000, 100, -50, 0, 5000, 20000], [5000, 5000, 5000, 5000, 10000, 3],
+                                 D, 300)
+        self.assertEqual(e[0], np.inf)             # > radius: reported as +inf
+        self.assertAlmostEqual(e[1], 100.0, places=9)
+        self.assertEqual(list(e[2:]), [0.0, 0.0, 0.0, 0.0])   # outside / on the boundary -> 0
+
+    def test_threshold_inclusive(self):
+        D = self._square((0, 0, 10000, 10000))
+        e = A.domain_edge_within([300.0, 300.000001], [5000.0, 5000.0], D, 300)
+        self.assertEqual(e[0], 300.0)
+        self.assertTrue(e[0] <= 300)               # exactly BUFFER_M: dropped
+        self.assertGreater(e[1], 300)              # BUFFER_M + 1e-6: kept
+
+    def _edge_rows(self, b):
+        """Two rows inside a 10 km square D: edge_m == BUFFER_M exactly and
+        BUFFER_M + 1e-6 (x distance to the west side; exact in float64)."""
+        return pd.DataFrame({"longitude": [-72.0, -72.1], "latitude": [44.0, 44.1],
+                             "x_5070": [b, b + 1e-6], "y_5070": [5000.0, 5000.0]})
+
+    def test_domain_edge_mask_threshold_inclusive(self):
+        """Replay.domain_edge_mask (step 6 rule (b)): edge_m == BUFFER_M is
+        dropped, BUFFER_M + 1e-6 is kept (CR-0017 F1)."""
+        b = float(CFG["constants"]["BUFFER_M"])
+        D = self._square((0, 0, 10000, 10000))
+        rep = A.Replay.__new__(A.Replay)
+        rep.C = {"BUFFER_M": CFG["constants"]["BUFFER_M"]}
+        rep.domain = lambda: D
+        cand = self._edge_rows(b)
+        self.assertEqual(A.domain_edge_within(cand["x_5070"], cand["y_5070"], D, b)[0], b)
+        self.assertEqual(list(rep.domain_edge_mask(cand)), [True, False])
+
+    def test_gate_e13_threshold_inclusive(self):
+        """gate_E13: a row at edge_m == BUFFER_M FAILs; BUFFER_M + 1e-6 passes
+        (CR-0017 F1). The context is a stub; D is monkeypatched."""
+        from unittest import mock
+        b = float(CFG["constants"]["BUFFER_M"])
+        D = self._square((0, 0, 10000, 10000))
+        rows = self._edge_rows(b)
+
+        class Ctx:
+            def __init__(self, N, C):
+                self.C, self.root, self.cfg = {"BUFFER_M": CFG["constants"]["BUFFER_M"]}, BASE, CFG
+                self._N, self._C = N, C
+
+            def pooled(self, kind, missing):
+                return self._N.assign(_R="VT")
+
+            def try_csv(self, rel, missing):
+                return self._C
+
+            def xy(self, df):
+                return df["x_5070"].to_numpy(dtype=float), df["y_5070"].to_numpy(dtype=float)
+
+        at, above = rows.iloc[[0]].reset_index(drop=True), rows.iloc[[1]].reset_index(drop=True)
+        with mock.patch.object(A, "acquisition_domain", return_value=D):
+            problems, missing = A.gate_E13(Ctx(at, above))
+            self.assertEqual(missing, [])
+            self.assertEqual(len(problems), 1, problems)
+            self.assertTrue(problems[0].startswith("N (pooled): 1 rows within"), problems)
+            problems, missing = A.gate_E13(Ctx(above, at))
+            self.assertEqual(len(problems), 1, problems)
+            self.assertTrue(problems[0].startswith("C: 1 rows within"), problems)
+            self.assertEqual(A.gate_E13(Ctx(above, above)), ([], []))
+
+    def test_long_segments_are_exact(self):
+        """A 10 km side has only two vertices; the nearest point is mid-segment."""
+        D = self._square((0, 0, 10000, 10000))
+        e = A.domain_edge_within([5000.0, 7321.5], [299.9, 9950.0], D, 300)
+        self.assertAlmostEqual(e[0], 299.9, places=9)
+        self.assertAlmostEqual(e[1], 50.0, places=9)
+
+    def test_line_between_dissolved_states_is_not_an_edge(self):
+        import geopandas as gpd
+        parts = self._square((0, 0, 5000, 10000), (5000, 0, 10000, 10000))
+        D = gpd.GeoSeries([parts.union_all()], crs="EPSG:5070")
+        e = A.domain_edge_within([5005.0, 4990.0], [5000.0, 5000.0], D, 300)
+        self.assertEqual(list(e), [np.inf, np.inf])
+        e = A.domain_edge_within([5005.0, 4990.0, 5000.0], [5000.0, 5000.0, 5000.0], parts, 300)
+        self.assertAlmostEqual(e[0], 5.0, places=9)   # undissolved: the internal line counts
+        self.assertAlmostEqual(e[1], 10.0, places=9)
+        self.assertEqual(e[2], 0.0)                   # on the internal line: within neither part
+
+    def test_matches_shapely_reference_on_the_fixture(self):
+        rng = np.random.default_rng(11)
+        lon = rng.uniform(-72.62, -71.98, 4000)
+        lat = rng.uniform(43.99, 44.21, 4000)
+        x, y = A.to_5070(lon, lat)
+        D = A.acquisition_domain(BASE, CFG)
+        for radius in (300.0, 1000.0):
+            got = A.domain_edge_within(x, y, D, radius)
+            ref = shapely_edge_m(lon, lat)
+            near = ref <= radius
+            self.assertTrue(near.any() and (~near).any())
+            np.testing.assert_allclose(got[near], ref[near], rtol=0, atol=1e-6)
+            self.assertTrue(np.isinf(got[~near]).all())
+
+    def test_domain_is_the_config_states_only(self):
+        D = A.acquisition_domain(BASE, CFG)
+        self.assertEqual(len(D), 1)
+        self.assertEqual(D.crs.to_string(), "EPSG:5070")
+        ref = fixture_domain_5070()
+        self.assertLess(D.iloc[0].symmetric_difference(ref).area, 1e-3 * ref.area / 1e6)
+
+    def test_step6_drops_rule_a_or_rule_b(self):
+        """Pool step 6: the rows dropped are exactly (a) | (b) of the step-5 pool."""
+        seen = {}
+
+        class Spy(A.Replay):
+            def buffer_drop(self, cand):
+                out = A.Replay.buffer_drop(self, cand)
+                seen["in"], seen["out"] = cand, out
+                return out
+
+        Spy(BASE, CFG).run(stop_on_error=True)
+        cand, out = seen["in"], seen["out"]
+        dmin = _min_sighting_dist(cand)
+        a = dmin <= BUF
+        b = shapely_edge_m(cand["longitude"], cand["latitude"]) <= BUF
+        self.assertTrue((a & ~b).any() and (b & ~a).any())
+        self.assertEqual(sorted(A.key_list(out, 5)), sorted(A.key_list(cand[~(a | b)], 5)))
+
+    def test_e13_missing_county_file_is_named(self):
+        root = fresh()
+        rel = CFG["paths"]["county_polygons"]["path"]
+        os.remove(os.path.join(root, rel))
+        res = gates(root, only={"E13"})
+        self.assertEqual(res["E13"]["status"], "FAIL")
+        self.assertIn(rel, res["E13"]["missing"])
+
+    def test_e13_catches_one_edge_row_in_C(self):
+        root = fresh()
+        c = read(root, "candidate_pool")
+        row = c.iloc[[0]].copy()
+        row["longitude"], row["latitude"] = -72.598, 44.1          # ~160 m inside VT's west edge
+        c = A.sort_canonical(pd.concat([c, row], ignore_index=True), CFG["row_order"]["pool"])
+        c.to_csv(os.path.join(root, A.rpath(CFG, "candidate_pool")), index=False)
+        res = gates(root, only={"E13"})
+        self.assertEqual(res["E13"]["status"], "FAIL")
+        self.assertTrue(any(x.startswith("C: 1 rows within 300 m") for x in res["E13"]["problems"]),
+                        res["E13"]["problems"])
+
+    def test_config_domain_edge_cannot_be_removed_or_repointed(self):
+        with open(PROD_CONFIG) as f:
+            base = json.load(f)
+        muts = {"absent": lambda c: c["paths"].pop("domain_edge"),
+                "source": lambda c: c["paths"]["domain_edge"].update(source="data/roads/other.zip"),
+                "copied": lambda c: c["paths"]["domain_edge"].update(
+                    source=dict(c["paths"]["county_polygons"])),
+                "crs": lambda c: c["paths"]["domain_edge"].update(edge_crs="EPSG:4326")}
+        for name, mut in muts.items():
+            c = copy.deepcopy(base)
+            mut(c)
+            p = os.path.join(TMP, f"de_{name}.json")
+            with open(p, "w") as f:
+                json.dump(c, f)
+            with self.assertRaises(A.ConfigError, msg=name):
+                A.load_config(p)
+            out = subprocess.run([sys.executable, os.path.join(REPO, "acceptance_split.py"),
+                                  "--config", p, "--data-root", BASE], capture_output=True, text=True)
+            self.assertEqual(out.returncode, 2, name)
+            self.assertIn("paths.domain_edge", out.stdout, name)
+
+    def test_e13_not_in_standing_subset(self):
+        import inspect
+        src = inspect.getsource(A.standing_checks)
+        self.assertNotIn("E13", src)
+        self.assertIn("E13", A.GATE_IDS)
+        self.assertEqual(len(A.GATE_IDS), 19)
+
+
 class TestStanding(unittest.TestCase):
     """Standing checks: val file edited after acceptance; pre-CR file
     swapped in; raster touched; --jitter 8 with augmentation."""
@@ -1183,7 +1613,7 @@ GATE_SECTION_SHA256 = {
     "hash_spec": "b23ed261b2a27647b9cd4dccf71c9638448efc2338d0d2889013807ab44f82e1",
     "manifest_schema": "652b8c0262fec0070c7216e8ceeb9053445c5deef3bb8cd98692e7c8732d3e2a",
     "parsing": "4acb340c20cf9c16404cefd22555a3a626a799808d6d1eee1283e2aa929129b8",
-    "paths": "78a8ad79fddaa53e07e4ae8b7204ef4ca688bd4fb89f5a4a5fda2547ff7f8c29",
+    "paths": "14f974c9fe084aa1db73b74ab038888816f91b7bc17002c215e7f62366355ef5",   # CR-0017: + domain_edge
     "pins": "9957bf9f9161c6a2d61d9573b91d952e5e4e77db26e9f0158adad3725354f0d9",
     "raster": "f05264dd8932f962a54552e8db3a77264158357b5744c4c4029f1aa70173dca8",
     "regions_py": "71890049878a8ce76dea88baf1a901f8ee7d3b7c02684f45e3c648ef4c9a1d00",

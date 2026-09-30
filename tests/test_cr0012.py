@@ -24,6 +24,7 @@ from unittest import mock
 
 import numpy as np
 import pandas as pd
+import shapely
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -47,6 +48,23 @@ CONFIG = json.loads(_read(os.path.join(ROOT, "docs", "quality",
 def identity_5070(lon, lat):
     return (np.atleast_1d(np.asarray(lon, dtype=np.float64)),
             np.atleast_1d(np.asarray(lat, dtype=np.float64)))
+
+
+# CR-0017: pool step 6 (b) builds domain D from the real TIGER county file,
+# as verify_partition does (patched in these tests). Here D is a box far
+# larger than any synthetic region, so (b) drops nothing and every CR-0012
+# expectation below is unchanged; tests/test_cr0017.py tests (b) itself.
+_FAR_DOMAIN = mock.patch.object(
+    regions, "_domain_5070",
+    lambda: shapely.box(-1e8, -1e8, 1e8, 1e8))
+
+
+def setUpModule():
+    _FAR_DOMAIN.start()
+
+
+def tearDownModule():
+    _FAR_DOMAIN.stop()
 
 
 # ---------------------------------------------------------------------------

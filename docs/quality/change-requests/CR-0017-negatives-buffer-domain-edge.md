@@ -376,7 +376,7 @@ regeneration and bookkeeping. They cannot land separately:
         `preregister.txt` and `preregister_keys.csv`;
       - `check_must_change.py`, `mc_selftest.txt`, `mc_wrongtrees.txt`
         and the reviewer tree builders.
-- [ ] 2. Acceptance changes (§3), on the unmerged CR-0017 branch (§ Impact),
+- [x] 2. Acceptance changes (§3), on the unmerged CR-0017 branch (§ Impact),
       by a fresh agent that does not also write deliverable 3 (CR-0013
       rule 4):
       - `acceptance_split.py`, the config and the tests;
@@ -384,12 +384,13 @@ regeneration and bookkeeping. They cannot land separately:
       - a read-only run on today's files gives the expected FAILs
         (§ Test plan);
       - evidence: `docs/quality/evidence/CR-0017/acceptance_prefix.txt`.
-- [ ] 3. Pipeline changes (§2) and `tests/test_cr0017.py`, on the same
+- [x] 3. Pipeline changes (§2) and `tests/test_cr0017.py`, on the same
       unmerged branch, on top of the merged CR-0015.
       `tests/test_cr0012.py`, `tests/test_shared_constants.py` and
       `tests/test_nodata_zero_lint.py` still pass.
-- [ ] 4. Scratch-tree real-data run (§ Test plan). Evidence goes to
-      `docs/quality/evidence/CR-0017/scratch/`.
+- [x] 4. Scratch-tree real-data run (§ Test plan). Evidence goes to
+      `docs/quality/evidence/CR-0017/scratch/` (pipeline side) and
+      `docs/quality/evidence/CR-0017/combined/` (combined code).
 - [ ] 5. Preconditions, recorded in the evidence before any write under
       `data/`:
       - CR-0009 is CLOSED;

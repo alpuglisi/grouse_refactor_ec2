@@ -228,6 +228,16 @@
         "VT": "50"
       },
       "rule": "verify_partition(lon, lat, state) returns the records whose county-polygon state differs from state or that lie in no polygon; pyogrio where STATEFP IN (<STATE_FIPS values>), dissolve by STATEFP, EPSG:4269 -> EPSG:4326, within (CR-0007 v9 section 1)"
+    },
+    "domain_edge": {
+      "source": "paths.county_polygons",
+      "source_rule": "a reference by key: the county file, sha256, where and dissolve_by are those of paths.county_polygons and are not copied; load_config refuses any other value",
+      "edge_crs": "EPSG:5070",
+      "crs_rule": "the dissolved county polygons are projected from the file CRS (county_polygons.source_crs) straight to edge_crs, never via county_polygons.target_crs",
+      "rule": "union of the dissolved polygons; edge_m = distance to the union's boundary for contained points, else 0; drop iff edge_m <= BUFFER_M",
+      "points": "x, y = EPSG:4326 -> EPSG:5070 (always_xy) of the row's longitude/latitude; never the file's x_5070/y_5070",
+      "applies_to": "pool step 6 rule (b), after thinning (step 5), with rule (a) buffer_drop on the same step-5 pool; manifest count 6 = rows remaining after both; E13 on N combined (pooled) and C",
+      "source_cr": "CR-0017 section 3 (APPROVED v3)"
     }
   },
   "regions_py": {

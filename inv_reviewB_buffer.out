@@ -1,0 +1,47 @@
+ALL evaluated rows 18407 -> unique coords 13952 (veg + nonveg; the buffer uses every row)
+   unique grouse locations by polygon state: {'ME': 7924, 'VT': 3725, 'NH': 2303}
+
+=== A. 300 m buffer source: box-clipped (now) vs state-clipped (post-CR) vs pooled (PA-0018-correct) ===
+   ME: buffer against rd.evaluated (box-clipped, NOW)     8207 grouse locs -> 11404 of 16261 candidates survive
+   ME: buffer against state ME only (POST-CR)             7924 grouse locs -> 11405 of 16261 candidates survive
+   ME: buffer against ALL grouse locations (correct)     13952 grouse locs -> 11404 of 16261 candidates survive
+   ME: post-CR admits 1 candidates that the CURRENT box-clipped buffer excludes, and 0 fewer than the pooled-source buffer would; candidates within 300 m of an out-of-state grouse location: 1
+   NH: buffer against rd.evaluated (box-clipped, NOW)     4999 grouse locs ->  5216 of 6955 candidates survive
+   NH: buffer against state NH only (POST-CR)             2303 grouse locs ->  5218 of 6955 candidates survive
+   NH: buffer against ALL grouse locations (correct)     13952 grouse locs ->  5216 of 6955 candidates survive
+   NH: post-CR admits 2 candidates that the CURRENT box-clipped buffer excludes, and 0 fewer than the pooled-source buffer would; candidates within 300 m of an out-of-state grouse location: 2
+   VT: buffer against rd.evaluated (box-clipped, NOW)     5201 grouse locs ->  5573 of 8690 candidates survive
+   VT: buffer against state VT only (POST-CR)             3725 grouse locs ->  5573 of 8690 candidates survive
+   VT: buffer against ALL grouse locations (correct)     13952 grouse locs ->  5573 of 8690 candidates survive
+   VT: post-CR admits 0 candidates that the CURRENT box-clipped buffer excludes, and 0 fewer than the pooled-source buffer would; candidates within 300 m of an out-of-state grouse location: 0
+
+=== B. can the candidate pool still fill a 1:1 val quota under a GLOBAL block split? ===
+   proposed positives 6508, val 1302
+   block-level val fraction (what split_for_unassigned would hash at): 0.190
+   ME train: positives  2951  candidates available (pre-extraction-nodata)  9320
+   ME val: positives   773  candidates available (pre-extraction-nodata)  2085
+      unassigned-block candidates (hash-split): 7512 of 11405
+   NH train: positives   924  candidates available (pre-extraction-nodata)  4209
+   NH val: positives   247  candidates available (pre-extraction-nodata)  1009
+      unassigned-block candidates (hash-split): 3536 of 5218
+   VT train: positives  1331  candidates available (pre-extraction-nodata)  4477
+   VT val: positives   282  candidates available (pre-extraction-nodata)  1096
+      unassigned-block candidates (hash-split): 2868 of 5573
+
+=== C. candidate statistics for the support assertion ===
+   grid   3000 m: pos blocks 4004 neg blocks 4683 jaccard 0.245 pos-only 57.3%
+   grid  10000 m: pos blocks 1249 neg blocks 1289 jaccard 0.805 pos-only 9.4%
+   grid  30000 m: pos blocks 180 neg blocks 190 jaccard 0.927 pos-only 1.1%
+   per-partition-unit class composition (the BUG-0029 statistic):
+     CURRENT ME: pos {'ME': 3723, 'NH': 137}   neg {'ME': 3859, nan: 1}
+     CURRENT NH: pos {'NH': 1116, 'VT': 728, 'ME': 400}   neg {'NH': 2243, 'ME': 1}
+     CURRENT VT: pos {'VT': 1544, 'NH': 717}   neg {'VT': 2261}
+     POST-CR ME: pos {'ME': 3724}   neg {'ME': 3859, nan: 1}
+     POST-CR NH: pos {'NH': 1171}   neg {'NH': 2243, 'ME': 1}
+     POST-CR VT: pos {'VT': 1613}   neg {'VT': 2261}
+
+=== D. nearest-negative distance for positives ===
+   CURRENT pooled positives: median nearest-negative 1,687 m, p90 4,223 m, share with no negative within 3 km 21.7%
+   POST-CR pooled positives: median nearest-negative 1,729 m, p90 4,363 m, share with no negative within 3 km 23.2%
+
+done

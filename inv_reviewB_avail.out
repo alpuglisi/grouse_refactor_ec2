@@ -1,0 +1,4 @@
+BACKGROUND_N = 20000 uniform points per region box
+  ME:  52.6% of the availability sample is inside ME,   2.2% in another study state,  45.1% outside all three (Canada/ocean/NY/MA/QC)
+  NH:  47.7% of the availability sample is inside NH,  37.7% in another study state,  14.6% outside all three (Canada/ocean/NY/MA/QC)
+  VT:  54.0% of the availability sample is inside VT,  30.3% in another study state,  15.7% outside all three (Canada/ocean/NY/MA/QC)

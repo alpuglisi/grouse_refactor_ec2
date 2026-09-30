@@ -1,0 +1,19 @@
+pooled train 6691 rows / 5621 coords; pooled val 1674 rows / 1613 coords
+coords in BOTH pooled train and pooled val: 522  (= 522 of 1674 val rows, 31.2%)   CR/BUG-0027 claim: 522 of 1674 (31.2%)
+  pooled: val with a train positive within    0.5 m:  31.2%
+  pooled: val with a train positive within     30 m:  31.7%
+  pooled: val with a train positive within    300 m:  32.6%
+  pooled: val with a train positive within   3000 m:  74.7%
+  ME within-region: val 772, <=30 m 0.0%, <=300 m 1.6%
+  NH within-region: val 450, <=30 m 0.0%, <=300 m 1.6%
+  VT within-region: val 452, <=30 m 0.0%, <=300 m 0.9%
+
+=== per-region block ids: does the SAME string mean different ground in different regions? ===
+  ME vs NH: 2409 vs 1367 block ids, 308 identical strings, 106 of them with OPPOSITE splits
+  ME vs VT: 2409 vs 1362 block ids, 244 identical strings, 73 of them with OPPOSITE splits
+  NH vs VT: 1367 vs 1362 block ids, 380 identical strings, 138 of them with OPPOSITE splits
+  ME: local grid origin EPSG:5070 (1,994,777, 2,472,517) -> block '0_0' is a different 3 km cell in each region
+  NH: local grid origin EPSG:5070 (1,887,090, 2,411,811) -> block '0_0' is a different 3 km cell in each region
+  VT: local grid origin EPSG:5070 (1,816,378, 2,397,517) -> block '0_0' is a different 3 km cell in each region
+
+done

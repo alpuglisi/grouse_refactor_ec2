@@ -1,0 +1,98 @@
+constants from source: MIN_SPACING=30 BLOCK_M=3000 VAL_FRAC=0.2 SEED=42
+
+=== 0. global block-id math: injectivity / negative coords ===
+   x=       0.0 y=       0.0 -> 0_0
+   x=      -1.0 y=      -1.0 -> -1_-1
+   x=   -3000.0 y=    3000.0 -> -1_1
+   x=    2999.9 y=   -2999.9 -> 0_-1
+   x=   -3000.1 y=       0.0 -> -2_0
+   x= 1000000.0 y=-2000000.0 -> 333_-667
+   x=-1000000.0 y= 2000000.0 -> -334_666
+   lattice 1000000 (bx,by) pairs from -500..499 -> 1000000 distinct ids (INJECTIVE)
+   study-area EPSG:5070 x range 1816378..2173844  y range 2397517..3065062  (both strictly positive: True)
+
+=== 1. the real input of the proposed rebuild ===
+   ME: 8207 evaluated rows, 3875 habitat-only (nonveg dropped 4332)
+   NH: 4999 evaluated rows, 2270 habitat-only (nonveg dropped 2729)
+   VT: 5201 evaluated rows, 2277 habitat-only (nonveg dropped 2924)
+   pooled habitat rows: 8422
+   (author's simulation instead pooled the already-thinned files: 8365 rows)
+   columns only in evaluated: ['cc', 'ch', 'fdist']
+   columns only in thinned  : ['aspect_gradient', 'block_id', 'slope', 'split']
+
+=== 2. state-polygon partition of the REAL input ===
+   habitat positives in NO state polygon: 0 of 8422
+   src_region -> poly_state crosstab:
+poly_state    ME    NH    VT
+src_region                  
+ME          3740   135     0
+NH           422  1119   729
+VT             0   725  1552
+   rows whose CSV 'state' column (source file) != poly_state: 0 of 8422  <-- prepare_training_data cannot use 'state' as the region
+
+=== 3. pooled de-duplication on rounded coordinates ===
+   8422 pooled rows -> 6702 unique rounded coords (removes 1720)
+   after dropping no-state records: 6702
+   by assigned state: {'ME': 3806, 'VT': 1677, 'NH': 1219}
+
+=== 4. thinning: pooled-once vs per-region (real algorithm) ===
+   pooled thin: 6702 -> 6508 kept (97.1%) in 7.8s
+   per-region thin of the SAME partitioned input: 6509 kept in 3.3s  (pooled removes 1 more)
+
+=== 5. one global block grid + one draw (source algorithm) ===
+   pooled positives: 6508  occupied blocks: 4004
+   target val 1302  val blocks 759  val records 1302 (20.01%)  overshoot 0
+   largest block holds 16 records; blocks with 1 record: 2654
+   exact coord collisions train&val: 0
+   val points with a train positive within    30 m:  0.00%  (0 of 1302)
+   val points with a train positive within   300 m:  0.69%  (9 of 1302)
+   val points with a train positive within  1500 m: 20.97%  (273 of 1302)
+   val points with a train positive within  3000 m: 61.60%  (802 of 1302)
+   val by state: {'ME': 773, 'VT': 282, 'NH': 247}
+   train by state: {'ME': 2951, 'VT': 1331, 'NH': 924}
+     ME: 3724 records, val fraction 20.76%
+     NH: 1171 records, val fraction 21.09%
+     VT: 1613 records, val fraction 17.48%
+   CR claims: 6712 positives / 4069 blocks / 763 val blocks / 1344 val (20.0%) / 0.0% 1.3% 64.4%
+
+=== 6. positive/negative 3km-block support, CURRENT data ===
+   ME train: pos blocks 1964 neg blocks 2001 shared 632  jaccard 0.190  pos-only 1332 (67.8%) neg-only 1369 (68.4%)
+   NH train: pos blocks 1107 neg blocks 914 shared 278  jaccard 0.159  pos-only 829 (74.9%) neg-only 636 (69.6%)
+   VT train: pos blocks 1126 neg blocks 986 shared 379  jaccard 0.219  pos-only 747 (66.3%) neg-only 607 (61.6%)
+   POOLED train: pos 3465 neg 3877 shared 1357 jaccard 0.227 pos-only 60.8% neg-only 65.0%
+   ME val: pos blocks 559 neg blocks 537 shared 131  jaccard 0.136  pos-only 428 (76.6%) neg-only 406 (75.6%)
+   NH val: pos blocks 305 neg blocks 245 shared 62  jaccard 0.127  pos-only 243 (79.7%) neg-only 183 (74.7%)
+   VT val: pos blocks 334 neg blocks 280 shared 84  jaccard 0.158  pos-only 250 (74.9%) neg-only 196 (70.0%)
+   POOLED val: pos 1145 neg 1061 shared 290 jaccard 0.151 pos-only 74.7% neg-only 72.7%
+
+=== 7. support check on the SIMULATED post-fix data ===
+   ME train: pos 2951 (blocks 1877) neg avail 3580 sampled 2951 (blocks 1990) shared 584 jaccard 0.178 pos-only 68.9%
+   NH train: pos 924 (blocks 588) neg avail 2088 sampled 924 (blocks 627) shared 175 jaccard 0.168 pos-only 70.2%
+   VT train: pos 1331 (blocks 783) neg avail 2063 sampled 1331 (blocks 801) shared 329 jaccard 0.262 pos-only 58.0%
+   POOLED train: jaccard 0.197 pos-only 66.3% neg-only 67.8%
+   ME val: pos 773 (blocks 459) neg avail 280 sampled 280 (blocks 155) shared 155 jaccard 0.338 pos-only 66.2%
+   NH val: pos 247 (blocks 139) neg avail 156 sampled 156 (blocks 76) shared 75 jaccard 0.536 pos-only 46.0%
+   VT val: pos 282 (blocks 163) neg avail 198 sampled 198 (blocks 94) shared 92 jaccard 0.558 pos-only 43.6%
+   POOLED val: jaccard 0.424 pos-only 57.6% neg-only 0.0%
+
+=== 8. does filter_by_year_gap (train.py, pre-pool) matter? ===
+   ME: EXCLUDED 689 pos train records - sighting years [2016, 2017, 2018, 2019] have no raster within +/-2 years for at least one feature (2,399 kept).
+   ME pos train: 3088 -> 2399
+   ME neg train: 3088 -> 3088
+   ME: EXCLUDED 173 pos val records - sighting years [2016, 2017, 2018, 2019] have no raster within +/-2 years for at least one feature (599 kept).
+   ME pos val: 772 -> 599
+   ME neg val: 772 -> 772
+   NH: EXCLUDED 445 pos train records - sighting years [2016, 2017, 2018, 2019] have no raster within +/-2 years for at least one feature (1,349 kept).
+   NH pos train: 1794 -> 1349
+   NH neg train: 1794 -> 1794
+   NH: EXCLUDED 122 pos val records - sighting years [2016, 2017, 2018, 2019] have no raster within +/-2 years for at least one feature (328 kept).
+   NH pos val: 450 -> 328
+   NH neg val: 450 -> 450
+   VT: EXCLUDED 437 pos train records - sighting years [2016, 2017, 2018, 2019] have no raster within +/-2 years for at least one feature (1,372 kept).
+   VT pos train: 1809 -> 1372
+   VT neg train: 1809 -> 1809
+   VT: EXCLUDED 107 pos val records - sighting years [2016, 2017, 2018, 2019] have no raster within +/-2 years for at least one feature (345 kept).
+   VT pos val: 452 -> 345
+   VT neg val: 452 -> 452
+
+done

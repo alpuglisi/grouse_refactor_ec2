@@ -1849,6 +1849,24 @@ class TestYearFloorUnits(unittest.TestCase):
         self.assertEqual(len(r["problems"]), 1, r["problems"])
         self.assertIn(f"only in P {{{top}}}", r["problems"][0])
 
+    def test_e14b_negative_only_year(self):
+        """(b): P without its latest year fails too — the mirror case, so a
+        gate weakened to "P years subset of N years" is caught (CR-0019
+        code review B, F1)."""
+        top = FIX_YEARS[-1]
+
+        def fn(df):
+            df = df.copy()
+            df.loc[df["year"] == top, "year"] = top - 1
+            return df
+        root = fresh()
+        for R in REGIONS3:
+            write_set(root, A.P_KINDS, R, fn(read(root, "thinned_positives", R)))
+        r = gates(root, only={"E14"})["E14"]
+        self.assertEqual(r["status"], "FAIL")
+        self.assertEqual(len(r["problems"]), 1, r["problems"])
+        self.assertIn(f"only in N {{{top}}}", r["problems"][0])
+
     def test_e14_in_standing_subset_without_C(self):
         import inspect
         self.assertIn('("E14", gate_E14, {"include_C": False})', inspect.getsource(A.standing_checks))

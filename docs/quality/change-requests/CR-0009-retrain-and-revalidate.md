@@ -1,6 +1,6 @@
 # CR-0009: Retrain once on the rebuilt data, and prove the Errol map is still right
 
-**Status: v5, awaiting round-5 review, 2026-09-30.** The user
+**Status: APPROVED (v5.1), 2026-09-30** — author and both reviewers (round 5); user pre-authorised. The user
 pre-authorised the full cycle (review, approval by the author and two
 reviewers, implementation) on 2026-09-30; the retrain runs on this machine
 (NVIDIA L40S, 46 GB). History, verdicts and dispositions:
@@ -65,7 +65,7 @@ pipeline data changes here.
 python train.py --epochs 10 --loss an_full --an-pos-weight 1.0 \
     --embed-dropout 0.1 --dropout 0.4 \
     --dynamic-dropout --dynamic-dropout-step 0.05 --dynamic-dropout-max 0.9 \
-    --weight-decay 1e-3 --seed 42 --save-path grouse_cr0009.pth \
+    --weight-decay 1e-3 --seed 0 --save-path grouse_cr0009.pth \
     --metrics-csv docs/quality/evidence/CR-0009/retrain/metrics.csv \
     --tensorboard
 ```
@@ -84,12 +84,19 @@ python train.py --epochs 10 --loss an_full --an-pos-weight 1.0 \
   reported (§ Baselines).
 - `--an-pos-weight 1.0` is pinned explicitly so it does not depend on the
   auto rule; it equals what both baselines resolved.
-- `--seed 42` differs from the baselines' seed 0. One seed only (§ Stated
+- `--seed 0` equals the baselines' default. One seed only (§ Stated
   limits).
 - `--compile` is omitted: it changes execution speed, not the recipe.
-- `--metrics-csv` and `--tensorboard` are output-only; `bce.pth` was run
-  with both. TensorBoard's `run/command` and `run/args` texts are the
-  source of the recorded argv and `vars(args)` (no code change).
+- `--metrics-csv` and `--tensorboard` are output-only apart from the RNG
+  stream (`--tensorboard` draws one validation batch at
+  `model_handler.py:836-840`, which advances torch's global RNG); `bce.pth`
+  was run with both. TensorBoard's `run/command` and `run/args` texts
+  (under `runs/<timestamp>_grouse_cr0009/`) are the source of the recorded
+  argv and `vars(args)`; they are extracted and copied into the evidence
+  directory (no code change).
+- **Before the run:** `mkdir -p docs/quality/evidence/CR-0009/retrain`
+  (`_log_metrics` appends without creating directories), and
+  `metrics.csv` must not exist (append mode would mix two runs).
 - Everything else is at `train.py` defaults, including `--missing-mask`
   (default on), `--max-year-gap 2`, `--regions` (all three) and
   `--save-path` (default `grouse_single_best.pth`, `train.py:437`, which
@@ -100,8 +107,8 @@ python train.py --epochs 10 --loss an_full --an-pos-weight 1.0 \
   log; and, from CR-0013, the sha256 of `data/pipeline/acceptance_record.json`
   and the config sha256 it records (must equal the sha256 of
   `docs/quality/acceptance_split.json` at the retrain's commit).
-- Runtime: about a fifth of `bce.pth`'s ~25 min of epochs (uncompiled may
-  be slower), plus the patch-cache build.
+- Runtime is not a gate; expect roughly a fifth of a 50-epoch run, plus
+  the patch-cache build.
 
 ### 2. Refit calibration
 ```
@@ -136,7 +143,9 @@ captured before CR-0012's deliverable 6.
 **Deliverable 2 (baseline capture) runs before approval.** This extends
 §1.1 A3 (which covers gate code, not running it) by **lead-author decision
 under the user's standing authorisation (2026-09-30)**: the capture is a
-read-only measurement; it writes only under
+read-only measurement; maps are scored in-process (`symptom_check.py
+--reproduce`), never with the `predict.py` CLI, and nothing under `data/`
+is written; it writes only under
 `docs/quality/evidence/CR-0009/baseline/`, with a `SHA256SUMS` file,
 re-verified with `sha256sum -c` and committed. It is CR-0012's
 deliverable 0. It captures exactly:
@@ -186,7 +195,7 @@ closed on the recorded values and that investigation.
 | # | type | statistic | investigate if | pre-fix / post-fix (§ Why now) | would indicate |
 |---|---|---|---|---|---|
 | 1a | OBS | `P(ME pixel > NH pixel)` (Mann–Whitney U / n_ME·n_NH) | outside [0.44, 0.56] | 0.8513, 0.8235 / 0.5400, 0.5089 | return of the reported symptom |
-| 1b | OBS | ME ≥0.8 share − NH ≥0.8 share, pp | > 15 pp | 62.9, 45.6 / 5.36, 0.08 | a bimodal Maine side that 1a misses (a hypothetical ME 45.0 % / NH 4.9 % = 40.1 pp, `inv_reviewG_r2_cr9.py:10`) |
+| 1b | OBS | ME ≥0.8 share − NH ≥0.8 share, pp | > 15 pp | 62.9, 45.6 / 5.36, 0.08 | a bimodal Maine side that 1a misses (a hypothetical ME 45.0 % / NH 4.9 % = 40.1 pp, constructed in review) |
 | 2a | OBS | mean ME−NH `road_dist` (m) over the frozen pairs, NH grid, current rasters | \|·\| > 600 m | +4,255 / +202.75 | a `road_dist` raster regression (raster-only; § Stated limits) |
 | 2b | OBS | mean ME−NH calibrated probability over the frozen pairs | > +0.20 | +0.3484 / +0.1078 (`bce.pth`) | model-side reintroduction via `road_dist` |
 | 3 | OBS | AUC and AP of the item-1 map at in-box records, by split × side; NH side; all points | report | NH side 0.6918 (41 pos / 11 neg) / 0.6918; all points 0.7570 / 0.7273 (55 pos / 11 neg) (`bce.pth`) | — (no power; see fields) |
@@ -344,7 +353,7 @@ epochs.
       before approval (§1.1 A3).
 - [ ] 2. Baseline capture (§ Baselines), before approval; `SHA256SUMS`
       verified and committed. R passes.
-- [ ] 3. Round-5 review; approval by the author and both reviewers.
+- [x] 3. Round-5 review; approval by the author and both reviewers.
 - [ ] 4. Confirm CR-0012 deliverable 6 passed, with `acceptance_record.json`
       written; CR-0014 landed.
 - [ ] 5. Backups (§ Disk).

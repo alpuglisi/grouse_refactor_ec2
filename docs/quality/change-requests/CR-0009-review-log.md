@@ -57,7 +57,7 @@ Verbatim list from v3's header, each with its v4 disposition.
 ## Author sign-off
 Pending (v5).
 
-## v4 amendment (2026-09-30, uncommitted with v4)
+## v4 amendment (2026-09-30, committed with v4)
 BUG-0039 (CR-0013's PA-0021 sweep): symptom items 1a/1b/2a/2b were GATEs
 with thresholds from one or two observed runs or an 8-pair bootstrap and
 no retrain-seed null. **User decision: demoted to OBS.** Promotion needs
@@ -231,3 +231,26 @@ v3/v4 tables above point here.
 
 MEDIUM/LOW items are also listed in `docs/quality/CR-0007-0008-OPEN-ISSUES.md`
 (§ CR-0009 v5), owner CR-0009's author, for round-5 confirmation.
+
+## Round 5 (v5 at 765e18b) — verdicts
+- Reviewer A (a099db52e7f07b719): **APPROVE WITH FOLLOW-UPS**. All round-4
+  BLOCKING/MAJOR resolved; A-M1's premise withdrawn (item-3 inputs
+  byte-identical to the CR-0007 backup; NH 2,244 -> 1,079 happens at CR-0012).
+- Reviewer B (ae60139f55241898c): **APPROVE WITH FOLLOW-UPS**. B-B1 and
+  B-M1..M6 resolved; every recipe flag verified in `train.py`.
+- Author (lead): approve. **User pre-authorised (2026-09-30): author + both
+  reviewers = sign-off. CR-0009 APPROVED as v5.1.**
+
+## v5.1 dispositions (all accepted and revised in the CR)
+| id | sev | finding | disposition / location |
+|---|---|---|---|
+| A-R5-1 = B-R5-M1 | MEDIUM | `--metrics-csv` dir absent; append mode | § The change 1 "Before the run": `mkdir -p`, file must be absent |
+| A-R5-2 = B-R5-M2 | MEDIUM (A: LOW) | deliverable 2 could write `data/predictions` via `predict.py` | § Baselines: in-process scoring only, nothing under `data/`; `symptom_check.py` author instructed |
+| A-R5-3 | LOW | `--seed 42` adds a needless difference | recipe now `--seed 0` |
+| A-R5-4 | LOW | untracked citation `inv_reviewG_r2_cr9.py:10` | row 1b: "constructed in review" |
+| B-R5-L1 | LOW | `--tensorboard` advances the RNG; event files outside evidence dir | § The change 1: stated; `run/args` extracted and copied |
+| B-R5-L2 | LOW | stale "uncommitted with v4" label | relabelled |
+| B-R5-L3 | LOW | unsourced "~25 min" | removed; runtime not a gate |
+
+All v5.1 edits are confined to the lines named above; no bounded re-review
+is needed (no BLOCKING/MAJOR raised; A1).

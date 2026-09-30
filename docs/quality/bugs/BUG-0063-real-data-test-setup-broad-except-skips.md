@@ -1,6 +1,6 @@
-# BUG-NEW-4: The CR-0015 real-data test setup turns any error into a skip
+# BUG-0063: The CR-0015 real-data test setup turns any error into a skip
 
-> Placeholder id: the lead allocates the real id and renames this file.
+> Id allocated by the lead (2026-09-30; filed as placeholder BUG-NEW-4).
 > Found in the CR-0015 implementation code review: reviewer A finding
 > A-3, reviewer B finding B-2 (MEDIUM, PA-0027 violation), at `3add80b`.
 

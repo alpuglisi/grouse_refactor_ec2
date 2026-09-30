@@ -296,3 +296,51 @@ implementer's interpretations and results, for the code review:
 - **Handed to the lead:** the `BUG_LOG`/PA rows, the Swept? cells and the
   tracker items in `docs/quality/evidence/CR-0015-bookkeeping-rows.md`
   (deliverable 9).
+
+## Implementation code review (head `3add80b`, 2026-09-30)
+Two independent reviewers re-derived the change from the diff
+`00c0b6f..3add80b`, re-ran the synthetic suite, applied mutations to
+scratch copies, and re-ran V1–V3 on real data (read-only). Full reviews:
+`/tmp/claude-1000/-home-ec2-user-grouse2/cr0015-review-A.md` and
+`cr0015-review-B.md` (scratch; their findings are recorded below).
+
+| reviewer | head | verdict | blocking / major |
+|---|---|---|---|
+| A — code review | `3add80b` | **APPROVE WITH FOLLOW-UPS** | 0 / 0 |
+| B — code review | `3add80b` | **APPROVE WITH FOLLOW-UPS** | 0 / 0 |
+
+Reviewer B reproduced the 7b numbers digit for digit, using the exported
+code at `3add80b` against the main tree's `data/` (read-only).
+
+### Dispositions
+| id | severity | disposition + where |
+|---|---|---|
+| A-1 | MEDIUM | **Tracked.** V3 stays OBS (see V3 below), so the 5-draw broken side decides nothing. Before any GATE re-reading: ≥ 50 seeds per broken sampler, or a recorded analytic argument for the deterministic unassigned-excluded statistic. Tracker: "CR-0015 implementation code review", owner the lead. |
+| A-2 | MEDIUM | **Fixed.** 7b and 7a re-run at `d567355` from a clean tree (`git status --porcelain --untracked-files=no` empty, checked by the run scripts before starting). The hash and clean status are recorded in `docs/quality/evidence/CR-0015-background.txt` and `docs/quality/evidence/CR-0015-V/calibration_7a.log`. The 7b stdout is identical to the earlier run, and the 7a calibration JSON is identical except for the wall-clock `seconds` fields. Evidence commit: see "Follow-up commits" below. |
+| A-3 = B-2 | MEDIUM | **Fixed** in `d567355`. `tests/test_cr0015_real.py` `_setup` now catches only `FileNotFoundError`, `ImportError` and `MissingDataError`. Verified: a patched `TypeError` in `train.discover_features` gives `errors 1, skipped 0`, and no data root still skips with `FileNotFoundError`. Filed as **BUG-0063** (PA-0027 recurrence of BUG-0049, with the prior-PA failure analysis); the PA-0027 Swept? correction is in `docs/quality/evidence/CR-0015-bookkeeping-rows.md`. |
+| A-4 | LOW | **Fixed** in `d567355`. The rows file no longer says "allocate from BUG-0050". It names BUG-0058..0060 as allocated and warns that BUG-0050..0057 are taken. |
+| A-5 | LOW | **Tracked** (call-site test for `build_datasets`), owner the lead. |
+| A-6 | LOW | **Tracked** together with B-7 (NH acceptance 0.3773 < the budget premise of 0.38; converged in 6 rounds), owner the lead. |
+| B-1 | LOW | **Fixed** in `d567355`. U1's raster is in `ALBERS_OTHER`, the "state" line is in lon, and `in_state` asserts that it receives lon/lat. Verified by applying the mutation `in_state(np.asarray(xs)[ok], np.asarray(ys)[ok], region)` to a `git archive` copy under `/tmp/claude-1000/cr0015-mut`: U1 FAILS. |
+| B-3 | LOW | **Tracked.** `block_split` input validation is a production-code validation change, out of this CR's scope. Owner the lead (CR or trivial-fix record). |
+| B-4 | LOW | **Tracked** (optional re-scope of V3's separation requirement), owner the lead. |
+| B-5 | LOW | **Accepted as the deliverable-5 disposition.** The CR's §1 names `generate_negatives.to_albers`, which CR-0012 had already removed. The operative wrapper is `prepare_training_data.to_5070`, which `generate_negatives.py` imports and which now delegates to `regions.to_5070`. B1 covers it: 20/20 manifest outputs byte-identical, including `block_assignments.csv` and every positives file, and `acceptance_split.py` 18/18 (`docs/quality/evidence/CR-0015-B1/`). |
+| B-6 | LOW | **Tracked** (the `pretrain.py` preflight uses the private `regions._state_polygons`), owner the lead. |
+| B-7 | INFO | **Tracked** together with A-6. |
+
+**V3 status: OBS.** This is the CR's literal rule (md5-0.18 does not
+separate). It is the lead's decision, and both reviewers concur. The
+optional re-scope is tracker item B-4.
+
+**Sweep ids.** The lead allocated BUG-NEW-1/2/3 as **BUG-0058**,
+**BUG-0059** and **BUG-0060**. The files are renamed and the references
+replaced. The lead allocated BUG-0063 as **BUG-0063**.
+
+### Sign-off
+- Reviewer A: APPROVE WITH FOLLOW-UPS (`3add80b`).
+- Reviewer B: APPROVE WITH FOLLOW-UPS (`3add80b`).
+- Author/implementer: **signed off.** Follow-ups applied as dispositioned
+  above.
+
+The author and both reviewers approved, and the user pre-authorised the
+autonomous review → approve → implement cycle (2026-09-30).

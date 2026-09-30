@@ -4,23 +4,20 @@ The implementer did not edit `BUG_LOG.md` or `PREVENTIVE_ACTIONS.md`
 (handoff §3.4). Apply each row below by exact whole-line insertion or
 replacement (rows can contain `\|`, so never use sed on them).
 
-**Ids.** The lead allocated the sweep findings as BUG-0058 (was
-BUG-NEW-1), BUG-0059 (was BUG-NEW-2) and BUG-0060 (was BUG-NEW-3). The
-files are renamed and every reference is replaced. BUG-0050..0057 already
-exist or are held on the integration branch (CR-0012 d8, CR-0013, and
-CR-0017's placeholder), so do not reuse them. **BUG-NEW-4** (review
-finding A-3/B-2) is still a placeholder. Allocate the next free id after
-checking the integration branch's `BUG_LOG.md` and any other pending
-placeholders. Then rename
-`docs/quality/bugs/BUG-NEW-4-real-data-test-setup-broad-except-skips.md`
-and replace `BUG-NEW-4` in this file, that doc and
-`docs/quality/change-requests/CR-0015-review-log.md`
-(`grep -rl BUG-NEW-4 docs/`).
+**Ids.** The lead allocated the CR-0015 findings as follows. The files
+are renamed and every reference is replaced.
+
+| id | was | finding |
+|---|---|---|
+| BUG-0058 | BUG-NEW-1 | PA-0006 re-sweep finding |
+| BUG-0059 | BUG-NEW-2 | PA-0006 re-sweep finding |
+| BUG-0060 | BUG-NEW-3 | PA-0018 producer-sweep finding |
+| BUG-0063 | BUG-NEW-4 | code review A-3/B-2 |
 
 ## 1. `BUG_LOG.md`: new rows (newest first, above the current top row)
 
 ```
-| BUG-NEW-4 | 2026-09-30 | `tests/test_cr0015_real.py` `_setup`: `except Exception` turned any error (e.g. a `TypeError` from `discover_features`) into `SkipTest` without `GROUSE_REQUIRE_REAL_DATA=1`, so a broken harness reported `OK (skipped=6)` like a machine with no data (CR-0015 code review A-3/B-2) | Broad handler resolved to a designed non-error outcome (PA-0027 recurrence of BUG-0049); PA-0027 was filed on the integration branch after the CR-0015 branch was cut and has no lint yet (CR-0018) | Trivial fix, no CR (CR-0015 review follow-ups): catch only `FileNotFoundError`, `ImportError`, `MissingDataError`; verified a patched `TypeError` now errors (0 skipped) | FIXED |
+| BUG-0063 | 2026-09-30 | `tests/test_cr0015_real.py` `_setup`: `except Exception` turned any error (e.g. a `TypeError` from `discover_features`) into `SkipTest` without `GROUSE_REQUIRE_REAL_DATA=1`, so a broken harness reported `OK (skipped=6)` like a machine with no data (CR-0015 code review A-3/B-2) | Broad handler resolved to a designed non-error outcome (PA-0027 recurrence of BUG-0049); PA-0027 was filed on the integration branch after the CR-0015 branch was cut and has no lint yet (CR-0018) | Trivial fix, no CR (CR-0015 review follow-ups): catch only `FileNotFoundError`, `ImportError`, `MissingDataError`; verified a patched `TypeError` now errors (0 skipped) | FIXED |
 | BUG-0060 | 2026-09-30 | Checkpoints carry no split provenance: `--distill-from` teachers, `--init-from` (any GrouseResNet state dict), `--resume` and `calibrate.py --model` accept a checkpoint fitted under another split; 81.0 % of today's val positives were training rows under the pre-CR-0012 split (CR-0015 PA-0029 producer sweep) | Model artefacts that feed training or calibration record no holdout, so the holdout is not enforced on run-time producers of training signal | None yet; owner the lead, via a CR (split digest in checkpoint config, refusal on mismatch; SSL checkpoints exempt). Does not affect CR-0009 as pinned | OPEN |
 | BUG-0059 | 2026-09-30 | With `missing_mask=False` (legacy checkpoints, `train.py --no-missing-mask`) `embed` clamps `MISSING_CODE` to row 0 and fills NaN with 0.0; `fdist` 0 is a real code in ~92–96 % of pixels (CR-0015 PA-0006 re-sweep) | Opt-out embedding mode maps nodata onto a legitimate 0; the refusal guard covers only CR-0010-repaired rasters | None yet; owner the lead, via a CR (refuse the flag for training or widen `refuse_legacy_checkpoint_on_repaired`). Residual of BUG-0017 | OPEN |
 | BUG-0058 | 2026-09-30 | `predict.py` TensorBoard Edge metric: `torch.nan_to_num` turns continuous nodata into 0 and categorical `MISSING_CODE` counts as a class change, biasing `Edge/pearson_r/*` at coverage edges (CR-0015 PA-0006 re-sweep) | Nodata converted to the legitimate value 0 instead of excluded by a validity mask (PA-0006 mechanism) | None yet; one-function fix (difference only valid pairs); owner the lead (trivial-fix candidate). Diagnostic only | OPEN |
@@ -52,7 +49,7 @@ New line:
 | BUG-0029 | 2026-09-30 | Negatives fetched per state (`stateProvince`), positives clipped by overlapping box: half of NH's positives lie outside NH vs 1 of 2,244 negatives | Two label classes drawn from differently shaped regions; nothing compares their support | Membership: CR-0007 (state partition, implemented); split and draw: CR-0012 (landed, deliverable 6 18/18 GATEs); assumed negatives: CR-0015 (in-state draw; V1 0 out-of-state points, deliverable 7b). PA-0020 (filed) | FIXED — closed when CR-0009 closes |
 ```
 
-## 3. `PREVENTIVE_ACTIONS.md`: new rows (append after PA-0026, or after PA-0027 if CR-0012 d8 files it)
+## 3. `PREVENTIVE_ACTIONS.md`: new rows (insert after PA-0027 and before PA-0030, in numeric order)
 
 ```
 | PA-0028 | Extends PA-0006. A validity or nodata mask rejects only the declared nodata, `NODATA_SENTINELS` and non-finite values; any further rejected value (e.g. a literal `0`) needs a reviewed entry in the L1 allowlist (`tests/test_nodata_zero_lint.py`) stating why that value is not a reading. Enforced by L1 over every tracked `.py` (minus top-level `inv_*`/`res_*` and `docs/**`); forms L1 cannot see (a 0 through a variable, `fill_value=0`, `nan_to_num` defaults, integer casts of NaN, `clamp`/`masked_fill` onto a real code) are read by hand on every PA-0006/PA-0028 sweep. | yes — CR-0015 deliverable 4, 2026-09-30, by mechanism: every tracked non-evidence file reading `NODATA_SENTINELS` or a declared nodata (24 production/tool + 7 test files, plus `models.py`, `model_handler.py`, `inspect_point.py`, `diagnose_wetland.py`, `generate_negatives.py`). L1: BUG-0032 fixed; 3 statements allowlisted with justification (`find_tsd_contrast_points.py` NLCD has no 0; `generate_time_since_disturbance.py` VAT 0 Background stays covered; `check_road_dist.py` STATEFP fill 0); the deliberate pre-CR copy in `tests/cr0015_wrong_samplers.py` allowlisted. Manual read: BUG-0058 (`predict.py` Edge metric), BUG-0059 (`missing_mask=False` embed); BUG-0017 closed (fixed by `51a4ad0`); all other `nan_to_num`/boundless/VRT/`fill=0`/int-cast sites checked, not affected. Open: BUG-0058, BUG-0059 (owner the lead) | BUG-0032; swept, BUG-0058, BUG-0059 |
@@ -68,8 +65,8 @@ New line:
 
 ## 4b. PA-0027 Swept? cell update (append to the existing cell text)
 
-- **PA-0027.** Append: ` **Correction (CR-0015 code review, 2026-09-30):** "`tests/` has none" is stale — `tests/test_cr0015_real.py` `_setup` (written on a branch cut before PA-0027 was filed) turned any error into a skip, BUG-NEW-4, fixed (narrow types). Other new CR-0015 handlers compliant: `pretrain.py` preflight (→ `SystemExit`), `tests/test_cr0015_sampler.py` (`except SystemExit`, counted as a violation)`.
-  In its Source cell, append `; recurrence BUG-NEW-4`.
+- **PA-0027.** Append: ` **Correction (CR-0015 code review, 2026-09-30):** "`tests/` has none" is stale — `tests/test_cr0015_real.py` `_setup` (written on a branch cut before PA-0027 was filed) turned any error into a skip, BUG-0063, fixed (narrow types). Other new CR-0015 handlers compliant: `pretrain.py` preflight (→ `SystemExit`), `tests/test_cr0015_sampler.py` (`except SystemExit`, counted as a violation)`.
+  In its Source cell, append `; recurrence BUG-0063`.
 
 ## 5. Tracker items (`docs/quality/CR-0007-0008-OPEN-ISSUES.md`), owner the lead
 

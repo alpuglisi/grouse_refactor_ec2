@@ -1,3 +1,9 @@
+CR-0015 deliverable 7a V3 calibration
+date (UTC): 2026-09-30T14:36:49Z
+code: d567355de1ad16a44322e0f8efe62b2d5690f201 (worktree clean at start: `git status --porcelain --untracked-files=no` empty)
+cwd (data root): /tmp/claude-1000/cr0015-b1 (read only)
+command: GROUSE_REQUIRE_REAL_DATA=1 PYTHONPATH=<worktree> python tests/cr0015_background_check.py calibrate --seeds 100
+
 ME {"reference": {"stride": 22, "centres": 420537, "in_state_centres": 210341, "subset_centres": 169417, "share": 0.7759374797098284}, "bound": 0.0179454797098284, "separates": {"todays_sampler": true, "unassigned_excluded": true, "unassigned_train": true, "md5_fraction_018": false}}
    ME todays_sampler: min 0.0813 vs fair p99 0.0179
    ME unassigned_excluded: min 0.7759 vs fair p99 0.0179
@@ -14,4 +20,6 @@ VT {"reference": {"stride": 11, "centres": 434403, "in_state_centres": 228665, "
    VT unassigned_train: min 0.0907 vs fair p99 0.0154
    VT md5_fraction_018: min 0.0003 vs fair p99 0.0154
 separates (all regions): {'todays_sampler': True, 'unassigned_excluded': True, 'unassigned_train': True, 'md5_fraction_018': False}
-wrote /home/ec2-user/grouse2/.claude/worktrees/agent-a74570e35615ea5e3/docs/quality/cr0015_v3_calibration.json
+wrote /tmp/claude-1000/-home-ec2-user-grouse2/491a150a-d26d-456d-b9b4-036cd4a6478b/scratchpad/cr0015_v3_calibration.json
+
+Reproducibility: this re-run (A-2) reproduces the calibration JSON of the first 7a run (1612543) exactly, except the wall-clock "seconds" fields.

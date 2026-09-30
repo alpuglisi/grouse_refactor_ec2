@@ -162,7 +162,7 @@
     "stride": 22,
     "subset_centres": 169417
    },
-   "seconds": 140.4,
+   "seconds": 138.0,
    "separates": {
     "md5_fraction_018": false,
     "todays_sampler": true,
@@ -330,7 +330,7 @@
     "stride": 11,
     "subset_centres": 180210
    },
-   "seconds": 114.2,
+   "seconds": 112.7,
    "separates": {
     "md5_fraction_018": false,
     "todays_sampler": true,
@@ -498,7 +498,7 @@
     "stride": 11,
     "subset_centres": 182671
    },
-   "seconds": 100.3,
+   "seconds": 98.3,
    "separates": {
     "md5_fraction_018": false,
     "todays_sampler": true,

@@ -1,6 +1,6 @@
 CR-0015 deliverable 7b: V1-V3 on real data, plus V1 on the constructed wrong samplers
-date (UTC): 2026-09-30T14:18:15Z
-code: baec43281ec3306cfcb118f9da480b924e30cba3
+date (UTC): 2026-09-30T14:36:40Z
+code: d567355de1ad16a44322e0f8efe62b2d5690f201 (worktree clean at start: `git status --porcelain --untracked-files=no` empty)
 cwd (data root): /tmp/claude-1000/cr0015-b1 (scratch tree: copied CSVs, symlinked rasters; its pipeline outputs are byte-identical to the main tree's, B1)
 command: GROUSE_REQUIRE_REAL_DATA=1 PYTHONPATH=<worktree> python -m unittest -v tests.test_cr0015_real
 exit code: 0
@@ -34,6 +34,8 @@ test_v2_acceptance_report (tests.test_cr0015_real.V2.test_v2_acceptance_report) 
 test_v3_unassigned_train_share (tests.test_cr0015_real.V3.test_v3_unassigned_train_share) ... ok
 
 ----------------------------------------------------------------------
-Ran 6 tests in 18.629s
+Ran 6 tests in 18.645s
 
 OK
+
+Reproducibility: stdout identical to the first 7b run (recorded at 1612543, harness then uncommitted); reviewer B reproduced it independently at 3add80b.

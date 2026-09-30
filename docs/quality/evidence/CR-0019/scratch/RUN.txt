@@ -1,0 +1,42 @@
+CR-0019 deliverable 4, pipeline part: scratch-tree real-data run, 2026-09-30.
+Code: branch worktree-agent-a65312f33ca0c8664, commit 628083d (deliverable 3),
+base main 140a73e (CR-0019 APPROVED v3). Both manifest sections record
+commit 628083d, dirty false.
+
+Tree: /tmp/claude-1000/cr0019-scratch, built by mkscratch.sh:
+  data/pipeline and data/negatives copied (cp -a, 41 regular files);
+  every other data/ directory recreated with symlinked FILES (cp -rs:
+  3,543 symlinks, no symlinked directory).
+  Output-path check before the run: the 20 generator outputs, the manifest
+  and the record are regular files; no written directory is a symlink.
+Live tree: data/pipeline + data/negatives sha256 taken before
+  (live_before.sha256), re-checked after both runs: unchanged.
+
+Commands (cwd = the scratch tree; nice -n 10):
+  python <worktree>/prepare_training_data.py   > prepare_training_data_runN.log
+  python <worktree>/generate_negatives.py      > generate_negatives_runN.log
+
+1. Run 1: both exit 0.
+   Positives: ME 2,854, NH 827, VT 1,128 = 4,809 (pre-registered).
+   Positives count "2" (habitat, year >= YEAR_MIN): ME 2,909, NH 856, VT 1,174.
+   Pool count "1" (after the pool step 1 floor): ME 91,917, NH 69,219,
+   VT 104,076 = 265,212 (no candidate below 2020: unchanged, as the CR states).
+   Pool 22,099 rows. Draw = P per (region, split): ME 2,291/563,
+   NH 634/193, VT 922/206.
+   acceptance_record.json removed by prepare_training_data (CR-0012 step 6),
+   as designed.
+2. MC, --old /home/ec2-user/grouse2 (live, read-only) --new scratch:
+   mc_live_vs_scratch.txt: "MC: PASS (42/42 checks pass)", exit 0
+   (matches mc_selftest.txt's predicted tree).
+3. Run 2: scratch_run1.sha256 == scratch_run2.sha256 (40 files);
+   logs identical: byte-identical.
+4. yeargap_check.py (train.filter_by_year_gap on the scratch split files,
+   features = train.discover_features, as build_datasets calls it):
+   yeargap_check.txt. Tolerance 2: every frame returned unchanged (0 rows
+   dropped, either class). Tolerance 1: all 12 (region, class, split)
+   calls refuse; refused rows P 928, N 1,861 (CR section 2 figures).
+   build_datasets itself was not called: its standing_checks refuses until
+   the deliverable 2 acceptance run writes a record.
+5. Not run here: acceptance_split.py (20/20 GATEs, E14, R1-R4). It needs
+   deliverable 2 (replay, config, E14), written by a separate agent
+   (CR-0013 rule 4); run it on this tree after that branch is combined.

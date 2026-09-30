@@ -1,0 +1,44 @@
+MC0: PASS record copy sha ok=True; 20 artifacts; mismatched []
+MC1 ME rows: PASS new 2854, pre-registered 2854, missing 0, extra 0, differing 0
+MC1 ME kept lines: PASS header equal=True; 0 kept rows differ beyond the pre-registered split changes (7 split changes)
+MC1 ME order: PASS
+MC5 train_positives_ME: PASS
+MC5 val_positives_ME: PASS
+MC1 NH rows: PASS new 827, pre-registered 827, missing 0, extra 0, differing 0
+MC1 NH kept lines: PASS header equal=True; 0 kept rows differ beyond the pre-registered split changes (0 split changes)
+MC1 NH order: PASS
+MC5 train_positives_NH: PASS
+MC5 val_positives_NH: PASS
+MC1 VT rows: PASS new 1128, pre-registered 1128, missing 0, extra 0, differing 0
+MC1 VT kept lines: PASS header equal=True; 0 kept rows differ beyond the pre-registered split changes (1 split changes)
+MC1 VT order: PASS
+MC5 train_positives_VT: PASS
+MC5 val_positives_VT: PASS
+MC2: PASS new 3205 rows, pre-registered 3205
+MC3: PASS header/rows equal length=True; 501/501 pre-registered split changes found; 0 rows differ otherwise
+MC4 ME rows: PASS new 2854, pre-registered 2854, missing 0, extra 0
+MC4 ME equals C: PASS 0 rows not equal to their NEW C row on 19 shared columns
+MC4 ME label: PASS
+MC4 ME order: PASS
+MC4 ME train count: PASS P 2291, N 2291
+MC4 ME val count: PASS P 563, N 563
+MC5 train_negatives_ME: PASS
+MC5 val_negatives_ME: PASS
+MC4 NH rows: PASS new 827, pre-registered 827, missing 0, extra 0
+MC4 NH equals C: PASS 0 rows not equal to their NEW C row on 19 shared columns
+MC4 NH label: PASS
+MC4 NH order: PASS
+MC4 NH train count: PASS P 634, N 634
+MC4 NH val count: PASS P 193, N 193
+MC5 train_negatives_NH: PASS
+MC5 val_negatives_NH: PASS
+MC4 VT rows: PASS new 1128, pre-registered 1128, missing 0, extra 0
+MC4 VT equals C: PASS 0 rows not equal to their NEW C row on 19 shared columns
+MC4 VT label: PASS
+MC4 VT order: PASS
+MC4 VT train count: PASS P 922, N 922
+MC4 VT val count: PASS P 206, N 206
+MC5 train_negatives_VT: PASS
+MC5 val_negatives_VT: PASS
+MC: PASS (42/42 checks pass)
+exit 0

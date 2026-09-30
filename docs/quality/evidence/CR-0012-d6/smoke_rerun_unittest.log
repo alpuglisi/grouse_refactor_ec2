@@ -1,0 +1,59 @@
+............................................................................................................................./home/ec2-user/grouse2/.claude/worktrees/agent-adef8b998228501c0/tests/test_cr0010.py:89: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpprm08oh3/pins.json' mode='w' encoding='UTF-8'>
+  json.dump({
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./home/ec2-user/grouse2/.claude/worktrees/agent-adef8b998228501c0/tests/test_cr0010.py:89: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpd2jfsb7m/pins.json' mode='w' encoding='UTF-8'>
+  json.dump({
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./home/ec2-user/grouse2/.claude/worktrees/agent-adef8b998228501c0/tests/test_cr0010.py:89: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpwvsvb4hy/pins.json' mode='w' encoding='UTF-8'>
+  json.dump({
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./home/ec2-user/grouse2/.claude/worktrees/agent-adef8b998228501c0/tests/test_cr0010.py:89: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmp0kb0augq/pins.json' mode='w' encoding='UTF-8'>
+  json.dump({
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./home/ec2-user/grouse2/.claude/worktrees/agent-adef8b998228501c0/tests/test_cr0010.py:89: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpey17v5yh/pins.json' mode='w' encoding='UTF-8'>
+  json.dump({
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+./home/ec2-user/grouse2/.claude/worktrees/agent-adef8b998228501c0/tests/test_cr0010.py:89: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpstxny6sq/pins.json' mode='w' encoding='UTF-8'>
+  json.dump({
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/home/ec2-user/grouse2/.claude/worktrees/agent-adef8b998228501c0/tests/test_cr0010.py:197: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpstxny6sq/pins.json' mode='r' encoding='UTF-8'>
+  pins = json.load(open(self.fx.pins))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+/home/ec2-user/grouse2/.claude/worktrees/agent-adef8b998228501c0/tests/test_cr0010.py:199: ResourceWarning: unclosed file <_io.TextIOWrapper name='/tmp/tmpstxny6sq/pins.json' mode='w' encoding='UTF-8'>
+  json.dump(pins, open(self.fx.pins, "w"))
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+..................................................L1 match: check_road_dist.py:227 (b) (state != 0) & ~home
+L1 match: find_tsd_contrast_points.py:121 (b) ~np.isin(nlcd_arr, NODATA_SENTINELS) & (nlcd_arr != 0)
+L1 match: generate_time_since_disturbance.py:330 (b) (arr > 0) & ~sentinel
+L1 match: train.py:144 (a) set(NODATA_SENTINELS) | {nodata, 0}
+....................usage: python -m unittest [-h] [--model MODEL]
+                          [--map MAP | --predict | --reproduce] --calibration
+                          CALIBRATION --pairs PAIRS --out OUT
+                          [--evidence EVIDENCE] [--pins PINS]
+                          [--region-map REGION=TIF|predict] [--points POINTS]
+python -m unittest: error: --model and one of --map / --predict are required (or --reproduce)
+.missing input(s): ['/home/ec2-user/grouse2/.claude/worktrees/agent-adef8b998228501c0/data/roads/tl_2023_us_county.zip', '/tmp/tmpygeq32zr/c.json', '/tmp/tmpygeq32zr/p.csv', '/tmp/tmpygeq32zr/none.tif', '/tmp/tmpygeq32zr/none.pth']
+......................
+----------------------------------------------------------------------
+Ran 223 tests in 120.690s
+
+OK
+      2016 <- TreeMap 2016: mean over grid (non-forest counted as 0) balive 68.7ft2/ac, tpa_live 257.5stems/ac, qmd 6.0in, carbon_dwn 1.7t/ac
+
+============================================================
+VT
+============================================================
+   template grid: VT_2019_nlcd.tif
+   years to write: [2019, 2020, 2021]
+      VT_2019_tsd.tif: 0.1% of pixels carry a disturbance within 30y of 2019
+      VT_2020_tsd.tif: 0.1% of pixels carry a disturbance within 30y of 2020
+      VT_2021_tsd.tif: 0.1% of pixels carry a disturbance within 30y of 2021
+      downloading x.zip ...
+      downloading x.zip ...
+      [warn] cached x.zip is not a valid zip - fetching again
+      downloading x.zip ...
+      downloading x.zip ...
+      rasterized: 20 road pixels inside the grid (0.250%), 0 in the 0-px margin
+      rasterized: 20 road pixels inside the grid (0.250%), 0 in the 0-px margin
+      rasterized: 20 road pixels inside the grid (0.250%), 0 in the 0-px margin
+exit 0

@@ -1,0 +1,17 @@
+Case A file:
+auc,dropout,epoch,val_loss
+0.7,0.2,1,0.5
+0.8,1,0.4
+
+   auc  dropout  epoch  val_loss
+0  0.7      0.2    1.0       0.5
+1  0.8      1.0    0.4       NaN
+-> run 2's row: auc 0.80 correct, but epoch 1 lands under 'dropout', val_loss 0.40 under 'epoch', and val_loss reads NaN (every column after the missing key shifts left).
+
+Case B file:
+auc,epoch,val_loss
+0.7,1,0.5
+0.8,0.2,1,0.4
+
+pd.read_csv fails: ParserError: Error tokenizing data. C error: Expected 3 fields in line 3, saw 4
+

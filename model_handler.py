@@ -1336,7 +1336,7 @@ class GrouseModelHandler:
                       f"TTA AUC: {metrics.get('tta_auc', float('nan')):.4f} | "
                       f"AP: {metrics['ap']:.4f} | "
                       f"rank: {metrics['rank_score']:.4f} | "
-                      f"tuned acc: {metrics['tuned_tta_accuracy']:.2f}% | "
+                      f"tuned acc: {metrics.get('tuned_tta_accuracy', float('nan')):.2f}% | "
                       f"strict: {metrics.get('strict_accuracy', float('nan')):.2f}% "
                       f"(hedged {metrics.get('hedged_pct', float('nan')):.1f}%) | "
                       f"train acc: {metrics['train_accuracy']:.1f}% | "

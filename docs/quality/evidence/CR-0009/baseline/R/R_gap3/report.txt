@@ -1,0 +1,100 @@
+CR-0009 § Symptom acceptance - symptom_check.py. Every row is OBS (BUG-0039); none is pass/fail.
+run 2026-09-30T12:45:08+00:00  git HEAD 72f7bf9e0111e3fa1ef1f8101e53c9132c659605  device cuda
+argv: symptom_check.py --reproduce --calibration docs/quality/evidence/CR-0009/baseline/calibration.json --pairs docs/quality/evidence/CR-0009/baseline/inv_matched_pairs.csv --points docs/quality/evidence/CR-0009/baseline/points_S1_NH_region_files.csv --out docs/quality/evidence/CR-0009/baseline/R --evidence docs/quality/evidence/CR-0009/baseline/R_reproduction.txt
+model /home/ec2-user/grouse2/gap3.pth
+calibration /home/ec2-user/grouse2/docs/quality/evidence/CR-0009/baseline/calibration.json (Platt scale 1.455535 bias -1.489525; model_path /home/ec2-user/grouse2/gap3.pth)
+map (box) docs/quality/evidence/CR-0009/baseline/R/R_gap3/map_box_NH_gap3.tif - scored in-process by predict.py's functions (stride 4); re-scored 20 cells with --model/--calibration: max|diff| 6.39e-05 <= 0.001
+inputs (sha256):
+  7ec71f127ab055ec8044f6dcd8acac2c7a6623a5b1300f2dbcf066b89d7f2648  /home/ec2-user/grouse2/data/landfire/NH_2023_tcc.tif
+  76876507843188c1ea1bf854a6a491472360dcd928e06063a84d6d90e4d847ec  /home/ec2-user/grouse2/data/landfire/NH_2024_cc.tif
+  5e759aea6d553f7e2d6fe8712a48cf4b1a55cf4075f2bd6cab9e2505e9280750  /home/ec2-user/grouse2/data/landfire/NH_2024_ch.tif
+  8d7ba7b50975ae381754e0b6fee60b1de8f95388d121fc3986704e422be0e382  /home/ec2-user/grouse2/data/landfire/NH_2024_evc.tif
+  0210282a4a2225f83191dcbfa6b14604c167452138647220e6b209b11ddadde5  /home/ec2-user/grouse2/data/landfire/NH_2024_evh.tif
+  92133c1931767538e43d87f96690c297acd3d103d72592a5af383c2aac556ac9  /home/ec2-user/grouse2/data/landfire/NH_2024_evt.tif
+  fdd838d8df6699ae668643a9f151d6b73181c85fef9f85455b1aa9865d27b466  /home/ec2-user/grouse2/data/landfire/NH_2024_fdist.tif
+  5020eb356a84cbc7484bbdb764af53fa562fe389ca3af1fc69387749175b4988  /home/ec2-user/grouse2/data/landfire/NH_2024_sclass.tif
+  58471fcd307803cefe90350529ca4e3c9a3f7dfea73fb448f235bb9b6162ddc5  /home/ec2-user/grouse2/data/landfire/NH_2025_balive.tif
+  8f09b856f24f4fde3abdd61da86897d1d023e941d8e6afbaba0a4e914959989f  /home/ec2-user/grouse2/data/landfire/NH_2025_carbon_dwn.tif
+  fa0f31f9b72569a5cab66b19723b02d6ce14ec7971cbbd8d0b5e01c73a81b73e  /home/ec2-user/grouse2/data/landfire/NH_2025_nlcd.tif
+  3182ded517636e002cdf32d8bf2e5871cb81ba2ced9292fed18557b659b11ffc  /home/ec2-user/grouse2/data/landfire/NH_2025_qmd.tif
+  8e44166d0e43ed265432fc6688152a5e31b6f0c1de2e559cefc182d296ddd2bf  /home/ec2-user/grouse2/data/landfire/NH_2025_road_dist.tif
+  9bb17fb6a4c21bacb1bcff9f01c604080d102687fa9cbe330729355958e72b2a  /home/ec2-user/grouse2/data/landfire/NH_2025_tpa_live.tif
+  75f496fe392202f301da91ada29d594154773711ae515d8654930a3701505c15  /home/ec2-user/grouse2/data/landfire/NH_2025_tsd.tif
+  692e12c30c83adcaabdbac0d3954fafa55e1c89a24b36d95e72e02dff938652e  /home/ec2-user/grouse2/data/roads/tl_2023_us_county.zip
+  deb1a7d46fa1aa4985336bb9f71d2ef704f0f6afed81c8d7764edee80970696e  /home/ec2-user/grouse2/docs/quality/evidence/CR-0009/baseline/R/R_gap3/map_box_NH_gap3.tif
+  14c09d1d7e0b4f730ecef10bde28347fb263cad6f3c3db207e29def805d7e26b  /home/ec2-user/grouse2/docs/quality/evidence/CR-0009/baseline/calibration.json
+  0840b46e1906af9bd1393605cfe2fedd9d5e227dbed60b04d94b9d427c2f6eae  /home/ec2-user/grouse2/docs/quality/evidence/CR-0009/baseline/inv_matched_pairs.csv
+  e932c9fcee09f4b87c6769741081cd0ce5ab9ddd9d5ed0121c36761adc1a7aeb  /home/ec2-user/grouse2/docs/quality/evidence/CR-0009/baseline/points_S1_NH_region_files.csv
+  094c2a444f2eb1b1a3b42760b9c41de28c9d6e68cfa2f10773743d82b090b800  /home/ec2-user/grouse2/gap3.pth
+
+1a  OBS  P(ME pixel > NH pixel), Mann-Whitney U / (n_ME n_NH)
+    value: 0.5400   investigate if: outside [0.44, 0.56]   -> within reference
+    class: calibrated pixel scores of one map (rank statistic, so calibration-invariant)
+    subset: finite pixels in the box, ME vs NH side by TIGER 2023 county (other/none excluded)
+    null population: none: two post-fix values from two recipes, not a seed null
+    calibration: /home/ec2-user/grouse2/docs/quality/evidence/CR-0009/baseline/calibration.json (Platt scale 1.455535 bias -1.489525; model_path /home/ec2-user/grouse2/gap3.pth)
+    counts: ME 17320 scored + 0 NaN; NH 34394 scored + 0 NaN; other/none 0 excluded
+
+1b  OBS  ME >=0.8 share - NH >=0.8 share (pp)
+    value: +5.36   investigate if: > 15.0 pp   -> within reference
+    class: same map, thresholded at 0.8 (depends on calibration)
+    subset: as 1a
+    null population: none, as 1a
+    calibration: /home/ec2-user/grouse2/docs/quality/evidence/CR-0009/baseline/calibration.json (Platt scale 1.455535 bias -1.489525; model_path /home/ec2-user/grouse2/gap3.pth)
+    counts: ME 17320 scored + 0 NaN; NH 34394 scored + 0 NaN; other/none 0 excluded
+      baselines (pre-fix / post-fix, § Why now), then this run:
+        map                  ME mean  NH mean  P(ME>NH)  ME>=.8  NH>=.8  gap pp
+        gap3.pth before      0.7949   0.6289   0.8513     67.93    5.05   62.88
+        gap3.pth after       0.6333   0.6277   0.5400     10.24    4.88    5.36
+        bce.pth before       0.6887   0.4228   0.8235     45.68    0.11   45.57
+        bce.pth after        0.4217   0.4220   0.5089      0.18    0.10    0.08
+        this run             0.6333   0.6277   0.5400     10.24    4.88    5.36
+        (both rows used data/calibration/calibration.json, fitted on gap3.pth (so the bce.pth rows carry gap3's calibration))
+        ME: mean=0.6333 median=0.6811 p10=0.4226 p90=0.8012 >=0.5=87.51% >=0.8=10.24%
+        NH: mean=0.6277 median=0.6671 p10=0.4788 p90=0.7741 >=0.5=88.68% >=0.8=4.88%
+
+2a  OBS  mean ME-NH road_dist (m) over the frozen pairs, NH grid
+    value: +202.68 (sides rounded to whole metres as recorded: +202.75)   investigate if: |.| > 600 m   -> within reference
+    class: road_dist raster values at pair centres (model-independent)
+    subset: the 8 frozen pairs, NH region grid
+    null population: none needed for a deterministic raster read; the value changes only if a raster changes
+    calibration: n/a (raster read)
+    counts: 8 pairs; finite road_dist 8, finite prob 8; cells with an input missing at the centre 0
+      per pair, as recorded: ['-549', '-185', '490', '1154', '203', '-155', '835', '-171']
+      re-run of inv_matched_pairs.py's matching on the current NH rasters: 8 pairs; same cells as the frozen pairs: yes
+
+2b  OBS  mean ME-NH calibrated probability over the frozen pairs
+    value: +0.0579 (sides rounded to 4 decimals as recorded: +0.0580)   investigate if: > +0.20   -> within reference
+    class: calibrated probability of a single 64x64 window at each pair centre, D4 TTA (as inv_matched_pairs.py)
+    subset: the 8 frozen pairs, NH region grid
+    null population: none for retrain seeds; an 8-pair bootstrap is reported as pair-sampling spread only (95 % interval of the mean)
+    calibration: /home/ec2-user/grouse2/docs/quality/evidence/CR-0009/baseline/calibration.json (Platt scale 1.455535 bias -1.489525; model_path /home/ec2-user/grouse2/gap3.pth)
+    counts: 8 pairs; finite road_dist 8, finite prob 8; cells with an input missing at the centre 0
+      per pair, as recorded: ['-0.103', '0.120', '0.132', '-0.199', '0.065', '0.041', '0.183', '0.226']
+      pair-sampling spread: 95 % interval of the mean over 8 pairs [-0.0409, +0.1444] (n_boot=100000, seed=0); not a retrain-seed null
+
+3   OBS  AUC and AP of the item-1 map at in-box records
+    value: all points AUC 0.7322, NH side AUC 0.6763   investigate if: report
+    class: map value sampled at each record
+    subset: point set 'captured': in-box records of the named point set, by split x side
+    null population: none; few negatives, mostly training points
+    calibration: /home/ec2-user/grouse2/docs/quality/evidence/CR-0009/baseline/calibration.json (Platt scale 1.455535 bias -1.489525; model_path /home/ec2-user/grouse2/gap3.pth)
+    counts: 66 records, 66 on scored pixels; off the map by side {'NH': 0, 'ME': 0}
+      all/all   n=  66 pos=  55 neg= 11 AUC=0.7322 AP=0.9394 mean_pos=0.6073 mean_neg=0.4788   ref post-fix 0.7273 (pre-fix 0.757)
+      all/train n=  55 pos=  46 neg=  9 AUC=0.7246 AP=0.9402 mean_pos=0.6217 mean_neg=0.5143
+      all/val   n=  11 pos=   9 neg=  2 AUC=0.8333 AP=0.9675 mean_pos=0.5339 mean_neg=0.3190
+      ME/all    n=  14 pos=  14 neg=  0 AUC=n/a AP=n/a mean_pos=0.6930 mean_neg=n/a
+      ME/train  n=  12 pos=  12 neg=  0 AUC=n/a AP=n/a mean_pos=0.7044 mean_neg=n/a
+      ME/val    n=   2 pos=   2 neg=  0 AUC=n/a AP=n/a mean_pos=0.6245 mean_neg=n/a
+      NH/all    n=  52 pos=  41 neg= 11 AUC=0.6763 AP=0.9016 mean_pos=0.5780 mean_neg=0.4788   ref post-fix 0.6918 (pre-fix 0.6918)
+      NH/train  n=  43 pos=  34 neg=  9 AUC=0.6536 AP=0.8961 mean_pos=0.5925 mean_neg=0.5143
+      NH/val    n=   9 pos=   7 neg=  2 AUC=0.7857 AP=0.9478 mean_pos=0.5080 mean_neg=0.3190
+      references: GrouseData()['NH'] positives('all') + negatives('all') inside the box (66 points: 55 positives, 11 negatives; NH side 41/11, ME side 14/0); bce.pth, calibration on (inv_before/before_cal.tif, inv_after/after_cal.tif)
+
+5   OBS  1a/1b/2a/2b beside bf8d31a's before/after (§ Why now; the 1b row's detail)
+    value: stated   investigate if: stated
+    class: - (not distributional)
+    subset: -
+    null population: -
+    calibration: n/a
+    counts: n/a

@@ -351,8 +351,8 @@ epochs.
 ## Deliverables (in execution order)
 - [x] 1. `symptom_check.py` and `tests/test_symptom_check.py`, committed
       before approval (§1.1 A3).
-- [ ] 2. Baseline capture (§ Baselines), before approval; `SHA256SUMS`
-      verified and committed. R passes.
+- [x] 2. Baseline capture (§ Baselines), before approval; `SHA256SUMS`
+      verified and committed. R passes against the evidence copies; S0 = S1 byte-identical (`docs/quality/evidence/CR-0009/baseline/`).
 - [x] 3. Round-5 review; approval by the author and both reviewers.
 - [ ] 4. Confirm CR-0012 deliverable 6 passed, with `acceptance_record.json`
       written; CR-0014 landed.

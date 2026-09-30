@@ -1,0 +1,14 @@
+S0 pipeline/thinned_positives_ME.csv: sha256 d08d8ef0f6fdfcee7bd5f861343d847cf2f07ab94f9caf74753b67fff79109e9 matches CR-0007-backup-manifest.txt
+S0 negatives/negatives_ME.csv: sha256 11862fbfe55306844933a7baa520d45c5c24d6860ddc433b34eccf4011b2283b matches CR-0007-backup-manifest.txt
+S0 pipeline/thinned_positives_NH.csv: sha256 0eacf6dbb1d0abb895ac32e3d3a04daaaac9fe3e396ec7b89635d2bfcd8fe0f8 matches CR-0007-backup-manifest.txt
+S0 negatives/negatives_NH.csv: sha256 b153ac1d719ca42ab16ca3f179fc67c85eff7d5e12fccddd4a2707aa168095be matches CR-0007-backup-manifest.txt
+S0 pipeline/thinned_positives_VT.csv: sha256 c12b684608109bfaff1b3d66f925792fbaa813e3690de4e8e003bf86c07d3aa2 matches CR-0007-backup-manifest.txt
+S0 negatives/negatives_VT.csv: sha256 e9a08da6f410f4c84ab3cb7dcbdeac61f4dd7091cad0ed22269b224bee11bdf1 matches CR-0007-backup-manifest.txt
+S0 vs S1 pipeline/thinned_positives_ME.csv: byte-identical
+S0 vs S1 pipeline/thinned_positives_NH.csv: byte-identical
+S0 vs S1 pipeline/thinned_positives_VT.csv: byte-identical
+S0 vs S1 negatives/negatives_ME.csv: byte-identical
+S0 vs S1 negatives/negatives_NH.csv: byte-identical
+S0 vs S1 negatives/negatives_VT.csv: byte-identical
+copied data/calibration/calibration.json -> baseline/calibration.json (sha256 14c09d1d7e0b4f730ecef10bde28347fb263cad6f3c3db207e29def805d7e26b)
+copied inv_matched_pairs.csv -> baseline/inv_matched_pairs.csv (sha256 0840b46e1906af9bd1393605cfe2fedd9d5e227dbed60b04d94b9d427c2f6eae)

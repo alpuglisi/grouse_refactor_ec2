@@ -1,0 +1,85 @@
+Item 3 baseline scores (CR-0009 § Baselines 2): maps from the R run (baseline/R/R_<model>/map_box_NH_<model>.tif, in-process, calibration = baseline/calibration.json). AUC/AP by side x split; records on NaN pixels excluded (counted as off-map).
+
+== gap3.pth  map docs/quality/evidence/CR-0009/baseline/R/R_gap3/map_box_NH_gap3.tif sha256 deb1a7d46fa1aa4985336bb9f71d2ef704f0f6afed81c8d7764edee80970696e
+-- points_S0_NH_region_files.csv (reference set): 66 records, 66 on the map, off-map by side {'ME': 0, 'NH': 0}
+   all/all   n=  66 pos=  55 neg= 11 AUC=0.7322 AP=0.9394 mean_pos=0.6073 mean_neg=0.4788
+   all/train n=  55 pos=  46 neg=  9 AUC=0.7246 AP=0.9402 mean_pos=0.6217 mean_neg=0.5143
+   all/val   n=  11 pos=   9 neg=  2 AUC=0.8333 AP=0.9675 mean_pos=0.5339 mean_neg=0.3190
+   ME/all    n=  14 pos=  14 neg=  0 AUC=n/a AP=n/a mean_pos=0.6930 mean_neg=n/a
+   ME/train  n=  12 pos=  12 neg=  0 AUC=n/a AP=n/a mean_pos=0.7044 mean_neg=n/a
+   ME/val    n=   2 pos=   2 neg=  0 AUC=n/a AP=n/a mean_pos=0.6245 mean_neg=n/a
+   NH/all    n=  52 pos=  41 neg= 11 AUC=0.6763 AP=0.9016 mean_pos=0.5780 mean_neg=0.4788
+   NH/train  n=  43 pos=  34 neg=  9 AUC=0.6536 AP=0.8961 mean_pos=0.5925 mean_neg=0.5143
+   NH/val    n=   9 pos=   7 neg=  2 AUC=0.7857 AP=0.9478 mean_pos=0.5080 mean_neg=0.3190
+-- points_S0_all_region_files.csv (all region files, duplicates kept - not a reference set): 113 records, 113 on the map, off-map by side {'ME': 0, 'NH': 0}
+   all/all   n= 113 pos=  97 neg= 16 AUC=0.6366 AP=0.8970 mean_pos=0.6000 mean_neg=0.5138
+   all/train n=  96 pos=  82 neg= 14 AUC=0.6037 AP=0.8851 mean_pos=0.6013 mean_neg=0.5416
+   all/val   n=  17 pos=  15 neg=  2 AUC=0.9000 AP=0.9877 mean_pos=0.5932 mean_neg=0.3190
+   ME/all    n=  36 pos=  31 neg=  5 AUC=0.4968 AP=0.8279 mean_pos=0.6547 mean_neg=0.5908
+   ME/train  n=  33 pos=  28 neg=  5 AUC=0.5000 AP=0.8167 mean_pos=0.6542 mean_neg=0.5908
+   ME/val    n=   3 pos=   3 neg=  0 AUC=n/a AP=n/a mean_pos=0.6598 mean_neg=n/a
+   NH/all    n=  77 pos=  66 neg= 11 AUC=0.6694 AP=0.9333 mean_pos=0.5744 mean_neg=0.4788
+   NH/train  n=  63 pos=  54 neg=  9 AUC=0.6214 AP=0.9224 mean_pos=0.5739 mean_neg=0.5143
+   NH/val    n=  14 pos=  12 neg=  2 AUC=0.8750 AP=0.9812 mean_pos=0.5765 mean_neg=0.3190
+-- points_S1_NH_region_files.csv (reference set): 66 records, 66 on the map, off-map by side {'ME': 0, 'NH': 0}
+   all/all   n=  66 pos=  55 neg= 11 AUC=0.7322 AP=0.9394 mean_pos=0.6073 mean_neg=0.4788
+   all/train n=  55 pos=  46 neg=  9 AUC=0.7246 AP=0.9402 mean_pos=0.6217 mean_neg=0.5143
+   all/val   n=  11 pos=   9 neg=  2 AUC=0.8333 AP=0.9675 mean_pos=0.5339 mean_neg=0.3190
+   ME/all    n=  14 pos=  14 neg=  0 AUC=n/a AP=n/a mean_pos=0.6930 mean_neg=n/a
+   ME/train  n=  12 pos=  12 neg=  0 AUC=n/a AP=n/a mean_pos=0.7044 mean_neg=n/a
+   ME/val    n=   2 pos=   2 neg=  0 AUC=n/a AP=n/a mean_pos=0.6245 mean_neg=n/a
+   NH/all    n=  52 pos=  41 neg= 11 AUC=0.6763 AP=0.9016 mean_pos=0.5780 mean_neg=0.4788
+   NH/train  n=  43 pos=  34 neg=  9 AUC=0.6536 AP=0.8961 mean_pos=0.5925 mean_neg=0.5143
+   NH/val    n=   9 pos=   7 neg=  2 AUC=0.7857 AP=0.9478 mean_pos=0.5080 mean_neg=0.3190
+-- points_S1_all_region_files.csv (all region files, duplicates kept - not a reference set): 113 records, 113 on the map, off-map by side {'ME': 0, 'NH': 0}
+   all/all   n= 113 pos=  97 neg= 16 AUC=0.6366 AP=0.8970 mean_pos=0.6000 mean_neg=0.5138
+   all/train n=  96 pos=  82 neg= 14 AUC=0.6037 AP=0.8851 mean_pos=0.6013 mean_neg=0.5416
+   all/val   n=  17 pos=  15 neg=  2 AUC=0.9000 AP=0.9877 mean_pos=0.5932 mean_neg=0.3190
+   ME/all    n=  36 pos=  31 neg=  5 AUC=0.4968 AP=0.8279 mean_pos=0.6547 mean_neg=0.5908
+   ME/train  n=  33 pos=  28 neg=  5 AUC=0.5000 AP=0.8167 mean_pos=0.6542 mean_neg=0.5908
+   ME/val    n=   3 pos=   3 neg=  0 AUC=n/a AP=n/a mean_pos=0.6598 mean_neg=n/a
+   NH/all    n=  77 pos=  66 neg= 11 AUC=0.6694 AP=0.9333 mean_pos=0.5744 mean_neg=0.4788
+   NH/train  n=  63 pos=  54 neg=  9 AUC=0.6214 AP=0.9224 mean_pos=0.5739 mean_neg=0.5143
+   NH/val    n=  14 pos=  12 neg=  2 AUC=0.8750 AP=0.9812 mean_pos=0.5765 mean_neg=0.3190
+
+== bce.pth  map docs/quality/evidence/CR-0009/baseline/R/R_bce/map_box_NH_bce.tif sha256 6d1bda4f5cb51f9f6370ca58397e1f15653275977c5f2fcc258aa3025fba8c62
+-- points_S0_NH_region_files.csv (reference set): 66 records, 66 on the map, off-map by side {'ME': 0, 'NH': 0}
+   all/all   n=  66 pos=  55 neg= 11 AUC=0.7273 AP=0.9307 mean_pos=0.4341 mean_neg=0.2989
+   all/train n=  55 pos=  46 neg=  9 AUC=0.7029 AP=0.9268 mean_pos=0.4448 mean_neg=0.3339
+   all/val   n=  11 pos=   9 neg=  2 AUC=0.8333 AP=0.9675 mean_pos=0.3793 mean_neg=0.1415
+   ME/all    n=  14 pos=  14 neg=  0 AUC=n/a AP=n/a mean_pos=0.4924 mean_neg=n/a
+   ME/train  n=  12 pos=  12 neg=  0 AUC=n/a AP=n/a mean_pos=0.4979 mean_neg=n/a
+   ME/val    n=   2 pos=   2 neg=  0 AUC=n/a AP=n/a mean_pos=0.4593 mean_neg=n/a
+   NH/all    n=  52 pos=  41 neg= 11 AUC=0.6918 AP=0.8976 mean_pos=0.4141 mean_neg=0.2989
+   NH/train  n=  43 pos=  34 neg=  9 AUC=0.6634 AP=0.8890 mean_pos=0.4260 mean_neg=0.3339
+   NH/val    n=   9 pos=   7 neg=  2 AUC=0.7857 AP=0.9478 mean_pos=0.3565 mean_neg=0.1415
+-- points_S0_all_region_files.csv (all region files, duplicates kept - not a reference set): 113 records, 113 on the map, off-map by side {'ME': 0, 'NH': 0}
+   all/all   n= 113 pos=  97 neg= 16 AUC=0.7223 AP=0.9403 mean_pos=0.4340 mean_neg=0.3033
+   all/train n=  96 pos=  82 neg= 14 AUC=0.6916 AP=0.9302 mean_pos=0.4334 mean_neg=0.3264
+   all/val   n=  17 pos=  15 neg=  2 AUC=0.9000 AP=0.9877 mean_pos=0.4369 mean_neg=0.1415
+   ME/all    n=  36 pos=  31 neg=  5 AUC=0.7742 AP=0.9501 mean_pos=0.4676 mean_neg=0.3128
+   ME/train  n=  33 pos=  28 neg=  5 AUC=0.7643 AP=0.9432 mean_pos=0.4649 mean_neg=0.3128
+   ME/val    n=   3 pos=   3 neg=  0 AUC=n/a AP=n/a mean_pos=0.4930 mean_neg=n/a
+   NH/all    n=  77 pos=  66 neg= 11 AUC=0.6956 AP=0.9338 mean_pos=0.4182 mean_neg=0.2989
+   NH/train  n=  63 pos=  54 neg=  9 AUC=0.6440 AP=0.9204 mean_pos=0.4171 mean_neg=0.3339
+   NH/val    n=  14 pos=  12 neg=  2 AUC=0.8750 AP=0.9812 mean_pos=0.4229 mean_neg=0.1415
+-- points_S1_NH_region_files.csv (reference set): 66 records, 66 on the map, off-map by side {'ME': 0, 'NH': 0}
+   all/all   n=  66 pos=  55 neg= 11 AUC=0.7273 AP=0.9307 mean_pos=0.4341 mean_neg=0.2989
+   all/train n=  55 pos=  46 neg=  9 AUC=0.7029 AP=0.9268 mean_pos=0.4448 mean_neg=0.3339
+   all/val   n=  11 pos=   9 neg=  2 AUC=0.8333 AP=0.9675 mean_pos=0.3793 mean_neg=0.1415
+   ME/all    n=  14 pos=  14 neg=  0 AUC=n/a AP=n/a mean_pos=0.4924 mean_neg=n/a
+   ME/train  n=  12 pos=  12 neg=  0 AUC=n/a AP=n/a mean_pos=0.4979 mean_neg=n/a
+   ME/val    n=   2 pos=   2 neg=  0 AUC=n/a AP=n/a mean_pos=0.4593 mean_neg=n/a
+   NH/all    n=  52 pos=  41 neg= 11 AUC=0.6918 AP=0.8976 mean_pos=0.4141 mean_neg=0.2989
+   NH/train  n=  43 pos=  34 neg=  9 AUC=0.6634 AP=0.8890 mean_pos=0.4260 mean_neg=0.3339
+   NH/val    n=   9 pos=   7 neg=  2 AUC=0.7857 AP=0.9478 mean_pos=0.3565 mean_neg=0.1415
+-- points_S1_all_region_files.csv (all region files, duplicates kept - not a reference set): 113 records, 113 on the map, off-map by side {'ME': 0, 'NH': 0}
+   all/all   n= 113 pos=  97 neg= 16 AUC=0.7223 AP=0.9403 mean_pos=0.4340 mean_neg=0.3033
+   all/train n=  96 pos=  82 neg= 14 AUC=0.6916 AP=0.9302 mean_pos=0.4334 mean_neg=0.3264
+   all/val   n=  17 pos=  15 neg=  2 AUC=0.9000 AP=0.9877 mean_pos=0.4369 mean_neg=0.1415
+   ME/all    n=  36 pos=  31 neg=  5 AUC=0.7742 AP=0.9501 mean_pos=0.4676 mean_neg=0.3128
+   ME/train  n=  33 pos=  28 neg=  5 AUC=0.7643 AP=0.9432 mean_pos=0.4649 mean_neg=0.3128
+   ME/val    n=   3 pos=   3 neg=  0 AUC=n/a AP=n/a mean_pos=0.4930 mean_neg=n/a
+   NH/all    n=  77 pos=  66 neg= 11 AUC=0.6956 AP=0.9338 mean_pos=0.4182 mean_neg=0.2989
+   NH/train  n=  63 pos=  54 neg=  9 AUC=0.6440 AP=0.9204 mean_pos=0.4171 mean_neg=0.3339
+   NH/val    n=  14 pos=  12 neg=  2 AUC=0.8750 AP=0.9812 mean_pos=0.4229 mean_neg=0.1415

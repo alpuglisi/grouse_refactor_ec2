@@ -1,0 +1,191 @@
+===== VT
+B0   GATE PASS backup (30)                              value=all match  required=all match
+R0   GATE PASS VT T                                     value=(50450367, '52e5049c360a5143146ac1342d4177f8')  required=(50450367, '52e5049c360a5143146ac1342d4177f8')
+R0b  GATE PASS VT road zips vs /home/ec2-user/grouse2/data/roads value=all identical  required=all identical
+R3   GATE PASS VT year-copies (10)                      value=1 distinct  required=1
+R1   GATE PASS VT                                       value=0  required=0
+R2   GATE PASS VT nodata∩T                              value=(69475, 'a14fbc20317dffa7ad667d75c18bc396')  required=C pin (69475, 'a14fbc20317dffa7ad667d75c18bc396')
+R7   GATE PASS VT_2016_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2016_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2017_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2017_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2018_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2018_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2019_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2019_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2020_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2020_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2021_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2021_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2022_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2022_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2023_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2023_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2024_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2024_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2025_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2025_road_dist.tif                    value=identical  required=identical
+RD1  GATE PASS VT uniform (n=400)                       value=9.9  required=see pins
+RD2  GATE PASS VT uniform (n=400)                       value=19.1  required=see pins
+RD3  GATE PASS VT uniform (n=400)                       value=0  required=see pins
+RD4  GATE PASS VT uniform (n=400)                       value=-8.8  required=see pins
+RD5  GATE PASS VT uniform (n=400)                       value=0  required=see pins
+X3   OBS       VT uniform                               value=0  required=report
+RD1  GATE PASS VT interior (n=400)                      value=10.0  required=see pins
+RD2  GATE PASS VT interior (n=400)                      value=19.1  required=see pins
+RD3  GATE PASS VT interior (n=400)                      value=0  required=see pins
+RD4  GATE PASS VT interior (n=400)                      value=-9.2  required=see pins
+RD5  GATE PASS VT interior (n=400)                      value=0  required=see pins
+X3   OBS       VT interior                              value=0  required=report
+RD1  GATE PASS VT state_line (n=400)                    value=9.6  required=see pins
+RD2  GATE PASS VT state_line (n=400)                    value=19.4  required=see pins
+RD3  GATE PASS VT state_line (n=400)                    value=0  required=see pins
+RD4  GATE PASS VT state_line (n=400)                    value=-8.9  required=see pins
+RD5  GATE PASS VT state_line (n=400)                    value=0  required=see pins
+X3   OBS       VT state_line                            value=0  required=report
+RD1  GATE PASS VT grid_edge (n=400)                     value=9.1  required=see pins
+RD2  GATE PASS VT grid_edge (n=400)                     value=19.6  required=see pins
+RD3  GATE PASS VT grid_edge (n=400)                     value=0  required=see pins
+RD4  GATE PASS VT grid_edge (n=400)                     value=-8.5  required=see pins
+RD5  GATE PASS VT grid_edge (n=400)                     value=0  required=see pins
+X3   OBS       VT grid_edge                             value=0  required=report
+RD1  GATE PASS VT coverage_edge (n=400)                 value=9.5  required=see pins
+RD2  GATE PASS VT coverage_edge (n=400)                 value=20.1  required=see pins
+RD3  GATE PASS VT coverage_edge (n=400)                 value=0  required=see pins
+RD4  GATE PASS VT coverage_edge (n=400)                 value=-8.6  required=see pins
+RD5  GATE PASS VT coverage_edge (n=400)                 value=0  required=see pins
+X3   OBS       VT coverage_edge                         value=0  required=report
+X1   OBS       VT |C|                                   value=69475  required=report
+X2   OBS       VT T\C nearer a Canada-adjacent edge than a road value=17804  required=report
+X1   OBS       VT positives centre in C                 value=2  required=report
+X1   OBS       VT negatives centre in C                 value=0  required=report
+
+60 rows, 0 gate failure(s): ALL GATES PASS
+===== NH
+B0   GATE PASS backup (30)                              value=all match  required=all match
+R0   GATE PASS NH T                                     value=(51386748, '1a29cc5bc79b7d4c73dc49e4fb9ac93a')  required=(51386748, '1a29cc5bc79b7d4c73dc49e4fb9ac93a')
+R0b  GATE PASS NH road zips vs /home/ec2-user/grouse2/data/roads value=all identical  required=all identical
+R3   GATE PASS NH year-copies (10)                      value=1 distinct  required=1
+R1   GATE PASS NH                                       value=0  required=0
+R2   GATE PASS NH nodata∩T                              value=(108684, 'fe6b7f2595cae38e64cd0dfd4ca306c8')  required=C pin (108684, 'fe6b7f2595cae38e64cd0dfd4ca306c8')
+R7   GATE PASS NH_2016_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS NH_2016_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS NH_2017_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS NH_2017_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS NH_2018_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS NH_2018_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS NH_2019_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS NH_2019_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS NH_2020_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS NH_2020_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS NH_2021_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS NH_2021_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS NH_2022_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS NH_2022_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS NH_2023_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS NH_2023_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS NH_2024_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS NH_2024_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS NH_2025_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS NH_2025_road_dist.tif                    value=identical  required=identical
+RD1  GATE PASS NH uniform (n=400)                       value=9.7  required=see pins
+RD2  GATE PASS NH uniform (n=400)                       value=18.7  required=see pins
+RD3  GATE PASS NH uniform (n=400)                       value=0  required=see pins
+RD4  GATE PASS NH uniform (n=400)                       value=-8.5  required=see pins
+RD5  GATE PASS NH uniform (n=400)                       value=0  required=see pins
+X3   OBS       NH uniform                               value=0  required=report
+RD1  GATE PASS NH interior (n=400)                      value=9.7  required=see pins
+RD2  GATE PASS NH interior (n=400)                      value=19.3  required=see pins
+RD3  GATE PASS NH interior (n=400)                      value=0  required=see pins
+RD4  GATE PASS NH interior (n=400)                      value=-8.5  required=see pins
+RD5  GATE PASS NH interior (n=400)                      value=0  required=see pins
+X3   OBS       NH interior                              value=0  required=report
+RD1  GATE PASS NH state_line (n=400)                    value=9.1  required=see pins
+RD2  GATE PASS NH state_line (n=400)                    value=20.1  required=see pins
+RD3  GATE PASS NH state_line (n=400)                    value=0  required=see pins
+RD4  GATE PASS NH state_line (n=400)                    value=-8.0  required=see pins
+RD5  GATE PASS NH state_line (n=400)                    value=0  required=see pins
+X3   OBS       NH state_line                            value=0  required=report
+RD1  GATE PASS NH grid_edge (n=400)                     value=10.2  required=see pins
+RD2  GATE PASS NH grid_edge (n=400)                     value=19.4  required=see pins
+RD3  GATE PASS NH grid_edge (n=400)                     value=0  required=see pins
+RD4  GATE PASS NH grid_edge (n=400)                     value=-9.5  required=see pins
+RD5  GATE PASS NH grid_edge (n=400)                     value=0  required=see pins
+X3   OBS       NH grid_edge                             value=0  required=report
+RD1  GATE PASS NH coverage_edge (n=400)                 value=10.1  required=see pins
+RD2  GATE PASS NH coverage_edge (n=400)                 value=19.9  required=see pins
+RD3  GATE PASS NH coverage_edge (n=400)                 value=0  required=see pins
+RD4  GATE PASS NH coverage_edge (n=400)                 value=-9.1  required=see pins
+RD5  GATE PASS NH coverage_edge (n=400)                 value=0  required=see pins
+X3   OBS       NH coverage_edge                         value=0  required=report
+X1   OBS       NH |C|                                   value=108684  required=report
+X2   OBS       NH T\C nearer a Canada-adjacent edge than a road value=24841  required=report
+X1   OBS       NH positives centre in C                 value=6  required=report
+X1   OBS       NH negatives centre in C                 value=0  required=report
+
+60 rows, 0 gate failure(s): ALL GATES PASS
+===== ME
+B0   GATE PASS backup (30)                              value=all match  required=all match
+R0   GATE PASS ME T                                     value=(107441621, '22a9995e0b920e81c205a962e7e64237')  required=(107441621, '22a9995e0b920e81c205a962e7e64237')
+R0b  GATE PASS ME road zips vs /home/ec2-user/grouse2/data/roads value=all identical  required=all identical
+R3   GATE PASS ME year-copies (10)                      value=1 distinct  required=1
+R1   GATE PASS ME                                       value=0  required=0
+R2   GATE PASS ME nodata∩T                              value=(822494, '6af4a96ae5a4b1771508b24c7cbf4b3d')  required=C pin (822494, '6af4a96ae5a4b1771508b24c7cbf4b3d')
+R7   GATE PASS ME_2016_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS ME_2016_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS ME_2017_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS ME_2017_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS ME_2018_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS ME_2018_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS ME_2019_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS ME_2019_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS ME_2020_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS ME_2020_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS ME_2021_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS ME_2021_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS ME_2022_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS ME_2022_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS ME_2023_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS ME_2023_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS ME_2024_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS ME_2024_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS ME_2025_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS ME_2025_road_dist.tif                    value=identical  required=identical
+RD1  GATE PASS ME uniform (n=400)                       value=10.3  required=see pins
+RD2  GATE PASS ME uniform (n=400)                       value=19.6  required=see pins
+RD3  GATE PASS ME uniform (n=400)                       value=0  required=see pins
+RD4  GATE PASS ME uniform (n=400)                       value=-9.5  required=see pins
+RD5  GATE PASS ME uniform (n=400)                       value=0  required=see pins
+X3   OBS       ME uniform                               value=0  required=report
+RD1  GATE PASS ME interior (n=400)                      value=9.3  required=see pins
+RD2  GATE PASS ME interior (n=400)                      value=19.8  required=see pins
+RD3  GATE PASS ME interior (n=400)                      value=0  required=see pins
+RD4  GATE PASS ME interior (n=400)                      value=-8.5  required=see pins
+RD5  GATE PASS ME interior (n=400)                      value=0  required=see pins
+X3   OBS       ME interior                              value=0  required=report
+RD1  GATE PASS ME state_line (n=400)                    value=10.0  required=see pins
+RD2  GATE PASS ME state_line (n=400)                    value=19.4  required=see pins
+RD3  GATE PASS ME state_line (n=400)                    value=0  required=see pins
+RD4  GATE PASS ME state_line (n=400)                    value=-9.4  required=see pins
+RD5  GATE PASS ME state_line (n=400)                    value=0  required=see pins
+X3   OBS       ME state_line                            value=0  required=report
+RD1  GATE PASS ME grid_edge (n=400)                     value=10.0  required=see pins
+RD2  GATE PASS ME grid_edge (n=400)                     value=19.1  required=see pins
+RD3  GATE PASS ME grid_edge (n=400)                     value=0  required=see pins
+RD4  GATE PASS ME grid_edge (n=400)                     value=-9.3  required=see pins
+RD5  GATE PASS ME grid_edge (n=400)                     value=0  required=see pins
+X3   OBS       ME grid_edge                             value=0  required=report
+RD1  GATE PASS ME coverage_edge (n=400)                 value=8.7  required=see pins
+RD2  GATE PASS ME coverage_edge (n=400)                 value=20.2  required=see pins
+RD3  GATE PASS ME coverage_edge (n=400)                 value=0  required=see pins
+RD4  GATE PASS ME coverage_edge (n=400)                 value=-6.4  required=see pins
+RD5  GATE PASS ME coverage_edge (n=400)                 value=0  required=see pins
+X3   OBS       ME coverage_edge                         value=0  required=report
+X1   OBS       ME |C|                                   value=822494  required=report
+X2   OBS       ME T\C nearer a Canada-adjacent edge than a road value=8522  required=report
+X1   OBS       ME positives centre in C                 value=10  required=report
+X1   OBS       ME negatives centre in C                 value=2  required=report
+
+60 rows, 0 gate failure(s): ALL GATES PASS
+
+R8 after purge (2026-09-30): data/cache patches_* = 0

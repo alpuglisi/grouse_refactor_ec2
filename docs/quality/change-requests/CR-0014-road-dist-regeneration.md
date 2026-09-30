@@ -1,6 +1,6 @@
 # CR-0014: Regenerate `road_dist` from every intersecting county at TIGER 2023, with nodata where Canadian roads could be nearer
 
-**Status: APPROVED (v3), 2026-09-30 — implementation in progress.** Nothing implemented.
+**Status: IMPLEMENTED (v3), 2026-09-30 — all deliverables complete; 153 gate rows, 0 failures (`docs/quality/evidence/CR-0014-gates.txt`).** Nothing implemented.
 History and dispositions: `CR-0014-review-log.md`. This document states
 only current intent.
 
@@ -108,7 +108,7 @@ rehearsal. Digests are the first 32 hex digits of `sha256(np.packbits(mask))`.
 | R8 | GATE | `count(data/cache/patches_*)` after purge | 0 |
 | B0 | GATE | Backup of the 30 files hashes to the committed manifest | all match |
 | X1 | OBS | `|C|`; positives and negatives with centre in `C` | report |
-| X2 | OBS | Pixels in `T \ C` closer to a grid-edge pixel outside `T` (Canada or ocean; an upper bound on the Canada residual) than to any road | report |
+| X2 | OBS | Pixels in `T \ C` closer to a Canada-adjacent grid edge (edge pixels within 20 km of `L`) than to any road — the unseen-land residual, an upper bound | report |
 | X3 | OBS | Sample points whose nearest truth road lies outside grid + 10 km (v7 measured 0 of 2,000 in NH and ME) | report |
 
 **RD1–RD5.** Truth is the exact `shapely` STRtree distance from each
@@ -179,16 +179,16 @@ estimating.
       sampling seed, and `C` count and digest per region from the
       verifier's own TIGER copy), unit-tested on a synthetic fixture;
       committed.
-- [ ] 2. `generate_road_distance.py` changes (§1); U1–U4.
-- [ ] 3. Fetch the 8 VT-grid county road files into `data/roads`.
-- [ ] 4. Manifest (sha256, mtime) and backup of the 30 `road_dist` files
+- [x] 2. `generate_road_distance.py` changes (§1); U1–U4.
+- [x] 3. Fetch the 8 VT-grid county road files into `data/roads`.
+- [x] 4. Manifest (sha256, mtime) and backup of the 30 `road_dist` files
       to `/home/ec2-user/grouse_backup/CR-0014/`.
-- [ ] 5. VT rehearsal into scratch; all gates; restore rehearsal.
-- [ ] 6. Regenerate ME, NH, VT in place; run `check_road_dist.py` one
+- [x] 5. VT rehearsal into scratch; all gates; restore rehearsal.
+- [x] 6. Regenerate ME, NH, VT in place; run `check_road_dist.py` one
       region at a time (ME peaks at ~15–20 GB), never alongside the
       generator; save to `docs/quality/evidence/CR-0014-gates.txt`.
-- [ ] 7. Purge `data/cache/patches_*`; R8.
-- [ ] 8. Bookkeeping:
+- [x] 7. Purge `data/cache/patches_*`; R8.
+- [x] 8. Bookkeeping:
       - BUG-0037 (Canada over-read), all §2 sections, `BUG_LOG.md` row.
       - §4 recurrence review: same mechanism as BUG-0023 under PA-0017
         ("plus a margin for neighbourhood operations") and PA-0018

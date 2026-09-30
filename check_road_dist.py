@@ -26,7 +26,8 @@ The raster must be -9999 exactly on ~T | C.
 
 Gates: R0 R0b R1 R2 R3 RD1-RD5 R6 R7 R8 B0 (exit 1 if any fails).
 Observations: X1 |C| and records with centre in C; X2 pixels in T\\C
-closer to a grid-edge pixel outside T (Canada or ocean) than to any road; X3 sample points whose
+closer to a Canada-adjacent grid edge (within 20 km of Canadian land)
+than to any road - the unseen-land residual, an upper bound; X3 sample points whose
 nearest road lies outside grid + pad.
 
 RD thresholds (derivation, CR-0014): truth is measured from the pixel
@@ -411,14 +412,27 @@ def cmd_check(args, pins):
             add("X3", "OBS", f"{r} {name}", outside, "report")
         # X1, X2
         add("X1", "OBS", f"{r} |C|", int(C.sum()), "report")
+        # Residual: Canadian land just BEYOND the grid edge is unseen. The
+        # edges it can lie behind are those within 20 km of Canadian land
+        # the grid does show; count T\C pixels nearer such an edge than
+        # any road (an upper bound - the land may not reach the edge).
+        samp = (abs(tr.e), abs(tr.a))
         frame = np.zeros_like(T)
         frame[0, :] = frame[-1, :] = frame[:, 0] = frame[:, -1] = True
-        edge_out = frame & ~T
-        if edge_out.any():
-            d_e = distance_transform_edt(~edge_out,
-                                         sampling=(abs(tr.e), abs(tr.a)))
-            add("X2", "OBS", f"{r} T\\C nearer a non-US edge than a road",
-                int((T & ~C & (d_e < D["d_road"])).sum()), "report")
+        if D["L"].any():
+            near_l = distance_transform_edt(~D["L"], sampling=samp) < 20000
+            edge = frame & near_l
+            del near_l
+        else:
+            edge = np.zeros_like(T)
+        if edge.any():
+            d_e = distance_transform_edt(~edge, sampling=samp)
+            n2 = int((T & ~C & (d_e < D["d_road"])).sum())
+            del d_e
+        else:
+            n2 = 0
+        add("X2", "OBS", f"{r} T\\C nearer a Canada-adjacent edge than a road",
+            n2, "report")
         try:
             from grouse_data import GrouseData
             from pyproj import Transformer

@@ -124,8 +124,24 @@ implemented directly at the user's explicit request, with no CR and no
 independent review. A retroactive CR with an independent agent review
 is outstanding.
 
-Status: **OPEN**. Fix implemented; the link to the reported symptom is
-not yet confirmed; CR/review outstanding; retraining outstanding.
+**CR-0014 (2026-09-30) — the retroactive CR.** It re-derived the
+diagnosis from the current code, extended the fix to ME and VT (both had
+never been regenerated), pinned TIGER 2023, made downloads atomic, added
+the Canada rule (BUG-0037), and was independently reviewed (two
+reviewers, two rounds). All 30 `road_dist` rasters were regenerated and
+verified by `check_road_dist.py` — distance accuracy against exact
+TIGER-2023 truth in five strata, including the state-line and grid-edge
+strata where this bug lived (`docs/quality/evidence/CR-0014-gates.txt`).
+
+**Deviation still recorded:** CR-0014 reviewed `bf8d31a` after the fact.
+It cannot supply review *before* implementation, so §1.1's ordering
+deviation for `bf8d31a` stays on record. That is a process record, not an
+open defect.
+
+The link to the reported Errol symptom is verified separately by CR-0009
+§ Symptom acceptance.
+
+Status: **FIXED** (`bf8d31a` NH; CR-0014 all regions).
 
 ## 7. Recurrence review
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`:

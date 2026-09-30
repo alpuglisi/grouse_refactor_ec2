@@ -1,0 +1,63 @@
+B0   GATE PASS backup (30)                              value=all match  required=all match
+R0   GATE PASS VT T                                     value=(50450367, '52e5049c360a5143146ac1342d4177f8')  required=(50450367, '52e5049c360a5143146ac1342d4177f8')
+R0b  GATE PASS VT road zips vs /home/ec2-user/grouse2/data/roads value=all identical  required=all identical
+R3   GATE PASS VT year-copies (10)                      value=1 distinct  required=1
+R1   GATE PASS VT                                       value=0  required=0
+R2   GATE PASS VT nodata∩T                              value=(69475, 'a14fbc20317dffa7ad667d75c18bc396')  required=C pin (69475, 'a14fbc20317dffa7ad667d75c18bc396')
+R7   GATE PASS VT_2016_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2016_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2017_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2017_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2018_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2018_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2019_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2019_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2020_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2020_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2021_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2021_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2022_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2022_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2023_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2023_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2024_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2024_road_dist.tif                    value=identical  required=identical
+R7   GATE PASS VT_2025_road_dist.tif                    value=tiger-minus-canada  required=present
+R6   GATE PASS VT_2025_road_dist.tif                    value=identical  required=identical
+RD1  GATE PASS VT uniform (n=400)                       value=9.9  required=see pins
+RD2  GATE PASS VT uniform (n=400)                       value=19.1  required=see pins
+RD3  GATE PASS VT uniform (n=400)                       value=0  required=see pins
+RD4  GATE PASS VT uniform (n=400)                       value=-8.8  required=see pins
+RD5  GATE PASS VT uniform (n=400)                       value=0  required=see pins
+X3   OBS       VT uniform                               value=0  required=report
+RD1  GATE PASS VT interior (n=400)                      value=10.0  required=see pins
+RD2  GATE PASS VT interior (n=400)                      value=19.1  required=see pins
+RD3  GATE PASS VT interior (n=400)                      value=0  required=see pins
+RD4  GATE PASS VT interior (n=400)                      value=-9.2  required=see pins
+RD5  GATE PASS VT interior (n=400)                      value=0  required=see pins
+X3   OBS       VT interior                              value=0  required=report
+RD1  GATE PASS VT state_line (n=400)                    value=9.6  required=see pins
+RD2  GATE PASS VT state_line (n=400)                    value=19.4  required=see pins
+RD3  GATE PASS VT state_line (n=400)                    value=0  required=see pins
+RD4  GATE PASS VT state_line (n=400)                    value=-8.9  required=see pins
+RD5  GATE PASS VT state_line (n=400)                    value=0  required=see pins
+X3   OBS       VT state_line                            value=0  required=report
+RD1  GATE PASS VT grid_edge (n=400)                     value=9.1  required=see pins
+RD2  GATE PASS VT grid_edge (n=400)                     value=19.6  required=see pins
+RD3  GATE PASS VT grid_edge (n=400)                     value=0  required=see pins
+RD4  GATE PASS VT grid_edge (n=400)                     value=-8.5  required=see pins
+RD5  GATE PASS VT grid_edge (n=400)                     value=0  required=see pins
+X3   OBS       VT grid_edge                             value=0  required=report
+RD1  GATE PASS VT coverage_edge (n=400)                 value=9.5  required=see pins
+RD2  GATE PASS VT coverage_edge (n=400)                 value=20.1  required=see pins
+RD3  GATE PASS VT coverage_edge (n=400)                 value=0  required=see pins
+RD4  GATE PASS VT coverage_edge (n=400)                 value=-8.6  required=see pins
+RD5  GATE PASS VT coverage_edge (n=400)                 value=0  required=see pins
+X3   OBS       VT coverage_edge                         value=0  required=report
+X1   OBS       VT |C|                                   value=69475  required=report
+X2   OBS       VT T\C nearer a non-US edge than a road  value=0  required=report
+X1   OBS       VT positives centre in C                 value=2  required=report
+X1   OBS       VT negatives centre in C                 value=0  required=report
+
+60 rows, 0 gate failure(s): ALL GATES PASS
+restore rehearsal: VT_2025_road_dist.tif from backup, sha256 matches manifest

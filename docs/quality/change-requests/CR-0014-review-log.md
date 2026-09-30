@@ -87,3 +87,22 @@ stale year-copy each fail a gate.
 
 ## Quorum (§1.4)
 Reviewer A: APPROVE WITH FOLLOW-UPS (v3). Reviewer B: APPROVE WITH FOLLOW-UPS (v3). Author: **signed off** — user instructed implementation 2026-09-30. **CR-0014 APPROVED (v3).**
+
+## Implementation record (2026-09-30)
+- Generator fixes + U1–U4 (7 tests) committed `05d788d`; manifest of the
+  30 originals committed before regeneration; backup verified.
+- VT rehearsal into scratch: all 60 gate rows pass; the generator's own
+  Canada count equals the pin; restore rehearsal matches the manifest.
+- Regeneration in place: generator's Canada counts VT 69,475 / NH 108,684
+  / ME 822,494 — each equal to the pre-registered pin.
+- Full check, one region at a time: 3 × 60 rows, 0 gate failures; R8 after
+  purge. Evidence `docs/quality/evidence/CR-0014-gates.txt`.
+- **X2 corrected during implementation:** as first written it measured
+  edges outside `T`, which are already `L`, so it read 0. Redefined to
+  edges within 20 km of Canadian land (an upper bound): ME 8,522 / NH
+  24,841 / VT 17,804 — looser than reviewer A's Canada-facing-edge
+  measurement (NH 6,884 / VT 1,881). OBS only; CR text updated.
+- X1: positives with centre in `C` ME 10 / NH 6 / VT 2; negatives ME 2.
+- Bookkeeping: BUG-0037 filed; BUG-0023 FIXED; PA-0023 added; PA-0017/0018
+  Swept? cells; `BUG_LOG.md` rows.
+

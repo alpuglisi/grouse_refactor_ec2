@@ -12,6 +12,8 @@ match) and every key against `GrouseModelHandler.__init__`.
 |---|---|---|---|---|
 | 1 | v1 | A (agent, fresh) | REVISE | 1 |
 | 1 | v1 | B (agent, fresh) | REVISE | 0 |
+| 2 | v2 | A (agent, fresh; bounded) | APPROVE WITH FOLLOW-UPS (conditional on N1 wording) | 0 |
+| 2 | v2 | B (agent, fresh; bounded) | APPROVE WITH FOLLOW-UPS (conditional on N1 wording) | 0 |
 
 ## Round 1, reviewer A
 - **A1 BLOCKING:** `HANDLER_KEYS` (§2) is undefined; read as the geometry
@@ -87,8 +89,89 @@ match) and every key against `GrouseModelHandler.__init__`.
 | A11 / B7 | LOW | **Accept** — § Impact; `load()` reads the vocab from `embeddings.<f>.weight` rows, so bare checkpoints get the named error too |
 | B7 (PA-0041 test) | LOW | **Accept** — delivered in `tests/test_cr0026.py` |
 
+## Round 2 (v2), reviewer A (bounded, CR-0011 A2)
+Every round-1 BLOCKING/MAJOR concern verified RESOLVED in the v2 text
+against the code (A1/B2, A2/B7, A3/B6, A4, A5/B4/B5, A6/B3, B1); the 34
+`TRAIN_DEFAULTS` values re-derived equal to `train.py:629-916`; the two
+`PARSER_DEST` entries are the only dest mismatches.
+- **A-N1 MAJOR:** §2 "compares `set(cfg) − LOSS_CONFIG_KEYS` against
+  `_model_config`" fails on an interim checkpoint carrying the legacy
+  `early_attn_pos_enc` key (`model_handler.py:485-491`,
+  `models.py:876-879`): `KeyError` or a spurious mismatch inside
+  `load()`, where today (`:556-557`, iterating `actual`) it loads.
+- A-N2 MEDIUM: `from_checkpoint`'s non-geometry kwargs unspecified
+  (library `flip_tta=False`, `select_by='loss'`), so a tool calling
+  `evaluate()` on it reproduces BUG-0085; the source-shape test accepts
+  `from_checkpoint(` as compliant.
+- A-N3 MEDIUM: the `GrouseResNet(` rule and the scorer rule are not
+  decidable on `pretrain.py` (`:212-220` literals by design; `:245`,
+  `:252` SimSiam forward); name the accepted spread forms.
+- A-N4 MEDIUM: section 2 keeps `lr=0.0003` (`:120`) and
+  `clip_grad_norm_(…, 1.0)` (`:133`); `focal_alpha` is not a
+  `TRAIN_DEFAULTS` key.
+- A-N5 LOW: `diagnose_training.py:147` → `:158`.
+- A-N6 LOW (A4): review facts inside the CR text.
+- A-N7 LOW: `load()`'s row check must skip features absent from the
+  state (`_orig_mod.` prefix).
+- A-N8 LOW: bench `store_true` flags with `default=TRAIN_DEFAULTS[...]`.
+- A-N9 LOW: add the positive `load()` assertion (PA-0040(c)).
+- A-N10 LOW: `_batch_loss` `w` depends on CR-0027's choice.
+- A-N11 LOW: `pretrain.py --weight-decay` neither shared nor named
+  SSL-specific.
+- CR-0027 (same reviewer): no MAJOR; L1 PA-0042 table gaps
+  (`train.py:221`, `calibrate.py:142`, `diagnose_wetland.py:134`,
+  `acceptance_split.py:739`, `:1261`) and the recorded search; L2 smoke
+  lines `:121-122`, `:146`, `:147`; L3 the test's own needle; L4 fix the
+  `w` choice; L5 status-line review sentence, `NONVEG_WEIGHT` wording.
+
+## Round 2 (v2), reviewer B (bounded, CR-0011 A2)
+Same RESOLVED table (A1/B2, A2, A3/B6, A4, A5/B4/B5, A6/B3, B1), with
+`_wrap_checkpoint`'s fifteen keys and the `--resume` equality at
+`model_handler.py:1102` re-derived.
+- **B-N1 MAJOR:** same as A-N1; remedy "compares every key of
+  `_model_config(model, features)` present in `cfg`".
+- B-N2 MEDIUM: same as A-N2; remedy: build with
+  `{**TRAIN_DEFAULTS, **geometry_kw, **{loss keys from cfg}}` and extend
+  the round trip to `evaluate()` parity.
+- B-N3 MEDIUM: scorer-shape test not implementable as stated
+  (`pretrain.py:245`, `:252`); state the predicate and record
+  `diagnose_training.py:128`, `:174` as the pre-change FAIL set.
+- B-N4 MEDIUM: cross-CR coupling on `_batch_loss`'s `w`.
+- B-N5 LOW: `FocalLoss(alpha=TRAIN_DEFAULTS-derived 0.5)` and the
+  optimizer literals; use `handler.hp[...]`.
+- B-N6 LOW: section 3 `from_checkpoint(path)` without `features`.
+- B-N7 LOW: stale cites `:147`, `:1096`; `--n-train` help.
+- B-N8 LOW: pin `pretrain.py`'s shared defaults; `BooleanOptionalAction`;
+  the `GrouseResNet(` predicate.
+- B-N9 LOW: `_model_config` `int()`/`'none'` fallback; `load()` `.get`.
+- B-N10 LOW: smoke `--epochs 2` never leaves the warmup criterion.
+- B-N11 LOW: tracker row for BUG-0021 with an owner (PA-0024(b)).
+- CR-0027 (same reviewer): N1 MEDIUM fix the `w` choice ("keeps `w`");
+  N2 LOW smoke lines; N3 LOW `NONVEG_WEIGHT` still read by O6; N4 LOW
+  "about 3×" → "3–4×"; N5 LOW AST-node match; N6 LOW landing order.
+
+## v3 dispositions (round 2)
+| # | sev | disposition (operative location) |
+|---|---|---|
+| A-N1 / B-N1 | MAJOR | **Accept** — §2 `check_checkpoint_config` bullet: iterates `_model_config`'s keys present in `cfg`; cfg keys outside the union plus `early_attn_pos_enc` ignored; `from_checkpoint` does not call it; round trip accepts an `early_attn_pos_enc` checkpoint |
+| A-N2 / B-N2 | MEDIUM | **Accept** — §2 `from_checkpoint` bullet: full construction from `TRAIN_DEFAULTS` + geometry + loss keys; § 3 round trip: identical `hp` and `evaluate()` parity |
+| A-N3 / B-N3 / B-N8(c) | MEDIUM / LOW | **Accept** — § 3: accepted spread forms; `GrouseResNet(` predicate restated; `pretrain.py` allow-list; scorer predicate stated; pre-change FAIL set `:128`, `:174` |
+| A-N4 / B-N5 | MEDIUM / LOW | **Accept** — §2 `diagnose_training.py`: `handler.hp[...]` for alpha, gamma, lr, weight_decay, grad_clip; `:120`, `:133` literals named |
+| A-N5 / B-N7 | LOW | **Accept** — `:158`, `:1102`; `--n-train` help; FAIL set re-recorded on the tree tested |
+| A-N6 | LOW | **Accept** — review sentences removed from §2 and § Out of scope |
+| A-N7 / B-N9 | LOW | **Accept** — §2 `load()` and `_model_config` bullets |
+| A-N8 / B-N8(b) | LOW | **Accept** — §2 bench: `BooleanOptionalAction` |
+| A-N9 | LOW | **Accept** — § 3 round trip: positive `load()` assertion |
+| A-N10 / B-N4 | LOW / MEDIUM | **Accept** — CR-0027 v3 fixes "keeps `w`"; § Impact landing-order bullet |
+| A-N11 | LOW | **Accept** — §2 `pretrain.py`: `--weight-decay` named SSL-specific |
+| B-N6 | LOW | **Accept** — section 3 passes `features=feats`; `except` names its types |
+| B-N8(a) | LOW | **Accept** — § 3 pin covers `pretrain.py`'s shared defaults |
+| B-N10 | LOW | **Accept** — §2 smoke `--epochs` default 4 |
+| B-N11 | LOW | **Accept** — deliverable 5: tracker row for BUG-0021, owner lead |
+
 ## Versions
 | version | change |
 |---|---|
 | v1 | initial draft |
-| v2 | dispositions above; predict/calibrate re-point split out |
+| v2 | round-1 dispositions; predict/calibrate re-point split out |
+| v3 | round-2 dispositions above; approved by agent quorum |

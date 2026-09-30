@@ -107,7 +107,7 @@ change is confined to one function, so trivial fixes are possible; the
 exit-code change is a small CLI behaviour change and may warrant a CR.
 Status: **OPEN**. Owner: lead.
 
-**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0025-analyze-grouse-no-stale-outputs-on-skip.md` (DRAFT v1, awaiting independent review under CLAUDE.md §1.2; nothing implemented).
+**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0025-analyze-grouse-no-stale-outputs-on-skip.md` (v3, approved by agent quorum after two review rounds; nothing implemented).
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md` for "skip",

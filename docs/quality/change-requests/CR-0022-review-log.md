@@ -13,6 +13,8 @@ each re-deriving from the code before reading the CR (CLAUDE.md §1.2,
 |---|---|---|---|---|
 | 1 | v2 | A (agent, fresh) | REVISE | 1 |
 | 1 | v2 | B (agent, fresh) | REVISE | 0 |
+| 2 | v3 | A (agent, fresh; bounded) | APPROVE WITH FOLLOW-UPS (conditional on N1 text) | 0 |
+| 2 | v3 | B (agent, fresh; bounded) | APPROVE WITH FOLLOW-UPS (conditional on M1 text) | 0 |
 
 ## Round 1, reviewer A
 - **A1 BLOCKING:** the fix does not cover a resumed run. `load_existing`
@@ -65,9 +67,56 @@ each re-deriving from the code before reading the CR (CLAUDE.md §1.2,
 | B5 | LOW | **Accept as recorded cost** — § Impact states the bound (one page per open year per pass) and § Out of scope leaves `fetch_capped` unchanged |
 | B6 | LOW | **Accept** — the decision is stated once in Status and referenced elsewhere; `:306-340` |
 
+## Round 2 (v3), reviewer A (bounded, CR-0011 A2)
+A1/B4 (BLOCKING) verified RESOLVED (today's `load_existing` `:144-165`,
+pass 1 `:287-288`; the resumed-run row fails today); A2/B2 resolved by
+move to CR-0030 (each item verified there); A3/B1 resolved.
+- **A-N1 MAJOR:** `run_passes` "returning `(total, stalled_final)`" with
+  the `KeyboardInterrupt` handler unmentioned: today `total`/`stalled_final`
+  are bound before the `try` (`:277-278`) and the handler (`:341-342`)
+  falls through to the summary (`:347`); a Ctrl-C mid-fetch would leave
+  both unbound → `UnboundLocalError` after the files close.
+- A-N2 MEDIUM: `fetch_capped` needs `session` (`:168-169`), which
+  `run_passes` does not receive; state the fetch callable's signature.
+- A-N3 LOW: `by_year` key type (string `row["year"]` vs int `args.years`).
+- A-N4 LOW: the parser is built inside `main()` (`:225-237`), which then
+  opens a session; say how the test obtains the `Namespace`.
+- A-N5 LOW: rollover passes on a resumed run ignore existing per-year
+  totals (PA-0034-compliant); record.
+- A-N6 LOW (A4): the decision repeated.
+
+## Round 2 (v3), reviewer B (bounded, CR-0011 A2)
+Same RESOLVED table; the per-open-year cap re-derived (4,3,3; 3,3,2,2;
+mid-pass exhaustion; termination); `load_existing`'s single caller.
+- **B-M1 MAJOR:** `by_year` key type — a string key makes every lookup
+  miss and A1 is intact — and the resumed-run test pre-loads `by_year`
+  without going through `load_existing`, so it would pass anyway.
+- B-M2 MEDIUM: same as A-N2 (`functools.partial(fetch_capped, session)`).
+- B-M3 MEDIUM: "stubs `requests` so it runs here" is false here:
+  `requests` is installed, numpy is not, and `regions.py:24` imports it
+  (`get_negatives.py:46-48` import `regions`); a numpy stub suffices.
+- B-L1 LOW: fresh-run pass-1 assertion omits the `sp_cap - counts` clip.
+- B-L2 LOW: pin `_greedy_reference` to today's loop by commit; commit
+  order extract → test → fix.
+- B-L3 LOW (A4): pointers repeated.
+
+## v4 dispositions (round 2)
+| # | sev | disposition (operative location) |
+|---|---|---|
+| A-N1 | MAJOR | **Accept** — §2 `run_passes` bullet: caller-supplied `tally` dict updated in place; `main()` keeps its `try`/`except KeyboardInterrupt`/`finally`; § 3 interrupt case; risk row |
+| B-M1 / A-N3 | MAJOR / LOW | **Accept** — §2 first bullet: `int(row["year"])`, empty unattributed; § 3 resumed-run case goes through `load_existing` on a temp CSV |
+| A-N2 / B-M2 | MEDIUM | **Accept** — §2 `run_passes` bullet: fetch signature; `functools.partial(fetch_capped, session)` |
+| B-M3 | MEDIUM | **Accept** — § 3 last paragraph and § Test plan: numpy stub (and `requests` only if absent) |
+| A-N4 | LOW | **Accept** — §2 `build_parser()` bullet; § 3 parser case |
+| A-N5 | LOW | **Accept** — § Out of scope last bullet |
+| A-N6 / B-L3 | LOW | **Accept** — decision and pointer stated once in Status and referenced |
+| B-L1 | LOW | **Accept** — § 3 fresh-run case includes the clip |
+| B-L2 | LOW | **Accept** — § 3: `_greedy_reference` cites `:306-340` at `7f40bc4`; commit order stated; deliverable 1 |
+
 ## Versions
 | version | change |
 |---|---|
 | v1 | initial draft (re-fetch of 2023–2024 negatives) |
 | v2 | no re-fetch (user decision 2026-09-30); latent code fix plus O11 |
-| v3 | code only; O11 split to CR-0030; resumed-run quotas; per-year cap recomputed per open year; no flag; dispositions above |
+| v3 | code only; O11 split to CR-0030; resumed-run quotas; per-year cap recomputed per open year; no flag; round-1 dispositions |
+| v4 | `tally` and the interrupt path; `int(year)` keys; fetch signature; `build_parser()`; numpy stub; round-2 dispositions above; approved by agent quorum |

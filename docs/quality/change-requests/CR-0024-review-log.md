@@ -15,6 +15,8 @@ not read by the reviewer.
 |---|---|---|---|---|
 | 1 | v1 | A (agent, fresh) | report not received | — |
 | 1 | v1 | B (agent, fresh) | REVISE | 1 |
+| 2 | v2 | B2 (agent, fresh; bounded) | APPROVE WITH FOLLOW-UPS | 0 |
+| 2 | v2 | A (agent, fresh; unrestricted first review, fills the round-1 slot) | REVISE | 0 |
 
 ## Round 1, reviewer B
 - **B1 BLOCKING:** §2 places `TRAINING_INPUT_KINDS` in `grouse_data.py`
@@ -60,8 +62,68 @@ not read by the reviewer.
 | B5 | MEDIUM | **Accept** — §2 first bullet defines the list as consumer inputs ∪ standing-gate inputs; the guard pins consumer ⊆ list, the paths test pins list == standing paths |
 | B6 | LOW | **Accept** — § 3 labels the digest GATE and E6-with-B as defence; §2 last bullet adds the source pin |
 
+## Round 2 (v2), reviewer B2 (bounded, CR-0011 A2)
+B1 (BLOCKING), B2 and B3 (MAJOR) verified RESOLVED; the config-sha,
+`rpath`, 19/20 counts and PA-0021(a) rows re-derived.
+- B2-N1 MEDIUM: the guard is blind to `path()`-based reads (`rd.path(kind)`
+  + `pd.read_csv`); record in `path()` or state the limit.
+- B2-N2 MEDIUM: two kind namespaces compared by name (`PATH_TEMPLATES`
+  keys vs config `paths` keys: `thinned` vs `thinned_positives`, raw vs
+  evaluated `sightings`); compare resolved relative paths instead.
+- B2-N3 LOW: the cited harness (`tests/test_cr0012.py:385-396`) stops at
+  `split_features`; the guard test needs `regions=[]` and the guard
+  before the `return` at `train.py:394`; `standing_checks` returns
+  `True`, not `cfg`.
+- B2-N4 LOW: the data-host row exercises the BUG-0074-forbidden path.
+- B2-N5 LOW: A5 sentence inaccurate.
+- B2-N6 LOW: keep `digested_paths`' region-outer order (record bytes).
+
+## Round 2 (v2), reviewer A (unrestricted first review)
+Diagnosis re-derived and confirmed; every §2–3 / Impact citation
+verified; import constraints, `rpath` derivation, the digest row's
+ability to fail, the record-already-digests-B claim and the PA-0037
+third-clause tracker item all confirmed.
+- **A-1 MAJOR:** a config-owned standing list is a downgrade vector
+  (CR-0013 design rule 3; `load_config` floors `:101-110`): editing
+  `standing.kinds` shrinks the digest set unseen by the guard. Remedy: a
+  code floor, or keep the list in `acceptance_split.py` (no `grouse_data`
+  import needed), which also removes the config-sha change and the
+  record re-issue.
+- **A-2 MAJOR:** the guard checks accessor-mediated reads, not "what was
+  actually read" (`RegionData.path()` `:267-284`, `GrouseData.path()`
+  `:557-567` resolve without recording; `sample_background_points`
+  takes `assignments` as an argument). Remedy: record in `path()`.
+- A-3 MEDIUM: "E6 with B" cannot fail on the header-swap scenario
+  (`gate_E6` skips silently when the columns are absent, `:1787-1790`;
+  standing E0 runs with `("P", "N")`, `:2836`).
+- A-4 MEDIUM: `cfg` is not available in `build_datasets`
+  (`standing_checks` returns `True`); the cited harness never reaches
+  the guard.
+- A-5 MEDIUM: nothing pins that the files the standing gates read are in
+  the list (`Context.csv`, `:1495-1500`).
+- A-6 LOW: A5 "cannot be separated" is not true.
+- A-7 LOW (A4): counts repeated.
+- A-8 LOW: the re-issue's E11 environment-equality risk (moot if the
+  list lives in code).
+
+## v3 dispositions (round 2)
+| # | sev | disposition (operative location) |
+|---|---|---|
+| A-1 | MAJOR | **Accept** — §2 first bullet: `STANDING_KINDS` in `acceptance_split.py`; no config change, no re-issue; § Impact and deliverable 3 |
+| A-2 / B2-N1 | MAJOR / MEDIUM | **Accept** — §2 fourth bullet: recording in `RegionData.path` and `GrouseData.path` for every `.csv` kind regardless of `must_exist` |
+| B2-N2 | MEDIUM | **Accept** — §2 fourth bullet: `csv_paths_read` holds relative paths compared with `standing_csv_paths(cfg)` |
+| A-3 | MEDIUM | **Accept** — §2 third bullet: standing E0 with `("P", "N", "B")`; E6 reports a B without the columns; § 3 header-swap case |
+| A-4 / B2-N3 | MEDIUM / LOW | **Accept** — §2: `standing_checks` returns `cfg`; guard placed after the region loop before `:394`; § 3 harness test with `regions=[]` and a fake `GrouseData` |
+| A-5 | MEDIUM | **Accept** — §2 third bullet: post-gate assertion on `ctx._csv`; § 3 gate-side row |
+| A-6 / B2-N5 | LOW | **Accept** — § One change per CR reworded |
+| A-7 | LOW | **Accept** — counts stated in §2, § 3 refers |
+| A-8 | LOW | moot (list in code); noted |
+| B2-N4 | LOW | **Accept** — § 3 consumer-guard row: guard exercise only, no checkpoint |
+| B2-N6 | LOW | **Accept** — §2 second bullet: today's order kept |
+
 ## Versions
 | version | change |
 |---|---|
 | v1 | initial draft (`TRAINING_INPUT_KINDS` in `grouse_data.py`) |
-| v2 | list in `acceptance_split.json`; run-time guard on kinds read; pins and record re-issue stated; dispositions above |
+| v2 | list in `acceptance_split.json`; run-time guard on kinds read; pins and record re-issue stated; round-1 dispositions |
+| v3 | list code-owned (`STANDING_KINDS`); path recording in `path()`; guard on relative paths; E0/E6 with B; gate-side assertion; no re-issue; round-2 dispositions above |

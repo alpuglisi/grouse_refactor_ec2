@@ -11,6 +11,8 @@ Review logs were not read by the reviewers.
 |---|---|---|---|---|
 | 1 | v1 | A (agent, fresh) | REVISE | 0 |
 | 1 | v1 | B (agent, fresh) | REVISE | 1 |
+| 2 | v2 | A (agent, fresh; bounded) | APPROVE WITH FOLLOW-UPS (conditional on N1, N2 text) | 0 |
+| 2 | v2 | B (agent, fresh; bounded) | APPROVE WITH FOLLOW-UPS (conditional on N1 text) | 0 |
 
 ## Round 1, reviewer A
 - A1 MAJOR: the `ast` header test cannot apply to `sightings.py`, which
@@ -62,8 +64,52 @@ Review logs were not read by the reviewers.
 | A6 / B4 / B6 | LOW / MEDIUM / LOW | **Accept** — §2 second bullet states the required-subset reading of PA-0045 and why; last bullet states the CWD write and `organize_project.py`; bundling note removed |
 | (author) | — | constant placed in `regions.py`, not `grouse_data.py`, so the acquisition scripts do not import rasterio; `Consts` already parses `regions.py` |
 
+## Round 2 (v2), reviewer A (bounded, CR-0011 A2)
+B1/A2 (BLOCKING/MAJOR) and A1/B2 (MAJOR) verified RESOLVED against the
+code (`extrasaction='ignore'`, `dropna` at `:188`; the check precedes
+every `to_csv`).
+- **A-N1 MAJOR:** `tests/test_check_partition.py` writes a synthetic
+  `regions.py` (`:118-119`) without the new literal; after §2 `Consts.get`
+  raises `Missing` for every `x.raw()` caller (P3 `:409`, P4 `:445`,
+  `box_source` `:363`) and the suite fails; the CR does not touch it.
+- A-N2 MEDIUM: "`regions.py` is the dependency-free leaf" is false
+  (`regions.py:24` imports numpy), so `to_row` cannot run here without
+  a stub; the test-plan sentence is wrong.
+- A-N3 LOW: `download_tcc_nlcd.sighting_years` reads positives/negatives;
+  the filename-only reader is `RegionData.sighting_years`.
+- A-N4 LOW: cites (`:120`, `:157-187`, `:158-161`, `preregister.py:252`).
+- A-N5 LOW: `check_partition.P6_NAMES` (`:602-606`) should gain the name.
+- A-N6 LOW: record the required-subset reading in PA-0045's rule cell.
+
+## Round 2 (v2), reviewer B (bounded, CR-0011 A2)
+Same RESOLVED table; `regions.py` as home confirmed allowed (`P6_EXEMPT`;
+`p6_problems` pins only expected keys); `EXPECTED_REGIONS` pin is the
+right enforcement.
+- **B-N1 MAJOR:** the PA-0027 lint pin for `ebird.main`
+  (`tests/test_pa0027_lint.py:169`) breaks when `main()` changes; absent
+  from §2 and deliverables.
+- B-N2 MEDIUM: same as A-N2 (stub numpy; import `ebird`; read
+  `CSV_HEADERS` directly).
+- B-N3 LOW: same as A-N3; `sightings.py` write is `:138`.
+- B-N4 LOW: the zero-coordinate raise is per file, before
+  `check_partition.load_raw`'s concat (`:177-178`); the harness fixture
+  already uses the GBIF names (`:110-113`).
+
+## v3 dispositions (round 2)
+| # | sev | disposition (operative location) |
+|---|---|---|
+| A-N1 | MAJOR | **Accept** — §2 `check_partition` bullet: the fixture `regions.py` gains the literal; § 3 last row; deliverable 1 |
+| B-N1 | MAJOR | **Accept** — §2 `ebird.py` bullet: re-pin with owner unchanged; deliverable 2; § 3 last row |
+| A-N2 / B-N2 | MEDIUM | **Accept** — §2 first bullet reworded; § 3 first row and § Test plan: numpy stub, `ebird` imported |
+| A-N3 / B-N3 | LOW | **Accept** — § Impact consumer list; `:138` |
+| A-N4 | LOW | **Accept** — cites corrected |
+| A-N5 | LOW | **Accept** — deliverable 3: `P6_NAMES`; § Impact enforcement note |
+| A-N6 | LOW | **Accept** — §2 second bullet and deliverable 3: rule-cell clarification (not a weakening) |
+| B-N4 | LOW | **Accept** — §2 reader bullets: per file, before the concat; fixture note |
+
 ## Versions
 | version | change |
 |---|---|
 | v1 | initial draft |
-| v2 | row remap and `to_row`; runtime check in `sightings.py`; constant in `regions.py`; `source` dropped; fail-closed readers; dispositions above |
+| v2 | row remap and `to_row`; runtime check in `sightings.py`; constant in `regions.py`; `source` dropped; fail-closed readers; round-1 dispositions |
+| v3 | harness fixture and lint re-pin; numpy stub; per-file checks; `P6_NAMES`; round-2 dispositions above; approved by agent quorum |

@@ -69,7 +69,7 @@ by both scripts (`ebird.py` renames `lat`/`lng` to it), readers select
 by exact name, a test pins both writers' headers to the list.
 Status: **OPEN (latent)**. Owner: lead.
 
-**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0028-sightings-schema-shared-columns.md` (DRAFT v1, awaiting independent review under CLAUDE.md §1.2; nothing implemented).
+**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0028-sightings-schema-shared-columns.md` (v3, approved by agent quorum after two review rounds; nothing implemented).
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md` for "ebird",

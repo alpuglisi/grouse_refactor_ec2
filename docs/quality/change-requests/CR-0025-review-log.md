@@ -12,6 +12,8 @@ path that BUG-0081 §2 also omitted; BUG-0081 §1–2 corrected the same day.
 |---|---|---|---|---|
 | 1 | v1 | A (agent, fresh) | REVISE | 1 |
 | 1 | v1 | B (agent, fresh) | REVISE | 0 |
+| 2 | v2 | A (agent, fresh; bounded) | APPROVE WITH FOLLOW-UPS | 0 |
+| 2 | v2 | B (agent, fresh; bounded) | APPROVE WITH FOLLOW-UPS | 0 |
 
 ## Round 1, reviewer A
 - **A1 BLOCKING:** §2 lists four skip paths; the code has a fifth at
@@ -60,8 +62,59 @@ path that BUG-0081 §2 also omitted; BUG-0081 §1–2 corrected the same day.
 | B4 | LOW | **Accept** — §2 second bullet: `remove_region_outputs` is the first statement of `analyze_region`, so exceptions are covered too; `:251` cited as reached via `:741` |
 | B5 | LOW | noted; no change |
 
+## Round 2 (v2), reviewer A (bounded, CR-0011 A2)
+A1/B1 (BLOCKING/MAJOR), A2/B2 and A3 (MAJOR) verified RESOLVED against
+the code (five non-final exits; `:884` writes only `nonveg_flagged`;
+`env_zone` joins at `:1010-1012`; every § 3 row fails today).
+- A-N1 MEDIUM: "ahead of the map block (`:1010-1097`)" — the map block
+  is `:1015-1097`; `:1010-1012` is the `env_zone`/`envelope_id` join;
+  taken literally the writes would precede the join and produce the
+  PA-0045 second schema.
+- A-N2 LOW: cites (`:877-878`; handlers `:641-645`, `:654-663`,
+  `:666-676`; `grouse_data.py:281-283`).
+- A-N3 LOW: `check_partition.py:382`/`:477` report FAIL lines through
+  `Missing`, they do not raise.
+- A-N4 LOW: PA-0042 readers of `evaluated_sightings_{R}.csv` with
+  print-and-skip (`tune.py`, `tune_bins.py`, `clean.py`, `dupe_check.py`,
+  `check_exotic.py`).
+- A-N5 LOW: `PATH_TEMPLATES["diagnostic_map"]` is a fifth per-region
+  output left stale.
+- A-N6 LOW: bullet 3's write-then-remove is reached after a write
+  (PA-0038(c) wording); move the check ahead of the write.
+- A-N7 LOW: test mechanics (subprocess, cwd, `MPLBACKEND=Agg`);
+  byte-identity scoped to the CSVs.
+
+## Round 2 (v2), reviewer B (bounded, CR-0011 A2)
+Same RESOLVED table; the return-type change reaches one caller
+(`:1118`); `write_csv_atomic` byte-identical; no concurrent readers;
+PA-0027 lint pins of `load_state_boundaries` untouched.
+- B-L1 LOW: "an unhandled exception leaves no output" overstates (a
+  complete `nonveg_flagged` of this run can remain); say "no output of a
+  previous run".
+- B-L2 LOW: same as A-N5.
+- B-L3 LOW: cites (`:877-878`; `__main__` `:1108`).
+- B-L4 LOW: the test table covers 3 of 5 skip paths.
+- B-L5 LOW: `background_envelope_sample`'s `return None` (`:546`) is a
+  designed in-region fallback that a previous file no longer masks;
+  record in Impact.
+
+## v3 dispositions (round 2)
+| # | sev | disposition (operative location) |
+|---|---|---|
+| A-N1 | MEDIUM | **Accept** — §2 fifth bullet: writes after the join (`:1010-1012`), before the map (`:1015-1097`) |
+| A-N2 / B-L3 | LOW | **Accept** — cites corrected |
+| A-N3 | LOW | **Accept** — §2 last bullet: FAIL lines through `Missing` |
+| A-N4 | LOW | **Accept** — § Impact fourth bullet; tracker items in deliverable 4 |
+| A-N5 / B-L2 | LOW | **Accept** — §2 first bullet: five outputs including `diagnostic_map` |
+| A-N6 | LOW | **Accept** — §2 third bullet: the check moves ahead of the write; no second removal |
+| A-N7 | LOW | **Accept** — § 3 mechanics; deliverable 3 scoped to the CSVs |
+| B-L1 | LOW | **Accept** — §2 second bullet wording |
+| B-L4 | LOW | **Accept** — § 3 table covers all five paths |
+| B-L5 | LOW | **Accept** — §2 last bullet |
+
 ## Versions
 | version | change |
 |---|---|
 | v1 | initial draft (removal at each of four skip paths) |
-| v2 | removal at region start; fifth path; `:884` full skip; atomic writes; pre-seeded fixture test; dispositions above |
+| v2 | removal at region start; fifth path; `:884` full skip; atomic writes; pre-seeded fixture test; round-1 dispositions |
+| v3 | writes after the `env_zone` join; five outputs; check ahead of the `nonveg_flagged` write; all five skip cases; round-2 dispositions above; approved by agent quorum |

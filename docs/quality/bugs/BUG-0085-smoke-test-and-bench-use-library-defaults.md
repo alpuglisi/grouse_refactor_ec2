@@ -69,7 +69,7 @@ save_path=...)`) in both scripts, and pass `expand_rotations=True` to the
 smoke test's train negatives (the documented deviation at `:87-89`) so
 its data path matches `train.py` too. Status: **OPEN**. Owner: lead.
 
-**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0026-train-defaults-and-checkpoint-config-compare.md` (DRAFT v1, awaiting independent review under CLAUDE.md §1.2; nothing implemented).
+**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0026-train-defaults-and-checkpoint-config-compare.md` (v3, approved by agent quorum after two review rounds; nothing implemented).
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** as BUG-0083. **Matches:** BUG-0011 / PA-0009 (same

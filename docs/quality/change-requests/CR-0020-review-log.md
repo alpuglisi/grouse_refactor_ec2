@@ -11,6 +11,8 @@ quorum). Review logs were not read by the reviewers.
 |---|---|---|---|---|
 | 1 | v1 | A (agent, fresh) | REVISE | 2 |
 | 1 | v1 | B (agent, fresh) | REVISE | 2 |
+| 2 | v2 | A (agent, fresh; bounded) | APPROVE WITH FOLLOW-UPS (conditional on N1, N2 text) | 0 |
+| 2 | v2 | B (agent, fresh; bounded) | APPROVE WITH FOLLOW-UPS (conditional on N2 text) | 0 |
 
 ## Round 1, reviewer A
 - **A1 BLOCKING:** §2 step 3 "re-bin the recorded availability sample" is
@@ -80,8 +82,79 @@ quorum). Review logs were not read by the reviewers.
 | A8 | LOW | **Accept** — MC pins `candidate_pool.csv` rows by 5 dp key; `float_rel_tol`; risk row for the ratio-0 share |
 | B9 | LOW | **Accept** — buffer deviation recorded in PA-0033's Swept? cell (deliverable 8); absent blocks conservative (§2 step 1); `*` unpack; pins listed; `envelope_metrics_table` raises without availability |
 
+## Round 2 (v2), reviewer A (bounded, CR-0011 A2)
+Every round-1 BLOCKING/MAJOR verified RESOLVED against the code
+(A1/B1: `bg[feat]` in scope at `analyze_grouse.py:515` before `:524`;
+A2/B2: `Replay.assign_split` uses `self.B`, `acceptance_split.py:1199-1205`;
+A3/B3; B4; B5; A7/B6: `env_zone`/`envelope_id` not on the training path).
+- **A-N1 MAJOR (PA-0021(e)):** the availability half of E15's reference
+  is read from a file this CR produces and nothing verifies the recorded
+  feature values; a positional (misaligned) copy after `bg.dropna()`
+  (`:524`) gives pipeline and replay identical wrong `Avail_N`.
+- **A-N2 MAJOR:** the availability sample is not bound as an input:
+  `paths` has no `availability_sample`, the negatives `inputs` are only
+  reduced, E11's required list only loses a kind; following the file's
+  own `digest(rd.path(...))` pattern makes E11 FAIL "outside S and I"
+  (`:2164-2165`), omitting it leaves the input unrecorded.
+- A-N3 MEDIUM: E15's comparison key unspecified (`comparison.rule` keys
+  on coordinates or `block_id`; the table has neither; `:942` sort is not
+  canonical among ties).
+- A-N4 MEDIUM: the replay unit test as worded cannot pass (deleting
+  validation-block S rows moves the replay's own B).
+- A-N5 MEDIUM: "R1 compares S row-for-row" is false (R1 compares P,
+  `:2261-2275`); E11 last-wins (`:2142`).
+- A-N6 MEDIUM: attack rows (iii)/(iv) fail only if the fixture's
+  train-only EVH median differs from the all-rows median.
+- A-N7 LOW: the CR-0019 control compares keys and split only; say it
+  compares `weight` too.
+- A-N8 LOW: Step 0 lists `evc`, which `needed` (`:479-482`) lacks; "P5
+  reads only the coordinates" is wrong (`check_partition.py:482`).
+- A-N9 LOW: consumer list: `diagnose_*` do not read the metrics table;
+  `check_partition.py` P5 and `organize_project.py` do; E9 counts by
+  `is_nonveg`; the ratio-0 weight is `1/W_FLOOR`.
+- A-N10 LOW (A4): E15's C/N half duplicates E10.
+- A-N11 LOW: `envelope_metrics_table` raising on empty availability vs
+  today's fallback (`:974-985`).
+
+## Round 2 (v2), reviewer B (bounded, CR-0011 A2)
+Same RESOLVED table.
+- **B-N1 MAJOR:** same as A-N1 (remedy: a re-sampling gate; may be a
+  tracked follow-up with a PA-0024(a) location).
+- **B-N2 MAJOR:** same as A-N2 (`Replay.read_input` resolves through
+  `rpath`, `:950-956`; E11 loops only required kinds, `:2157-2160`).
+- B-N3 MEDIUM: deliverable order: the pre-registration needs a sample
+  with feature columns, which exists on the live tree only after
+  `analyze_grouse.py` runs.
+- B-N4 MEDIUM: `evc` (same as A-N8).
+- B-N5 LOW: the new table needs a match key, canonical order and a
+  `columns` entry for E0.
+- B-N6 LOW: "R1 checks S" (same as A-N5); S is bound by E11 through the
+  positives manifest inputs (`prepare_training_data.py:373`).
+- B-N7 LOW: E9/O6 and P5 wording (same as A-N9/A-N8).
+- B-N8 LOW: O13's id presumes O11/O12 land first; `digested_paths`
+  20→23 interacts with CR-0024; E10's reference depends on the replay's
+  positives stage; attack row (iv) needs distinct edges.
+
+## v3 dispositions (round 2)
+| # | sev | disposition (operative location) |
+|---|---|---|
+| A-N1 / B-N1 | MAJOR | **Accept** — §3 new check E15b re-samples the rasters at the recorded year and recomputes `evt_phys`; §2 Step 0 requires the index-aligned join; the vintage choice is the recorded accepted gap (tracker, deliverable 8) |
+| A-N2 / B-N2 | MAJOR | **Accept** — §2 Step 3 and Manifest: the sample is read through `digest(rd.path(...))` and its three digests enter the negatives `inputs`; §3 Config: `paths.availability_sample`, E11 required kinds, `manifest_schema.inputs` |
+| A-N3 / B-N5 | MEDIUM / LOW | **Accept** — §2 Step 4 canonical order by `Envelope`; §3 E15 keyed on `Envelope`; `row_order`, `columns`, `comparison.rule` entries |
+| A-N4 | MEDIUM | **Accept** — §3 replay unit test holds B fixed and deletes from the fitting input only |
+| A-N5 / B-N6 | MEDIUM / LOW | **Accept** — §4, risk table and deliverable 5: sha256 of S before and after, abort on difference; E11 binds S through the positives inputs |
+| A-N6 / B-N8 | MEDIUM / LOW | **Accept** — §3 attack rows: the fixture writer asserts distinct EVH edges |
+| A-N7 | LOW | **Accept** — §3 pre-registration: control = pre-CR replay under pre-CR config, compares `weight` |
+| A-N8 / B-N4 | LOW / MEDIUM | **Accept** — §2 Step 0: `evt`, `evh`, `sclass` (+ derived `evt_phys`), P5 columns named |
+| A-N9 / B-N7 | LOW | **Accept** — § Impact consumer list corrected |
+| A-N10 | LOW | **Accept** — §3 E15 is the table comparison only |
+| A-N11 | LOW | **Accept** — §2 shared metric function: called only inside the `bg_counts is not None` branch |
+| B-N3 | MEDIUM | **Accept** — deliverables 5–7 reordered: live `analyze_grouse.py` with S check, then pre-registration, then `generate_negatives.py` |
+| B-N8 | LOW | **Accept** — §3 O13 id caveat; § One change per CR: `digested_paths` derived, composes with CR-0024; E10 dependence stated |
+
 ## Versions
 | version | change |
 |---|---|
 | v1 | initial draft |
-| v2 | dispositions above; availability schema step; single fitting-set definition; E15 redefined; O13; manifest and pin list; PA-0042 table; landing order with CR-0029 |
+| v2 | round-1 dispositions; availability schema step; single fitting-set definition; E15 redefined; O13; manifest and pin list; PA-0042 table; landing order with CR-0029 |
+| v3 | round-2 dispositions above (E15b, input binding, canonical order, deliverable order); approved by agent quorum |

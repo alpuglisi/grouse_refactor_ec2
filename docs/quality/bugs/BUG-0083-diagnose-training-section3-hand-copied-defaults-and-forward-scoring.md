@@ -108,7 +108,7 @@ already answer its question correctly. (3) changes production code and
 needs a CR; (1), (2), (4) are confined to the diagnostic.
 Status: **OPEN**. Owner: lead.
 
-**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0026-train-defaults-and-checkpoint-config-compare.md` (DRAFT v1, awaiting independent review under CLAUDE.md §1.2; nothing implemented).
+**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0026-train-defaults-and-checkpoint-config-compare.md` (v3, approved by agent quorum after two review rounds; nothing implemented).
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md` for

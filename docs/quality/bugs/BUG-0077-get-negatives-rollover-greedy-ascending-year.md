@@ -91,7 +91,7 @@ comparing the positive and negative per-year histograms. Any change
 requires a re-fetch and a rebuild of negatives (user decision recorded in
 BUG-0073). Status: **OPEN**. Owner: lead.
 
-**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0022-negatives-rollover-round-robin.md` (DRAFT v3 after round-1 review; nothing implemented). **User decision 2026-09-30: no re-fetch** — the code fix is latent until the next acquisition; today's year imbalance stays with BUG-0073's no-network remedy. Round 1 found the same defect on a resumed run's first pass (`load_existing` has no per-year counts); v3 covers it. The per-class year-distribution observation (O11) is CR-0030.
+**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0022-negatives-rollover-round-robin.md` (v4, approved by agent quorum after two review rounds; nothing implemented). **User decision 2026-09-30: no re-fetch** — the code fix is latent until the next acquisition; today's year imbalance stays with BUG-0073's no-network remedy. Round 1 found the same defect on a resumed run's first pass (`load_existing` has no per-year counts); v3 covers it. The per-class year-distribution observation (O11) is CR-0030.
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md` for "year",

@@ -15,6 +15,8 @@ not read by the reviewer.
 |---|---|---|---|---|
 | 1 | v1 | A (agent, fresh) | report not received | — |
 | 1 | v1 | B (agent, fresh) | REVISE | 2 |
+| 2 | v2 | B2 (agent, fresh; bounded) | APPROVE WITH FOLLOW-UPS (conditional on N1 text) | 0 |
+| 2 | v2 | A (agent, fresh; unrestricted first review, fills the round-1 slot) | REVISE | 0 |
 
 ## Round 1, reviewer B
 - **B1 BLOCKING:** §4 cannot be implemented: there are no "E11(b)
@@ -74,8 +76,74 @@ not read by the reviewer.
 | B9 | LOW | **Accept** — `download_tcc_nlcd.py:467-468` added to §2; `sample_background_points` recorded in § Impact for PA-0036's Swept? cell and § Out of scope (BUG-0074) |
 | B10 | LOW | **Accept** — §3 last bullet |
 
+## Round 2 (v2), reviewer B2 (bounded, CR-0011 A2)
+B1–B4 verified RESOLVED against the code (fallback loop `grouse_data.py:392-407`;
+`tol=-1` unreachable by the refusing callers; `_emit` at
+`generate_time_since_disturbance.py:352`); healthy-tree verdict of
+`filter_by_year_gap` shown unchanged; `on_fallback` threading at
+`dataset.py:126` feasible; A5 justification adequate; Swept? items
+verified.
+- **B2-N1 MAJOR (PA-0021(a)):** G3 cannot fail for the defect it exists
+  to catch: `filter_by_year_gap` runs at `train.py:339-350` before
+  `soft_labels_for` (`:356`), so with the default tolerance G3 passes
+  even if `_score_teacher_probs` never received `on_fallback`.
+- B2-N2 MEDIUM: G4 has an injection for one of five writers only.
+- B2-N3 MEDIUM: §2 does not fix the order of close vs replace; an
+  `else: os.replace` inside the existing `try/finally` runs before the
+  handles close and can publish a truncated file on a close-time error.
+- B2-N4 LOW: the must-change row needs a pin (`_path_for`/`_cache_key`
+  equality between warn and raise).
+- B2-N5 LOW: G2's message; whether the `if ys` skip (`:243`) is kept.
+- B2-N6 LOW: cites (`:324-327`, `:336-342`).
+- B2-N7 LOW: tie rule; invalid `on_fallback` value.
+
+## Round 2 (v2), reviewer A (unrestricted first review)
+Diagnosis re-derived and confirmed; six constructions confirmed to be
+all; `.tmp` invisibility verified across every raster glob; `--an-background`
+patch reads covered by the dataset refusal; PA-0027 lint digest untouched.
+- **A-1 MAJOR:** same mechanism as B2-N3, with the remedy: success flag,
+  close in `finally`, then validate (`rasterio.open(tmp)`, shape, one
+  window) and replace after the statement; `with` sites need an explicit
+  unlink on exception.
+- **A-2 MAJOR:** PA-0036(a) not fully met: two direct final-path writers
+  of the same call shape missed: `generate_treemap_features.py:518-522`
+  (sibling-year `shutil.copy2` fan-out) and `download_rev.py:416-431`
+  (`copy_topo_baselines`, `shutil.copy`); PA-0044 requires the search to
+  be recorded; CSV direct writers to be listed with an owner.
+- A-3 MEDIUM: §3 raises `MissingDataError` where G2 asserts `SystemExit`;
+  § Impact says `filter_by_year_gap` gains a keyword while §3 always
+  passes `"raise"`; `tests/test_cr0019.py:328-332` `FakeRD` breaks.
+- A-4 MEDIUM: G4 per site.
+- A-5 MEDIUM: the pipeline producers (`prepare_training_data.window_mask:177`,
+  `generate_negatives.extract_envelope:229`) and the acceptance
+  `Rasters.raster_path` (`acceptance_split.py:479-493`) keep the fallback;
+  state the pre-acceptance consequence.
+- A-6 LOW: the "must-change" row is the must-not-change side.
+- A-7 LOW: cites (CHANGELOG `:502` not ARCHITECTURE.md; `dataset.py:125-127`;
+  `train.py:226-265`; `predict.open_aligned_sources:177-180`).
+- A-8 LOW: `nearest=False` still falls through to the fallback
+  (`generate_road_distance.py:334`).
+- A-9 LOW: return the resolved year rather than regex-parse the filename.
+
+## v3 dispositions (round 2)
+| # | sev | disposition (operative location) |
+|---|---|---|
+| B2-N1 | MAJOR | **Accept** — § 4 G3: `train_year_gap=-1`, `standing_checks` mocked, `MissingDataError` from the `_score_teacher_probs` construction |
+| A-1 / B2-N3 | MAJOR / MEDIUM | **Accept** — §2 ordering rule: success flag, close in `finally`, validate and replace after the statement; `with` sites unlink on exception |
+| A-2 | MAJOR | **Accept** — §2 table: seven sites including the fan-out and `copy_topo_baselines`; the search recorded; CSV writers listed with owners; deliverable 5 corrects the Swept? cell |
+| A-3 | MEDIUM | **Accept** — §3 `filter_by_year_gap` bullet: catches `MissingDataError`, re-raises `SystemExit`; gains no keyword; `FakeRD` change in § 4 and deliverable 1 |
+| A-4 / B2-N2 | MEDIUM | **Accept** — § 4 G4: one row per site with the injection named |
+| A-5 | MEDIUM | **Accept** — § Impact third bullet; § Out of scope |
+| A-6 / B2-N4 | LOW | **Accept** — § 4 pin row relabelled and pinned |
+| A-7 / B2-N6 | LOW | **Accept** — cites corrected throughout |
+| A-8 | LOW | **Accept** — § Impact and Swept? cell; out of scope |
+| A-9 | LOW | **Accept** — §3 `resolve_raster` returns `(path, resolved_year)` |
+| B2-N5 | LOW | **Accept** — §3: message carries the resolver's remedy; `if ys` kept |
+| B2-N7 | LOW | **Accept** — §3 first bullet |
+
 ## Versions
 | version | change |
 |---|---|
 | v1 | initial draft (tolerance-conditioned refusal; manifest fallback records) |
-| v2 | unconditional refusal; §4 dropped; six dataset constructions; `download_tcc_nlcd.py` writer; GATE table; dispositions above |
+| v2 | unconditional refusal; §4 dropped; six dataset constructions; `download_tcc_nlcd.py` writer; GATE table; round-1 dispositions |
+| v3 | ordering rule; seven writer sites; `resolve_raster`; G3/G4 per site; producers' fallback stated; round-2 dispositions above |

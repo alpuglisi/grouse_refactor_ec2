@@ -49,7 +49,7 @@ projected bounds (or by pixel index of the region template, as
 re-run `analyze_grouse.py`, `generate_negatives.py` and acceptance
 (rebuild). Status: **OPEN (low)**. Owner: lead.
 
-**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0029-availability-sample-area-uniform.md` (DRAFT v1, awaiting independent review under CLAUDE.md §1.2; nothing implemented).
+**CR drafted 2026-09-30:** `docs/quality/change-requests/CR-0029-availability-sample-area-uniform.md` (v3, approved by agent quorum after two review rounds; nothing implemented).
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 **Searched:** `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md` for

@@ -1,6 +1,6 @@
 # CR-0016: Demote `check_road_dist.py` RD1 and RD4 from gates to observations
 
-**Status: PROPOSED (v2) — awaiting bounded re-review.** Nothing implemented.
+**Status: APPROVED (v2.1), 2026-09-30 — implementation in progress.**
 History and dispositions: `CR-0016-review-log.md`. Current intent only.
 
 ## Scope

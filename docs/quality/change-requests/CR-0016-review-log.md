@@ -78,7 +78,7 @@ encoder", not "checked" — a violation fails safe.
 
 ## Quorum (§1.4)
 Reviewer A: APPROVE (v2). Reviewer B: APPROVE WITH FOLLOW-UPS (v2).
-Author: pending user.
+Author: **signed off** — user approved 2026-09-30. **CR-0016 APPROVED (v2.1).**
 
 ## Author sign-off
 Pending.

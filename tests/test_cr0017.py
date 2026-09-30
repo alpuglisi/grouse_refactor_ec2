@@ -171,6 +171,13 @@ class DomainD(unittest.TestCase):
         self.assertTrue(dom.equals(direct))
         self.assertAlmostEqual(dom.area, 3e8, delta=3e8 * 1e-6)
 
+    def test_analysis_epsg_is_the_to_5070_target(self):
+        # D is built in _ANALYSIS_EPSG; the points come from to_5070, which
+        # still has its own literal target (CR-0007 (d)). They must agree.
+        regions.to_5070([-70.0], [44.0])
+        t = regions._TO_5070["t"]
+        self.assertEqual(t.target_crs.to_epsg(), regions._ANALYSIS_EPSG)
+
     def test_missing_state_raises(self):
         fips = regions.STATE_FIPS["NH"]
         with mock.patch.object(regions, "_county_polygons",

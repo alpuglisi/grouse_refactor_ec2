@@ -68,7 +68,10 @@ BOXES = {
 }
 
 # CRS of the TIGER county file (NAD83), of the lon/lat inputs (WGS84) and
-# of the analysis grid (CONUS Albers; the target of to_5070 below).
+# of the analysis grid (CONUS Albers). _ANALYSIS_EPSG is used only for
+# domain D; to_5070 below still hard-codes its own "EPSG:5070" target, and
+# the two must stay equal (tests/test_cr0017.py pins this; wiring to_5070
+# to a shared constant is CR-0007 item (d)).
 _COUNTY_FILE_EPSG = 4269
 _LONLAT_EPSG = 4326
 _ANALYSIS_EPSG = 5070

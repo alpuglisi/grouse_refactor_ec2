@@ -1243,7 +1243,8 @@ class TestDomainEdgeAttacks(unittest.TestCase):
         rep = A.Replay(BASE, CFG).run(stop_on_error=True)
         for df in (rep.pool_full, _pooled_neg(rep)):
             self.assertGreater(shapely_edge_m(df["longitude"], df["latitude"]).min(), BUF)
-        # both step-6 rules bite on the fixture, separately
+        # step 6 removes rows on the fixture; that rules (a) and (b) each bite
+        # separately is asserted in TestDomainEdgeUnits.test_step6_drops_rule_a_or_rule_b
         self.assertGreater(rep.counts["negatives"]["VT"]["5"] - rep.counts["negatives"]["VT"]["6"], 0)
 
     def test_no_domain_edge_filter(self):
@@ -1333,6 +1334,57 @@ class TestDomainEdgeUnits(unittest.TestCase):
         self.assertEqual(e[0], 300.0)
         self.assertTrue(e[0] <= 300)               # exactly BUFFER_M: dropped
         self.assertGreater(e[1], 300)              # BUFFER_M + 1e-6: kept
+
+    def _edge_rows(self, b):
+        """Two rows inside a 10 km square D: edge_m == BUFFER_M exactly and
+        BUFFER_M + 1e-6 (x distance to the west side; exact in float64)."""
+        return pd.DataFrame({"longitude": [-72.0, -72.1], "latitude": [44.0, 44.1],
+                             "x_5070": [b, b + 1e-6], "y_5070": [5000.0, 5000.0]})
+
+    def test_domain_edge_mask_threshold_inclusive(self):
+        """Replay.domain_edge_mask (step 6 rule (b)): edge_m == BUFFER_M is
+        dropped, BUFFER_M + 1e-6 is kept (CR-0017 F1)."""
+        b = float(CFG["constants"]["BUFFER_M"])
+        D = self._square((0, 0, 10000, 10000))
+        rep = A.Replay.__new__(A.Replay)
+        rep.C = {"BUFFER_M": CFG["constants"]["BUFFER_M"]}
+        rep.domain = lambda: D
+        cand = self._edge_rows(b)
+        self.assertEqual(A.domain_edge_within(cand["x_5070"], cand["y_5070"], D, b)[0], b)
+        self.assertEqual(list(rep.domain_edge_mask(cand)), [True, False])
+
+    def test_gate_e13_threshold_inclusive(self):
+        """gate_E13: a row at edge_m == BUFFER_M FAILs; BUFFER_M + 1e-6 passes
+        (CR-0017 F1). The context is a stub; D is monkeypatched."""
+        from unittest import mock
+        b = float(CFG["constants"]["BUFFER_M"])
+        D = self._square((0, 0, 10000, 10000))
+        rows = self._edge_rows(b)
+
+        class Ctx:
+            def __init__(self, N, C):
+                self.C, self.root, self.cfg = {"BUFFER_M": CFG["constants"]["BUFFER_M"]}, BASE, CFG
+                self._N, self._C = N, C
+
+            def pooled(self, kind, missing):
+                return self._N.assign(_R="VT")
+
+            def try_csv(self, rel, missing):
+                return self._C
+
+            def xy(self, df):
+                return df["x_5070"].to_numpy(dtype=float), df["y_5070"].to_numpy(dtype=float)
+
+        at, above = rows.iloc[[0]].reset_index(drop=True), rows.iloc[[1]].reset_index(drop=True)
+        with mock.patch.object(A, "acquisition_domain", return_value=D):
+            problems, missing = A.gate_E13(Ctx(at, above))
+            self.assertEqual(missing, [])
+            self.assertEqual(len(problems), 1, problems)
+            self.assertTrue(problems[0].startswith("N (pooled): 1 rows within"), problems)
+            problems, missing = A.gate_E13(Ctx(above, at))
+            self.assertEqual(len(problems), 1, problems)
+            self.assertTrue(problems[0].startswith("C: 1 rows within"), problems)
+            self.assertEqual(A.gate_E13(Ctx(above, above)), ([], []))
 
     def test_long_segments_are_exact(self):
         """A 10 km side has only two vertices; the nearest point is mid-segment."""

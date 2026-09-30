@@ -120,10 +120,15 @@ def composition_table(name, codes):
 @torch.no_grad()
 def score_points(model, ds, device, nlcd_idx=None, batch_size=256,
                  workers=4):
-    """Per-POINT mean sigmoid over the 4 stored rotations. nlcd_idx set
-    -> that categorical channel is replaced by nodata (ablation):
-    padding for every model, plus a cleared validity channel for
-    missing_mask models - "nlcd unknown", not "nlcd = a real 0"."""
+    """Per-POINT probability over the 4 stored rotations and their
+    mirrors: LOGITS averaged over the eight views, then one sigmoid -
+    the same D4 score model_handler.evaluate reports as the TTA metrics
+    and predict.py deploys (BUG-0084; ARCHITECTURE.md "exactly one
+    inference-side scorer"). A mean of per-view sigmoids is not a
+    monotone function of it. nlcd_idx set -> that categorical channel is
+    replaced by nodata (ablation): padding for every model, plus a
+    cleared validity channel for missing_mask models - "nlcd unknown",
+    not "nlcd = a real 0"."""
     loader = DataLoader(ds, batch_size=batch_size, num_workers=workers)
     outs = []
     for cat_x, cont_x, _y, _w in loader:
@@ -132,10 +137,12 @@ def score_points(model, ds, device, nlcd_idx=None, batch_size=256,
         if nlcd_idx is not None:
             cat_x = cat_x.clone()
             cat_x[:, nlcd_idx] = MISSING_CODE
-        outs.append(torch.sigmoid(
-            model.logits(cat_x, cont_x).float()).squeeze(1).cpu())
-    s = torch.cat(outs).numpy()
-    return s.reshape(-1, 4).mean(axis=1)
+        lg = model.logits(cat_x, cont_x).float()
+        lg = 0.5 * (lg + model.logits(cat_x.flip(-1),
+                                      cont_x.flip(-1)).float())
+        outs.append(lg.squeeze(1).cpu())
+    lg = torch.cat(outs).numpy().reshape(-1, 4).mean(axis=1)
+    return 1.0 / (1.0 + np.exp(-lg))
 
 
 def main():

@@ -794,8 +794,14 @@ class GrouseModelHandler:
                              if p.requires_grad]
         if train_labels is not None:
             from dataset import StratifiedBatchSampler
-            sampler = StratifiedBatchSampler(train_labels, batch_size,
-                                             pos_frac=batch_pos_frac)
+            # BUG-0092: seed the sampler from the run seed (train.py's
+            # torch.manual_seed(args.seed [+ member index])) instead of
+            # the constructor's fixed 0, so batch composition and order
+            # follow --seed and differ per ensemble member. --seed 0 (the
+            # default) reproduces the previous order exactly.
+            sampler = StratifiedBatchSampler(
+                train_labels, batch_size, pos_frac=batch_pos_frac,
+                seed=int(torch.initial_seed() % (2 ** 32)))
             train_loader = DataLoader(train_ds, batch_sampler=sampler,
                                       num_workers=workers, pin_memory=pin,
                                       persistent_workers=keep,

@@ -573,10 +573,14 @@ def pairs_to_cells(pairs, ref):
 
 
 def pair_rows(scorer, cells):
-    """Per cell: every input at the centre (real units), road_dist in
-    metres, missing inputs, and the fp32 calibrated probability."""
+    """Per cell: every input at the centre in real units (the stored
+    encoding undone after the FEATURE_SPEC scale: road_dist/tsd/tpa_live
+    through their log decoders, balive/qmd/carbon_dwn through
+    treemap_decode - BUG-0087), road_dist also as road_dist_m, missing
+    inputs, and the fp32 calibrated probability."""
     from grouse_data import MISSING_CODE
-    from models import FEATURE_SPEC, road_dist_decode
+    from models import (FEATURE_SPEC, TREEMAP_FIXED, road_dist_decode,
+                        tsd_decode, tpa_live_decode, treemap_decode)
     from pyproj import Transformer
     ref = scorer.ref
     inv = Transformer.from_crs(ref.crs, "EPSG:4326", always_xy=True)
@@ -594,13 +598,26 @@ def pair_rows(scorer, cells):
             if rec[f] == MISSING_CODE:
                 missing.append(f)
         for j, f in enumerate(scorer.cont_f):
-            v = float(cont[j, HALF, HALF]) * FEATURE_SPEC[f].get("scale", 1.0)
+            stored = (float(cont[j, HALF, HALF])
+                      * FEATURE_SPEC[f].get("scale", 1.0))
+            if not np.isfinite(stored):
+                v = stored
+            elif f == "road_dist":
+                v = float(road_dist_decode(stored))
+            elif f == "tsd":
+                v = float(tsd_decode(stored))
+            elif f == "tpa_live":
+                v = float(tpa_live_decode(stored))
+            elif f in TREEMAP_FIXED:
+                v = float(treemap_decode(f, stored))
+            else:
+                v = stored
             rec[f] = v
             if not np.isfinite(v):
                 missing.append(f)
-        rd = rec.get("road_dist", float("nan"))
-        rec["road_dist_m"] = (float(road_dist_decode(rd)) if np.isfinite(rd)
-                              else float("nan"))
+        # Same value as rec["road_dist"] (now metres); kept as its own
+        # column because the OBS rows and the frozen baseline read it.
+        rec["road_dist_m"] = float(rec.get("road_dist", float("nan")))
         rec["missing_at_centre"] = ",".join(missing)
         rec["prob"] = float(probs[i])
         rows.append(rec)

@@ -246,10 +246,24 @@ def discover_vintages(src_dir, regions):
     for v in TREEMAP_YEARS:
         missing = [(region, a) for region in regions for a in SOURCE_ATTRS
                   if find_source(src_dir, v, a, region) is None]
-        if missing:
-            print(f"   [warn] TreeMap {v}: missing {missing} - "
-                  f"skipping this vintage entirely.")
+        if missing and len(missing) == len(regions) * len(SOURCE_ATTRS):
+            # No source for any region or attribute: the vintage was
+            # never downloaded (e.g. 2023, absent from the Earth Engine
+            # catalog - download_treemap.py). A designed, whole-vintage
+            # absence; say so and go on.
+            print(f"   [note] TreeMap {v}: no source for any region/"
+                  f"attribute under {src_dir} - not downloaded, skipping.")
             continue
+        if missing:
+            # BUG-0091 (PA-0038): a PARTIAL vintage (present for some
+            # region/attribute, missing or invalid for others) used to be
+            # skipped for every region with a warning and exit 0, so every
+            # year was silently written from another vintage. Refuse.
+            raise SystemExit(
+                f"TreeMap {v} is incomplete under {src_dir}: missing or "
+                f"invalid source for {missing}. Re-run download_treemap.py "
+                f"--vintages {v} for those, or remove the vintage's other "
+                f"files to skip it deliberately.")
         ok.append(v)
     if not ok:
         raise SystemExit(

@@ -1,0 +1,46 @@
+BUG-0078 evidence: LANDFIRE EVT attribute table EVT_PHYS values vs analyze_grouse.EVT_PHYS_NONVEG_PREFIXES
+Recorded 2026-09-30 (static review session; landfire.gov blocked by the egress proxy, so the
+tables were taken from public GitHub copies of LANDFIRE's published CSVs and cross-checked by md5).
+
+Sources (identical content across copies):
+  LF 2023 (LF 2.4.0, "240"):
+    https://raw.githubusercontent.com/LANDFIRE-TNC/r_demos/main/inputs/LF23_EVT_240.csv
+    md5 2a0956dbb49a7ad6a46f486961729b7f (same in conservation-data-lab/lta_exploration and
+    rswaty/cougar_creek_fire copies)
+  LF 2022 (LF 2.3.0, "230"):
+    https://raw.githubusercontent.com/rswaty/northwoods/main/inputs/LF22_EVT_230.csv
+    (byte-identical to the LF 2023 table)
+  LF 2024:
+    https://raw.githubusercontent.com/rswaty/apps_demo/main/inputs/LF2024_EVT.csv
+    md5 5b3ccd22200d96c663919064eaf67672
+  (published by LANDFIRE as landfire.gov/sites/default/files/CSV/LF2023/LF23_EVT_240.csv etc.)
+
+Check run (python3 csv module; regex = "|".join(EVT_PHYS_NONVEG_PREFIXES), re.I, as
+analyze_grouse.is_evt_phys_nonveg applies it):
+
+LF22_EVT_230.csv 1069 rows; Agricultural: 47 | Agriculture: None | Barren: None
+   PHYS values: ['Agricultural', 'Conifer', 'Conifer-Hardwood', 'Developed', 'Developed-High Intensity',
+   'Developed-Low Intensity', 'Developed-Medium Intensity', 'Developed-Open Space', 'Developed-Roads',
+   'Exotic Herbaceous', 'Exotic Tree-Shrub', 'Grassland', 'Hardwood', 'NA', 'Open Water',
+   'Quarries-Strip Mines-Gravel Pits-Well and Wind Pads', 'Riparian', 'Shrubland', 'Snow-Ice',
+   'Sparsely Vegetated']
+   sample Agricultural EVTs: [('7754', 'Agriculture-Pasture and Hay'),
+   ('7755', 'Agriculture-Cultivated Crops and Irrigated Ag'), ('7834', 'Tropical Pacific Orchard')]
+   PHYS values matched by the repo's regex: ['Developed', 'Developed-High Intensity',
+   'Developed-Low Intensity', 'Developed-Medium Intensity', 'Developed-Open Space', 'Developed-Roads',
+   'Open Water', 'Quarries-Strip Mines-Gravel Pits-Well and Wind Pads', 'Snow-Ice']
+LF23_EVT_240.csv: identical to LF22 (same counts, same matched set).
+LF2024_EVT.csv 1069 rows; Agricultural: 47 | Agriculture: None | Barren: None
+   (only difference: the VALUE -9999 row's EVT_PHYS is 'Fill-NoData' instead of 'NA')
+   PHYS values matched by the repo's regex: same nine as above.
+
+Conclusions:
+  1. EVT_PHYS spells the class "Agricultural" (47 EVT codes). The prefix "Agriculture" in
+     analyze_grouse.py:127 never matches it (the strings diverge at the 11th character).
+     "Agriculture" does occur in the table, but in the EVT_LF (lifeform) and EVT_NAME columns,
+     which the filter does not read.
+  2. "Barren" is not an EVT_PHYS value in LF2022/2023/2024; the barren class is
+     "Quarries-Strip Mines-Gravel Pits-Well and Wind Pads" (EVT_LF Barren), already matched
+     by the "Quarries" prefix. The "Barren" prefix is dead, not wrong.
+  3. "Snow"/"Ice" match "Snow-Ice"; "Developed" matches all six Developed classes;
+     "Open Water" matches. No false positives among the 19 real classes.

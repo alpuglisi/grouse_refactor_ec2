@@ -1,0 +1,17 @@
+ME {"reference": {"stride": 22, "centres": 420537, "in_state_centres": 210341, "subset_centres": 169417, "share": 0.7759374797098284}, "bound": 0.0179454797098284, "separates": {"todays_sampler": true, "unassigned_excluded": true, "unassigned_train": true, "md5_fraction_018": false}}
+   ME todays_sampler: min 0.0813 vs fair p99 0.0179
+   ME unassigned_excluded: min 0.7759 vs fair p99 0.0179
+   ME unassigned_train: min 0.1069 vs fair p99 0.0179
+   ME md5_fraction_018: min 0.0053 vs fair p99 0.0179
+NH {"reference": {"stride": 11, "centres": 471000, "in_state_centres": 222236, "subset_centres": 180210, "share": 0.7536651684146274}, "bound": 0.01526586504633489, "separates": {"todays_sampler": true, "unassigned_excluded": true, "unassigned_train": true, "md5_fraction_018": false}}
+   NH todays_sampler: min 0.1301 vs fair p99 0.0153
+   NH unassigned_excluded: min 0.7537 vs fair p99 0.0153
+   NH unassigned_train: min 0.1075 vs fair p99 0.0153
+   NH md5_fraction_018: min 0.0059 vs fair p99 0.0153
+VT {"reference": {"stride": 11, "centres": 434403, "in_state_centres": 228665, "subset_centres": 182671, "share": 0.6760514805305714}, "bound": 0.015358519469428617, "separates": {"todays_sampler": true, "unassigned_excluded": true, "unassigned_train": true, "md5_fraction_018": false}}
+   VT todays_sampler: min 0.0705 vs fair p99 0.0154
+   VT unassigned_excluded: min 0.6761 vs fair p99 0.0154
+   VT unassigned_train: min 0.0907 vs fair p99 0.0154
+   VT md5_fraction_018: min 0.0003 vs fair p99 0.0154
+separates (all regions): {'todays_sampler': True, 'unassigned_excluded': True, 'unassigned_train': True, 'md5_fraction_018': False}
+wrote /home/ec2-user/grouse2/.claude/worktrees/agent-a74570e35615ea5e3/docs/quality/cr0015_v3_calibration.json

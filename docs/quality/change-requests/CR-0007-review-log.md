@@ -523,3 +523,158 @@ and the reason this table exists.
 
 **Author sign-off:** withheld.
 
+
+## v8 dispositions (author, 2026-09-30)
+
+v8 is the three-way split the user decided on 2026-09-30:
+- **CR-0007 v8**: membership and constants.
+- **CR-0012**: the global split and the pooled draw.
+- **CR-0013**: the acceptance gates, as a committed script.
+
+This table dispositions **every row marked NOT DISPOSITIONED above**, plus
+three rows marked "never dispositioned" or "not recorded" (B1-11, B1-14,
+D1-14) and five coordinator-raised items. The original rows are unchanged.
+
+Terms used in the table:
+- **Resolved**: the fix is in the operative text at the place named.
+- **N/A**: the text or mechanism the concern refers to no longer exists
+  in any of the three CRs.
+- **Tracked**: a tracker item exists in
+  `docs/quality/CR-0007-0008-OPEN-ISSUES.md`.
+
+Cross-CR tables with the same content: `CR-0012-review-log.md` and
+`CR-0013-review-log.md`.
+
+| row | sev | disposition |
+|---|---|---|
+| B1-7 | LOW | Resolved — CR-0012 §3 names the owners: `prepare_training_data.py` owns the grid and the val draw; `generate_negatives.py` only reads it. §2 pool step 10: the positive-free val share is global (0.197 today under the hash spec). |
+| B1-9 | LOW | Resolved — CR-0007 §1: `in_state` uses `verify_partition`'s polygons, predicate and `to_crs`. |
+| B1-11 | positive | Recorded — CR-0012 §4 removes the template; §7 guards `legacy/gen_negs.py`. |
+| B1-14 | unrated | N/A — assertion (d) no longer exists. |
+| D1-14 | unrated | Resolved — CR-0013 R1/R3/R4 (exact replayed sets) and E9 (counts); a matched shrink of both classes fails. |
+| F2-C5 | MAJOR | Resolved — CR-0012 §1 adds `VAL_FRACTION` and `SPLIT_SEED`; §3 removes the flags; CR-0013 E11. |
+| F2-C8 | MAJOR | Resolved — CR-0007 deliverable 7 files PA-0020 from the one committed draft text, citing BUG-0034 as its live instance; the inert example is removed. Support at receptive-field scale: CR-0013 O5 and O9 (OBS; CR-0013 design rule 2). |
+| F2-C10 | MAJOR | Resolved — CR-0012 §3 (`--regions` dry run on both scripts) and §2 Writes. |
+| F2-C12 | LOW | Resolved — CR-0007 §2 "Known limit" (coastal water is removed by the extraction `dropna`); relabelling covered at C7-6. |
+| F2-C13 | LOW | Resolved — CR-0012 §2 fixes the kept-set semantics, and CR-0013 R1/R3 check it; the implementation, and so its cost, is free. |
+| F2-C15 | LOW | Resolved — CR-0012 Out of scope: `scripts_backup/` uses pre-reorganisation paths (e.g. `landfire_data/`, `scripts_backup/check_raster.py:70`). |
+| F2-C16 | LOW | Resolved — CR-0007 §2 "Provenance of `state`": both classes carry GBIF `stateProvince`; the polygon check is the evidence for both. |
+| F2-S | unrated | Resolved or N/A: <br>• S1 BUG-0029 path: CR-0007 deliverable 7. <br>• S2 `clip_to_region` before/after: CR-0007 §2. <br>• S3, S4, S8: accepted earlier. <br>• S5 undefined terms: each CR defines its record sets. <br>• S6 PA-0019: Tracked. <br>• S7 PA-0020 text: CR-0007 deliverable 7. <br>• S9 I2 readings: now exact E5. <br>• S10 absent content: v8 has no forward references. |
+| F2-N | unrated | Resolved — v8 carries only re-verified numbers: <br>• 35,678; `:238-317`; `:143`. <br>• The 30–79 m window is N/A (flags removed; R1 exact). <br>• `:302` is not cited. <br>• 0.190 is replaced by 0.197 under the hash spec. <br>• "~65 %" is dropped. <br>• The NH box share is not needed: 0 NH sightings lie outside the NH box (verified), and candidates are handled by the window drop. |
+| F3-D5 | MAJOR | Resolved — clean rewrite (§1.1 A4). `TIGER_YEAR` is in CR-0007 §1 and deliverable 3; there is no appendix; GATE/OBS are explicit in CR-0013. |
+| F3-D6 | MAJOR | Resolved — CR-0007 deliverable 7 (no `coord_uncertainty_m` example). |
+| F3-D8 | LOW | Resolved — CR-0013 deliverable 0: PA-0021's Swept? cell names the sweep scope. |
+| E-1 | BLOCKING (programme) | Resolved — the CRs have been tracked in git since `1445ccd`, and version headers are correct in v8. The BUG-0033 §2.4 statement goes into its filing (CR-0013 deliverable 0). |
+| E-3 | BLOCKING | Resolved — CR-0013 deliverable 0 files the calibration-from-extrema cause as its own BUG. |
+| E-4 | BLOCKING | Resolved — PA-0021 extends PA-0016 (CR-0013 deliverable 0). |
+| E-9 | BLOCKING | Resolved — CR-0012 deliverable 8 files BUG-0032. |
+| E-11 | MAJOR | Resolved — same as F3-D6. |
+| E-12 | MAJOR | Resolved: <br>• "Before" is measured by running `check_partition.py` or `acceptance_split.py` on the backed-up pre-CR files (CR-0007 test plan; CR-0013 deliverable 5). <br>• `analyze_grouse.py` runs once (CR-0007 deliverable 6). <br>• CR-0009's baselines come before CR-0012 (CR-0012 deliverable 0). |
+| E-13 | MAJOR | Resolved — review is not a deliverable in v8; deliverables begin after approval. CR-0013's pre-approval item is labelled as such. |
+| E-16 | MAJOR | N/A — escape mode deleted (user decision); CR-0013 design rule 3. |
+| E-17 | MAJOR | Tracked (Shared: "Land bookkeeping batch; name an owner"). Each v8 CR names what it files: <br>• CR-0007 deliverable 7; <br>• CR-0012 deliverable 8; <br>• CR-0013 deliverable 0. <br>A single writer and the BUG_LOG ordering are for the user to decide. |
+| E-18 | MAJOR | Resolved — CR-0013 deliverable 0 bounds PA-0021's sweep scope. |
+| E-PAa | unrated | Accepted into the PA-0021 filing (CR-0013 deliverable 0): attacks are recorded so they can be re-run. Most CR-0013 attacks were built by reviewers (§ Attacks). |
+| E-19 | LOW | Tracked — BUG-0028/PA-0019 promotion (bookkeeping batch). |
+| E-20 | LOW | Resolved — CR-0007 deliverable 7 and CR-0012 deliverable 8: fixed when CR-0012 lands, closed after CR-0009. |
+| E-21 | LOW | Resolved — the backup is CR-0007 deliverable 1; CR-0012 deliverable 1 verifies it. |
+| E-22 | LOW | Resolved — no struck or pre-ticked items. |
+| E-R1 | ruling | N/A — moot. The user deleted escape mode (2026-09-30), so no escaped run exists to refuse writes. |
+| C7-2 | BLOCKING | N/A — I14b is not a gate. CR-0013 R2 requires the val-block set to equal the replay at the pinned seed; the Jaccard-0.992 draw fails it. |
+| C7-5 | MAJOR | Resolved — CR-0013 E3. |
+| C7-6 | MAJOR | Escape part: N/A (deleted). Known exceptions: **F's ruling adopted — drop all 6**; H's "drop 5, relabel 1" is not adopted (CR-0012 §2 pool step 4). `state` is the acquisition query key. Relabelling the NH-filed record would make a record fetched by an NH query an ME member, and an audited list grows silently. Cost: 6 of 35,678. |
+| C7-8 | LOW | Resolved — CR-0012 §2 positives step 3; CR-0013 E8 covers positives. |
+| C7-9 | LOW | Resolved — CR-0012 manifest sha256 values; CR-0013 E11. |
+| C7-11 | LOW | Resolved — CR-0012 §3 removes the flags. |
+| C7-12 | LOW | Tracked — PA-0019 with BUG-0028 (bookkeeping batch). |
+| H-X7 | unrated | Tracked (new item). `INVESTIGATION_REPORT_errol_map.md` is in git and needs no backup. `old_road_dist/` and `new_road_dist/` belong with CR-0014/CR-0009, not CR-0007. |
+| H-Q | unrated | Tracked — same as E-19. |
+| H-I14a | unrated | N/A — parameters are checked exactly by E11 against the config and by the R1–R4 replay. |
+| F4-Q3 | BLOCKING | N/A — clean rewrite; none of the nine contradicted passages exists in v8, CR-0012 or CR-0013. |
+| FA-C4 | BLOCKING | N/A — (d) no longer exists. |
+| FA-C6 | MAJOR | Resolved — CR-0012 claims no "no effect"; pooled thinning changes the kept set (manifest counts). |
+| FA-C7 | MAJOR | Resolved — window counts are recorded at the stage they occur (CR-0012 §2); no raw-stage figure is quoted. |
+| FA-C8 | MAJOR | Resolved — there are no extremum thresholds. I18 and I19 are OBS O1 and O5, with defined nulls (CR-0013). |
+| FA-C9 | MAJOR | Resolved — stratification not adopted (CR-0012 Out of scope). |
+| FA-C11 | LOW | N/A — the BUG-0034 and load/construct text is gone. |
+| FA-Q1 | unrated | Resolved — rounds table above plus this table. |
+| FA-Q3 | unrated | Resolved — each record has a named filer: <br>• PA-0020: CR-0007 deliverable 7. <br>• PA-0021/BUG-0033: CR-0013 deliverable 0, before CR-0013's approval. <br>• BUG-0031: CR-0007. <br>• BUG-0032: CR-0012. <br>PA-0019 is Tracked. |
+| FA-Q4 | unrated | Tracked — the BUG-0034 per-class drop-rate assert belongs to BUG-0034's fix CR (new item); CR-0013 O9 reports per-class year support until then. |
+| FA-Q5 | unrated | Tracked — BUG-0034 sweep, same item. |
+| FA-Q6 | unrated | Resolved — all deliverables pending. |
+| FC-C4 | BLOCKING | Resolved — CR-0013 call-site matrix, with one implementation. |
+| FC-C5 | BLOCKING | Resolved — no BUG-0034 residue in any CR. The `DRAFT_BUG-0034` status fix is CR-0007 deliverable 7 plus a tracker item. |
+| FC-C6 | BLOCKING | Resolved — this log. |
+| FC-C7 | BLOCKING | Resolved — same as FA-Q3. |
+| FC-C9 | BLOCKING | N/A — (d) no longer exists. |
+| FC-C10 | BLOCKING | Resolved: <br>• `:444` is cited in CR-0007 §2. <br>• `build_datasets` is **`train.py:238-317`** (def `:238`, `return` `:316-317`, verified 2026-09-30); `:238-336` does not match the file. |
+| FC-C11 | MAJOR | Resolved — same as FA-C8. |
+| FC-C12 | MAJOR | Resolved — CR-0012 §2 pool step 4 states the rule; no contradicting text remains. |
+| FC-C14 | LOW | Resolved — same as FA-Q6. |
+| FC-C15 | LOW | Resolved — BUG-0029 is promoted by CR-0007 deliverable 7; BUG-0027 is marked fixed by CR-0012 deliverable 8 and closed after CR-0009. |
+| A-1 | BLOCKING | Resolved (CR-0013): <br>• There is no per-region I18 gate. <br>• O1 is pooled and OBS, with its null measured post-CR. <br>• BUG-0027's leak is gated exactly by E4/E5 (pre-CR: 522 keys, 882 blocks). |
+| A-2 | BLOCKING | Resolved: <br>• `BUFFER_M` is centralised (CR-0007 §1). <br>• The removed count is in the manifest (CR-0012 §2 step 6). <br>• E7 is an exact minimum-distance check and R3 replays the buffer (CR-0013). <br>• O5 is two-sided; the attack is in the suite. |
+| A-3 | BLOCKING | Resolved — this log. |
+| A-4 | MAJOR | Resolved — CR-0013 O5 N-draw is conditioned on the realised split and pool; the attack fails R3, so stated limit 3 no longer applies. |
+| A-5 | MAJOR | Resolved — CR-0013 E3. |
+| A-6 | MAJOR | Resolved — CR-0013 O6–O8 are calibrated on the rebuilt footing (deliverable 6) and bound to its digest. |
+| A-7 | MAJOR | Resolved — CR-0012 §2 step 11 persists the columns; everything is computed in `acceptance_split.py`. |
+| A-8 | MAJOR | Resolved — no escape; CR-0012 deliverable 0; CR-0009 v4 already updated (tracker). |
+| A-9 | MEDIUM | N/A — clean rewrite. |
+| A-10 | MEDIUM | Resolved — CR-0013 O4. |
+| A-11 | MEDIUM | Accepted; the claim is withdrawn. Verified: VT val has 452 selected, of which 136 NonVeg = round(452 × 0.3), with no top-up. It is not used anywhere. |
+| A-12 | MEDIUM | Resolved — CR-0013 O7 (OBS; compared with the previous run). |
+| A-13 | MEDIUM | Resolved — same as FC-C12. |
+| A-14 | LOW | Resolved — v8 citations re-verified. <br>• Provenance: `get_negatives.py:268`, `sightings.py:132`. <br>• `:143`, `:444`. <br>• R5's `:443-444` is not needed: standing checks read the CSVs directly. <br>• "723" is not carried. <br>• The year rule is stated as either/or (CR-0013 E8). <br>• "NH 721" / "3 of 5,220" are not quoted. |
+| A-15 | LOW | Resolved — `REGIONS` constant (CR-0007 §1) and config (CR-0013 E1/E11); guard in CR-0012 §3. |
+| A-16 | LOW | Resolved — deliverables are numbered in execution order in all three CRs. |
+| B-1 | BLOCKING | Resolved — reconstruction (above) plus this table. Quorum: see below. |
+| B-2 | BLOCKING | Resolved — the user chose option (i): baselines first, no escape. |
+| B-3 | MAJOR | Resolved — CR-0013 matrix. |
+| B-4 | MAJOR | Resolved — same as A-10. |
+| B-5 | MAJOR | Resolved — no GATE has a null; OBS nulls come from CR-0013's own replay, after the gates pass. |
+| B-6 | MAJOR | Resolved — CR-0013 § Attacks, deliverables 1 and 4; CR-0012 §7 pins the evidence scripts to `ec1470a`. |
+| B-7 | MAJOR | Resolved, item by item: <br>• `TIGER_YEAR`: CR-0007 §1, deliverable 3. <br>• `ignore_index`: CR-0012 §2 Draw. <br>• negative `verify_partition`: CR-0012 §2 step 4, CR-0013 E12. <br>• windowless drop: CR-0012 §2 steps 3 and 8. <br>• PA-0020: CR-0007 deliverable 7. <br>• "none": see FA-C6. <br>• Known exceptions: see FC-C12. <br>• §6 (d), the test plan and "Not optional detail": the text is gone. |
+| B-8 | MAJOR | Resolved per CR (FA-Q3); a batch-wide owner is Tracked (Shared). |
+| B-9 | MEDIUM | Resolved — user decision: CR-0014 sets 2023 with its own regeneration and gates; CR-0007 only centralises (§1 reconciliation rule). |
+| B-10 | MEDIUM | Resolved — same as F2-C10. |
+| B-11 | MEDIUM | Resolved (CR-0012; see CR-0012-review-log): <br>• hash ordering adopted; <br>• flags removed; <br>• stratification not adopted; <br>• `draw_val_blocks` not adopted (R2 makes it redundant). |
+| B-12 | MEDIUM | Resolved — CR-0012 §1 `WINDOW_PX`, §2 year rule, §5 refusal; CR-0013 E8. |
+| B-13 | MEDIUM | Resolved — CR-0012 §4. |
+| B-14 | MEDIUM | Resolved — CR-0007 §2: the KDE source stays box-clipped (it includes neighbouring-state records) and its output is partitioned. Recorded in PA-0018's Swept? cell (CR-0007 deliverable 7). |
+| B-15 | MEDIUM | Resolved — same as A-11. |
+| B-16 | MEDIUM | Resolved: <br>• Every GATE is exact on deterministic data, so the family-wise false-fail rate in the pinned environment is 0. <br>• No multiple-of-max rule remains. <br>• C11, I15 and I18 are OBS with all fields named (CR-0013). |
+| B-17 | MEDIUM | Resolved — CR-0013 R1 (the target is the replayed set); 6,232 is only an expectation (CR-0012 Impact). |
+| B-18 | MEDIUM | Resolved — CR-0007 deliverable 7 (new BUG: constants and `TIGER_YEAR` drift, PA-0001 recurrence); CR-0012 deliverable 8 (new BUG: `:153`). |
+| B-19 | LOW | Resolved: <br>• citations re-verified; <br>• consumers listed per CR (including `tune_bins.py:213`); <br>• 5 guards (CR-0007: 1, CR-0012: 4); <br>• backup of 2 directories; <br>• the standing checks precede the loop. |
+| B-20 | LOW | Resolved — same as A-16. |
+| B-21 | LOW | Resolved — CR-0012 §6. |
+| B-R | unrated | Resolved — the four risks are in: <br>• CR-0013 Risk (replay false-fail, float/PROJ); <br>• CR-0012 Risk (partial writes, shared misreading); <br>• CR-0007 Risk (`TIGER_YEAR`). <br>"Cannot validate" additions: CR-0013 stated limit 2; non-default jitter is refused (CR-0012 §5). |
+
+**Coordinator-raised items:**
+1. **E and H's escape ruling** (all four assertions, provided the escaped
+   run refuses to write): moot. The user deleted escape mode on
+   2026-09-30. Recorded at E-R1 and C7-6.
+2. **Known exceptions, H vs F:** F's "drop all 6" is adopted. Reason at
+   C7-6.
+3. **Rounds 1–2 row "`TIGER_YEAR` owned by no CR"** (traced to the CR-0006
+   reviews): resolved. CR-0014 owns the value (2023); CR-0007 v8 §1
+   centralises it, and whichever lands second reconciles.
+4. **`build_datasets` range:** `train.py:238-317`, verified. See FC-C10.
+5. **`DRAFT_BUG-0034` still says "fixed in CR-0007"**: tracker item added.
+   CR-0007 deliverable 7 corrects it on promotion.
+
+**Quorum for v8 (open, needs a user decision).** §1.4 counts every
+reviewer who commented: B, D, E, F, H, Formal A, Formal C, and round-7 A
+and B. Those agents cannot be resumed. The author proposes the following,
+which the user must confirm:
+- CR-0007 v8, CR-0012 and CR-0013 each get a first, unrestricted review
+  (§1.2), because each is a new document after the split.
+- This table serves as the record that no prior concern was dropped.
+
+**Author sign-off on v8:** pending review.
+
+## Versions
+| version | date | change |
+|---|---|---|
+| v8 | 2026-09-30 | Split three ways. CR-0007 keeps membership and constants, with exact checks P1–P7 only. The split and draw go to CR-0012; the acceptance gates to CR-0013 (exact predicates and replay; statistics as OBS). No escape mode. `TIGER_YEAR` value owned by CR-0014. |

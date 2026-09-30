@@ -8,53 +8,56 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 
 ## Shared / decisions needed
 - [ ] Land bookkeeping batch: PA-0019/0020/0021, BUG-0030/0033/0035; name an owner (0007 B-8, 0008 R7-2)
-- [x] Decide: pre-landing baselines vs `gate_obs_only` — **baselines first, no escape mode** (user, 2026-09-30). CR-0009 still to be updated to match (0007 B-2)
+- [x] Decide: pre-landing baselines vs `gate_obs_only` — **baselines first, no escape mode** (user, 2026-09-30). CR-0009 updated to match in v4 (0007 B-2)
 - [x] Decide: CR-0007 structure — **split into 3** (user, 2026-09-30): CR-0007 partition + constants; CR-0012 global split + pooled draw; CR-0013 acceptance gates as a committed script
 - [x] Decide: `TIGER_YEAR` — **2023** (user, 2026-09-30); set by CR-0014, centralised by CR-0007 (0007 B-9)
 - [x] Decide: TreeMap coverage boundary — NLCD (CR-0010 repair, CR-0008 v9 generator) (0008 R7-1, R7-3)
 - [x] Decide: Canadian-border road distance — **nodata where Canadian land is nearer than the nearest TIGER road** (user, 2026-09-30); CR-0014 (0008 R7-4)
 - [x] Reconcile I17 / G5 hand-off — moved to CR-0010: 0 positive centre values change, so I17 is unaffected; X3 reports window exposure (0008 R7-5, R7-6)
-- [ ] Reconcile PA-0021 clause text: one version, cited consistently (0008 R7-12)
+- [x] **I17 WILL change under CR-0014** (140 ME / 717 VT positives' `road_dist` values): CR-0012/CR-0013 must take I17 after CR-0014 lands, and say so (CR-0014 B6) — CR-0013 O8/E8 taken after CR-0014 or repeated; CR-0012 landing order
+- [ ] Reconcile PA-0021 clause text: one version, cited consistently (0008 R7-12) — CR-0013 deliverable 0 files one text (draft + clause (f))
+- [ ] Decide: quorum for CR-0007 v8 / CR-0012 / CR-0013 — author proposes fresh first reviews of each, with the v8 disposition table as the no-drop record (prior agents cannot be resumed) (CR-0007-review-log § v8)
+- [ ] Decide: CR-0013 replaces v7's statistical gates with exact predicates + independent replay; statistics become OBS. Confirm this direction before review (CR-0013 design rule 2)
 
 ## CR-0007
-- [ ] B-1 Recover rounds 3–6 verdicts from prior-session transcripts; rebuild round table; disposition all concerns; list every reviewer for quorum
-- [ ] B-2 Escape-mode contradiction (`gate_obs_only` undefined; "Deleted: the escape mode")
-- [ ] B-3 Gate call-site matrix (GATE/OBS per script); SUP rows have no call site
-- [ ] B-4 I16b: in-run null vs frozen constants
-- [ ] B-5 I19′ nulls must come from independent harness, pre-registered
-- [ ] B-6 Deliverable: run recorded attacks against implemented gates; port or pin broken `inv_*` scripts
-- [ ] B-7 Fold accepted dispositions into operative text (`TIGER_YEAR`, `ignore_index`, negative `verify_partition`, windowless drop, PA-0020 cite, §6 (d), test plan, "Not optional detail" header); mark superseded v4 sections
-- [ ] B-8 Bookkeeping batch owner (see Shared)
-- [ ] B-9 `TIGER_YEAR` behaviour change (see Shared)
-- [ ] B-10 `generate_negatives.py --regions` write guard; raise before any `to_csv`
-- [ ] B-11 Rule in/out: hash ordering, `draw_val_blocks`, stratification, flag removal
-- [ ] B-12 Pin I5 window (`img_size + 2·jitter`, year rule) in manifest
-- [ ] B-13 `PATH_TEMPLATES` entries for new paths
-- [ ] B-14 KDE clip vs PA-0018
-- [ ] B-15 SUP0 VT/val 0.87 claim appears false
-- [ ] B-16 Family-wise false-fail rate; threshold-rule consistency; C11, I15, I18 gaps
-- [ ] B-17 I6 target definition
-- [ ] B-18 BUG ids for `TIGER_YEAR` drift, `STATE_FIPS`/`MIN_SPACING_M` dupes, `generate_negatives.py:153`
-- [ ] B-19 Citation/count fixes (`:444`, `:143`, `:443-444`, consumers 18 + `tune_bins.py`, 5 guards, backup items, I5 raise point)
-- [ ] B-20 Reorder deliverables (backup first)
-- [ ] B-21 §7 geopandas dependency in `train.py`
-- [ ] Risk table: add 4 missing risks; extend "cannot validate" list
-- [ ] A-1 **BLOCKING** I18 per-region inverted: false-fails ~52 % of correct runs, blind to BUG-0027 leak; revert to pooled or per-region null bands
-- [ ] A-2 **BLOCKING** No gate on 300 m exclusion buffer (removing it: ~2,053 of 6,230 negatives within 300 m of grouse, all gates green); add exact min-distance predicate, centralise `BUFFER_M`, lower bound on I19′
-- [ ] A-3 **BLOCKING** Rounds 3–5 verdicts/dispositions (same as B-1)
-- [ ] A-4 I19′ val cells calibrated on wrong null (6–11σ slack); condition on realised positive split; fix stated limit 3
-- [ ] A-5 Gate duplicate negatives within a split (0 dup 5 dp keys, 0 pairs < `MIN_SPACING_M`)
-- [ ] A-6 Re-derive C5–C17 on rebuilt footing (deliverable)
-- [ ] A-7 Persist `weight`, `weight_basis`, `evt_phys`, `common_name`, `envelope_id`, `year`; compute C rows in `acceptance.py`, not `generate_negatives.py`
-- [ ] A-8 Escape mode (same as B-2)
-- [ ] A-9 §6 contradictions / superseded (d), "Not optional detail" (overlaps B-7)
-- [ ] A-10 I16b (same as B-4)
-- [ ] A-11 VT val NonVeg claim false (same as B-15)
-- [ ] A-12 SUP-R/SUP-O headroom; re-pin after rebuild
-- [ ] A-13 Known-exceptions: ticked in deliverables, open in body
-- [ ] A-14 Citations (`:302`→`CSV_KEEP :89-90`, `:143`, `:160`, `:444`, `:443-444`, "723 blocks", year rule, NH 3 of 5,220)
-- [ ] A-15 `GATE_REGIONS` from artifact under test; `generate_negatives --regions` guard (overlaps B-10)
-- [ ] A-16 Deliverable order (same as B-20)
+- [x] B-1 Recover rounds 3–6 verdicts from prior-session transcripts; rebuild round table; disposition all concerns; list every reviewer for quorum — review log reconstructed; all 100 open rows dispositioned; v8 quorum → Shared (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-2 Escape-mode contradiction (`gate_obs_only` undefined; "Deleted: the escape mode") — no escape mode; CR-0012 deliverable 0 (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-3 Gate call-site matrix (GATE/OBS per script); SUP rows have no call site — CR-0013 call-site matrix (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-4 I16b: in-run null vs frozen constants — CR-0013 O4 (OBS, in-run null, no constants) (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-5 I19′ nulls must come from independent harness, pre-registered — CR-0013: no GATE uses a null; OBS nulls from its own replay (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-6 Deliverable: run recorded attacks against implemented gates; port or pin broken `inv_*` scripts — CR-0013 § Attacks, deliverables 1, 4; CR-0012 §7 pins scripts to `ec1470a` (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-7 Fold accepted dispositions into operative text (`TIGER_YEAR`, `ignore_index`, negative `verify_partition`, windowless drop, PA-0020 cite, §6 (d), test plan, "Not optional detail" header); mark superseded v4 sections — clean rewrite; each item mapped in the log (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-8 Bookkeeping batch owner (see Shared) — per-CR filers named; batch owner still open (Shared) (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-9 `TIGER_YEAR` behaviour change (see Shared) — CR-0014 sets 2023; CR-0007 v8 §1 centralises (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-10 `generate_negatives.py --regions` write guard; raise before any `to_csv` — CR-0012 §3, §2 Writes (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-11 Rule in/out: hash ordering, `draw_val_blocks`, stratification, flag removal — CR-0012: hash order + flag removal in; stratification, `draw_val_blocks` out (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-12 Pin I5 window (`img_size + 2·jitter`, year rule) in manifest — CR-0012 §1 `WINDOW_PX`, §5; CR-0013 E8 (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-13 `PATH_TEMPLATES` entries for new paths — CR-0012 §4 (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-14 KDE clip vs PA-0018 — CR-0007 v8 §2 (KDE source box-clipped, output partitioned) (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-15 SUP0 VT/val 0.87 claim appears false — claim withdrawn (verified false) (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-16 Family-wise false-fail rate; threshold-rule consistency; C11, I15, I18 gaps — CR-0013: exact gates only; OBS rows fully specified (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-17 I6 target definition — CR-0013 R1 (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-18 BUG ids for `TIGER_YEAR` drift, `STATE_FIPS`/`MIN_SPACING_M` dupes, `generate_negatives.py:153` — CR-0007 deliverable 7; CR-0012 deliverable 8 (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-19 Citation/count fixes (`:444`, `:143`, `:443-444`, consumers 18 + `tune_bins.py`, 5 guards, backup items, I5 raise point) — citations re-verified in v8/CR-0012 (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-20 Reorder deliverables (backup first) — all three CRs in execution order (see CR-0007-review-log.md § v8 dispositions)
+- [x] B-21 §7 geopandas dependency in `train.py` — CR-0012 §6 (see CR-0007-review-log.md § v8 dispositions)
+- [x] Risk table: add 4 missing risks; extend "cannot validate" list — CR-0007/0012/0013 Risk tables, CR-0013 stated limit 2 (see CR-0007-review-log.md § v8 dispositions)
+- [x] A-1 **BLOCKING** I18 per-region inverted: false-fails ~52 % of correct runs, blind to BUG-0027 leak; revert to pooled or per-region null bands — CR-0013 O1 pooled OBS; leak gated by E4/E5 (see CR-0007-review-log.md § v8 dispositions)
+- [x] A-2 **BLOCKING** No gate on 300 m exclusion buffer (removing it: ~2,053 of 6,230 negatives within 300 m of grouse, all gates green); add exact min-distance predicate, centralise `BUFFER_M`, lower bound on I19′ — CR-0007 `BUFFER_M`; CR-0012 manifest count; CR-0013 E7, R3, O5 two-sided (see CR-0007-review-log.md § v8 dispositions)
+- [x] A-3 **BLOCKING** Rounds 3–5 verdicts/dispositions (same as B-1) — as B-1 (see CR-0007-review-log.md § v8 dispositions)
+- [x] A-4 I19′ val cells calibrated on wrong null (6–11σ slack); condition on realised positive split; fix stated limit 3 — CR-0013 O5 N-draw conditioned on realised split; attack fails R3 (see CR-0007-review-log.md § v8 dispositions)
+- [x] A-5 Gate duplicate negatives within a split (0 dup 5 dp keys, 0 pairs < `MIN_SPACING_M`) — CR-0013 E3 (see CR-0007-review-log.md § v8 dispositions)
+- [x] A-6 Re-derive C5–C17 on rebuilt footing (deliverable) — CR-0013 `--calibrate` on rebuilt footing (deliverable 6) (see CR-0007-review-log.md § v8 dispositions)
+- [x] A-7 Persist `weight`, `weight_basis`, `evt_phys`, `common_name`, `envelope_id`, `year`; compute C rows in `acceptance.py`, not `generate_negatives.py` — CR-0012 §2 step 11; computed in `acceptance_split.py` (see CR-0007-review-log.md § v8 dispositions)
+- [x] A-8 Escape mode (same as B-2) — as B-2 (see CR-0007-review-log.md § v8 dispositions)
+- [x] A-9 §6 contradictions / superseded (d), "Not optional detail" (overlaps B-7) — clean rewrite (see CR-0007-review-log.md § v8 dispositions)
+- [x] A-10 I16b (same as B-4) — as B-4 (see CR-0007-review-log.md § v8 dispositions)
+- [x] A-11 VT val NonVeg claim false (same as B-15) — as B-15 (see CR-0007-review-log.md § v8 dispositions)
+- [x] A-12 SUP-R/SUP-O headroom; re-pin after rebuild — CR-0013 O7 (OBS) (see CR-0007-review-log.md § v8 dispositions)
+- [x] A-13 Known-exceptions: ticked in deliverables, open in body — CR-0012 §2 pool step 4 (see CR-0007-review-log.md § v8 dispositions)
+- [x] A-14 Citations (`:302`→`CSV_KEEP :89-90`, `:143`, `:160`, `:444`, `:443-444`, "723 blocks", year rule, NH 3 of 5,220) — citations re-verified (see CR-0007-review-log.md § v8 dispositions)
+- [x] A-15 `GATE_REGIONS` from artifact under test; `generate_negatives --regions` guard (overlaps B-10) — CR-0007 `REGIONS`; CR-0013 E1/E11; CR-0012 §3 (see CR-0007-review-log.md § v8 dispositions)
+- [x] A-16 Deliverable order (same as B-20) — as B-20 (see CR-0007-review-log.md § v8 dispositions)
 
 ## CR-0008
 - [x] R7-1 TreeMap generator needs external mask; strengthen G4.2; withdraw "latent defect is closed" — v8 (see CR-0008-review-log.md)
@@ -82,6 +85,20 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 ## New CR to write
 - [x] ~~`road_dist` ME/VT CR~~ — written as **CR-0014** (see its review log for the carried items). Was: `road_dist` ME/VT CR (split from CR-0008): regeneration, `_download` atomicity, densified footprint reprojection, `TIGER_YEAR`, Canadian-border decision (R7-4), G7/RD1–RD5 with truth from all TIGER counties intersecting grid+pad (PA-0018) and excluded-point count gated at 0, all 10 year-copies byte-identical (R7-10), G6 for regenerated files, BUG-0023 §6 retroactive-review ruling for `bf8d31a`
 - [x] ~~After first real `download_tcc_nlcd.py` run: G2 check~~ — replaced by CR-0008 v9 in-code post-download check
-- [ ] CR-0009: "CR-0008 owns the raster backup (9.75 GB)" is wrong — CR-0010 owns it, 9.46 GB (9,458,119,704 B)
+- [x] CR-0009: "CR-0008 owns the raster backup (9.75 GB)" — fixed in CR-0009 v4
 - [ ] PA numbering: PA-0022 was filed while PA-0019–0021 are only drafts (res_qms file). Either file 0019–0021 or record the reservation as a deliberate exception to creation-order numbering (CR-0008 B14)
 - [ ] If CR-0008's post-download `tcc` check (U5) ever refuses a real download, switch it to masking `tcc` by the region NLCD footprint (as CR-0010 does) instead of refusing (CR-0008 A7)
+- [ ] BUG-0037 is reserved for CR-0014 (Canada over-read). The untracked `res_qms_PA-0019-0020-0021-draft-rows.md` proposes BUG-0036/0037 for other defects — renumber them when filed (BUG-0036 is the encoder bug) (CR-0014 B8)
+- [ ] CR-0007 B-9 (`TIGER_YEAR` value is a behaviour change) moved to CR-0014, which sets 2023 (CR-0014 B6)
+- [ ] CR-0014 residual: Canadian land beyond the grid edge is unseen (NH 6,884 px, VT 1,881 px at the top edges). Closes only with Canadian road data (Statistics Canada NRN) (CR-0014 A4)
+- [ ] CR-0009: remove dependence on CR-0007 escape mode; capture additional baselines before CR-0012 lands — text done in CR-0009 v4 (§ Baselines, deliverable 2); the capture itself is pending and is CR-0012 deliverable 0 (0007 A-8/B-2)
+- [ ] `DRAFT_BUG-0034` says "DECIDED … fixed in CR-0007": correct to "open; fix owned by a future CR" on promotion (CR-0007 v8 deliverable 7) (0007 FC-C5)
+- [ ] BUG-0034 fix CR (not yet written): per-class drop-rate assert at dataset build (BUG-0034 §8) and mechanism-scoped sweep (e.g. `predict.py:164`); re-calibrate CR-0013 OBS references on the new footing (0007 FA-Q4, FA-Q5)
+- [ ] `old_road_dist/`, `new_road_dist/` are untracked and unprotected; decide ownership (CR-0014 or CR-0009) — not CR-0007 (`INVESTIGATION_REPORT_errol_map.md` is in git) (0007 H-X7)
+
+## Decisions on the CR-0007 split (user, 2026-09-30)
+- [x] CR-0013 gates: **exact replay** of a deterministic thin/split/draw; v7 statistics become report-only
+- [x] Quorum for CR-0007 v8 / CR-0012 / CR-0013: **fresh first review** (two reviewers each); the v8 dispositions table in CR-0007-review-log.md is the record that no prior finding was dropped
+- [x] Evidence: **commit only the scripts CR-0013's attack table cites**, under docs/quality/evidence/CR-0007-r7/ where copied; other inv_/res_ files stay untracked
+- [x] Bookkeeping batch (PA-0021, BUG-0033): **filed by CR-0013's author before CR-0013's approval**; new BUGs take the next free id at filing
+- [x] Replay author ≠ CR-0012 implementer: workable (separate agents)

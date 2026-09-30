@@ -1,0 +1,143 @@
+CR-0012 deliverable 6, test plan item 7 re-run after BUG-0056/BUG-0057 fixes
+============================================================================
+date: 2026-09-30
+code: branch worktree-agent-adef8b998228501c0, commit 40dbecf (fixes on top
+      of 6ab66d7). The scripts were run from the worktree
+      (/home/ec2-user/grouse2/.claude/worktrees/agent-adef8b998228501c0).
+cwd:  scratch tree B (/tmp/claude-1000/-home-ec2-user-grouse2/cr0012-d6/B),
+      the same tree test plan item 7 used. Outputs go to B/data/models
+      (smoke_test_model*.pth and their .resume files).
+guard: run through a wrapper that aborts if B, B/data, B/data/models,
+      B/data/pipeline or B/data/negatives is a symlink, or if any symlink
+      exists under models/pipeline/negatives (result: "symlink check OK").
+      B/data/landfire holds per-file symlinks to the real rasters. They are
+      read-only inputs and nothing writes under landfire/.
+real data: `find /home/ec2-user/grouse2/data -newer <marker touched before
+      run 1>` returned 0 entries after both runs and the unit tests. Real
+      data/ was not written.
+GPU shared with a running symptom_check job; run under `nice -n 10`.
+
+RESULT: PASS
+------------
+Run 1: defaults (`python smoke_test_training.py`, fixed script).
+  ALL 7 STAGES PASSED, exit 0. val = 80 samples (10 pos x 4 + 10 neg x 4),
+  so the TTA metrics are computed on every epoch (TTA AUC, tuned acc,
+  strict and hedged all finite).
+Run 2 (BUG-0056 absent-key path, differential): the PRE-FIX
+  smoke_test_training.py (`git show 6ab66d7:smoke_test_training.py`, val =
+  50 samples, 50 % 4 != 0) run against the FIXED model_handler.py
+  (PYTHONPATH=worktree), `--epochs 1`. This is the exact configuration
+  that raised KeyError: 'tuned_tta_accuracy' in item 7. Now: ALL 7 STAGES
+  PASSED, exit 0. The status line prints "TTA AUC: nan | ... | tuned acc:
+  nan% | strict: nan% (hedged nan%)".
+Unit tests: `python -m unittest discover -s tests -t .` in the worktree:
+  Ran 223 tests, OK.
+
+================ Run 1 log (progress bars stripped) ================
+symlink check OK (/tmp/claude-1000/-home-ec2-user-grouse2/cr0012-d6/B); cwd=/tmp/claude-1000/-home-ec2-user-grouse2/cr0012-d6/B; script=/home/ec2-user/grouse2/.claude/worktrees/agent-adef8b998228501c0/smoke_test_training.py; args=
+=== 1/7 Imports (torch, torchvision, the new ml files, grouse_data) ===
+    torch 2.6.0+cu124 | cuda available: True
+=== 2/7 Data discovery for ME ===
+    features: ['evt', 'evh', 'evc', 'sclass', 'fdist', 'ch', 'cc', 'tcc', 'nlcd', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn']
+    categorical: ['evt', 'evh', 'evc', 'sclass', 'fdist', 'nlcd'] | continuous: ['ch', 'cc', 'tcc', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn']
+    on disk: 2,922 train pos, 2,922 train neg, 738 val pos, 738 val neg
+=== 3/7 Patch dataset construction + one sample inspection ===
+   [warn] [ME] evt: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] evh: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] evc: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024, 2025]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] sclass: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] fdist: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024, 2025]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] ch: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024, 2025]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] cc: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024, 2025]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+    train=200 samples, val=80 samples
+    sample shapes: cat_x=(6, 64, 64) (torch.int64), cont_x=(9, 64, 64) (torch.float32), y=1.0, weight=1.00
+    a negative sample: label=0.0, weight=10.00 (envelope-derived if != 1.0)
+=== 4/7 Model construction (dynamic geometry) ===
+GrouseModelHandler: device=cuda, categorical=['evt', 'evh', 'evc', 'sclass', 'fdist', 'nlcd'], continuous=['ch', 'cc', 'tcc', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn'], stem input channels=121 (derived, not hardcoded)
+=== 5/7 Training loop (2 epochs, unweighted - original behavior) ===
+   Init sanity (train-mode forward, 32 spread samples): logit std = 0.0597 - input-dependent. Watch the per-epoch 'logit std' in the status line: it should GROW as training progresses.
+   Differential LR: backbone 3.0e-05 (11,167,104 params) | fresh layers 3.0e-04 (929,161 params)
+   Warmup: alpha-weighted BCE (gamma=0) for the first 3 epoch(s), then FocalLoss(gamma=2.0).
+   Epoch 1/2 | Focal Loss: 0.0996 | Val Accuracy: 50.00% | AUC: 0.5250 | TTA AUC: 0.5300 | AP: 0.5963 | rank: 0.5951 | tuned acc: 50.00% | strict: 0.00% (hedged 100.0%) | train acc: 73.5% | logit std: 0.110 (Saved)
+   Epoch 2/2 | Focal Loss: 0.4141 | Val Accuracy: 50.00% | AUC: 0.6016 | TTA AUC: 0.6200 | AP: 0.6002 | rank: 0.6216 | tuned acc: 55.00% | strict: 50.00% (hedged 10.0%) | train acc: 80.0% | logit std: 0.829
+Training finished. Best Focal Loss: 0.0996 | Best TTA AUC: 0.6200 | Best rank: 0.6216 | Best strict acc: 50.00% (selection metric: loss -> saved checkpoint is epoch 1)
+=== 6/7 Weighted-loss mode (1 epoch) ===
+GrouseModelHandler: device=cuda, categorical=['evt', 'evh', 'evc', 'sclass', 'fdist', 'nlcd'], continuous=['ch', 'cc', 'tcc', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn'], stem input channels=121 (derived, not hardcoded)
+   Init sanity (train-mode forward, 32 spread samples): logit std = 0.0246 - input-dependent. Watch the per-epoch 'logit std' in the status line: it should GROW as training progresses.
+   Differential LR: backbone 3.0e-05 (11,167,104 params) | fresh layers 3.0e-04 (929,161 params)
+   Warmup: alpha-weighted BCE (gamma=0) for the first 3 epoch(s), then FocalLoss(gamma=2.0).
+   Epoch 1/1 | Focal Loss: 0.3546 | Val Accuracy: 50.00% | AUC: 0.4969 | TTA AUC: 0.4500 | AP: 0.5450 | rank: 0.5020 | tuned acc: 50.00% | strict: 0.00% (hedged 100.0%) | train acc: 78.5% | logit std: 0.067 (Saved)
+Training finished. Best Focal Loss: 0.3546 | Best TTA AUC: 0.4500 | Best rank: 0.5020 | Best strict acc: 0.00% (selection metric: loss -> saved checkpoint is epoch 1)
+=== 7/7 Checkpoint round-trip + both prediction paths ===
+GrouseModelHandler: device=cuda, categorical=['evt', 'evh', 'evc', 'sclass', 'fdist', 'nlcd'], continuous=['ch', 'cc', 'tcc', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn'], stem input channels=121 (derived, not hardcoded)
+    predict_proba: 0.532 | predict_map: (1, 1, 8, 8)
+==================================================
+ALL 7 STAGES PASSED - the stack is functional on your data.
+Cleanup: rm smoke_test_model.pth smoke_test_model_weighted.pth
+Full run: python train.py
+==================================================
+real	1m47.896s
+user	1m49.883s
+sys	0m16.547s
+smoke exit 0
+total 378508
+drwxr-xr-x. 2 ec2-user ec2-user       120 2026-09-30 14:05:05.853187587 +0000 .
+drwxr-xr-x. 7 ec2-user ec2-user       140 2026-09-30 13:53:43.167921383 +0000 ..
+-rw-r--r--. 1 ec2-user ec2-user  48474090 2026-09-30 14:24:17.368909956 +0000 smoke_test_model.pth
+-rw-r--r--. 1 ec2-user ec2-user 145317690 2026-09-30 14:24:18.798941866 +0000 smoke_test_model.pth.resume
+-rw-r--r--. 1 ec2-user ec2-user  48475450 2026-09-30 14:24:20.218973551 +0000 smoke_test_model_weighted.pth
+-rw-r--r--. 1 ec2-user ec2-user 145321274 2026-09-30 14:24:20.368976898 +0000 smoke_test_model_weighted.pth.resume
+
+================ Run 2 log (progress bars stripped) ================
+symlink check OK (/tmp/claude-1000/-home-ec2-user-grouse2/cr0012-d6/B); cwd=/tmp/claude-1000/-home-ec2-user-grouse2/cr0012-d6/B; script=/tmp/claude-1000/-home-ec2-user-grouse2/491a150a-d26d-456d-b9b4-036cd4a6478b/scratchpad/smoke_test_training_orig.py; args=--epochs 1
+=== 1/7 Imports (torch, torchvision, the new ml files, grouse_data) ===
+    torch 2.6.0+cu124 | cuda available: True
+=== 2/7 Data discovery for ME ===
+    features: ['evt', 'evh', 'evc', 'sclass', 'fdist', 'ch', 'cc', 'tcc', 'nlcd', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn']
+    categorical: ['evt', 'evh', 'evc', 'sclass', 'fdist', 'nlcd'] | continuous: ['ch', 'cc', 'tcc', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn']
+    on disk: 2,922 train pos, 2,922 train neg, 738 val pos, 738 val neg
+=== 3/7 Patch dataset construction + one sample inspection ===
+   [warn] [ME] evt: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] evh: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] evc: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024, 2025]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] sclass: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] fdist: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024, 2025]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] ch: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024, 2025]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+   [warn] [ME] cc: sighting year 2016 has no raster within +/-2 year(s) (vintages on disk: [2022, 2023, 2024, 2025]) - using nearest (2022, 6y off). Other out-of-tolerance years for this feature resolve the same way; this notice prints once per feature.
+    train=200 samples, val=50 samples
+    sample shapes: cat_x=(6, 64, 64) (torch.int64), cont_x=(9, 64, 64) (torch.float32), y=1.0, weight=1.00
+    a negative sample: label=0.0, weight=10.00 (envelope-derived if != 1.0)
+=== 4/7 Model construction (dynamic geometry) ===
+GrouseModelHandler: device=cuda, categorical=['evt', 'evh', 'evc', 'sclass', 'fdist', 'nlcd'], continuous=['ch', 'cc', 'tcc', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn'], stem input channels=121 (derived, not hardcoded)
+=== 5/7 Training loop (1 epochs, unweighted - original behavior) ===
+   Init sanity (train-mode forward, 32 spread samples): logit std = 0.1268 - input-dependent. Watch the per-epoch 'logit std' in the status line: it should GROW as training progresses.
+   Differential LR: backbone 3.0e-05 (11,167,104 params) | fresh layers 3.0e-04 (929,161 params)
+   Warmup: alpha-weighted BCE (gamma=0) for the first 3 epoch(s), then FocalLoss(gamma=2.0).
+   Epoch 1/1 | Focal Loss: 0.0665 | Val Accuracy: 80.00% | AUC: 0.4913 | TTA AUC: nan | AP: 0.8270 | rank: 0.6591 | tuned acc: nan% | strict: nan% (hedged nan%) | train acc: 79.5% | logit std: 0.193 (Saved)
+Training finished. Best Focal Loss: 0.0665 | Best TTA AUC: -inf | Best rank: 0.6591 | Best strict acc: -inf% (selection metric: loss -> saved checkpoint is epoch 1)
+=== 6/7 Weighted-loss mode (1 epoch) ===
+GrouseModelHandler: device=cuda, categorical=['evt', 'evh', 'evc', 'sclass', 'fdist', 'nlcd'], continuous=['ch', 'cc', 'tcc', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn'], stem input channels=121 (derived, not hardcoded)
+   Init sanity (train-mode forward, 32 spread samples): logit std = 0.1552 - input-dependent. Watch the per-epoch 'logit std' in the status line: it should GROW as training progresses.
+   Differential LR: backbone 3.0e-05 (11,167,104 params) | fresh layers 3.0e-04 (929,161 params)
+   Warmup: alpha-weighted BCE (gamma=0) for the first 3 epoch(s), then FocalLoss(gamma=2.0).
+   Epoch 1/1 | Focal Loss: 0.2176 | Val Accuracy: 80.00% | AUC: 0.5975 | TTA AUC: nan | AP: 0.8384 | rank: 0.7180 | tuned acc: nan% | strict: nan% (hedged nan%) | train acc: 76.0% | logit std: 0.364 (Saved)
+Training finished. Best Focal Loss: 0.2176 | Best TTA AUC: -inf | Best rank: 0.7180 | Best strict acc: -inf% (selection metric: loss -> saved checkpoint is epoch 1)
+=== 7/7 Checkpoint round-trip + both prediction paths ===
+GrouseModelHandler: device=cuda, categorical=['evt', 'evh', 'evc', 'sclass', 'fdist', 'nlcd'], continuous=['ch', 'cc', 'tcc', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn'], stem input channels=121 (derived, not hardcoded)
+    predict_proba: 0.638 | predict_map: (1, 1, 8, 8)
+==================================================
+ALL 7 STAGES PASSED - the stack is functional on your data.
+Cleanup: rm smoke_test_model.pth smoke_test_model_weighted.pth
+Full run: python train.py
+==================================================
+real	1m44.918s
+user	1m42.920s
+sys	0m13.336s
+smoke exit 0
+total 378508
+drwxr-xr-x. 2 ec2-user ec2-user       120 2026-09-30 14:05:05.853187587 +0000 .
+drwxr-xr-x. 7 ec2-user ec2-user       140 2026-09-30 13:53:43.167921383 +0000 ..
+-rw-r--r--. 1 ec2-user ec2-user  48474090 2026-09-30 14:26:23.171726158 +0000 smoke_test_model.pth
+-rw-r--r--. 1 ec2-user ec2-user 145317690 2026-09-30 14:26:23.331729761 +0000 smoke_test_model.pth.resume
+-rw-r--r--. 1 ec2-user ec2-user  48475450 2026-09-30 14:26:24.661759717 +0000 smoke_test_model_weighted.pth
+-rw-r--r--. 1 ec2-user ec2-user 145321274 2026-09-30 14:26:24.801762873 +0000 smoke_test_model_weighted.pth.resume

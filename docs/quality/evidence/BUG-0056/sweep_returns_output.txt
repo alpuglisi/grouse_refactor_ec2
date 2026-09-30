@@ -1,0 +1,2 @@
+model_handler.py:46 _loader_extra: returns dicts with differing keys; optional keys ['prefetch_factor'] at lines [52, 49]
+symptom_check.py:135 value_stats: returns dicts with differing keys; optional keys ['ge05_pct', 'ge08_pct', 'mean', 'median', 'p01', 'p10', 'p90', 'p99'] at lines [140, 138]

@@ -10,7 +10,7 @@ not checked. Do not repeat that.
 
 1. **Get the symptom from the user first.** Ask what is wrong, where
    (lon/lat or a named place), and what they expected there instead.
-   Record the answer word for word in the report (§10). Do not infer the
+   Record the answer word for word in the report (§11). Do not infer the
    defect from the screenshots or from what looks most striking.
 2. **No cause is stated until a check that could have failed it has
    passed.** Until then call it an "untested hypothesis".
@@ -109,7 +109,7 @@ Ask the user:
 4. Whether they changed anything since training (other runs overwriting
    `bce.pth`, `git pull`, new rasters).
 
-Write the answers down (§10). Pick the steps below that bear on the
+Write the answers down (§11). Pick the steps below that bear on the
 symptom, but run steps 1 and 2 regardless; they are cheap.
 
 For this symptom, also ask for matched pairs: one Maine point and one NH
@@ -357,7 +357,93 @@ compute AUC inside the box. A map whose in-box AUC is far below the
 validation AUC (about 0.82) confirms a real local failure, and gives a
 number to measure any fix against.
 
-## 10. Reporting (hand this back to the user)
+## 10. Step 8: cross-region train/val leakage count (BUG-0027)
+
+Independent of the map symptom. Run it regardless, because it decides
+whether any validation number in this project can be trusted. BUG-0027 (on
+branch `claude/quality-policy-bug-review-hiptpa`) found in code that:
+- records are assigned to regions by **overlapping bounding boxes**
+  (most of the NH box lies inside the VT or ME box), so one sighting can
+  be in two regions' datasets;
+- each region makes its **own** block grid and random train/val draw;
+- `train.py` pools all regions without de-duplicating.
+
+So a record can be training data for one region and validation data for
+another. That is **unconfirmed on real data**; this step measures it. Save
+as `inv_leakage.py`.
+
+```python
+import numpy as np, pandas as pd
+from pyproj import Transformer
+from scipy.spatial import cKDTree
+from grouse_data import GrouseData
+
+REGIONS, BLOCK_M, NEAR_M = ["ME", "NH", "VT"], 3000, (30, 300, 3000)
+data = GrouseData()
+rows = []
+for reg in REGIONS:
+    rd = data[reg]
+    for kind, get in (("pos", rd.positives), ("neg", rd.negatives)):
+        for split in ("train", "val"):
+            df = get(split)[["longitude", "latitude"]].copy()
+            df["region"], df["kind"], df["split"] = reg, kind, split
+            rows.append(df)
+allr = pd.concat(rows, ignore_index=True)
+x, y = Transformer.from_crs("EPSG:4326", "EPSG:5070", always_xy=True).transform(
+    allr.longitude.values, allr.latitude.values)
+allr["x"], allr["y"] = x, y
+allr["key"] = allr.longitude.round(5).astype(str) + "," + allr.latitude.round(5).astype(str)
+print(allr.groupby(["region", "kind", "split"]).size().unstack(), "\n")
+
+# 1. The same coordinate in more than one region
+multi = allr.groupby(["kind", "key"]).region.nunique()
+for kind in ("pos", "neg"):
+    m = multi.loc[kind]
+    print(f"{kind}: {int((m > 1).sum()):,} coordinates appear in >1 region "
+          f"({(m > 1).mean():.1%} of {len(m):,} unique)")
+
+# 2. The same coordinate as TRAIN in one region and VAL in another
+for kind in ("pos", "neg"):
+    k = allr[allr.kind == kind]
+    tr = set(k[k.split == "train"].key); va = set(k[k.split == "val"].key)
+    both = tr & va
+    print(f"{kind}: {len(both):,} coordinates are TRAIN and VAL at once "
+          f"({len(both) / max(len(va), 1):.1%} of val coordinates)")
+
+# 3. Pooled proximity: val points with a pooled TRAIN point within d
+#    metres. Compare with the within-region-only rate - the difference is
+#    what cross-region pooling adds.
+for kind in ("pos", "neg"):
+    k = allr[allr.kind == kind]
+    tr, va = k[k.split == "train"], k[k.split == "val"]
+    d_pool, _ = cKDTree(tr[["x", "y"]].values).query(va[["x", "y"]].values, k=1)
+    d_own = np.full(len(va), np.inf)
+    for reg in REGIONS:
+        t, v = tr[tr.region == reg], va.region.values == reg
+        if len(t) and v.any():
+            d_own[v], _ = cKDTree(t[["x", "y"]].values).query(va[v][["x", "y"]].values, k=1)
+    for d in NEAR_M:
+        print(f"{kind}: val with a TRAIN point within {d:>4} m - pooled "
+              f"{(d_pool <= d).mean():6.1%} | same-region only {(d_own <= d).mean():6.1%}")
+```
+
+How to read it:
+- **Sections 1–2 (exact duplicates):** anything above zero in "TRAIN and
+  VAL at once" confirms BUG-0027. Those validation points were trained
+  on directly.
+- **Section 3 (proximity):**
+  - The **same-region-only** rate is what the block holdout was designed
+    to keep low (only points near block edges).
+  - The **pooled** rate is what training actually sees.
+  - A large gap, above all at 30 m and 300 m, is cross-region leakage.
+    The bigger it is, the more the reported validation AUC/AP (about
+    0.82 / 0.79) overstate real performance.
+- **Record every table verbatim in the report.** The BUG-0027 fix changes
+  every split, and these numbers are its "before".
+- **Do not fix anything here.** BUG-0027 needs a change request, per the
+  rules in §0.
+
+## 11. Reporting (hand this back to the user)
 Write `INVESTIGATION_REPORT_errol_map.md` with:
 1. **Symptom:** the user's words, verbatim, and their locations.
 2. **What each step found:** actual numbers and file names; for each step
@@ -365,10 +451,12 @@ Write `INVESTIGATION_REPORT_errol_map.md` with:
    with the reason.
 3. **Conclusion:** the confirmed cause with the check that confirmed it,
    *or* "not identified; stages checked: …".
-4. **Proposed fix:** only for a confirmed cause, with how to verify it
+4. **Leakage count (step 8):** its tables, and whether BUG-0027 is
+   confirmed.
+5. **Proposed fix:** only for a confirmed cause, with how to verify it
    (the step-7 in-box AUC and the step-3 points before and after). Do
    not implement it without the user's go-ahead.
-5. **Quality records:** if a code defect is confirmed, it needs a
+6. **Quality records:** if a code defect is confirmed, it needs a
    BUG-XXXX doc on the `claude/quality-policy-bug-review-hiptpa` branch,
    following that branch's `CLAUDE.md` (a change request for anything
    non-trivial). BUG-0022 there is the record for this investigation.

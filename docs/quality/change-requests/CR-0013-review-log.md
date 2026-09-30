@@ -372,3 +372,100 @@ A-R3-1, A-R3-2, B-R3-1, B-R3-2 and G2 addressed by the replay author
 (a969037d4098fb0c1); 90 tests OK, re-run by the lead. A-R3-1 went beyond
 the requested test pin: `load_config` refuses any `float_rel_tol` other
 than 1e-12. Accepted (stricter, same intent). B-R3-3 stays tracked on CR-0012.
+
+## Close-out: deliverables 0, 1 and 2a verified (2026-09-30)
+This was done by a bookkeeping agent, not the CR's author, as an
+independent check of the author's `f5e5ee4` work (which had been marked
+"not yet reviewed"). Documentation only. The attack suite was re-run
+first: `python -m unittest tests.test_acceptance_split` gives 90 tests,
+OK.
+
+**Deliverable 0: satisfied.**
+- `BUG-0033` exists (`f5e5ee4`) and carries the §2.4 statement (E-1).
+- The calibration-from-extrema cause has its own record, `BUG-0038`.
+- `PA-0021` is filed. Its text is the draft in
+  `res_qms_PA-0019-0020-0021-draft-rows.md`, clauses (a)–(e) verbatim,
+  plus two additions:
+  - clause (a)'s "built by someone other than the invariant's author,
+    and recorded so it can be re-run" (E-PAa);
+  - clause (f), class / subset / null.
+- It extends PA-0016 (E-4).
+- The filing out of id order is recorded in three places: PA-0021's
+  Source cell, BUG-0033 §8, and the tracker's PA-numbering item.
+- The Swept? cell has moved on from the required "no — not yet run;
+  owner: CR-0013" to the sweep result (deliverable 2a).
+
+**Deliverable 1: satisfied.**
+- Every `inv_*`/`res_*` script cited in § Attacks is tracked in git. That
+  is 28 names as written, with `res_supply_1…8` expanded, so 34 files.
+- R7-A's 9 scripts are tracked under `docs/quality/evidence/CR-0007-r7/`,
+  including the data producers `build.py`, `lib.py` and `feats.py`.
+- `CR-0013-evidence-manifest.md` lists 55 scripts. All 55 exist, are
+  tracked, and match their recorded sha256.
+- The scratch-data readers are labelled provenance-only.
+- No gap was found.
+
+**Deliverable 2a: the PA-0021 sweep, re-run by mechanism.**
+- **Mechanism:** an acceptance criterion that could not have failed. The
+  sub-mechanisms are PA-0021's clauses:
+  - (a) no constructed wrong pipeline shown failing it;
+  - (b) a set made only of count == 0 predicates, with no gate that a
+    no-op and a deletion both fail;
+  - (c) a non-exact threshold not calibrated fair against broken;
+  - (d) no GATE/OBS label, or justify-to-pass;
+  - (e) a reference read from the artifact or made true by another gate;
+  - (f) a distributional row that does not name class, subset and null.
+- **Scope:**
+  - the acceptance tables of CR-0007..0013 as they stand at `d1c8b34`;
+  - live-code acceptance and verification thresholds in git-tracked
+    `*.py`, minus `inv_*`, `res_*`, `legacy/` and `docs/`.
+
+  Runtime input guards are outside the mechanism (user decision,
+  tracker).
+- **Method:**
+  1. The first run (`f5e5ee4`, PA-0021's Swept? cell) is taken as the
+     baseline.
+  2. Every CR text and acceptance script changed since then was re-read:
+     `git log f5e5ee4..HEAD` over `docs/quality/change-requests/` and
+     `*.py`.
+  3. The live acceptance code was scanned for numeric tolerances,
+     thresholds and GATE/OBS labels (`grep` for `TOL`, `rtol`, `atol`,
+     comparisons against fractional literals, `GATE`, `OBS`,
+     `sys.exit`), and each hit was read in context.
+
+**Results:**
+
+| scope item | changed since `f5e5ee4` | result |
+|---|---|---|
+| CR-0007 v9.2 § Acceptance P1–P8 | yes | **Conform.** All are exact. P8's `rtol 1e-6` is a reproduction tolerance on a deterministic recomputation, so it is treated as exact. (a): `tests/test_check_partition.py` shows each wrong construction from round 8 failing. (b): a no-op fails P1–P3 and a deletion fails P3. O1–O4 are counts or provenance notes, not distributional. |
+| CR-0008 | no | Conform (first run: G4, G9, U1–U6 exact) |
+| CR-0009 v5.2 § Symptom acceptance, § `symptom_check.py` | yes | **Conform.** Rows 1a–5 are OBS, and each names class, subset and null in the PA-0021(f) table. That removes BUG-0039's instance in the text; BUG-0039 closes at CR-0009 deliverable 10. **R** is an exact pin of published values at their printed precision; `tests/test_symptom_check.py` exercises each statistic on constructions with known answers. `SPOT_TOL = 1e-3` is an input guard, stated as such, with 8.6e-5 jitter against a 0.43 other-model difference. `MATCH_TOL` is a pair-matching parameter, not acceptance. |
+| CR-0010 | no | Conform (exact gates and pins; G2′ must-change) |
+| CR-0011 | no | No gates |
+| CR-0012 v2.2.1 § Acceptance and test plan | no (text) | **Conform.** Acceptance is delegated to CR-0013. The test-plan items are exact: byte identity, order test, refusals. |
+| CR-0013 v2.3 gates and OBS | yes (v2.3, 5a, 5b) | **Conform.** E0–E12 and R1–R4 are exact or full-row replays. `float_rel_tol` is fixed at 1e-12 in code. (b): replay equality fails a no-op (deliverable 5, 1/18) and a deletion. O1–O10 name class, subset, pooling and null (none named where there is none). `OBS_Z = 4` flags OBS only. |
+| `acceptance_split.py`, `check_partition.py`, `symptom_check.py` | new or changed | Conform, as in the three rows above |
+| `check_road_dist.py` | yes (CR-0016) | Conform: RD1/RD4 are OBS, and RD2/RD3's analytic bound is accepted. BUG-0040 FIXED. |
+| `check_raster_repair.py`, `check_generator_parity.py`, `smoke_test_training.py`, `tests/` | no | Conform (first run) |
+
+**New instances: none.** No new BUG was filed. The first run's instances
+now stand as:
+- **BUG-0039:** demoted to OBS in CR-0009 v5; it closes at CR-0009
+  deliverable 10.
+- **BUG-0040:** FIXED by CR-0016.
+
+PA-0021's Swept? cell records this re-run.
+
+**Consequential status changes:**
+- **BUG-0033 → FIXED.** Its condition was "deliverables 3–5 pass (the
+  attack suite shows every recorded break failing its gate)". Round-3
+  reviewer A read every attack's failure reason, and the suite is green
+  today.
+- **BUG-0038 → FIXED.** Its condition was "CR-0013 approved and
+  implemented". The live instances are BUG-0039 (in text) and BUG-0040
+  (fixed).
+
+**Every deliverable is checked, so CR-0013 → IMPLEMENTED.** Its open
+LOW tracker items do not reopen it (§1.3):
+- stated limit 1 still says "CR-0007 (P1–P7)" where v9 has P1–P8;
+- table I does not name the county file.

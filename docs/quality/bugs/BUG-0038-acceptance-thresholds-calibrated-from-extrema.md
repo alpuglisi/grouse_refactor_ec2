@@ -153,8 +153,13 @@ and
   is the missing calibration rule. The sweep (CR-0013 deliverable 2a)
   found two live instances outside CR-0013, BUG-0039 and BUG-0040, which
   are remediated under their own records.
-- **Status:** OPEN until CR-0013 is approved and implemented. The live
-  sweep instances are tracked under BUG-0039 and BUG-0040.
+- **Status:** **FIXED. CR-0013 was approved and IMPLEMENTED on
+  2026-09-30.** The live sweep instances stand as follows:
+  - BUG-0040 is FIXED (CR-0016).
+  - BUG-0039's gates are demoted to OBS in CR-0009 v5, and BUG-0039
+    closes at CR-0009 deliverable 10.
+  - PA-0021's sweep was re-run at CR-0013's close-out with no new
+    instance (`CR-0013-review-log.md` § Close-out).
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 Searched `BUG_LOG.md` (BUG-0001..0037) and `PREVENTIVE_ACTIONS.md`

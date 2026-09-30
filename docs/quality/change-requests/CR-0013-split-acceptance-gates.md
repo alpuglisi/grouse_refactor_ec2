@@ -1,6 +1,6 @@
 # CR-0013: Acceptance gates for the pooled split and draw, as a committed script
 
-**Status: APPROVED; deliverables 3–6 done, 2026-09-30** (v2.3 text; code `3230262` + 5b `ba010a7`; deliverable 6 passed inside CR-0012's real run, 18/18 GATEs, OBS calibrated). Open: deliverables 0, 1 and 2a (bookkeeping, evidence scripts, PA-0021 sweep) — to verify and close.
+**Status: IMPLEMENTED, 2026-09-30** (v2.3 text; code `3230262` + 5b `ba010a7`; deliverable 6 passed inside CR-0012's real run, 18/18 GATEs, OBS calibrated; deliverables 0, 1 and 2a verified at close-out, `CR-0013-review-log.md` § Close-out).
 
 History, verdicts and dispositions are in `CR-0013-review-log.md`. This
 CR was split from CR-0007 v7's acceptance layer (commit `bb170ea`). This
@@ -422,7 +422,8 @@ A z-score is reported only for rows that have a null. Rows marked
 
 ## Deliverables (in execution order)
 **Before approval (reviewed in round 2):**
-- [ ] 0. File BUG-0033 and PA-0021, bookkeeping only, by this CR's author.
+- [x] 0. File BUG-0033 and PA-0021, bookkeeping only, by this CR's author.
+      Filed at `f5e5ee4`; verified at close-out (review log § Close-out).
       No BUG-0033 text exists yet, so draft it from CR-0007 v7's BUG-0033
       deliverable (`bb170ea`) and the review log's break history.
       - Include the §2.4 statement (E-1).
@@ -438,7 +439,8 @@ A z-score is reported only for rows that have a null. Rows marked
         CR-0007..0013 plus live-code thresholds.
       - Filing PA-0021 before PA-0019/0020 is recorded under the tracker's
         PA-numbering item.
-- [ ] 1. Commit the untracked evidence scripts in § Attacks. Copy R7-A's
+- [x] 1. Commit the untracked evidence scripts in § Attacks. Done at
+      `f5e5ee4`; verified at close-out (review log § Close-out). Copy R7-A's
       scripts into `docs/quality/evidence/CR-0007-r7/`, including the
       data-producing ones (`build.py`, `lib.py`, `feats.py`). Their CSV
       outputs are regenerable and not committed; they are labelled
@@ -450,8 +452,10 @@ A z-score is reported only for rows that have a null. Rows marked
       plus `region`, `block_id`, `split`; negatives = `CSV_KEEP` plus the
       envelope features and the other columns written at the pinned
       commit, plus `region`.
-- [ ] 2a. The PA-0021 sweep (this CR owns it, per deliverable 0's Swept?
-      cell): the acceptance tables of CR-0007..0013 and live-code
+- [x] 2a. The PA-0021 sweep (this CR owns it, per deliverable 0's Swept?
+      cell). First run at `f5e5ee4` (BUG-0039, BUG-0040); re-run over
+      everything changed since, at close-out, with no new instance
+      (review log § Close-out): the acceptance tables of CR-0007..0013 and live-code
       thresholds; each instance found gets its own BUG (§3.5); update the
       Swept? cell.
 - [x] 3. `acceptance_split.py`, by a separate author (rule 4), at `8501b51`.

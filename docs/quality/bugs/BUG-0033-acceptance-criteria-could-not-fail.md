@@ -176,8 +176,18 @@ v3 (`1445ccd`, § Test plan, invariant table):
   admission rule, and PA-0021 is that rule. CR-0013 applies it to the
   layer that failed. The PA-0021 sweep (CR-0013 deliverable 2a) applies
   it to every other acceptance table and to live-code thresholds.
-- **Status:** OPEN until CR-0013 deliverables 3–5 pass (the attack suite
-  shows every recorded break failing its gate).
+- **Status:** was "OPEN until CR-0013 deliverables 3–5 pass (the attack
+  suite shows every recorded break failing its gate)". That condition is
+  met:
+  - round-3 reviewer A read each attack's failure reason (CR-0013 review
+    log, round 3);
+  - `python -m unittest tests.test_acceptance_split` gives 90 tests, OK
+    (re-run 2026-09-30);
+  - the real run passed 18/18 (CR-0012 deliverable 6);
+  - PA-0021's sweep was re-run at CR-0013's close-out with no new
+    instance.
+
+  **FIXED (CR-0013 IMPLEMENTED, 2026-09-30).**
 
 ## 7. Recurrence review (`CLAUDE.md` §4)
 Searched `BUG_LOG.md` (BUG-0001..0037) and `PREVENTIVE_ACTIONS.md`

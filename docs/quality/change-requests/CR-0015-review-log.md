@@ -184,3 +184,19 @@ the named home files of the mechanism must be scanned, no excluded file
 is scanned, and the set is ≥ 60. The 4 matches are unchanged. The new
 files produce no match.
 
+## Round 3 (bounded, v2.1 at `da1484f`)
+| reviewer | verdict |
+|---|---|
+| A — correctness | APPROVE once the L1 count check is fixed — A-R2-1..3 resolved |
+| B — implementability | APPROVE WITH FOLLOW-UPS once the L1 count check is fixed — rule and 4-match set correct |
+
+Both reviewed `da1484f`; the only open item (the exact-count assertion,
+63 ≠ 60) was fixed at `05d4ce5` exactly as both recommended (count
+dropped; scope check kept; `test_no_unclassified_match` guards drift).
+v2.2 (text only): "top-level" `inv_*`/`res_*`; no pinned count; 63 files
+at `05d4ce5`; deliverable 3 marked committed.
+
+## Quorum (§1.4)
+Reviewer A: APPROVE (conditional met). Reviewer B: APPROVE WITH FOLLOW-UPS
+(conditional met). Author: pending user.
+

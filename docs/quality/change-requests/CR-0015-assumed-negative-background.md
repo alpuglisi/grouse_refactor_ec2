@@ -1,6 +1,6 @@
 # CR-0015: Draw assumed-negative background points only in-state, only in training blocks, and without treating 0 as nodata
 
-**Status: PROPOSED (v2.1) — awaiting round-3 review.** Nothing implemented
+**Status: PROPOSED (v2.2) — awaiting round-3 review.** Nothing implemented
 except the pre-approval L1 test (deliverable 3).
 History, lineage, verdicts and dispositions: `CR-0015-review-log.md`. This
 document states only current intent.
@@ -245,8 +245,10 @@ is `self.fail`, not a skip. The evidence file records the
   demoted to OBS and the demotion is recorded.
 
 ### L1 rule (committed as `tests/test_nodata_zero_lint.py`)
-**File set:** `git ls-files '*.py'`, minus `inv_*`, `res_*` and
-`docs/**` (the evidence scripts). That is 60 files today.
+**File set:** `git ls-files '*.py'`, minus top-level `inv_*` and `res_*`
+and `docs/**` (the evidence scripts). The set grows with the code, so the
+test pins no count; it checks that the mechanism's home files are in scope
+and no excluded file is.
 
 **Rule.** Parse each file with `ast`. A node is *nodata-bearing* if its
 subtree contains a `Name` or `Attribute` whose identifier matches
@@ -298,7 +300,7 @@ so any new match fails it. Deliverable 4 moves each to the allowlist
 the pinned set is empty.
 
 **Expected result on today's tree** (`python -m unittest
-tests.test_nodata_zero_lint -v`, 2026-09-30: 6 tests OK, 60 files):
+tests.test_nodata_zero_lint -v`, 2026-09-30, commit `05d4ce5`: 6 tests OK, 63 files):
 4 statements, cited by text (line numbers move).
 1. `train.py`: `set(NODATA_SENTINELS) | {nodata, 0}` — BUG-0032, fixed
    by §2; no allowlist entry.
@@ -401,7 +403,7 @@ not use the AN path.
         - `BUG_LOG.md` row.
 - [ ] 3. Commit `tests/test_nodata_zero_lint.py` (L1 and its controls)
       before approval (CLAUDE.md §1, CR-0011 A3). Written 2026-09-30
-      (uncommitted); passes and reports exactly the 4 pinned statements
+      (committed `da1484f`, count check fixed `05d4ce5`); passes and reports exactly the 4 pinned statements
       until deliverables 4 and 6 are done.
 - [ ] 4. **PA-0006 re-sweep, scoped by mechanism.**
   - **Scope:** every tracked, non-evidence file that reads

@@ -83,3 +83,11 @@ codebase, just not applied consistently to every retry/polling loop.
 in retry/polling loops; if a broad catch is genuinely necessary, log the
 exception type and traceback before continuing so a programming error isn't
 silently treated as a transient failure.
+
+**Recurrence (BUG-0049, 2026-09-30):** the same mechanism, a broad handler
+that resolves an unexpected error to "continue", recurred outside
+PA-0011's retry-loop scope, at `generate_negatives.py:154` (pre-CR-0012).
+PA-0011 is **superseded by PA-0027**. The failure analysis is in
+BUG-0049 §7. PA-0027's sweep leaves this bug's remaining call sites here:
+`ebird.py:106`, and `download_rev.py:218` and `:234`. The `legacy/`
+download scripts are all guarded and cannot run (PA-0026).

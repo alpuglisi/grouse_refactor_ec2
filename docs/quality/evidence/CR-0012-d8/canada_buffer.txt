@@ -1,0 +1,56 @@
+raw sightings: 43,024 rows; countryCode {'US': 43024}; stateProvince {'Maine': 18896, 'Vermont': 15512, 'New Hampshire': 8616}
+candidate_pool: rows 22,187; <= 300 m of the outer US boundary: 39; <= 1 km: 102
+   -70.27172,46.20770 ME train d=202 m  nearest boundary pt -70.2736,46.2090
+   -69.26836,47.41665 ME train d=30 m  nearest boundary pt -69.2687,47.4168
+   -69.26533,47.41959 ME train d=31 m  nearest boundary pt -69.2657,47.4198
+   -69.26263,47.42221 ME train d=32 m  nearest boundary pt -69.2630,47.4224
+   -69.24669,47.43768 ME train d=34 m  nearest boundary pt -69.2471,47.4379
+   -69.24021,47.44406 ME train d=29 m  nearest boundary pt -69.2405,47.4442
+   -69.23742,47.44669 ME train d=35 m  nearest boundary pt -69.2378,47.4469
+   -69.23717,47.44704 ME train d=28 m  nearest boundary pt -69.2375,47.4472
+   -68.66169,47.23376 ME train d=270 m  nearest boundary pt -68.6615,47.2362
+   -68.61436,47.24235 ME train d=212 m  nearest boundary pt -68.6157,47.2440
+   -68.59265,47.25701 ME val d=164 m  nearest boundary pt -68.5944,47.2578
+   -68.51301,47.29432 ME train d=213 m  nearest boundary pt -68.5132,47.2962
+   -68.50477,47.29402 ME train d=233 m  nearest boundary pt -68.5044,47.2961
+   -68.37949,47.33350 ME train d=130 m  nearest boundary pt -68.3812,47.3336
+   -68.30642,47.35455 ME train d=98 m  nearest boundary pt -68.3061,47.3554
+   -68.28831,47.35905 ME val d=110 m  nearest boundary pt -68.2885,47.3600
+   -68.27270,47.35348 ME val d=165 m  nearest boundary pt -68.2714,47.3547
+   -68.22734,47.34931 ME train d=211 m  nearest boundary pt -68.2246,47.3495
+   -68.15196,47.30838 ME train d=82 m  nearest boundary pt -68.1512,47.3089
+   -68.05708,47.25170 ME val d=233 m  nearest boundary pt -68.0554,47.2535
+   -68.02055,47.23576 ME train d=210 m  nearest boundary pt -68.0182,47.2367
+   -67.93204,47.15868 ME val d=130 m  nearest boundary pt -67.9305,47.1591
+   -67.89269,47.11902 ME val d=264 m  nearest boundary pt -67.8892,47.1189
+   -67.79180,46.84486 ME train d=175 m  nearest boundary pt -67.7895,46.8449
+   -67.72102,45.66053 ME val d=169 m  nearest boundary pt -67.7211,45.6620
+   -67.43803,45.52914 ME train d=241 m  nearest boundary pt -67.4350,45.5293
+   -67.31557,45.13577 ME train d=237 m  nearest boundary pt -67.3184,45.1364
+   -71.49456,45.05756 NH train d=236 m  nearest boundary pt -71.4976,45.0575
+   -71.49361,45.02916 NH train d=263 m  nearest boundary pt -71.4943,45.0315
+   -71.49157,45.03122 NH train d=179 m  nearest boundary pt -71.4936,45.0320
+   -71.10478,45.28509 NH train d=260 m  nearest boundary pt -71.1054,45.2828
+   -73.24270,45.01018 VT val d=260 m  nearest boundary pt -73.2428,45.0125
+   -73.04895,45.01402 VT train d=186 m  nearest boundary pt -73.0489,45.0157
+   -72.20186,45.00430 VT train d=125 m  nearest boundary pt -72.2019,45.0054
+   -72.19803,45.00320 VT train d=254 m  nearest boundary pt -72.1981,45.0055
+   -72.19698,45.00417 VT train d=147 m  nearest boundary pt -72.1970,45.0055
+   -72.14172,45.00493 VT train d=104 m  nearest boundary pt -72.1417,45.0059
+   -72.14080,45.00405 VT train d=201 m  nearest boundary pt -72.1408,45.0059
+   -71.62815,45.01148 VT val d=108 m  nearest boundary pt -71.6282,45.0125
+negatives_ME: rows 3,660; <= 300 m of the outer US boundary: 9; <= 1 km: 26
+   -70.27172,46.20770 ME train d=202 m  nearest boundary pt -70.2736,46.2090
+   -69.26533,47.41959 ME train d=31 m  nearest boundary pt -69.2657,47.4198
+   -69.23717,47.44704 ME train d=28 m  nearest boundary pt -69.2375,47.4472
+   -68.51301,47.29432 ME train d=213 m  nearest boundary pt -68.5132,47.2962
+   -68.30642,47.35455 ME train d=98 m  nearest boundary pt -68.3061,47.3554
+   -68.15196,47.30838 ME train d=82 m  nearest boundary pt -68.1512,47.3089
+   -68.05708,47.25170 ME val d=233 m  nearest boundary pt -68.0554,47.2535
+   -67.93204,47.15868 ME val d=130 m  nearest boundary pt -67.9305,47.1591
+   -67.79180,46.84486 ME train d=175 m  nearest boundary pt -67.7895,46.8449
+negatives_NH: rows 1,079; <= 300 m of the outer US boundary: 0; <= 1 km: 0
+negatives_VT: rows 1,493; <= 300 m of the outer US boundary: 3; <= 1 km: 4
+   -72.20186,45.00430 VT train d=125 m  nearest boundary pt -72.2019,45.0054
+   -72.19803,45.00320 VT train d=254 m  nearest boundary pt -72.1981,45.0055
+   -72.14080,45.00405 VT train d=201 m  nearest boundary pt -72.1408,45.0059

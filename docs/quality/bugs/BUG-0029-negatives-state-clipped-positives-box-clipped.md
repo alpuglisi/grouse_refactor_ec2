@@ -147,11 +147,24 @@ support do not coincide, and no check compares them.
   `docs/quality/evidence/CR-0007-gates.txt`). Positives are now assigned by
   state, the same definition the negatives' `stateProvince` query uses
   (option 1(a) below).
-- *Split and draw, CR-0012:* the pooled split and the negative draw over
-  the same partition. CR-0012's rebuild regenerates the splits and
-  negatives.
+- *Split and draw, CR-0012 (merged `4eb10dd`; real run `1bc2df6`,
+  18/18 CR-0013 GATEs):* both classes are split on one global grid over
+  the same state partition, and the negatives are drawn per (region,
+  split) against the positives of that cell.
+  - E1 checks `state == region` for every positive, negative and pool
+    row.
+  - E9 checks each cell's count against `n_pos`.
 
-Status: **OPEN — fixed when CR-0012 lands; closed after CR-0009's retrain.**
+  **The positive-side part of this bug is fixed.**
+- *Assumed-negative background, CR-0015:* `sample_background_points`
+  (`pretrain.py`) still draws background points that are not restricted to the state
+  partition or to training blocks (CR-0015 § Scope). That
+  remainder, with BUG-0032 and BUG-0042, is CR-0015's.
+
+Status: **OPEN — positive side fixed (CR-0007, CR-0012).** The bug is
+**FIXED when CR-0015 deliverable 7b passes**, and **CLOSED when CR-0009
+also closes**. This is the single closure rule in the tracker (CR-0015
+R1 B8), which replaces the earlier "fixed when CR-0012 lands".
 
 Original proposal (kept for the record):
 1. **Make both classes use one definition of a region.** Either is

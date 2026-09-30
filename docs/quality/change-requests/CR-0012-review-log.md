@@ -284,3 +284,22 @@ Merged at 4eb10dd. Dispositions:
 | I-L6 | LOW | double import as `__main__` | tracker |
 | I-L7 | LOW | PA-0023 cell missing from deliverable 8 | fixed: added |
 | (tracked) | LOW | `P7_GUARDED`, `PROJECT_TREE.md` | already in tracker |
+
+## Deliverable 8 (bookkeeping, 2026-09-30)
+This was done by a bookkeeping agent, the only editor of `BUG_LOG.md` and
+`PREVENTIVE_ACTIONS.md` during this pass. Documentation only; no code
+changed.
+
+| item | result (operative location) |
+|---|---|
+| New BUG for `generate_negatives.py:153` | **BUG-0049**. The faulty code is quoted from `3230262:generate_negatives.py:148-156`. Recurrence review against PA-0011: it **is** a recurrence of BUG-0013, because PA-0011 was scoped to retry loops and to logging. So **PA-0027** supersedes PA-0011. PA-0027's §3.5 sweep, scoped by mechanism, found BUG-0052..0055; each is a one-function fix, with owners in the tracker. |
+| BUG-0027 | FIXED (CR-0012); closes after CR-0009 (BUG-0027 §6, `BUG_LOG.md`) |
+| BUG-0029 | Positive side fixed. FIXED at CR-0015 deliverable 7b, CLOSED with CR-0009 (BUG-0029 §6; the tracker's closure-rule item is ticked) |
+| PA-0018 Swept? | Enforcement checked against the code: global grid, pooled thin/split/draw, E4/E5 PASS on the real run, and `standing_checks` at `train.py:250` |
+| PA-0023 Swept? | **The closure proposed in the deliverable text was not supported**, per PA-0024(a). Pool step 6 does pool every region's sightings, but all 43,024 are US-acquired, and E7 reads the same set. 12 of 6,232 selected negatives lie within 300 m of the Canadian border (`docs/quality/evidence/CR-0012-d8/canada_buffer.{py,txt}`). Filed as **BUG-0050** (needs a new CR). The KDE item is filed as **BUG-0051**. The deliverable text now states this outcome. |
+| BUG-0031 | FIXED, 5 of 5. The `clean.py` and `legacy/gen_negs.py` guards were verified, and `test_cr0012::Guards` PASS. |
+| Tracker | Six items ticked (guards, CR-0009 baselines, 6,232, P6 names, the `cec1542` pin, BUG-0029 wording). The `download_rev.py` hypothesis item is updated: its fails-to-open half is now BUG-0052. New section "CR-0012 deliverable 8 bookkeeping". |
+
+**Deliverables 6 and 7 are not ticked here.** The deliverable-6 test plan
+evidence, `docs/quality/evidence/CR-0012-d6/test_plan.txt`, did not exist
+when this was written. Deliverable 7 (data deletion) is the lead's.

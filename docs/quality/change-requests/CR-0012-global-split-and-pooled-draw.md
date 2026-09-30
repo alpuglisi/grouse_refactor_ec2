@@ -318,17 +318,21 @@ commit.
       CR-0014 should have landed first; if it lands after, repeat this
       step.
 - [ ] 7. Delete `data/pipeline/block_assignments_{ME,NH,VT}.csv`.
-- [ ] 8. Bookkeeping:
-      - New BUG (next free id) for `generate_negatives.py:153`, with a
-        PA-0011 recurrence review.
+- [x] 8. Bookkeeping (done 2026-09-30; details in `CR-0012-review-log.md`
+      § Deliverable 8):
+      - BUG-0049 for `generate_negatives.py:153`, with a PA-0011
+        recurrence review. It is a recurrence, so PA-0027 supersedes
+        PA-0011. PA-0027's sweep filed BUG-0052..0055.
       - BUG-0027: fixed, closing after CR-0009.
       - BUG-0029: the positive-side part is fixed. The assumed-negative
         part waits for CR-0015.
       - PA-0018's Swept? cell: pooled-holdout enforcement is provided by
         CR-0013.
-      - PA-0023's Swept? cell: the negatives' 300 m buffer against every
-        sighting (pool step 6, all regions) closes the Canadian-sightings
-        question CR-0012 owned (code review, PA-0022).
+      - PA-0023's Swept? cell, checked against the code: pool step 6
+        pools every region's sightings, but they are US-only, so the
+        Canadian-sightings question is **not** closed. It is re-owned by
+        BUG-0050 (buffer) and BUG-0051 (KDE), and needs a new CR.
+      - BUG-0031 is FIXED (5 of 5), and the tracker items are updated.
 
 ## Landing order
 CR-0007 → CR-0013 approved → CR-0009 baselines → **CR-0012** → CR-0009

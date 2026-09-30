@@ -80,12 +80,20 @@ write and neutralised by something that stops them from running.
   as their first statement (line 1 of each file). `check_partition.py` P7
   checks by AST that the guard is first, and that running the file exits
   non-zero naming BUG-0031. PASS in `docs/quality/evidence/CR-0007-gates.txt`.
-- **CR-0012 v2 §6:** the same guard for `clean.py` and `legacy/gen_negs.py`
-  (owner: CR-0012; until then both stay P6-exempt, CR-0007 round-9 B-R9-1).
+- **CR-0012 v2 §6** (code `20a52c1`, merged `4eb10dd`): `clean.py` and
+  `legacy/gen_negs.py` now start with the same guard, e.g.
+  `raise SystemExit("clean.py is a stale copy of prepare_training_data.py (BUG-0031); use prepare_training_data.py")`.
+  Checked by `tests/test_cr0012.py::Guards::test_stale_copies_exit_first`:
+  - by AST, the guard is the first statement (`check_partition.guard_first`);
+  - line 1 starts with `raise SystemExit(`;
+  - running the file from a scratch cwd exits non-zero, naming BUG-0031.
+
+  PASS, re-run 2026-09-30 (CR-0012 deliverable 8). The two files are not
+  yet in `check_partition.P7_GUARDED` (tracker, LOW).
 - **PA-0026** (below). PA-0002's and PA-0014's Swept? cells corrected.
 
-Status: **FIXED for the three CR-0007 copies**; `clean.py` and
-`legacy/gen_negs.py` **open, owned by CR-0012 §6**.
+Status: **FIXED, 5 of 5**: the three `legacy/` copies by CR-0007 §3, and
+`clean.py` and `legacy/gen_negs.py` by CR-0012 §6 (2026-09-30).
 
 ## 7. Recurrence review
 Searched `BUG_LOG.md` and `PREVENTIVE_ACTIONS.md`:

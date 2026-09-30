@@ -107,10 +107,29 @@ region but not across the pooled data.
   holds only state-R records, and the three files' keys are pairwise
   disjoint (CR-0007 P1–P3 PASS; before: ME∩NH 1,184, NH∩VT 3,271 shared
   keys; `docs/quality/evidence/CR-0007-gates.txt`).
-- *Global grid, pooled split and draw (items 2–3), CR-0012.*
+- *Global grid, pooled split and draw (items 2–3), CR-0012 (code
+  `20a52c1`, merged `4eb10dd`, follow-ups `df83c27`; real run
+  `1bc2df6`):*
+  - one global block grid (`regions.block_ids`, origin
+    `BLOCK_ORIGIN_5070`);
+  - one pooled thin and one pooled block split over every region
+    (`prepare_training_data.py`);
+  - one pooled buffer and draw (`generate_negatives.py`).
 
-Status: **OPEN — fixed when CR-0012 lands; closed after CR-0009's
-retrain** (the split change invalidates every checkpoint).
+  CR-0013's exact pooled gates PASS on the rebuilt files (18/18,
+  `docs/quality/evidence/CR-0012-d6/acceptance.log`):
+  - **E4:** 0 keys in both train and val, per class and across classes;
+  - **E5:** 0 recomputed blocks hold both a train and a val record.
+
+  Before the fix, E4 counted 522 keys and E5 882 blocks (CR-0012 § Why
+  now). `acceptance_split.standing_checks` re-runs E4/E5 on the files
+  `train.py` reads before every `build_datasets` (`train.py:250`), so
+  a later edit cannot reintroduce the leak unnoticed (item 3 of the
+  original proposal).
+
+Status: **FIXED (CR-0012), 2026-09-30.** It closes after CR-0009's
+retrain, because the split change invalidates every checkpoint and
+metric. CR-0009 deliverable 10 records the closure.
 
 Original proposal (needs a CR: it changes the dataset split, a data
 schema and behaviour change):

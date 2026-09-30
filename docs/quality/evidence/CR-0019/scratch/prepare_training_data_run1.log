@@ -1,0 +1,5 @@
+  ME: 7,924 loaded, 2,909 habitat, 2,909 window in bounds, 2,854 kept after pooled thinning
+  NH: 2,303 loaded, 856 habitat, 856 window in bounds, 827 kept after pooled thinning
+  VT: 3,725 loaded, 1,174 habitat, 1,174 window in bounds, 1,128 kept after pooled thinning
+  Wrote 10 files and the manifest's positives section (4,809 positives).
+exit 0

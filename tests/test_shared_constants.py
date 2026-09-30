@@ -38,6 +38,8 @@ EXPECTED_REGIONS = {
     "VAL_FRACTION": 0.2,
     "SPLIT_SEED": 42,
     "WINDOW_PX": 64,
+    # CR-0019 section 2
+    "YEAR_MIN": 2020,
     "BOXES": {
         "ME": (-71.158, 42.889, -66.852, 47.555),
         "NH": (-72.626, 42.605, -70.600, 45.398),

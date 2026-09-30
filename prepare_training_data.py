@@ -9,7 +9,12 @@ acceptance_split.py (CR-0013) can replay it exactly.
 
 1. Load every region's evaluated sightings; raise unless
    state == region == R on every row.
-2. Keep the habitat rows (~nonveg_landcover).
+2. Raise if any row (habitat or not) has a null year. Keep the habitat
+   rows (~nonveg_landcover) whose year >= regions.YEAR_MIN (CR-0019): the
+   one year floor for both classes, applied before thinning so a
+   pre-floor point cannot win the thin order over a kept neighbour.
+   evaluated_sightings_* themselves keep every year (the negatives'
+   buffer and the envelope metrics use them all).
 3. Drop rows whose WINDOW_PX window is not inside every FEATURE_SPEC
    raster (regions.window_in_bounds; nodata inside the window is not
    considered).
@@ -263,6 +268,7 @@ def measured_constants():
         "VAL_FRACTION": VAL_FRACTION,
         "SPLIT_SEED": SPLIT_SEED,
         "WINDOW_PX": WINDOW_PX,
+        "YEAR_MIN": regions.YEAR_MIN,
         "NEG_RATIO": gn.NEG_RATIO,
         "NONVEG_MAX_FRAC": gn.NONVEG_MAX_FRAC,
         "W_FLOOR": gn.W_FLOOR,
@@ -366,14 +372,21 @@ def build(data, root):
         df = read_csv(path)
         inputs[rel_path(path, root)] = sha256_file(path)
         counts[r]["1"] = len(df)
-        for col in ("state", "region", "nonveg_landcover"):
+        for col in ("state", "region", "nonveg_landcover", "year"):
             if col not in df.columns:
                 raise ValueError(f"{path}: no '{col}' column")
         bad = (df["state"] != r) | (df["region"] != r)
         if bad.any():
             raise ValueError(f"{path}: {int(bad.sum())} rows where "
                              f"state == region == {r!r} does not hold")
-        df = df[~df["nonveg_landcover"].astype(bool)].copy()
+        # Step 2 (CR-0019): habitat rows at or above the one year floor.
+        # regions.YEAR_MIN is read here, at call time (the test seam).
+        n_null = int(df["year"].isna().sum())
+        if n_null:
+            raise ValueError(f"{path}: {n_null} rows with a null year "
+                             f"(the year floor YEAR_MIN cannot be applied)")
+        df = df[~df["nonveg_landcover"].astype(bool)
+                & (df["year"] >= regions.YEAR_MIN)].copy()
         counts[r]["2"] = len(df)
         df = df[window_mask(df, rd)].copy()
         counts[r]["3"] = len(df)

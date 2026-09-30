@@ -8,7 +8,9 @@ specification; each step is a deterministic, order-free function of its
 inputs so acceptance_split.py (CR-0013) can replay it exactly.
 
 Candidate pool (data/negatives/candidate_pool.csv), pooled over regions:
-   1. load gbif_negatives_R for every R; raise unless state == R
+   1. load gbif_negatives_R for every R; raise unless state == R; drop
+      every row with a non-null year < regions.YEAR_MIN (CR-0019: the
+      same floor as the positives; a null year is still dropped at 7)
    2. drop records with coord_uncertainty_m > MAX_COORD_UNCERTAINTY_M
       (NaN kept - the GBIF analog of the hotspot-pin problem)
    3. deduplicate on the 5 dp coordinate key, keeping the SMALLEST
@@ -72,6 +74,7 @@ from prepare_training_data import (
     thin_by_min_distance, window_mask, to_5070, coord_keys, read_csv,
     canonical, csv_bytes, sha256_bytes, sha256_file, rel_path,
     atomic_write, json_bytes, section_common, raster_inputs)
+import regions
 from regions import (REGIONS, BUFFER_M, COUNTY_POLYGONS_YEAR, MIN_SPACING_M,
                      block_ids, block_split, domain_edge_m, verify_partition)
 from analyze_grouse import (ENVELOPE_SCHEME, build_envelope_id,
@@ -357,13 +360,19 @@ def build(data, root):
 
     blocks = read_csv(digest(data.path("block_assignments")))
 
-    # 1. load every region's candidates
+    # 1. load every region's candidates; drop non-null years below the
+    #    one year floor (CR-0019). regions.YEAR_MIN is read here, at call
+    #    time (the test seam). Null years are left for step 7.
     frames = []
     for r in REGIONS:
         path = digest(data[r].path("gbif_candidates"))
         df = read_csv(path)
         if "state" not in df.columns or (df["state"] != r).any():
             raise ValueError(f"{path}: rows where state != {r!r}")
+        if "year" not in df.columns:
+            raise ValueError(f"{path}: no 'year' column")
+        early = df["year"].notna() & (df["year"] < regions.YEAR_MIN)
+        df = df[~early].reset_index(drop=True)
         df["region"] = r
         frames.append(df)
     pool = pd.concat(frames, ignore_index=True)

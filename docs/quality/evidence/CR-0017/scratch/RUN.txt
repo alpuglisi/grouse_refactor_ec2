@@ -1,0 +1,30 @@
+CR-0017 deliverable 4 (pipeline part): scratch-tree real-data run, 2026-09-30.
+Code: branch worktree-agent-aa9cd9861e95c4aaf, commit 7424166 (base CR-0015 head 3add80b).
+
+Tree: /tmp/claude-1000/cr0017-scratch, built by mkscratch.sh:
+  data/pipeline and data/negatives copied (cp -a, 44 regular files);
+  every other data/ directory recreated with symlinked FILES (cp -rs:
+  3,543 symlinks, no symlinked directory), so a write could only replace
+  a link, never a live file.
+  Output-path check (before the run): the 10 generator outputs, the
+  manifest and the record are regular files, and no written directory is
+  a symlink.
+Live tree: data/pipeline + data/negatives sha256 taken before
+  (live_before.sha256) and re-checked after both runs: unchanged.
+
+1. generate_negatives.py (rungn.sh, cwd = scratch): generate_negatives_run1.log
+   step 6: (a) 9,720; (b only) 89; both 20. Pool 22,187 -> 22,099.
+   Manifest: positives section identical; negatives inputs identical;
+   counts 6..11 and 9 output digests changed (val_negatives_NH unchanged).
+2. MC, --old /home/ec2-user/grouse2 (live) --new scratch:
+   mc_live_vs_scratch.txt: MC0..MC5 all PASS, "MC: PASS", exit 0.
+   (MC script / keys / d6 record byte-identical to fc52728.)
+3. Second run: generate_negatives_run2.log; scratch_run1.sha256 ==
+   scratch_run2.sha256 (44 files), logs identical: byte-identical.
+4. acceptance_split.py (UNAMENDED, CR-0015 head) on the scratch tree,
+   informational only (runacc.sh, acceptance_unamended.log): 16/18, FAIL
+   R3 (88 replay pool rows absent; step-6..11 counts) and R4 (the
+   pre-registered negatives replaced); every E gate PASS; no record
+   written (record sha unchanged). The CR's 19/19 check needs the
+   deliverable 2 replay (E13, R3 rule (b)), written by another agent; it
+   is not run here.

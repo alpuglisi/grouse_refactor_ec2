@@ -1,0 +1,59 @@
+CR-0013 acceptance_split.py report
+data root : /tmp/claude-1000/cr0017-scratch
+config    : /home/ec2-user/grouse2/.claude/worktrees/agent-aa9cd9861e95c4aaf/docs/quality/acceptance_split.json (sha256 1e3bfaa45655e005fd9258c842d080274431812d72f53ea4bbc165236b67bfc5)
+commit    : 74241665462982e59e34fda44e25326f5d480acc (dirty tracked .py: False)
+started   : 2026-09-30T14:50:08.592873+00:00
+
+GATES (exact)
+E0   PASS
+E1   PASS
+E1p  PASS
+E2   PASS
+E3   PASS
+E4   PASS
+E5   PASS
+E6   PASS
+E7   PASS
+E8   PASS
+E9   PASS
+E10  PASS
+E11  PASS
+E12  PASS
+R1   PASS
+R2   PASS
+R3   FAIL
+       - data/negatives/candidate_pool.csv: 88 replay rows absent, e.g. [(-70.27172, 46.2077), (-69.26836, 47.41665), (-69.26533, 47.41959)]
+       - pool steps 1-11: manifest counts differ: ME.10: 11377 vs replay 11404; ME.11: 11377 vs replay 11404; ME.6: 11377 vs replay 11405; ME.7: 11377 vs replay 11404; ME.8: 11377 vs replay 11404; ME.9: 11377 vs replay 11404
+R4   FAIL
+       - data/negatives/negatives_ME.csv: 9 rows not in the replay, e.g. [(-70.35254, 43.92932), (-69.69226, 45.92641), (-69.59525, 44.03379)]
+       - data/negatives/negatives_ME.csv: 9 replay rows absent, e.g. [(-70.27172, 46.2077), (-69.26533, 47.41959), (-69.23717, 47.44704)]
+       - data/negatives/train_negatives_ME.csv: 7 rows not in the replay, e.g. [(-70.35254, 43.92932), (-69.69226, 45.92641), (-69.59525, 44.03379)]
+       - data/negatives/train_negatives_ME.csv: 7 replay rows absent, e.g. [(-70.27172, 46.2077), (-69.26533, 47.41959), (-69.23717, 47.44704)]
+       - data/negatives/val_negatives_ME.csv: 2 rows not in the replay, e.g. [(-68.88106, 44.54682), (-68.01472, 46.43639)]
+       - data/negatives/val_negatives_ME.csv: 2 replay rows absent, e.g. [(-68.05708, 47.2517), (-67.93204, 47.15868)]
+       - data/negatives/negatives_NH.csv: 1 rows not in the replay, e.g. [(-71.91565, 43.11031)]
+       - data/negatives/negatives_NH.csv: 1 replay rows absent, e.g. [(-71.3633, 42.70035)]
+       - data/negatives/train_negatives_NH.csv: 1 rows not in the replay, e.g. [(-71.91565, 43.11031)]
+       - data/negatives/train_negatives_NH.csv: 1 replay rows absent, e.g. [(-71.3633, 42.70035)]
+       - data/negatives/negatives_VT.csv: 13 rows not in the replay, e.g. [(-73.31017, 44.18407), (-73.30746, 44.2133), (-73.27864, 44.39629)]
+       - data/negatives/negatives_VT.csv: 13 replay rows absent, e.g. [(-73.41579, 44.03201), (-73.38281, 43.59231), (-73.38238, 43.59182)]
+       ... 4 more
+
+OBSERVATIONS (reported, never blocking)
+OBS references: current; flags |z| > 4: 2
+O1   OBS   median_m=2552 (z=+0.13)
+O2   OBS   records_per_val_block=1.642 (z=+0.73); share_gap=0.003355 (z=-0.10)
+O3   OBS   moran_k4.positive_blocks=0.004913 (z=+0.52); moran_k8.positive_blocks=0.005913 (z=+0.85)
+O4   OBS   moran_k4.pool_blocks=0.0004612 (z=+0.09); moran_k4.selected-record_blocks=0.001783 (z=+0.21); moran_k8.pool_blocks=-0.003119 (z=-0.55); moran_k8.selected-record_blocks=0.004508 (z=+0.78)
+O5   OBS   Exc.ME=1.127 (z=+2.31); Exc.NH=1.162 (z=+0.80); Exc.VT=0.5907 (z=+0.03); Excws_val.ME=3.481 (z=-0.53); Excws_val.NH=3.804 (z=+0.74); Excws_val.VT=2.749 (z=+0.62); S.ME=0.5328 (z=+0.54); S.NH=0.5607 (z=-0.10); S.VT=0.436 (z=+0.96); Sws_val.ME=0.6423 (z=+0.08); Sws_val.NH=0.59 (z=-1.23); Sws_val.VT=0.6208 (z=+1.28)
+O6   OBS   basis_tv_sel_vs_wpool.ME=0.6492 (z=-4.04 FLAG); basis_tv_sel_vs_wpool.NH=0.6428 (z=-3.40); basis_tv_sel_vs_wpool.VT=0.6543 (z=-14.38 FLAG); basis_tv_train_val.ME=0.008639 (z=-0.96); basis_tv_train_val.NH=0.03171 (z=+0.77); basis_tv_train_val.VT=0.01256 (z=-0.78); evtphys_tv_nonveg.ME=0.02444 (z=+0.31); evtphys_tv_nonveg.NH=0.04756 (z=+0.04); evtphys_tv_nonveg.VT=0.05742 (z=+1.49); hab_weight_sel_over_pool.ME=1.103 (z=+1.66); hab_weight_sel_over_pool.NH=1.201 (z=-0.18); hab_weight_sel_over_pool.VT=1.129 (z=-0.55); nonveg_val_minus_train.ME=-0.0006789 (delta=+0); nonveg_val_minus_train.NH=0.001255 (delta=+0); nonveg_val_minus_train.VT=0.001279 (delta=+0); species_tv.ME=0.04601 (z=+1.10); species_tv.NH=0.07682 (z=+0.26); species_tv.VT=0.1075 (z=-0.05)
+O7   OBS   SUP_O.ME=2 (delta=+0); SUP_O.NH=0 (delta=+0); SUP_O.VT=0 (delta=+0); SUP_R.ME=4.128 (delta=-0.00334); SUP_R.NH=3.842 (delta=+0); SUP_R.VT=3.654 (delta=+0); hab_pool_over_target_worst.ME=1.567 (delta=-0.003912); hab_pool_over_target_worst.NH=2.311 (delta=-0.005988); hab_pool_over_target_worst.VT=1.592 (delta=-0.007001); pool_over_target.ME=3.108 (delta=-0.007377); pool_over_target.NH=4.819 (delta=-0.01297); pool_over_target.VT=3.699 (delta=-0.03148)
+O8   OBS   neg_ks.ME=0.03552 (z=-0.79); neg_ks.NH=0.1249 (z=+3.52); neg_ks.VT=0.07555 (z=+0.32); neg_ks.pooled=0.03716 (z=+0.47); neg_smd.ME=0.07397 (z=+0.36); neg_smd.NH=0.1898 (z=+2.72); neg_smd.VT=0.1191 (z=+0.18); neg_smd.pooled=0.07426 (z=+1.06); neghab_ks.ME=0.04694 (z=-0.76); neghab_ks.NH=0.1236 (z=+1.47); neghab_ks.VT=0.118 (z=+1.11); neghab_ks.pooled=0.05563 (z=+0.79); pos_ks.ME=0.04689 (z=-0.39); pos_ks.NH=0.1254 (z=+1.38); pos_ks.VT=0.06489 (z=-0.74); pos_ks.pooled=0.04194 (z=+0.32); pos_smd.ME=0.06347 (z=-0.56); pos_smd.NH=0.2297 (z=+1.66); pos_smd.VT=0.0965 (z=-0.46); pos_smd.pooled=0.05463 (z=-0.24)
+O9   OBS   year_hist.neg.ME={"2020":1546,"2021":903,"2022":788,"2023":270,"2024":153}; year_hist.neg.NH={"2020":377,"2021":297,"2022":204,"2023":107,"2024":94}; year_hist.neg.VT={"2020":456,"2021":474,"2022":315,"2023":139,"2024":109}; year_hist.pos.ME={"2016":106,"2017":110,"2018":298,"2019":300,"2020":599,"2021":725,"2022":793,"2023":344,"2024":385}; year_hist.pos.NH={"2016":61,"2017":66,"2018":65,"2019":64,"2020":131,"2021":146,"2022":166,"2023":150,"2024":230}; year_hist.pos.VT={"2016":102,"2017":81,"2018":89,"2019":95,"2020":195,"2021":181,"2022":213,"2023":211,"2024":326}
+O10  OBS   val_fraction.neg.ME=0.2016 (delta=+0); val_fraction.neg.NH=0.2215 (delta=+0); val_fraction.neg.VT=0.1802 (delta=+0); val_fraction.pos.ME=0.2016 (delta=+0); val_fraction.pos.NH=0.2215 (delta=+0); val_fraction.pos.VT=0.1802 (delta=+0)
+
+SUMMARY: 16/18 GATEs pass; FAIL: R3, R4
+REJECTED. no record written.
+runtime: 55.9 s
+exit 1, 56 s
+/tmp/claude-1000/cr0017-scratch/data/pipeline/acceptance_record.json: OK

@@ -7,7 +7,7 @@ Deliverables, test plan), not just in a revision note.
 IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n.
 
 ## Shared / decisions needed
-- [ ] Land bookkeeping batch: PA-0019/0020/0021, BUG-0030/0033/0035; name an owner (0007 B-8, 0008 R7-2)
+- [ ] Land bookkeeping batch: PA-0019/0020/0021, BUG-0030/0033/0035; name an owner (0007 B-8, 0008 R7-2) — **PA-0021 and BUG-0033 filed** (CR-0013 deliverable 0, 2026-09-30; calibration cause split out as BUG-0038); BUG-0030/0035 filed earlier (CR-0008/CR-0010). Remaining: PA-0019 (Tracked, with BUG-0028) and PA-0020 (CR-0007 deliverable 7)
 - [x] Decide: pre-landing baselines vs `gate_obs_only` — **baselines first, no escape mode** (user, 2026-09-30). CR-0009 updated to match in v4 (0007 B-2)
 - [x] Decide: CR-0007 structure — **split into 3** (user, 2026-09-30): CR-0007 partition + constants; CR-0012 global split + pooled draw; CR-0013 acceptance gates as a committed script
 - [x] Decide: `TIGER_YEAR` — **2023** (user, 2026-09-30); set by CR-0014, centralised by CR-0007 (0007 B-9)
@@ -15,7 +15,7 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 - [x] Decide: Canadian-border road distance — **nodata where Canadian land is nearer than the nearest TIGER road** (user, 2026-09-30); CR-0014 (0008 R7-4)
 - [x] Reconcile I17 / G5 hand-off — moved to CR-0010: 0 positive centre values change, so I17 is unaffected; X3 reports window exposure (0008 R7-5, R7-6)
 - [x] **I17 WILL change under CR-0014** (140 ME / 717 VT positives' `road_dist` values): CR-0012/CR-0013 must take I17 after CR-0014 lands, and say so (CR-0014 B6) — CR-0013 O8/E8 taken after CR-0014 or repeated; CR-0012 landing order
-- [ ] Reconcile PA-0021 clause text: one version, cited consistently (0008 R7-12) — CR-0013 deliverable 0 files one text (draft + clause (f))
+- [x] Reconcile PA-0021 clause text: one version, cited consistently (0008 R7-12) — filed in `PREVENTIVE_ACTIONS.md` (draft + (a) "built by someone other than the author, recorded so it can be re-run" + (f)); earlier CR texts quoting other forms are superseded by the filed row (CR-0013 deliverable 0)
 - [x] Decided (user): fresh first review for each. Quorum for CR-0007 v8 / CR-0012 / CR-0013 — author proposes fresh first reviews of each, with the v8 disposition table as the no-drop record (prior agents cannot be resumed) (CR-0007-review-log § v8)
 - [x] Decided (user): exact replay. CR-0013 replaces v7's statistical gates with exact predicates + independent replay; statistics become OBS. Confirm this direction before review (CR-0013 design rule 2)
 
@@ -86,9 +86,9 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 - [x] ~~`road_dist` ME/VT CR~~ — written as **CR-0014** (see its review log for the carried items). Was: `road_dist` ME/VT CR (split from CR-0008): regeneration, `_download` atomicity, densified footprint reprojection, `TIGER_YEAR`, Canadian-border decision (R7-4), G7/RD1–RD5 with truth from all TIGER counties intersecting grid+pad (PA-0018) and excluded-point count gated at 0, all 10 year-copies byte-identical (R7-10), G6 for regenerated files, BUG-0023 §6 retroactive-review ruling for `bf8d31a`
 - [x] ~~After first real `download_tcc_nlcd.py` run: G2 check~~ — replaced by CR-0008 v9 in-code post-download check
 - [x] CR-0009: "CR-0008 owns the raster backup (9.75 GB)" — fixed in CR-0009 v4
-- [ ] PA numbering: PA-0022 was filed while PA-0019–0021 are only drafts (res_qms file). Either file 0019–0021 or record the reservation as a deliberate exception to creation-order numbering (CR-0008 B14)
+- [x] PA numbering: PA-0022 was filed while PA-0019–0021 are only drafts (res_qms file). Either file 0019–0021 or record the reservation as a deliberate exception to creation-order numbering (CR-0008 B14) — recorded as a deliberate exception: PA-0022's row reserves 0019–0021; PA-0021 filed 2026-09-30 after PA-0022/0023 under its reserved id, no renumbering (PA-0021 Source cell, BUG-0033 §8). PA-0019/0020 stay reserved until their owners file them (see Shared)
 - [ ] If CR-0008's post-download `tcc` check (U5) ever refuses a real download, switch it to masking `tcc` by the region NLCD footprint (as CR-0010 does) instead of refusing (CR-0008 A7)
-- [ ] BUG-0037 is reserved for CR-0014 (Canada over-read). The untracked `res_qms_PA-0019-0020-0021-draft-rows.md` proposes BUG-0036/0037 for other defects — renumber them when filed (BUG-0036 is the encoder bug) (CR-0014 B8)
+- [ ] BUG-0037 is reserved for CR-0014 (Canada over-read). The untracked `res_qms_PA-0019-0020-0021-draft-rows.md` proposes BUG-0036/0037 for other defects — renumber them when filed (BUG-0036 is the encoder bug) (CR-0014 B8) — note: BUG-0038..0040 are now taken (CR-0013 deliverables 0/2a); the draft's two proposals take the next free id (≥ BUG-0041) when filed
 - [ ] CR-0007 B-9 (`TIGER_YEAR` value is a behaviour change) moved to CR-0014, which sets 2023 (CR-0014 B6)
 - [ ] CR-0014 residual: Canadian land beyond the grid edge is unseen (NH 6,884 px, VT 1,881 px at the top edges). Closes only with Canadian road data (Statistics Canada NRN) (CR-0014 A4)
 - [ ] CR-0009: remove dependence on CR-0007 escape mode; capture additional baselines before CR-0012 lands — text done in CR-0009 v4 (§ Baselines, deliverable 2); the capture itself is pending and is CR-0012 deliverable 0 (0007 A-8/B-2)
@@ -105,7 +105,11 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 - [ ] **CR-0015** (not yet written): `sample_background_points` in-state partition (BUG-0029 remainder) and the 0/nodata conflation (file BUG-0032). The function is live (`pretrain.py:63,179`; `sweep/launch.sh --an-background 1.0`). Moved out of CR-0012 v2 (CR-0012 R1 B-2, B-7)
 - [x] (duplicate of the item below) Runtime guards for `legacy/download.py` and `legacy/download_more.py` (diverged copies; BUG-0031 sweep). Moved out of CR-0012 v2 → **CR-0007 v9** (user decision) (CR-0012 R1 B-7)
 - [ ] CR-0009: update the expected positive count to 6,232 (CR-0012 v2 hash-ordered specification) and commit CR-0009 v4 before CR-0012 deliverable 0 (CR-0012 R1 B-5, B-12)
-- [ ] PA-0021 sweep (owner of PA-0021's Swept? cell once CR-0013 deliverable 0 files it): acceptance tables of CR-0007..0013 plus live-code thresholds (CR-0013 R1 B-C6)
+- [x] PA-0021 sweep (owner of PA-0021's Swept? cell once CR-0013 deliverable 0 files it): acceptance tables of CR-0007..0013 plus live-code thresholds (CR-0013 R1 B-C6) — run as CR-0013 deliverable 2a (2026-09-30): 2 instances, BUG-0039 (CR-0009 symptom GATEs) and BUG-0040 (`check_road_dist.py` RD1/RD4); result in PA-0021's Swept? cell
+- [ ] BUG-0039: CR-0009's symptom GATEs 1a/1b/2a/2b — calibrate per PA-0021(c)/(f) (≥50 retrain seeds; compute needs user sign-off) or demote to OBS; 2b needs a constructed failing model — owner: CR-0009's next revision
+- [ ] BUG-0040: `check_road_dist.py` RD1/RD4 — demote to OBS or calibrate (seed-varied fair vs pre-CR-0014/constructed broken rasters); add failing tests; state whether RD2/RD3's analytic bound substitutes for a quantile — needs a CR (none written)
+- [ ] Decide (user): a finding dispositioned by moving its subject to another CR (CR-0008 R7 item 12 → CR-0014) was not carried into the receiving CR's log (BUG-0040 §7). Existing §1.3 rule, not followed — new PA or not?
+- [ ] Decide (user): runtime input guards are outside PA-0021 (not change acceptance) per the sweep; noted there: `download_rev.py` `_raster_valid_fraction` returns 1.0 when a raster declares no nodata and `None` on an open error, and both pass the 1 % guard (documented as "can't judge"; not confirmed as a defect, PA-0016)
 
 
 ## Decisions (user, 2026-09-30, continued)

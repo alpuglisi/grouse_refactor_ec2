@@ -37,3 +37,8 @@
 # 8. Unit tests.
 !/tests/
 !/tests/*.py
+
+# 9. CR-0013 deliverable 1: round-7 reviewer A's evidence scripts for
+#    CR-0007, copied verbatim (the directory itself is already allowed by
+#    rule 4; only its .py files are added). Their CSV outputs stay ignored.
+!/docs/quality/evidence/CR-0007-r7/*.py

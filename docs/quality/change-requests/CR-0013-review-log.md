@@ -250,3 +250,51 @@ evidence, config, sweep, `acceptance_split.py`, tests, first run) are
 pre-approval under §1.1 and must be written and reviewed first; deliverable
 3 waits for CR-0012's text approval (rule 4).
 
+## Separate authorship record (rule 4)
+- `acceptance_split.py` (deliverables 2–5): fresh agent, transcript id
+  `a969037d4098fb0c1`, launched 2026-09-30 with only CR-0013 (HEAD),
+  CR-0012 at `29f388b` and the code at `05d788d`. No CR-0012
+  implementation existed at launch.
+- CR-0012 implementer: not yet launched; must be a different fresh agent,
+  id to be recorded here.
+
+
+## Deliverables 0, 1, 2a done (author, 2026-09-30; not yet reviewed, nothing committed)
+- **0 — bookkeeping.**
+  - `BUG-0033` (falsifiability) is filed. It includes the §2.4 statement
+    (E-1): only v3 `1445ccd` and v7 `bb170ea` of CR-0007 can be quoted.
+  - The calibration-from-extrema cause is split out as `BUG-0038`, the
+    next free id (E-3).
+  - `PA-0021` is filed. The text is the draft, plus clause (a) "built by
+    someone other than the invariant's author, and recorded so it can be
+    re-run" (E-PAa) and clause (f). It extends PA-0016 (E-4).
+  - `PA-0021` is filed out of id order, after PA-0022/0023, under its
+    reserved id. Nothing is renumbered. This is recorded in its Source
+    cell, in BUG-0033 §8 and in the tracker's PA-numbering item.
+  - `BUG_LOG.md` has rows for BUG-0033 and BUG-0038..0040.
+- **1 — evidence.**
+  - `docs/quality/evidence/CR-0013-evidence-manifest.md` lists every
+    § Attacks script, its local imports and its scratch-data producers,
+    with sha256, attack row and provenance-only labels. `cand.pkl` and
+    `pos.pkl` had no producer script, so the inline command that made
+    them is quoted verbatim.
+  - Round-7 A's 9 scripts were copied byte-identical to
+    `docs/quality/evidence/CR-0007-r7/`.
+  - `.gitignore` rule 9 was added: `!/docs/quality/evidence/CR-0007-r7/*.py`.
+    That is the only allow rule needed; root `*.py` files were already
+    allowed.
+- **2a — PA-0021 sweep.**
+  - Scope: the acceptance tables of CR-0007..0013 and live-code
+    thresholds. The live-code enumeration was done by a read-only
+    helper agent and spot-verified.
+  - Two instances were found:
+    - `BUG-0039`: CR-0009 v4 symptom GATEs, owner CR-0009;
+    - `BUG-0040`: `check_road_dist.py` RD1/RD4, needs a CR.
+  - Superseded texts are noted with no BUG. Runtime input guards are
+    classed outside the mechanism.
+  - PA-0021's Swept? cell records the result.
+- **Open for the user:**
+  - BUG-0039's calibration compute;
+  - whether a PA is needed for findings lost when a gate moves between
+    CRs (BUG-0040 §7);
+  - whether runtime guards belong in PA-0021's scope.

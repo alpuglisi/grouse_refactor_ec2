@@ -247,8 +247,9 @@ class U3Validity(Base):
     def test_zero_eligible_nodata_not(self):
         # Float raster: a 0 band, each sentinel, the declared nodata
         # (-5555, not a sentinel) and NaN; one real value 9.
-        vals = [0.0, 9.0] + [float(s) for s in NODATA_SENTINELS] + \
-            [-5555.0, float("nan")]
+        readings = [0.0, 9.0]
+        sentinel_vals = [float(s) for s in NODATA_SENTINELS]
+        vals = readings + sentinel_vals + [-5555.0, float("nan")]
         arr = np.repeat(np.array(vals, np.float32), 20)[None, :].repeat(40, 0)
         rd = self.lonlat_raster("u3.tif", arr, nodata=-5555.0)
         df = train.sample_background_points(

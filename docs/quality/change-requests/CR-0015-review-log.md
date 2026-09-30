@@ -316,7 +316,7 @@ code at `3add80b` against the main tree's `data/` (read-only).
 | id | severity | disposition + where |
 |---|---|---|
 | A-1 | MEDIUM | **Tracked.** V3 stays OBS (see V3 below), so the 5-draw broken side decides nothing. Before any GATE re-reading: ≥ 50 seeds per broken sampler, or a recorded analytic argument for the deterministic unassigned-excluded statistic. Tracker: "CR-0015 implementation code review", owner the lead. |
-| A-2 | MEDIUM | **Fixed.** 7b and 7a re-run at `d567355` from a clean tree (`git status --porcelain --untracked-files=no` empty, checked by the run scripts before starting). The hash and clean status are recorded in `docs/quality/evidence/CR-0015-background.txt` and `docs/quality/evidence/CR-0015-V/calibration_7a.log`. The 7b stdout is identical to the earlier run, and the 7a calibration JSON is identical except for the wall-clock `seconds` fields. Evidence commit: see "Follow-up commits" below. |
+| A-2 | MEDIUM | **Fixed.** 7b and 7a re-run at `d567355` from a clean tree (`git status --porcelain --untracked-files=no` empty, checked by the run scripts before starting). The hash and clean status are recorded in `docs/quality/evidence/CR-0015-background.txt` and `docs/quality/evidence/CR-0015-V/calibration_7a.log`. The 7b stdout is identical to the earlier run, and the 7a calibration JSON is identical except for the wall-clock `seconds` fields. Evidence commit: `8a686a6`. |
 | A-3 = B-2 | MEDIUM | **Fixed** in `d567355`. `tests/test_cr0015_real.py` `_setup` now catches only `FileNotFoundError`, `ImportError` and `MissingDataError`. Verified: a patched `TypeError` in `train.discover_features` gives `errors 1, skipped 0`, and no data root still skips with `FileNotFoundError`. Filed as **BUG-0063** (PA-0027 recurrence of BUG-0049, with the prior-PA failure analysis); the PA-0027 Swept? correction is in `docs/quality/evidence/CR-0015-bookkeeping-rows.md`. |
 | A-4 | LOW | **Fixed** in `d567355`. The rows file no longer says "allocate from BUG-0050". It names BUG-0058..0060 as allocated and warns that BUG-0050..0057 are taken. |
 | A-5 | LOW | **Tracked** (call-site test for `build_datasets`), owner the lead. |
@@ -344,3 +344,8 @@ replaced. The lead allocated BUG-0063 as **BUG-0063**.
 
 The author and both reviewers approved, and the user pre-authorised the
 autonomous review → approve → implement cycle (2026-09-30).
+
+### Follow-up commits
+- `d567355`: A-3/B-2 fix (BUG-0063), B-1, A-4, id renames and tracker
+  items.
+- `8a686a6`: the A-2 re-run evidence, the BUG-0063 id, and this log.

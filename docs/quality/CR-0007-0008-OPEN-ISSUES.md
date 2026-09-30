@@ -172,7 +172,7 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 - [ ] LOW (BUG-0053 follow-up, owner: next change to `analyze_grouse.py` / `generate_negatives.py`): the `evt_xwalk is None` branches at `analyze_grouse.py:787`, `:1110` and `generate_negatives.py:407` are unreachable since `4683e3c`; delete them (left in place so the fix stayed inside one function)
 - [ ] LOW (BUG-0053 follow-up, owner: lead): `grouse_data.GrouseData.evt_crosswalk` still returns `None` for a missing or malformed table, and its docstring claims the same semantics as `load_evt_crosswalk`, which no longer holds. No caller in tracked code; decide whether to raise the same way or delete it
 - [ ] LOW (BUG-0052 follow-up, owner: next change to `download_rev.py`): after a download, an unreadable raster is rejected with the caller's "raster is empty (0.00% valid pixels)" message; the probe's preceding log line names the real cause. Reword the caller message if it misleads
-- [ ] **PA-0027 enforcement** (needs a CR; `CLAUDE.md` §3.4): lint test in the style of `tests/test_nodata_zero_lint.py` flagging every broad handler that neither re-raises nor is allow-listed with a reason (PA-0027 Swept? classification is the initial allow-list) — owner: lead
+- [x] **PA-0027 enforcement** (needs a CR; `CLAUDE.md` §3.4) — **DONE: CR-0018 APPROVED, `tests/test_pa0027_lint.py`; PA-0027 row update in `docs/quality/evidence/CR-0018-bookkeeping-rows.md` for the lead**: lint test in the style of `tests/test_nodata_zero_lint.py` flagging every broad handler that neither re-raises nor is allow-listed with a reason (PA-0027 Swept? classification is the initial allow-list) — owner: lead
 
 ## CR-0017 round 1 (2026-09-30)
 MAJOR items (A1=B1, B2) and most MEDIUM/LOW items were revised into CR-0017 v2 (review log). Open follow-ups:
@@ -197,3 +197,19 @@ open round-2 items beyond the CR-0017 round-1 list above.
 - [ ] **PA-0030 enforcement** (needs a CR; `CLAUDE.md` §3.4): lint test from `docs/quality/evidence/BUG-0056/sweep_condkeys.py` with an allow-list seeded from `sweep_triage.md` — owner: lead
 - [ ] LOW: `fit()` always calls `evaluate()` with the default `tta_group=4` and cannot opt out; decide with BUG-0062's CR whether `fit()` forwards `tta_group` (signature change) — owner: BUG-0062 CR author
 - [x] CR-0012 deliverable 6 test plan item 7 (`smoke_test_training.py`) re-run after `40dbecf`: PASS, all 7 stages, scratch tree B (`docs/quality/evidence/CR-0012-d6/smoke_rerun.txt`)
+
+## CR-0018 (2026-09-30)
+PA-0027 lint `tests/test_pa0027_lint.py`. BUG candidates, pinned in its `EXPECTED_UNCLASSIFIED` (CR-0018 §4); filing or fixing one must remove/re-key its entries:
+- [ ] LOW **C1** `download_rev.py:149` `published_products`: broad catch → `None`, caller prints "unreachable" without the exception type; missed by the PA-0027 sweep — owner: lead (file BUG), then next change to `download_rev.py`
+- [ ] LOW **C2** `fetch_tile` in `download_tcc_nlcd.py:338` and `download_treemap.py:263`: retry catches `Exception`, no per-retry log (PA-0027 retry clause) — owner: lead (file BUG)
+- [ ] LOW **C3** `ee_init` in `download_tcc_nlcd.py:146` and `download_treemap.py:152`: `as persistent_err` is unbound after the clause, so the SystemExit message becomes `UnboundLocalError` — owner: lead (file BUG)
+- [ ] LOW **C4** `acceptance_split.git_commit` (`:152`): unknown dirty state recorded as `False` by `build_manifest` (`:1185`) — owner: lead (file BUG); CR-0013 author on fix
+- [ ] LOW **C5** visible-unknown without the exception type: `acceptance_split.py:2620`, `analyze_grouse.py:658,671`, `check_exotic.py:71`, `check_raster.py:57`, `check_road_dist.py:480`, `symptom_check.py:663` — owner: lead (file BUG or decide per site)
+- [ ] MEDIUM **C6** region skip in diagnostics: `diagnose_training.py:52`, `diagnose_water_bias.py:115` (BUG-0055 shape) — owner: lead (file BUG)
+- [ ] MEDIUM **C7** `generate_treemap_features.py:179` `_source_is_valid`: any error → vintage skipped with a wrong printed cause, exit 0 — owner: lead (file BUG)
+
+Review follow-ups:
+- [ ] MEDIUM (A-r2, R-A5a): lint limits in CR-0018 §5 — broad→narrow laundering, aliases/walrus, caller-side handling, `finally`-swallow, `yield` before `raise` — decide whether to extend PA-0027's text and the lint — owner: lead
+- [ ] LOW (B11): run-time string exit messages (`SystemExit(msg)`) do not conform mechanically; accept str-producing expressions if such a handler appears — owner: lead
+- [ ] LOW (B9): `docs/quality/evidence/` acceptance scripts are outside the lint's file set; revisit if one gains a broad handler — owner: lead
+- [ ] LOW (CR-0018 T8, reviewer B): `download_tcc_nlcd.collection_years` (`:209`) fallback to `system:index` is silent; print it — owner: next change to `download_tcc_nlcd.py`

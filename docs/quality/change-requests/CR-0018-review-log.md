@@ -9,6 +9,14 @@ Reviewers: A and B, independent general-purpose agents, neither the author.
 |---|---|---|---|---|
 | 1 | v1 (`6773aa4`) | A | REQUEST CHANGES | R-A1 |
 | 1 | v1 (`6773aa4`; B's HEAD `73a08ec`, CR-0018 files unchanged) | B | REQUEST CHANGES | B1 |
+| 2 (bounded, A2) | v2 (`8a42b6e`) | A | APPROVE WITH FOLLOW-UPS | — |
+| 2 (bounded, A2) | v2 (`8a42b6e`) | B | APPROVE WITH FOLLOW-UPS | — |
+| — | v2.1 | author | APPROVE | — |
+
+**Approval: author + reviewers approved; user pre-authorised (2026-09-30).**
+Status APPROVED. v2.1 differs from the reviewed v2 only by the two §5
+known-limit bullets asked for in B11/B12, the status line and the
+deliverable ticks; no rule, code or classification change.
 
 ## Concerns and dispositions
 
@@ -33,6 +41,19 @@ before it was applied.
 | B10 | LOW | walrus / alias forms. | Already in §5 (walrus added to the text). No change. |
 | B (T8 note) | LOW | `download_tcc_nlcd.py:209` fallback not printed; id parse not provably equal to timestamps. | **Kept allowlisted**, reason extended: an empty result aborts in the caller (`download_tcc_nlcd.py:507`), and the enclosing-function digest now pins the fallback. Tracker follow-up (LOW, owner: next change to `download_tcc_nlcd.py`). |
 
+### Round 2 (bounded)
+Both reviewers: every round-1 BLOCKING/MAJOR concern resolved (R-A1,
+R-A2, R-A3a/b; B1–B4), no new BLOCKING or MAJOR.
+
+| id | sev | concern (short) | disposition |
+|---|---|---|---|
+| A-r2 | MEDIUM | R-A5(a) laundering and the other §5 limits need a tracker row with an owner. | **Accepted**: tracker § "CR-0018 (2026-09-30)", owner lead. |
+| A-r2b | LOW | Whole-function digests churn on large functions. | Accepted as designed (CR Impact). No change. |
+| B11 | LOW | Run-time string exit messages (`SystemExit(msg)`, `+`, `.format`) over-flagged. | **Accepted as documented behaviour**: added to CR §5 (conservative; none today); tracker item, owner lead. |
+| B12 | LOW | `yield` before `raise` in a handler conforms. | **Accepted**: added to CR §5; tracker item, owner lead. |
+| B13 | LOW | Digest churn (same as A-r2b). | Accepted as designed. |
+| B14 | MEDIUM (process) | Record that M11 remains a known limit. | Recorded: B6 row and round-2 T7 below; §5 caller limit. |
+
 ## Reviewer-built mutations (T7) and allowlist re-derivation (T8)
 ### Round 1
 - **A, T7:** M1 conditional `return` before `raise`, M2 `return` then a
@@ -49,6 +70,15 @@ before it was applied.
   `acceptance_split.py` entries. Confirmed except `diagnose_*` (R-A2),
   `ee_init` (R-A3a) and `git_commit` (R-A3b).
 - **B, T8:** every entry. Confirmed except as B2–B5 and the `:209` note.
+### Round 2
+- **A, T7 on v2:** M1, M2, M4, M5, M6, M8, M9 now flagged; M3 flagged;
+  M7 (laundering) missed, §5. Extra probes M10–M17 (for-else continue,
+  if-raise/else-continue, `SystemExit(msg_var)`, nested handler return,
+  match/case return; inner while/break, `async with` raise, lambda) all
+  behave as the v2 rule states.
+- **B, T7 on v2:** M1–M6, M8, M9, M10 fail T6 (M6 prints the re-key
+  hint); M7 (walrus) and M11 (caller) missed, both §5. Independent
+  path-sensitive enumerator: same 36 handlers.
 - **v2 check by the author:** A's M1 on `generate_negatives.main` →
   flagged; every v1 positive/negative control keeps its result.
 
@@ -57,3 +87,5 @@ before it was applied.
 - v2: round-1 dispositions above. Rule (early exits, exit arguments,
   `suppress` in `with`), digest scope, 3.13 dump; ALLOWLIST 30 → 17,
   candidates 3 → 16 sites (C1–C7).
+- v2.1: round-2 dispositions (B11, B12 to §5), APPROVED; deliverables
+  ticked; bookkeeping rows and tracker entries written.

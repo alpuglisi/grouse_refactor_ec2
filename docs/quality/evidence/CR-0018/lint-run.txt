@@ -1,4 +1,4 @@
-HEAD 8a42b6e (CR-0018 v2), python Python 3.12.9, 2026-09-30T14:38:13Z
+HEAD f24581b + CR-0018 v2.1 approval commit (test file identical to 8a42b6e), python Python 3.12.9, 2026-09-30T14:40:55Z
 test_prefix_code_flagged_and_unclassified (tests.test_pa0027_lint.TestHistoricalDefects.test_prefix_code_flagged_and_unclassified) ... ok
 test_edit_after_handler_in_same_scope_detected (tests.test_pa0027_lint.TestMutations.test_edit_after_handler_in_same_scope_detected) ... ok
 test_edit_to_classified_handler_detected (tests.test_pa0027_lint.TestMutations.test_edit_to_classified_handler_detected) ... ok
@@ -48,6 +48,6 @@ test_negative_controls_pass (tests.test_pa0027_lint.TestRuleControls.test_negati
 test_positive_controls_flagged (tests.test_pa0027_lint.TestRuleControls.test_positive_controls_flagged) ... ok
 
 ----------------------------------------------------------------------
-Ran 11 tests in 0.786s
+Ran 11 tests in 0.801s
 
 OK

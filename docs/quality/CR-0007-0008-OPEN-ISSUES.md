@@ -180,3 +180,13 @@ MAJOR items (A1=B1, B2) and most MEDIUM/LOW items were revised into CR-0017 v2 (
 - [ ] LOW (CR-0017 §4, retrain follow-up): `grouse_cr0009.pth` and earlier models were trained on pre-CR-0017 negatives (23 within 300 m of the domain edge); the next CR that retrains must train on the post-CR-0017 record and say so — owner: author of the next retrain CR
 - [ ] MEDIUM (A3=B4, process): CR-0017 deliverables 2–4 stay on an unmerged branch until deliverable 6; whoever merges branches must not merge it early (config sha change refuses all training until the new record) — owner: lead
 - [ ] BUG-NEW-a (NY/MA sibling of BUG-0050) and the proposed PA extending PA-0023 (review log § Proposed bookkeeping rows): allocate the BUG id — owner: lead; filing — owner: CR-0017 deliverable 8
+
+## CR-0017 round 2 (2026-09-30)
+Round 2 approved v3. A8, B11 and B12 were applied in v3; there are no
+open round-2 items beyond the CR-0017 round-1 list above.
+- [ ] LOW (B11 residual, stated limit): MC does not check the N-only
+      columns of added rows other than `label` (`obs_date`,
+      `coord_uncertainty_m`), nor the identity of the replacements. R4
+      checks both in the same run. If MC is ever run without R4, extend
+      MC4 to compare them with `gbif_negatives_R` by `gbif_id` — owner:
+      CR-0017 deliverable 6 executor.

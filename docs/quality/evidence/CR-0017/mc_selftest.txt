@@ -1,4 +1,4 @@
-CR-0017 MC author self-check (check_must_change.py v2), 2026-09-30. Not the PA-0021(a) run (see mc_wrongtrees.txt).
+CR-0017 MC author self-check (check_must_change.py v3), 2026-09-30. Not the PA-0021(a) run (see mc_wrongtrees.txt).
 == (1) no-op: --new = --old (the live tree) — must FAIL ==
 MC0: PASS 20 old artifacts equal the d6 record
 MC1: PASS P and B unchanged

@@ -18,10 +18,13 @@ MC4  N per (R, split, is_nonveg): row count NEW == OLD; the number of
      keys NEW adds equals the number removed in that cell; every added
      row is a row of NEW's C in the same (R, split, is_nonveg) cell, and
      equals that C row, as text, on every column N and C share; no cell
-     exists in NEW that is absent from OLD.
+     exists in NEW that is absent from OLD; every added row has label 0.
+     NEW's combined file is in canonical (longitude, latitude) order.
 MC5  train_negatives_R / val_negatives_R: header + the combined file's
      split == train / val lines, in order (NEW tree).
-MC does not check WHICH replacements are drawn: R4's replay does that.
+MC does not check WHICH replacements are drawn, nor the N-only columns
+of added rows other than label (obs_date, coord_uncertainty_m): R4's
+full-row replay does that, in the same run.
 
 Exit 0 only if every check passes. Every check is reported.
 
@@ -141,12 +144,17 @@ def main():
             bad_add = [k for k in added if k not in new_c_keys
                        or not n_s.loc[[k], shared].iloc[0].equals(
                            new_c_s.loc[[k], shared].iloc[0])
-                       or new_c_s.loc[[k], "region"].iloc[0] != r]
+                       or new_c_s.loc[[k], "region"].iloc[0] != r
+                       or n_s.loc[[k], "label"].iloc[0] != "0"]
             cell_ok = len(ng) == len(og) and len(added) == removed and not bad_add
             ok &= cell_ok
             det.append(f"{s_}/{'nv' if nv else 'hab'} {len(og)}->{len(ng)} "
                        f"-{removed}+{len(added)}"
                        + (f" BAD {bad_add[:2]}" if bad_add else ""))
+        order = list(zip(n["longitude"], n["latitude"]))
+        if order != sorted(order):
+            ok = False
+            det.append("combined file not in canonical (lon, lat) order")
         check(f"MC4[{r}]", ok, "; ".join(det))
         sp = n["split"].tolist()
         ok5 = True

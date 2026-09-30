@@ -1,6 +1,7 @@
 # CR-0017: Drop candidate negatives within BUFFER_M of the sightings' acquisition-domain edge
 
-**Status: DRAFT (v2), 2026-09-30, for round-2 review.** Verdicts and dispositions:
+**Status: APPROVED (v3), 2026-09-30.** Author and reviewers approved;
+user pre-authorised (2026-09-30). Verdicts and dispositions:
 `CR-0017-review-log.md`. This document states only current intent.
 
 ## Scope
@@ -101,7 +102,10 @@ candidates. So the final pool is the old pool minus exactly the rows with
 
 | file | change |
 |---|---|
-| `regions.py` | New `domain_edge_m(x, y, *, domain=None)` (x, y in EPSG:5070): returns a float64 array of `edge_m`. With `domain=None` it builds D once, as above, and caches it. `domain` is the test seam: a shapely polygon that replaces D. No new constant: `BUFFER_M` and `STATE_FIPS` already exist (PA-0001, PA-0025). |
+| `regions.py` | New `domain_edge_m(x, y, *, domain=None)` (x, y in EPSG:5070): returns a float64 array of `edge_m`. With `domain=None` it builds D once, as above, and caches it. One private
+helper reads the filtered counties in the file CRS, and both D and
+`_state_polygons()` use it. So the template, the `STATEFP` filter and the
+missing-CRS default exist once. `domain` is the test seam: a shapely polygon that replaces D. No new constant: `BUFFER_M` and `STATE_FIPS` already exist (PA-0001, PA-0025). |
 | `generate_negatives.py` | New `domain_edge_drop_mask(lon, lat)` = `regions.domain_edge_m(*to_5070(lon, lat)) <= BUFFER_M`. Pool step 6 drops `in_buffer \| at_edge`. Module docstring step 6 and the summary print are updated. |
 | `tests/test_cr0017.py` (new) | Synthetic unit tests (§ Test plan). |
 
@@ -187,25 +191,39 @@ reads the pre-registered removals in `preregister_keys.csv`:
   - the row count is unchanged, and additions equal removals;
   - every added row is a row of the new C in the same region and cell,
     and equals it, as text, on every column N and C share;
-  - no cell appears in the new tree that is absent from the old.
+  - no cell appears in the new tree that is absent from the old;
+  - every added row has `label` 0;
+  - the new combined file is in canonical (longitude, latitude) order.
 - **MC5:** each `train_`/`val_negatives_R` file is the header plus the
   combined file's lines of that split, in order.
 
 **What fails MC:**
 - a no-op (MC2, MC3);
 - a deletion without replacement (MC4);
-- rewritten values on kept or added rows (MC3, MC4).
+- rewritten values on kept rows (MC3);
+- rewritten C-shared columns or `label` on added rows (MC4);
+- row order (MC4).
 
-**Limit.** MC does not check *which* replacements are drawn. R4's replay
-does that, in the same run.
+**Limit.** MC does not check two things:
+- *which* replacements are drawn;
+- the N-only columns of added rows other than `label` (`obs_date`,
+  `coord_uncertainty_m`).
 
-**PA-0021(a) runs.** Reviewer B built five wrong and correct trees, and
-their results under the current MC are in `mc_wrongtrees.txt`:
-- "every US county" → FAIL;
-- undissolved → FAIL;
-- weights ×2 → FAIL;
-- correct → PASS;
-- wrong replacements → PASS, the stated limit.
+R4's full-row replay checks both, in the same run.
+
+**PA-0021(a) runs.** The reviewers built wrong and correct trees; their
+results under the current MC are in `mc_wrongtrees.txt`:
+- **Reviewer B:**
+  - "every US county" → FAIL;
+  - undissolved → FAIL;
+  - weights ×2 → FAIL;
+  - added rows relabelled → FAIL;
+  - reordered → FAIL;
+  - correct → PASS;
+  - wrong replacements → PASS, the stated limit.
+- **Reviewer A:**
+  - faithful regeneration → PASS;
+  - one retained weight changed → FAIL.
 
 `mc_selftest.txt` is the author's no-op check.
 
@@ -226,9 +244,9 @@ domain edge:
 
 Within 1 km, the counts are 27 train and 4 val (author's check, same
 method as `preregister.py`). Tolerance: the band holds at most 0.5 % of
-either class's positives. This per-class difference is accepted,
-because at that size it cannot be a usable label cue. It is recorded,
-not gated.
+the positives in each split. By design it holds no negatives after the
+change. The author judges, without measuring it, that a difference this
+small cannot be a usable label cue. It is recorded, not gated.
 
 ### 4. Retrain decision: no retrain under this CR
 **Decision:**
@@ -353,10 +371,11 @@ regeneration and bookkeeping. They cannot land separately:
   acquired data.
 
 ## Deliverables (in execution order)
-- [ ] 1. Pre-approval (CR-0011 A3), for review:
+- [x] 1. Pre-approval (CR-0011 A3), reviewed in rounds 1–2 (MC at v3):
       - `docs/quality/evidence/CR-0017/preregister.py`,
         `preregister.txt` and `preregister_keys.csv`;
-      - `check_must_change.py` and `mc_selftest.txt`.
+      - `check_must_change.py`, `mc_selftest.txt`, `mc_wrongtrees.txt`
+        and the reviewer tree builders.
 - [ ] 2. Acceptance changes (§3), on the unmerged CR-0017 branch (§ Impact),
       by a fresh agent that does not also write deliverable 3 (CR-0013
       rule 4):

@@ -9,6 +9,16 @@ intent (CR-0011 A4).
 |---|---|---|---|---|
 | 1 | v1 (`b043fb2`, `01e0605`) | A: correctness of diagnosis and fix (fresh agent) | APPROVE WITH FOLLOW-UPS | 0 (1 MAJOR, 2 MEDIUM, 4 LOW) |
 | 1 | v1 (`01e0605`) | B: implementability, composition, acceptance (fresh agent) | APPROVE WITH FOLLOW-UPS | 0 (2 MAJOR, 4 MEDIUM, 4 LOW) |
+| 2 (bounded, A2) | v2 (`73a08ec`) | A | APPROVE | 0 (1 LOW) |
+| 2 (bounded, A2) | v2 (`73a08ec`) | B | APPROVE WITH FOLLOW-UPS | 0 (1 MEDIUM, 1 LOW) |
+
+**Approval.**
+- Author and reviewers approved; user pre-authorised (2026-09-30).
+- Quorum (CLAUDE.md §1.4): the author and both reviewers who commented.
+  A: APPROVE (round 2). B: APPROVE WITH FOLLOW-UPS (round 2).
+- No BLOCKING concern was raised in either round.
+- The round-2 findings (A8, B11, B12) were applied in v3, after the
+  verdicts, as the reviewers suggested. Nothing else changed in v3.
 
 Both reviewers re-derived the fix from the code and data, not from the CR:
 - **A** recomputed the 88 / 23 split and the 39/31/18 and 12/6/5 counts
@@ -42,6 +52,21 @@ was applied.
 | B9 | LOW | There is no test seam for an injected domain. | Accepted and revised: `domain_edge_m(x, y, *, domain=None)`. | §2 Code; § Test plan |
 | B10 | LOW | CR-0009 remaining work is 9–12, not 8–12. Facts are restated (18/4,986, 1.802 m, the B1 precondition). The fixture "gets" a non-domain county it already has. `mc_selftest.txt` cites an old HEAD. | Accepted and revised. The CR-0009 range is corrected. The counts and margin are stated once and referenced elsewhere. The attack preamble now says "already has". `mc_selftest.txt` is regenerated for MC v2. The B1 precondition appears in §2 (why) and deliverable 5 (check), and Risk now points to the deliverable. | §4; § Risk; §3 |
 
+## Round 2: concerns and dispositions
+Round 2 was bounded (CR-0011 A2).
+- **Round-1 concerns:** both reviewers found all of them resolved in the
+  operative text.
+- **Reviewer A:** rebuilt a faithful regeneration (`tree2`), which passes
+  MC v2, and a one-weight mutation (`tree3`), which fails MC3.
+- **Reviewer B:** confirmed that every live N row equals its C row as text
+  on all 19 shared columns, so MC4 cannot fail a correct regeneration.
+
+| id | sev | concern (short) | disposition | where (v3) |
+|---|---|---|---|---|
+| A8 | LOW | The support tolerance wording is muddled ("either class"). "Cannot be a label cue" is asserted, not measured. | Accepted and revised: "at most 0.5 % of the positives in each split". The band holds no negatives by design. The cue statement is labelled as the author's unmeasured judgement. | §3 Support after the change |
+| B11 | MEDIUM | MC v2 passes W6 (added rows with `label=1` and junk `obs_date`/`coord_uncertainty_m`) and W7 (reordered N). "What fails MC" overstated this. R4 and the order checks catch both in the same run, so it is not BLOCKING. | Accepted and revised; both of B's options were taken in part. MC v3: MC4 requires `label` "0" on added rows, and canonical (lon, lat) order of the combined file. The text now says `obs_date` and `coord_uncertainty_m` on added rows are a stated limit, covered by R4. Verified against the real code: `canonical(sel, NEGATIVE_ORDER)` sorts by (longitude, latitude), and live `negatives_ME.csv` is sorted. Re-run on all 9 trees: W6 and W7 now FAIL; W2 and A's `tree2` PASS; W4 PASSes (the stated limit); the rest FAIL. | §3 MC; `check_must_change.py`; `mc_wrongtrees.txt`; `mc_selftest.txt` |
+| B12 | LOW | `regions.py` would hold two readers of the county file. | Accepted and revised. One private helper reads the filtered counties in the file CRS, and both D and `_state_polygons()` use it. The code review of deliverable 3 checks it. | §2 Code |
+
 ## Revision history
 - **v1** (`b043fb2`): first draft.
 - **v1** (`01e0605`): specified against CR-0015 head `3add80b` (lead
@@ -51,6 +76,13 @@ was applied.
   `mc_wrongtrees.txt` and `reviewB_build_trees.py` (reviewer B's tree
   builder, committed so the PA-0021(a) run can be re-run), and a
   regenerated `mc_selftest.txt`.
+- **v3**: round-2 dispositions (A8, B11, B12), with MC at v3. Status
+  APPROVED. Evidence: `reviewB_build_trees_r2.py` (W6, W7) and
+  `mc_wrongtrees.txt` re-run over 9 trees. Reviewer A's `tree2` and
+  `tree3` builder was not committed. It is described above: pool minus
+  the 88 rows, a real `draw_region_split`, added rows assembled from the
+  new C plus the `gbif_negatives_R` N-only fields; `tree3` is `tree2`
+  with one retained VT weight doubled.
 
 ## Proposed bookkeeping rows (for deliverable 8; not yet filed)
 The author does not edit `BUG_LOG.md` or `PREVENTIVE_ACTIONS.md`. The lead

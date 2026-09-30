@@ -134,10 +134,9 @@ CR-0009 and CR-0010 rely on it (e.g. CR-0009 retrains with the
 
 **Residual.** `missing_mask=False` (legacy checkpoints,
 `--no-missing-mask`) still sends nodata to the 0 representation. That
-is a separate defect with its own owner: **BUG-NEW-2** (placeholder id;
-the lead assigns it).
+is a separate defect with its own owner: **BUG-0059**.
 
 **Status: FIXED (by `51a4ad0`); CLOSED** per PA-0022, since nothing is
-left undetermined. The residual is owned by BUG-NEW-2. The `BUG_LOG.md`
+left undetermined. The residual is owned by BUG-0059. The `BUG_LOG.md`
 row change is proposed in
 `docs/quality/evidence/CR-0015-bookkeeping-rows.md`.

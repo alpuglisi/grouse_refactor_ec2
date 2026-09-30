@@ -1,7 +1,7 @@
-# BUG-NEW-3: Checkpoints carry no split provenance, so a model fitted to today's validation rows can re-enter training and calibration
+# BUG-0060: Checkpoints carry no split provenance, so a model fitted to today's validation rows can re-enter training and calibration
 
-> Placeholder id: the lead assigns the real id (≥ BUG-0050) and renames
-> this file. Found by the CR-0015 deliverable 2 producer sweep for
+> Id allocated by the lead (2026-09-30); filed as a placeholder by the
+> CR-0015 implementer. Found by the CR-0015 deliverable 2 producer sweep for
 > BUG-0042 / PA-0029.
 
 ## 1. Description

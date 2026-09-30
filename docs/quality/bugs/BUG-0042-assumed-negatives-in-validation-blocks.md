@@ -172,7 +172,7 @@ run-time producer of training or validation rows:
   `train.py:246` omits them.
 - `clean.py` and `legacy/gen_negs.py` would re-split, but they are
   guarded by a first-line `SystemExit` (CR-0012 §6).
-- **Finding → BUG-NEW-3.** Checkpoints carry no split provenance:
+- **Finding → BUG-0060.** Checkpoints carry no split provenance:
   - `--distill-from` teachers produce soft training targets.
   - `--init-from` accepts supervised checkpoints.
   - `--resume` checks geometry only.
@@ -191,5 +191,3 @@ run-time producer of training or validation rows:
     `Selection_Ratio` over all sightings).
   - D4: there is no buffer between training and validation blocks, and
     the 64 px window is about 1.9 km against 3 km blocks.
-
-(BUG-NEW-n ids are placeholders; the lead assigns the real ids.)

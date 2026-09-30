@@ -160,3 +160,16 @@ IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n
 - [ ] LOW (owner: lead): regenerate `PROJECT_TREE.md` after CR-0012 deliverable 6.
 - [ ] LOW (owner: BUG-0047 CR): `generate_negatives.load_evt_crosswalk` and `verify_partition` resolve paths from cwd/`raster_dir`, not the data root; `KEY_DECIMALS` lives in `generate_negatives.py`, outside P6 (CR-0012 code review F3, I-L1, I-L5)
 - [ ] LOW (owner: CR-0012 implementer): `git_state` gives an opaque error outside a git checkout; `organize_project.py:107` stale `block_assignments_` rewrite; `prepare_training_data` imported twice when run as `__main__` (F4, I-L4, I-L6)
+
+## CR-0015 implementation code review (head 3add80b) — follow-ups, owner: lead
+- [ ] A-1 (MEDIUM): the V3 broken-side calibration uses 5 draws per sampler (`tests/cr0015_background_check.py`, `for s in range(5)`), below PA-0021(c)'s ≥ 50. It does not affect the OBS verdict. Before V3 is ever re-read as a GATE, run ≥ 50 seeds per broken sampler, or record that the unassigned-excluded statistic is deterministic (share 0 → equals the reference share).
+- [ ] A-5 (LOW): no test checks the `train.build_datasets` call site (`train_blocks_only=True`, global `data.block_assignments`). A wrong-but-valid assignments frame would pass silently. Add a mock-based call-site test, or run V1's checker on the `bg_df` built inside `build_datasets`.
+- [ ] A-6 / B-7 (LOW / INFO): NH's observed acceptance of 0.3773 (V2) is below CR-0015 §2's budget premise of p ≥ 0.38. Sampling still converged in 6 of 40 rounds. Do not cite the budget argument as verified for NH.
+- [ ] B-3 (LOW): `regions.block_split` does not validate `assignments`:
+  - an empty frame gives `vf` NaN, so every unassigned block becomes "train";
+  - a duplicated `block_id` is decided by its last row;
+  - a label outside {train, val} lowers `vf`.
+
+  Fix: raise `ValueError` on each case, then re-check B1 and `test_cr0012`. This is a production-code validation change, out of CR-0015's scope, and needs a CR or a trivial-fix record.
+- [ ] B-4 (LOW): V3 is OBS under CR-0015's literal rule (lead decision; both reviewers concur). Optional later CR: scope V3's separation requirement to the samplers the CR's "caught by" table assigns to V3, and restore it as a GATE (needs A-1 first).
+- [ ] B-6 (LOW): `pretrain.py`'s preflight calls the private `regions._state_polygons()`. Use a public API, such as a one-point `regions.in_state` or a new `regions.require_state_polygons()`.

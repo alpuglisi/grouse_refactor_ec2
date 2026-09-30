@@ -158,11 +158,11 @@ The row text for `PREVENTIVE_ACTIONS.md` is in
       STATEFP.
 - **Manual read, two findings:**
   - `predict.py`'s `Edge` contrast metric turns nodata into 0 through
-    `torch.nan_to_num` → **BUG-NEW-1**.
+    `torch.nan_to_num` → **BUG-0058**.
   - `GrouseResNet.embed` with `missing_mask=False` sends
     `MISSING_CODE` to the embedding row of class 0 and NaN to 0.0. For
     `fdist`, 0 is a real code in about 92–96 % of in-coverage pixels
-    → **BUG-NEW-2**.
+    → **BUG-0059**.
 - **Checked and not affected:** every other `nan_to_num` (all use
   `nan=MISSING_CODE`), every boundless or WarpedVRT fill (every source
   declares a sentinel), `generate_treemap_features.py:300` (fill 0 is
@@ -170,5 +170,3 @@ The row text for `PREVENTIVE_ACTIONS.md` is in
   `fill=0` rasterisations (coverage or zone masks, not readings), and
   the int casts after NaN rows are dropped.
 - **BUG-0017:** FIXED by `51a4ad0` (see its doc).
-
-(The BUG-NEW-n ids are placeholders; the lead assigns the real ids.)

@@ -37,10 +37,13 @@ def _setup(case):
     if "chk" in _STATE:
         return _STATE
     import cr0015_background_check as C
+    from grouse_data import MissingDataError
+    # PA-0027: only the expected "no real data here" conditions are caught
+    # (a missing file or package); any other error propagates and fails.
     try:
         chk = C.Checker()
         data, feats, assign = C.real_inputs()
-    except Exception as e:                 # missing file or package
+    except (FileNotFoundError, ImportError, MissingDataError) as e:
         msg = f"real data unavailable from cwd {os.getcwd()}: {type(e).__name__}: {e}"
         _STATE["err"] = (case.failureException(msg) if REQUIRE
                          else unittest.SkipTest(msg))

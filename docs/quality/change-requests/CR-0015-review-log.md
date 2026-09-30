@@ -289,8 +289,8 @@ implementer's interpretations and results, for the code review:
 - **Deliverable 8.** The guard and `tests/test_cr0015_guard.py` were
   removed after 7b. The full suite passes: 239 tests OK. The 6
   real-data tests skip without a data root, by design.
-- **Sweep findings** (placeholder ids): BUG-NEW-1 (`predict.py` Edge
-  metric), BUG-NEW-2 (`missing_mask=False` embed), BUG-NEW-3 (no split
+- **Sweep findings** (ids allocated by the lead): BUG-0058 (`predict.py` Edge
+  metric), BUG-0059 (`missing_mask=False` embed), BUG-0060 (no split
   provenance on checkpoints). BUG-0017 was re-examined and is FIXED by
   `51a4ad0`.
 - **Handed to the lead:** the `BUG_LOG`/PA rows, the Swept? cells and the

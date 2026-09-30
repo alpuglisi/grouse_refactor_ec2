@@ -1,8 +1,7 @@
-# BUG-NEW-1: `predict.py`'s Edge contrast metric reads nodata as 0
+# BUG-0058: `predict.py`'s Edge contrast metric reads nodata as 0
 
-> Placeholder id: the lead assigns the real id (≥ BUG-0050) and renames
-> this file. Found by the CR-0015 deliverable 4 PA-0006 re-sweep (see
-> BUG-0032 §8).
+> Id allocated by the lead (2026-09-30); filed as a placeholder by the
+> CR-0015 implementer. Found by the CR-0015 deliverable 4 PA-0006 re-sweep.
 
 ## 1. Description
 When a TensorBoard writer and edge-capture features are given,

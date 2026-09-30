@@ -1,8 +1,7 @@
-# BUG-NEW-2: With `missing_mask=False`, nodata is embedded as class/value 0, and `fdist` uses 0 as a real code
+# BUG-0059: With `missing_mask=False`, nodata is embedded as class/value 0, and `fdist` uses 0 as a real code
 
-> Placeholder id: the lead assigns the real id (≥ BUG-0050) and renames
-> this file. Found by the CR-0015 deliverable 4 PA-0006 re-sweep (see
-> BUG-0032 §8).
+> Id allocated by the lead (2026-09-30); filed as a placeholder by the
+> CR-0015 implementer. Found by the CR-0015 deliverable 4 PA-0006 re-sweep.
 
 ## 1. Description
 `GrouseResNet.embed` handles nodata in two ways, depending on

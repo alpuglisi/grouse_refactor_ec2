@@ -85,20 +85,37 @@ class Base(unittest.TestCase):
         return FakeRegion(path)
 
 
+def albers_u1_raster(base):
+    """100 x 100 px, 200 m, in ALBERS_OTHER (not lon/lat), so native x/y
+    are metres and a sampler that passes them to in_state instead of
+    lon/lat fails U1 (review B-1). Returns (rd, lon of the "state" line)."""
+    tf = Transformer.from_crs("EPSG:4326", ALBERS_OTHER, always_xy=True)
+    x0, y0 = tf.transform(-71.2, 44.4)
+    path = os.path.join(base.tmp, "u1.tif")
+    write_raster(path, np.full((100, 100), 7, np.int16), ALBERS_OTHER,
+                 from_origin(x0, y0, 200.0, 200.0), -9999)
+    back = Transformer.from_crs(ALBERS_OTHER, "EPSG:4326", always_xy=True)
+    line_lon, _ = back.transform(x0 + 10_000.0, y0 - 10_000.0)
+    return FakeRegion(path), float(line_lon)
+
+
 class U1InState(Base):
     def test_every_point_in_state_and_region_passed(self):
-        rd = self.lonlat_raster("u1.tif", np.full((100, 100), 7, np.int16))
+        rd, line = albers_u1_raster(self)
         calls = []
 
         def in_state(lon, lat, region):
             calls.append(region)
-            return np.asarray(lon) < -70.5      # "state" west of a line
+            lon, lat = np.asarray(lon), np.asarray(lat)
+            # in_state must be given lon/lat, never native x/y
+            assert (np.abs(lon) <= 180).all() and (np.abs(lat) <= 90).all()
+            return lon < line                  # "state" west of a line
 
         df = train.sample_background_points(
             rd, ["evt"], 500, seed=1, region="AA", train_blocks_only=False,
             in_state=in_state)
         self.assertEqual(len(df), 500)
-        self.assertTrue((df["longitude"] < -70.5).all())
+        self.assertTrue((df["longitude"] < line).all())
         self.assertTrue(calls)
         self.assertEqual(set(calls), {"AA"})
 
@@ -236,11 +253,11 @@ class U1OnWrongSampler(Base):
     def test_todays_sampler_fails_u1(self):
         sys.path.insert(0, os.path.join(ROOT, "tests"))
         import cr0015_wrong_samplers as W
-        rd = self.lonlat_raster("u1w.tif", np.full((100, 100), 7, np.int16))
+        rd, line = albers_u1_raster(self)
         df = W.WRONG_SAMPLERS["todays_sampler"](
             rd, ["evt"], 500, seed=1, region="AA", train_blocks_only=False,
-            in_state=lambda lon, lat, r: np.asarray(lon) < -70.5)
-        self.assertFalse((df["longitude"] < -70.5).all())
+            in_state=lambda lon, lat, r: np.asarray(lon) < line)
+        self.assertFalse((df["longitude"] < line).all())
 
 
 class U3Validity(Base):

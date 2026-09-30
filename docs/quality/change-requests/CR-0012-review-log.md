@@ -238,3 +238,21 @@ re-review examines only the changed text.
 | version | date | change |
 |---|---|---|
 | v2.2 | 2026-09-30 | Cites CR-0013's config `columns` and `manifest_schema` (F2, F3). |
+
+## v2.2 bounded review (amendment 29f388b → v2.2)
+| reviewer | verdict |
+|---|---|
+| A — correctness | **APPROVE WITH FOLLOW-UPS** — positive/negative/pool/block columns and `manifest_schema` checked against today's files and §2 |
+| B — implementability | **APPROVE WITH FOLLOW-UPS** — implementable from text + config |
+
+Follow-ups applied in **v2.2.1** (text only):
+| # | sev | disposition (location) |
+|---|---|---|
+| A-v22-1 | LOW | undefined "S" → "the `evaluated_sightings_R` rows" (positives step 6) |
+| B-v22-1 | MEDIUM | manifest path keys are repo-relative, formed as the config's `paths`/`raster.template` form them (§2 Split manifest) |
+| B-v22-2 | MEDIUM | the manifest records the constants and environment **actually used**, measured at run time, never a copy of the config, so E11 detects build-time drift (§2 Split manifest). The replay's E11 must compare those recorded values with the config — passed to the replay author as part of CR-0013 deliverable 5a |
+
+## Quorum (v2.2)
+Reviewer A: APPROVE WITH FOLLOW-UPS. Reviewer B: APPROVE WITH FOLLOW-UPS.
+Author: pending user.
+

@@ -98,9 +98,9 @@ Conventions:
    Add whole blocks to validation until the running record count reaches
    `round(VAL_FRACTION × N)` (the `:105-111` rule).
 6. Write, per R, `thinned_/train_/val_positives_R.csv`, adding
-   `block_id` and `split`. `region` already exists in S (CR-0007 §2).
+   `block_id` and `split`. `region` already exists in the `evaluated_sightings_R` rows (CR-0007 §2).
    The columns are exactly CR-0013's config `columns.positives`, in that
-   order, selected from S by name; so `region` follows `envelope_id`.
+   order, selected from the `evaluated_sightings_R` rows by name; so `region` follows `envelope_id`.
    The train and val files are exactly the combined file's `split` rows.
    Write one `block_assignments.csv` with columns
    `columns.block_assignments`.
@@ -165,9 +165,14 @@ sections, one written by each script:
 The manifest's keys, the meaning of its counts (rows of a region
 remaining after each numbered step), the `draw` object and the format of
 the dropped list are defined by CR-0013's config `manifest_schema`
-(`docs/quality/acceptance_split.json`), which is normative. Each section
-records:
-- every constant in CR-0013's config list, one for one;
+(`docs/quality/acceptance_split.json`), which is normative. Every path
+key in `inputs` and `outputs` is **repo-relative**, formed exactly as the
+config's `paths` and `raster.template` form it (e.g.
+`data/pipeline/thinned_positives_ME.csv`). Each section records the values
+the script **actually used**, measured at run time — never a copy of the
+config — so that E11's comparison with the config detects drift:
+- every constant in CR-0013's config list, one for one, as read from
+  `regions.py` and the script;
 - the hash spec;
 - the sha256 of every input read (including each raster) and every output
   written;
@@ -175,8 +180,9 @@ records:
 - the dropped coordinates (pool step 4);
 - the git commit, and `dirty: true` if `git status --porcelain` lists any
   tracked `.py` file;
-- the `environment` object of CR-0013's config (library versions and the
-  4326→5070 operation string).
+- the environment the run used, in the shape of the config's
+  `environment` object (library versions from the imported modules, and
+  the 4326→5070 operation string produced per `environment.op_rule`).
 
 **Writes.** Each script builds all its outputs in memory, raises before
 writing anything, then writes each file to a temp file in the same

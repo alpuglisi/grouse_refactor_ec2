@@ -199,17 +199,22 @@ open round-2 items beyond the CR-0017 round-1 list above.
 - [x] CR-0012 deliverable 6 test plan item 7 (`smoke_test_training.py`) re-run after `40dbecf`: PASS, all 7 stages, scratch tree B (`docs/quality/evidence/CR-0012-d6/smoke_rerun.txt`)
 
 ## CR-0018 (2026-09-30)
-PA-0027 lint `tests/test_pa0027_lint.py`. BUG candidates, pinned in its `EXPECTED_UNCLASSIFIED` (CR-0018 §4); filing or fixing one must remove/re-key its entries:
-- [ ] LOW **C1** `download_rev.py:149` `published_products`: broad catch → `None`, caller prints "unreachable" without the exception type; missed by the PA-0027 sweep — owner: lead (file BUG), then next change to `download_rev.py`
-- [ ] LOW **C2** `fetch_tile` in `download_tcc_nlcd.py:338` and `download_treemap.py:263`: retry catches `Exception`, no per-retry log (PA-0027 retry clause) — owner: lead (file BUG)
-- [ ] LOW **C3** `ee_init` in `download_tcc_nlcd.py:146` and `download_treemap.py:152`: `as persistent_err` is unbound after the clause, so the SystemExit message becomes `UnboundLocalError` — owner: lead (file BUG)
-- [ ] LOW **C4** `acceptance_split.git_commit` (`:152`): unknown dirty state recorded as `False` by `build_manifest` (`:1185`) — owner: lead (file BUG); CR-0013 author on fix
-- [ ] LOW **C5** visible-unknown without the exception type: `acceptance_split.py:2620`, `analyze_grouse.py:658,671`, `check_exotic.py:71`, `check_raster.py:57`, `check_road_dist.py:480`, `symptom_check.py:663` — owner: lead (file BUG or decide per site)
-- [ ] MEDIUM **C6** region skip in diagnostics: `diagnose_training.py:52`, `diagnose_water_bias.py:115` (BUG-0055 shape) — owner: lead (file BUG)
-- [ ] MEDIUM **C7** `generate_treemap_features.py:179` `_source_is_valid`: any error → vintage skipped with a wrong printed cause, exit 0 — owner: lead (file BUG)
+PA-0027 lint `tests/test_pa0027_lint.py`. BUG candidates, pinned in its `EXPECTED_UNCLASSIFIED` (CR-0018 §4); filing or fixing one must remove/re-key its entries. Filed 2026-09-30 as BUG-0065..0071 (fixes `0355240`); `EXPECTED_UNCLASSIFIED` is now empty, the two pending `acceptance_split.py` sites are in `KNOWN_OPEN`:
+- [x] LOW **C1** `download_rev.py:149` `published_products`: broad catch → `None`, caller prints "unreachable" without the exception type; missed by the PA-0027 sweep — **BUG-0065, FIXED** (`0355240`: type logged; allowlisted visible-unknown)
+- [x] LOW **C2** `fetch_tile` in `download_tcc_nlcd.py:338` and `download_treemap.py:263`: retry catches `Exception`, no per-retry log (PA-0027 retry clause) — **BUG-0066, FIXED** (`0355240`: transient types only, type+traceback per retry)
+- [x] LOW **C3** `ee_init` in `download_tcc_nlcd.py:146` and `download_treemap.py:152`: `as persistent_err` is unbound after the clause, so the SystemExit message becomes `UnboundLocalError` — **BUG-0067, FIXED** (`0355240`; confirmed by repro; new PA-0031 proposed)
+- [ ] LOW **C4** `acceptance_split.git_commit` (`:152`): unknown dirty state recorded as `False` by `build_manifest` (`:1185`) — **filed BUG-0068, OPEN** (also: non-zero `git status` return code reads as clean); fix pending, owner: after CR-0017 merges (CR-0013 author on fix; two functions + manifest `dirty` may become `null`, so a CR or the next CR touching the file)
+- [ ] LOW **C5** visible-unknown without the exception type: `acceptance_split.py:2620`, `analyze_grouse.py:658,671`, `check_exotic.py:71`, `check_raster.py:57`, `check_road_dist.py:480`, `symptom_check.py:663` — **filed BUG-0069, PARTIALLY FIXED**: six sites fixed and allowlisted (`0355240`); `acceptance_split.py:2620` (`full_run#0`) pending, owner: after CR-0017 merges
+- [x] MEDIUM **C6** region skip in diagnostics: `diagnose_training.py:52`, `diagnose_water_bias.py:115` (BUG-0055 shape) — **BUG-0070, FIXED** (`0355240`: `MissingDataError` only; totals marked INCOMPLETE)
+- [x] MEDIUM **C7** `generate_treemap_features.py:179` `_source_is_valid`: any error → vintage skipped with a wrong printed cause, exit 0 — **BUG-0071, FIXED** (`0355240`: `OSError` only, cause printed)
+
+BUG-0065..0071 follow-ups (2026-09-30):
+- [ ] LOW (BUG-0070): `diagnose_water_bias.main`'s VERDICT omits a skipped region without a line of its own (the skip is printed in the region's section); add a "skipped: [...]" VERDICT line — owner: next change to `diagnose_water_bias.py`
+- [ ] LOW (BUG-0067 / PA-0031): PA-0031's enforcement is the re-runnable sweep `docs/quality/evidence/CR-0018-candidates/sweep_except_name.py`; a lint test (zero hits over the lint file set) needs a CR — owner: lead
+- [ ] LOW (BUG-0069): the PA-0027 lint does not check that a `visible-unknown` ALLOWLIST handler records the exception type (CR-0018 §5); consider a check that the handler body references `type(<exc name>)` or `traceback` — owner: lead (CR-0018 follow-up change)
 
 Review follow-ups:
-- [ ] MEDIUM (A-r2, R-A5a): lint limits in CR-0018 §5 — broad→narrow laundering, aliases/walrus, caller-side handling, `finally`-swallow, `yield` before `raise` — decide whether to extend PA-0027's text and the lint — owner: lead
+- [ ] MEDIUM (A-r2, R-A5a): lint limits in CR-0018 §5 — broad→narrow laundering, aliases/walrus, caller-side handling, `finally`-swallow, `yield` before `raise` — decide whether to extend PA-0027's text and the lint — owner: lead. Caller-side handling now has two filed instances: BUG-0068 (`None` coerced to clean by `bool()` in another function) and BUG-0071 (probe's `False` turned into a vintage skip by its callers); see their §8
 - [ ] LOW (B11): run-time string exit messages (`SystemExit(msg)`) do not conform mechanically; accept str-producing expressions if such a handler appears — owner: lead
 - [ ] LOW (B9): `docs/quality/evidence/` acceptance scripts are outside the lint's file set; revisit if one gains a broad handler — owner: lead
 - [ ] LOW (CR-0018 T8, reviewer B): `download_tcc_nlcd.collection_years` (`:209`) fallback to `system:index` is silent; print it — owner: next change to `download_tcc_nlcd.py`

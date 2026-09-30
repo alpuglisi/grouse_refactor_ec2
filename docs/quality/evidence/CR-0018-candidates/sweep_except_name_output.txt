@@ -1,0 +1,12 @@
+# sweep at 666474c (pre-fix)
+download_tcc_nlcd.py:162 ee_init: reads except-target 'persistent_err' outside its clause (NO other binding -> always unbound)
+download_treemap.py:168 ee_init: reads except-target 'persistent_err' outside its clause (NO other binding -> always unbound)
+72 files scanned at 666474c; 2 hit(s)
+
+# sweep at working tree (after BUG-0067 fix)
+72 files scanned at working tree; 0 hit(s)
+
+# controls
+python 3.12.9
+raised : UnboundLocalError - cannot access local variable 'persistent_err' where it is not associated with a value
+context: ValueError - path 2 failed

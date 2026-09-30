@@ -193,7 +193,7 @@ bookkeeping.**
 | R7-9 `tsd` `hit` semantics; vintage set | **Resolved** — `hit` excludes every sentinel; coverage per output year is the intersection over vintages ≤ Y, built in the same stripe loop |
 | R7-10 G7 year-copies | **Moved** to the `road_dist` CR |
 | R7-11 encoders sentinel→0 | **Resolved** — all four encoders and `qmd_from_balive_tpa` raise on non-finite input; nodata is written by mask after encoding |
-| R7-12 PA-0021 exemptions / fitted thresholds | **Resolved** — v8 has no statistical thresholds; every gate is exact equality |
+| R7-12 PA-0021 exemptions / fitted thresholds | **Resolved** — v8 has no statistical thresholds; every gate is exact equality. **Correction (2026-09-30, BUG-0041):** the RD part moved to CR-0014 and was dropped there; it is **moved to CR-0014 → BUG-0040 / CR-0016**, not resolved |
 | R7-13 provenance tag | **Resolved** — generators write `GROUSE_COVERAGE` |
 | R7-14 risk table | **Resolved** — rewritten for v8 scope |
 | R7-15 unattributed dispositions | **Accepted as historical** — the rounds 1–5 table is kept verbatim above; v8 dispositions are attributed |

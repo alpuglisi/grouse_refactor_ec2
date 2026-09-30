@@ -85,6 +85,14 @@ broken models, or else label the row OBS. It was not taken because the
 rule was unfiled when v4 was written (BUG-0033 § 5, step 4).
 
 ## 6. Corrective action
+**Decided and applied (user, 2026-09-30): demote.** CR-0009 v4 (working
+tree, uncommitted per user) now reports 1a/1b/2a/2b as OBS, with the
+reference values beside them and the rule that a value past its reference
+is investigated (PA-0016). Promotion needs ≥ 50 retrain seeds and a CR.
+Status: **FIXED in text** — takes effect when CR-0009 v4 is committed.
+
+Original analysis follows.
+
 Not yet applied. **Owner: CR-0009** (its next revision, before its
 review). CR-0009 is being revised by another session, so this record does
 not edit it. The remediation must satisfy PA-0021(c)/(f) for each of 1a,

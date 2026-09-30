@@ -103,6 +103,11 @@ Out of scope for this bug:
    another CR.
 
 ## 6. Corrective action
+**Decided (user, 2026-09-30): demote RD1 and RD4 to OBS — CR-0016**
+(written, awaiting review). The dropped-finding mechanism is BUG-0041.
+
+Original analysis follows.
+
 Not applied: this deliverable is bookkeeping only, with no code changes.
 It needs a CR, because the script is CR-0014's committed gate and a
 threshold change alters its acceptance behaviour. **Owner:** this bug,

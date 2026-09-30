@@ -1,0 +1,13 @@
+CR-0009 deliverable 6 - retrain evidence (2026-09-30)
+started   2026-09-30T13:49:44Z (started_utc.txt); training finished ~13:58Z
+hardware  hardware.txt (NVIDIA L40S, driver 560.35.03, 16 vCPU; DataLoader workers 14)
+argv      argv.txt; TensorBoard run/command (tb_run_command.txt) equals it minus the leading "python"
+vars      tb_run_args.txt (TensorBoard run/args, runs/20260930_135135_grouse_cr0009/)
+git       git_head.txt (615c805), git_status_porcelain.txt (untracked only)
+checkpoint grouse_cr0009.pth sha256 b2570c31c7bfbc49996313143da782930b111d11e863edd9c1d2f95ad9acfc25
+          (grouse_cr0009.pth.sha256); mtime 13:53:36Z = last save
+selection --select-by rank (default), min delta 0.001 -> saved checkpoint is epoch 3
+          (rank 0.7317 = 0.5*(TTA AUC 0.7783 + TTA AP 0.6851)); train.log last line
+acceptance acceptance_at_start.sha256: record 66d63e1d..., acceptance_split.json 1e3bfaa4...;
+          record config_sha256 = 1e3bfaa4... = sha256(git show 00c0b6f:docs/quality/acceptance_split.json). Consistent.
+per-epoch metrics.csv (10 rows); full log train.log

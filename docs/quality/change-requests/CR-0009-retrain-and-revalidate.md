@@ -357,7 +357,7 @@ epochs.
 - [ ] 4. Confirm CR-0012 deliverable 6 passed, with `acceptance_record.json`
       written; CR-0014 landed.
 - [x] 5. Backups (§ Disk): 23 files, 1.3 GB, verified; manifest `docs/quality/evidence/CR-0009/backup_SHA256SUMS`.
-- [ ] 6. Retrain (§ The change 1); record the evidence it lists.
+- [x] 6. Retrain (§ The change 1); record the evidence it lists. Saved checkpoint = epoch 3 (rank 0.7317); `docs/quality/evidence/CR-0009/retrain/retrain_summary.txt`.
 - [ ] 7. Refit calibration; confirm `model_path`.
 - [ ] 8. Record the new validation baseline, with the not-comparable
       note and BUG-0034.

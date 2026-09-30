@@ -175,3 +175,12 @@ Reviewer A round-2 findings:
 | B-R2-4 | LOW | Accept. B1 compares against the manifest of the latest CR-0012 deliverable 6 run. |
 
 Author: v2.1 signed off, 2026-09-30. Awaiting round 3 (bounded: A-R2-1 and the v2.1 changes, including the L1 test file).
+
+**Lead-author fix after v2.1 commit (`da1484f`):** `test_file_set_size`
+pinned `EXPECTED_FILE_COUNT = 60`; newly committed code
+(`acceptance_split.py`, `check_partition.py` and their tests) made it 63,
+so the test failed on a correct tree. Replaced by `test_file_set_scope`:
+the named home files of the mechanism must be scanned, no excluded file
+is scanned, and the set is ≥ 60. The 4 matches are unchanged. The new
+files produce no match.
+

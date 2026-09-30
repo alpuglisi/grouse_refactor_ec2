@@ -47,7 +47,12 @@ EXPECTED_UNCLASSIFIED = {
     ("check_road_dist.py", "(state != 0) & ~home"),
 }
 
-EXPECTED_FILE_COUNT = 60
+# Files that must always be in scope (the mechanism's known homes). The
+# set grows as code is added, so there is no exact count to pin.
+MUST_SCAN = {"train.py", "dataset.py", "predict.py", "analyze_grouse.py",
+             "generate_time_since_disturbance.py", "generate_road_distance.py",
+             "check_road_dist.py", "check_raster_repair.py",
+             "find_tsd_contrast_points.py", "legacy/audit.py"}
 
 
 def _ident(node):
@@ -207,8 +212,11 @@ class TestRuleControls(unittest.TestCase):
 
 
 class TestRepository(unittest.TestCase):
-    def test_file_set_size(self):
-        self.assertEqual(len(file_set()), EXPECTED_FILE_COUNT)
+    def test_file_set_scope(self):
+        fs = set(file_set())
+        self.assertTrue(MUST_SCAN <= fs, MUST_SCAN - fs)
+        self.assertFalse([f for f in fs if EXCLUDE.match(f)])
+        self.assertGreaterEqual(len(fs), 60)   # 60 when written; grows
 
     def test_no_unclassified_match(self):
         found = scan_repo()

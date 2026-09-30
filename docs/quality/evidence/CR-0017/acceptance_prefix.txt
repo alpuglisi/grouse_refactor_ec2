@@ -1,0 +1,92 @@
+CR-0017 deliverable 2: acceptance_split.py GATEs on today's real files (read-only)
+data root : /home/ec2-user/grouse2
+config    : docs/quality/acceptance_split.json (sha256 cd4b9b487a0076dac7a8f27858f682c51e5fcca5a174467a957f82282585f6e7)
+code      : 7e7b29bdd491e9492f0897e0f9c128a7929603b0 + working tree (acceptance_split.py sha256 d13fd748d9a014307d2a3b0c68a3980ecc65107eb4fe50d4df48556a968692da)
+started   : 2026-09-30T14:50:15.611849+00:00
+driver    : run_gates() only; OBS not computed; no record written
+live record sha256 66d63e1da915529ed0f33bf4f152d6626d9843c9fa8185a55a9727f54489d478; its config_sha256 1e3bfaa45655e005fd9258c842d080274431812d72f53ea4bbc165236b67bfc5
+today's 20 digested artifacts equal the live record's digests: True
+
+GATES (exact)
+E0   PASS
+E1   PASS
+E1p  PASS
+E2   PASS
+E3   PASS
+E4   PASS
+E5   PASS
+E6   PASS
+E7   PASS
+E8   PASS
+E9   PASS
+E10  PASS
+E11  PASS
+E12  PASS
+E13  FAIL
+       - N (pooled): 23 rows within 300 m of the sightings' acquisition-domain edge (edge_m <= BUFFER_M), e.g. ME (-70.27172, 46.207695) edge_m=202.400
+       - C: 88 rows within 300 m of the sightings' acquisition-domain edge (edge_m <= BUFFER_M), e.g. (-70.27172, 46.207695) edge_m=202.400
+R1   PASS
+R2   PASS
+R3   FAIL
+       - data/negatives/candidate_pool.csv: 88 rows not in the replay, e.g. [(-70.27172, 46.2077), (-69.26836, 47.41665), (-69.26533, 47.41959)]
+       - pool steps 1-11: manifest counts differ: ME.10: 11404 vs replay 11377; ME.11: 11404 vs replay 11377; ME.6: 11405 vs replay 11377; ME.7: 11404 vs replay 11377; ME.8: 11404 vs replay 11377; ME.9: 11404 vs replay 11377
+R4   FAIL
+       - data/negatives/negatives_ME.csv: 9 rows not in the replay, e.g. [(-70.27172, 46.2077), (-69.26533, 47.41959), (-69.23717, 47.44704)]
+       - data/negatives/negatives_ME.csv: 9 replay rows absent, e.g. [(-70.35254, 43.92932), (-69.69226, 45.92641), (-69.59525, 44.03379)]
+       - data/negatives/train_negatives_ME.csv: 7 rows not in the replay, e.g. [(-70.27172, 46.2077), (-69.26533, 47.41959), (-69.23717, 47.44704)]
+       - data/negatives/train_negatives_ME.csv: 7 replay rows absent, e.g. [(-70.35254, 43.92932), (-69.69226, 45.92641), (-69.59525, 44.03379)]
+       - data/negatives/val_negatives_ME.csv: 2 rows not in the replay, e.g. [(-68.05708, 47.2517), (-67.93204, 47.15868)]
+       - data/negatives/val_negatives_ME.csv: 2 replay rows absent, e.g. [(-68.88106, 44.54682), (-68.01472, 46.43639)]
+       - data/negatives/negatives_NH.csv: 1 rows not in the replay, e.g. [(-71.3633, 42.70035)]
+       - data/negatives/negatives_NH.csv: 1 replay rows absent, e.g. [(-71.91565, 43.11031)]
+       - data/negatives/train_negatives_NH.csv: 1 rows not in the replay, e.g. [(-71.3633, 42.70035)]
+       - data/negatives/train_negatives_NH.csv: 1 replay rows absent, e.g. [(-71.91565, 43.11031)]
+       - data/negatives/negatives_VT.csv: 13 rows not in the replay, e.g. [(-73.41579, 44.03201), (-73.38281, 43.59231), (-73.38238, 43.59182)]
+       - data/negatives/negatives_VT.csv: 13 replay rows absent, e.g. [(-73.31017, 44.18407), (-73.30746, 44.2133), (-73.27864, 44.39629)]
+       ... 4 more
+
+SUMMARY: 16/19 GATEs pass; FAIL: E13, R3, R4
+runtime: 34.8 s
+live record unchanged: True
+
+DETAIL (CR-0017 test plan: R4 replaces exactly the pre-registered negatives; draw counts equal)
+pre-registered keys: fc52728:docs/quality/evidence/CR-0017/preregister_keys.csv (sha256 1adce4a9dfb59d84acf8aa3152ed72fddfb4f07ea12f6ad816a65886cc2d5eb4)
+R3: 2 problem lines; any draw-count line: False
+R4: 16 problem lines; any draw-count line: False
+C: live minus replay = 88 rows (== pre-registered 88: True); replay minus live = 0
+N: live minus replay = 23 rows (== pre-registered 23: True); replay minus live = 23 (replacements)
+draw counts: manifest == replay: True
+  pool ME: step 5 manifest 16267 vs replay 16267; step 6 manifest 11405 vs replay 11377; step 11 manifest 11404 vs replay 11377
+  pool NH: step 5 manifest 6954 vs replay 6954; step 6 manifest 5218 vs replay 5204; step 11 manifest 5214 vs replay 5200
+  pool VT: step 5 manifest 8691 vs replay 8691; step 6 manifest 5569 vs replay 5522; step 11 manifest 5569 vs replay 5522
+live record unchanged at end: True
+
+UNIT AND ATTACK TESTS at 7e7b29b: python -m unittest -v tests.test_acceptance_split (CR-0017 rows; a test with a docstring prints its ok on the docstring line, omitted here)
+test_no_300m_buffer (tests.test_acceptance_split.TestAttacks.test_no_300m_buffer) ... ok
+test_every_section_is_pinned_or_obs_only (tests.test_acceptance_split.TestConfigPin.test_every_section_is_pinned_or_obs_only) ... ok
+test_float_rel_tol_is_1e12 (tests.test_acceptance_split.TestConfigPin.test_float_rel_tol_is_1e12) ... ok
+test_gate_affecting_sections_unchanged (tests.test_acceptance_split.TestConfigPin.test_gate_affecting_sections_unchanged) ... ok
+test_loose_tolerance_config_is_rejected (tests.test_acceptance_split.TestConfigPin.test_loose_tolerance_config_is_rejected) ... ok
+test_loose_tolerance_would_let_an_attack_through (tests.test_acceptance_split.TestConfigPin.test_loose_tolerance_would_let_an_attack_through)
+test_pin_covers_the_named_keys (tests.test_acceptance_split.TestConfigPin.test_pin_covers_the_named_keys) ... ok
+test_domain_is_every_us_county (tests.test_acceptance_split.TestDomainEdgeAttacks.test_domain_is_every_us_county) ... ok
+test_domain_not_dissolved (tests.test_acceptance_split.TestDomainEdgeAttacks.test_domain_not_dissolved) ... ok
+test_edge_filter_before_thinning (tests.test_acceptance_split.TestDomainEdgeAttacks.test_edge_filter_before_thinning) ... ok
+test_edge_radius_half_buffer (tests.test_acceptance_split.TestDomainEdgeAttacks.test_edge_radius_half_buffer) ... ok
+test_no_domain_edge_filter (tests.test_acceptance_split.TestDomainEdgeAttacks.test_no_domain_edge_filter) ... ok
+test_reference_has_no_row_in_the_edge_band (tests.test_acceptance_split.TestDomainEdgeAttacks.test_reference_has_no_row_in_the_edge_band) ... ok
+test_config_domain_edge_cannot_be_removed_or_repointed (tests.test_acceptance_split.TestDomainEdgeUnits.test_config_domain_edge_cannot_be_removed_or_repointed) ... ok
+test_domain_is_the_config_states_only (tests.test_acceptance_split.TestDomainEdgeUnits.test_domain_is_the_config_states_only) ... ok
+test_e13_catches_one_edge_row_in_C (tests.test_acceptance_split.TestDomainEdgeUnits.test_e13_catches_one_edge_row_in_C) ... ok
+test_e13_missing_county_file_is_named (tests.test_acceptance_split.TestDomainEdgeUnits.test_e13_missing_county_file_is_named) ... ok
+test_e13_not_in_standing_subset (tests.test_acceptance_split.TestDomainEdgeUnits.test_e13_not_in_standing_subset) ... ok
+test_inside_outside_on_boundary (tests.test_acceptance_split.TestDomainEdgeUnits.test_inside_outside_on_boundary) ... ok
+test_line_between_dissolved_states_is_not_an_edge (tests.test_acceptance_split.TestDomainEdgeUnits.test_line_between_dissolved_states_is_not_an_edge) ... ok
+test_long_segments_are_exact (tests.test_acceptance_split.TestDomainEdgeUnits.test_long_segments_are_exact)
+test_matches_shapely_reference_on_the_fixture (tests.test_acceptance_split.TestDomainEdgeUnits.test_matches_shapely_reference_on_the_fixture) ... ok
+test_step6_drops_rule_a_or_rule_b (tests.test_acceptance_split.TestDomainEdgeUnits.test_step6_drops_rule_a_or_rule_b)
+test_threshold_inclusive (tests.test_acceptance_split.TestDomainEdgeUnits.test_threshold_inclusive) ... ok
+test_missing_artifact_is_named_fail_and_every_gate_reported (tests.test_acceptance_split.TestReference.test_missing_artifact_is_named_fail_and_every_gate_reported) ... ok
+Ran 107 tests in 100.861s
+
+OK

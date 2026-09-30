@@ -83,10 +83,12 @@ Conventions:
 2. Keep the habitat rows (`~nonveg_landcover`).
 3. Drop rows that fail `window_in_bounds` in any `FEATURE_SPEC` raster at
    `rd.raster_path(feat, year)`, with `year` filled as at
-   `dataset.py:98-102`.
+   `dataset.py:98-102`, the column max taken over the region's
+   habitat rows from step 2 (no NaN years exist today).
 4. Thin the pooled rows. Visit rows by ascending `order_key(coord)`, ties
-   broken by lon then lat. Keep a row if no already-kept row is within
-   `MIN_SPACING_M`.
+   broken by lon then lat. Keep a row iff its squared distance to every
+   already-kept row is ≥ `MIN_SPACING_M²` (a row exactly
+   `MIN_SPACING_M` away is kept, as today and as CR-0013 E2 requires).
 5. Assign `block_ids`. Visit blocks by ascending `order_key(block_id)`.
    Add whole blocks to validation until the running record count reaches
    `round(VAL_FRACTION × N)` (the `:105-111` rule).
@@ -135,7 +137,8 @@ Conventions:
   top-up at `:278-286`.
 - In each sub-pool, select the `n_*` rows with the largest
   `log(u)/weight`, where `u = (order_key("neg:" + coord) + 0.5) / 2**64`.
-  Ties are broken by key. This is Efraimidis–Spirakis sampling without
+  Ties are broken by ascending `order_key("neg:" + coord)`. This is
+  Efraimidis–Spirakis sampling without
   replacement. It uses no index labels, which removes `weighted_take`'s
   `.loc` hazard (`:267-274`).
 - Write `negatives_R.csv` with the `:304-309` columns plus `region`. Its
@@ -248,8 +251,12 @@ Run `acceptance_split.py` (CR-0013). Every GATE passes, and
 | Habitat shortfall after CR-0007's reweighting | The draw raises; the counts are in the manifest |
 | Pre-CR baselines lost | Deliverable 0, with a fallback |
 
-**Rollback.** Restore `data/pipeline/` and `data/negatives/` from CR-0007's
-backup. Delete `block_assignments.csv`, `candidate_pool.csv`,
+**Rollback.** Restore only this CR's outputs from CR-0007's backup —
+`thinned_positives_*`, `train_positives_*`, `val_positives_*`,
+`block_assignments_*`, `negatives_*`, `train_negatives_*`,
+`val_negatives_*` — never CR-0007's own outputs (`evaluated_*`,
+`envelope_metrics_*`, `nonveg_flagged_*`), which would revert the
+partition. Delete `block_assignments.csv`, `candidate_pool.csv`,
 `split_manifest.json` and `acceptance_record.json`. Revert the code
 commit.
 

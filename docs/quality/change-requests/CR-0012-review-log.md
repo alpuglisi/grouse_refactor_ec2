@@ -200,3 +200,24 @@ shortfall (worst ratio 1.57); NonVeg cap binds in all 6 cells.
 | A8 | LOW | Accept. `diagnose_road_bias.py:132` and `diagnose_water_bias.py:123` added to the Impact readers. |
 | A9 | LOW | Tracked under BUG-0034 (tracker item added by the coordinator). CR-0013 O9 reports per-class support. |
 | A10 | LOW | Accept. Why now: "882 blocks, counting positives and negatives (541 counting positives only)". |
+
+## Round 2 (bounded re-review of v2, commit 5d51682)
+| reviewer | verdict |
+|---|---|
+| A — correctness | **APPROVE WITH FOLLOW-UPS** — A1–A10 resolved; positive counts still reproduce (6,232; 3,861; 759; 1,246); dedup by min `gbif_id` changes 3,294 kept candidates' `year` vs file order (pool counts after dedup may shift; supply ≥ 1.57× target) |
+| B — implementability | **APPROVE WITH FOLLOW-UPS** — all findings resolved except the rollback part of B-11 |
+
+Follow-ups applied in **v2.1** (text-only):
+| # | sev | concern | disposition |
+|---|---|---|---|
+| B-11r | MEDIUM | Rollback restored CR-0007's outputs too | **Accept** — restore only this CR's outputs, named |
+| A-R2-1 | LOW | Step 4 "within" vs "closer than" at exactly 30 m | **Accept** — keep iff squared distance ≥ `MIN_SPACING_M²` |
+| A-R2-2 | LOW | "Ties broken by key" — which key | **Accept** — `order_key("neg:" + coord)` |
+| A-R2-3 | LOW | Year-fill column max over which frame | **Accept** — the region's habitat rows (step 2) |
+| B-R2-L | LOW | `tune.py` listed as a reader; OBS readers `check_raster_repair.py`, `check_road_dist.py` not listed | **Tracked** — Impact wording, fold into the next edit |
+
+## Quorum (§1.4)
+Reviewer A: APPROVE WITH FOLLOW-UPS (v2). Reviewer B: APPROVE WITH
+FOLLOW-UPS (v2). Author: pending user. Implementation also waits for
+CR-0007 and CR-0013 (acceptance) per the landing order.
+

@@ -219,3 +219,21 @@ acceptance. Checks performed:
 | version | date | change |
 |---|---|---|
 | v2 | 2026-09-30 | Round-1 fixes: <br>• named artifacts, E0/E1p, full-row replay; <br>• order-free dedup; normative definitions pinned at `05d788d`; window predicate; <br>• input binding; CLI; <br>• pre-approval deliverables 0–5; <br>• new attacks; OBS file split out. |
+
+## Round 2 (bounded re-review of v2 text, commit 5d51682)
+| reviewer | verdict |
+|---|---|
+| A — attack power | **APPROVE (text)** — all round-1 findings resolved in operative text; interfaces consistent with CR-0012 v2; no new attack passes every gate beyond stated limits 1, 2, 4 |
+| B — implementability | **REJECT** — 2 new BLOCKING (below); all C1–C12 resolved |
+
+The script, config and tests (deliverables 2–4) and the first run (5) are
+pre-approval and still need their own review once written.
+
+Round-2 reviewer B new findings, applied in **v2.1** (text-only):
+| # | sev | concern | disposition |
+|---|---|---|---|
+| R2-B1 | BLOCKING | A fresh agent given "CR-0013 + `05d788d`" gets CR-0012 **v1** (pool without `gbif_id`, negatives without `region`, no tie-break or canonical order) — full-row R3/R4 and E0 would fail every correct run | **Accept** — rule 4: the implementer gets CR-0012 at the commit where CR-0012 is approved (recorded when it is); CR-0013 re-pinned on any CR-0012 revision; replay written only after CR-0012's text is approved |
+| R2-B2 | BLOCKING | E0's "dtypes CR-0012 names" — none are named | **Accept** — E0 reduced to the exact ordered column set (in the config); types constrained by R1–R4 full-row equality |
+| R2-L1 | LOW | Swept? owner must be a BUG or CR, not a tracker item | **Accept** — owner: CR-0013 |
+| R2-L2 | LOW | "`:304-309` columns plus `region`" is a line reference | **Accept as is** — resolves at the pinned commit; the config carries the column list (R2-B2) |
+

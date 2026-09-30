@@ -46,8 +46,11 @@ artifact row-for-row.
 3. **No escape mode.** No flag, environment variable or config key
    disables or downgrades a GATE. Pre-CR data fails.
 4. **Separate authorship** (user decision).
-   - A fresh agent writes `acceptance_split.py`, given only this CR and
-     commit `05d788d`.
+   - A fresh agent writes `acceptance_split.py`, given only this CR, CR-0012
+     **at the commit where CR-0012 is approved** (recorded here when it
+     is), and the code at commit `05d788d`. CR-0013 is re-pinned whenever
+     CR-0012 is revised; the replay is written only after CR-0012's text
+     is approved.
    - A different fresh agent implements CR-0012.
    - Both agents' transcript ids are recorded in the review log, and
      reviewers check them.
@@ -152,7 +155,7 @@ recomputed from lon/lat, never read.
 
 | id | set, pooling | predicate |
 |---|---|---|
-| E0 | P, N, B, C, M | Each file exists and has exactly the column set and dtypes CR-0012 §2 names. A missing file is a named FAIL. |
+| E0 | P, N, B, C, M | Each file exists and has exactly the column set CR-0012 §2 names (as an ordered list in the config). Values, and therefore types, are constrained by R1–R4's full-row equality; no separate dtype check. A missing file is a named FAIL. |
 | E1 | P, N (combined and parts), C | On every row, `state == region ==` the file's region. In C, `region ∈ REGIONS` and `state == region`. The regions present equal `REGIONS`. |
 | E1p | P, N per R | `train_*_R` equals the `split == "train"` rows of the combined file, row for row, in the same order and values. The same holds for `val_*_R`. Together they cover the combined file. |
 | E2 | P combined, pooled | 0 pairs closer than `MIN_SPACING_M` |
@@ -366,8 +369,8 @@ A z-score is reported only for rows that have a null. Rows marked
         (f) (class, subset, null). This is the one text the tracker's
         "Reconcile PA-0021" item asks for.
       - Lineage: extends PA-0016.
-      - Swept?: "no — not yet run; owner: tracker item *PA-0021 sweep*", as
-        PA-0022 requires. The scope is the acceptance tables of
+      - Swept?: "no — not yet run; owner: CR-0013", as PA-0022 requires
+        (a BUG or CR, not a tracker item). The scope is the acceptance tables of
         CR-0007..0013 plus live-code thresholds.
       - Filing PA-0021 before PA-0019/0020 is recorded under the tracker's
         PA-numbering item.

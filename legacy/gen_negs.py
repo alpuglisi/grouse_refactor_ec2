@@ -1,3 +1,4 @@
+raise SystemExit("legacy/gen_negs.py is a stale copy of generate_negatives.py (BUG-0031); use generate_negatives.py")  # CR-0012 section 6, PA-0002/PA-0026
 """
 generate_negatives.py
 

@@ -70,7 +70,7 @@ MOVE_RULES = [
     ("glob",  "thinned_positives_*.csv",    "data/pipeline"),
     ("glob",  "train_positives_*.csv",      "data/pipeline"),
     ("glob",  "val_positives_*.csv",        "data/pipeline"),
-    ("glob",  "block_assignments_*.csv",    "data/pipeline"),
+    ("glob",  "block_assignments*.csv",     "data/pipeline"),  # CR-0012: one global file
     ("glob",  "bin_tuning_*.csv",           "data/pipeline"),
     ("regex", RAW_SIGHTINGS_RE,             "data/sightings"),
     ("glob",  "gbif_negatives_*.csv",       "data/negatives"),

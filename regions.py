@@ -19,6 +19,8 @@ sighting-data extent (no data/ tree was available in the environment that
 made this fix). Confirm against real NH sighting data before relying on
 this for a production run; update here (one place) if it needs to change.
 """
+import hashlib
+
 import numpy as np
 
 REGIONS = ("ME", "NH", "VT")
@@ -44,6 +46,20 @@ BLOCK_SIZE_M = 3000
 # Exclusion radius around every grouse location for candidate negatives
 # (metres).
 BUFFER_M = 300
+
+# CR-0012 section 1: the one global block grid and the pooled split.
+# Origin of the global block grid in EPSG:5070 metres.
+BLOCK_ORIGIN_5070 = (0.0, 0.0)
+
+# Target share of pooled thinned positives placed in validation blocks.
+VAL_FRACTION = 0.2
+
+# The only seed source of the split/thin/draw hashes; no CLI seed.
+SPLIT_SEED = 42
+
+# Side of the square window every training record must have in bounds on
+# every feature raster (train.IMG_SIZE + 2 x default jitter 0).
+WINDOW_PX = 64
 
 BOXES = {
     "ME": (-71.158, 42.889, -66.852, 47.555),
@@ -121,3 +137,53 @@ def in_state(lon, lat, region):
     polygons and predicate as verify_partition)."""
     poly = _polygon_region(lon, lat)
     return np.array([p == region for p in poly], dtype=bool)
+
+
+# ---------------------------------------------------------------------------
+# CR-0012 section 1 helpers: block ids, hash order, window predicate.
+# ---------------------------------------------------------------------------
+def block_ids(x, y):
+    """Global block id of each EPSG:5070 point:
+    f"{floor((x-x0)/BLOCK_SIZE_M)}_{floor((y-y0)/BLOCK_SIZE_M)}" with
+    (x0, y0) = BLOCK_ORIGIN_5070. The only block-id function (CR-0012
+    section 1). Accepts scalars or array-likes; returns a list of str."""
+    x = np.atleast_1d(np.asarray(x, dtype=np.float64))
+    y = np.atleast_1d(np.asarray(y, dtype=np.float64))
+    x0, y0 = BLOCK_ORIGIN_5070
+    bx = np.floor((x - x0) / BLOCK_SIZE_M).astype(np.int64)
+    by = np.floor((y - y0) / BLOCK_SIZE_M).astype(np.int64)
+    return [f"{a}_{b}" for a, b in zip(bx.tolist(), by.tolist())]
+
+
+def coord_text(lon, lat):
+    """The hash text of a coordinate: f"{lon:.6f},{lat:.6f}"."""
+    return f"{float(lon):.6f},{float(lat):.6f}"
+
+
+def order_key(text):
+    """Seeded 64-bit hash order of `text` (CR-0012 section 1):
+    int.from_bytes(blake2b(f"{SPLIT_SEED}:{text}", digest_size=8), "big")."""
+    return int.from_bytes(
+        hashlib.blake2b(f"{SPLIT_SEED}:{text}".encode(),
+                        digest_size=8).digest(), "big")
+
+
+def window_in_bounds(src, x, y):
+    """True where the WINDOW_PX x WINDOW_PX window centred as dataset.py
+    centres it lies inside raster `src` (CR-0012 section 1). x, y are in
+    the raster's own CRS. (row, col) = rowcol(src.transform, x, y),
+    rounding down as dataset.py's src.index does; h = WINDOW_PX // 2; the
+    window is [row-h, row-h+WINDOW_PX) x [col-h, col-h+WINDOW_PX). Nodata
+    inside the window is not considered. Returns a bool array."""
+    from rasterio.transform import rowcol
+    x = np.atleast_1d(np.asarray(x, dtype=np.float64))
+    y = np.atleast_1d(np.asarray(y, dtype=np.float64))
+    if len(x) == 0:
+        return np.zeros(0, dtype=bool)
+    rows, cols = rowcol(src.transform, x, y)
+    rows = np.asarray(rows, dtype=np.int64)
+    cols = np.asarray(cols, dtype=np.int64)
+    h = WINDOW_PX // 2
+    r0, c0 = rows - h, cols - h
+    return ((r0 >= 0) & (r0 + WINDOW_PX <= src.height)
+            & (c0 >= 0) & (c0 + WINDOW_PX <= src.width))

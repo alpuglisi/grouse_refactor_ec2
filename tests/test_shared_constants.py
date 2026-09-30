@@ -33,6 +33,11 @@ EXPECTED_REGIONS = {
     "MIN_SPACING_M": 30,
     "BLOCK_SIZE_M": 3000,
     "BUFFER_M": 300,
+    # CR-0012 section 1
+    "BLOCK_ORIGIN_5070": (0.0, 0.0),
+    "VAL_FRACTION": 0.2,
+    "SPLIT_SEED": 42,
+    "WINDOW_PX": 64,
     "BOXES": {
         "ME": (-71.158, 42.889, -66.852, 47.555),
         "NH": (-72.626, 42.605, -70.600, 45.398),
@@ -42,6 +47,11 @@ EXPECTED_REGIONS = {
 EXPECTED_PATH_TEMPLATES = {
     "tiger_county": "data/roads/tl_{year}_us_county.zip",
     "availability_sample": "data/pipeline/availability_sample_{region}.csv",
+    # CR-0012 section 4
+    "block_assignments": "data/pipeline/block_assignments.csv",
+    "candidate_pool": "data/negatives/candidate_pool.csv",
+    "split_manifest": "data/pipeline/split_manifest.json",
+    "acceptance_record": "data/pipeline/acceptance_record.json",
 }
 # The only exemptions CR-0007 names; growth of this set is a review item.
 EXPECTED_EXEMPT = {"regions.py", "clean.py", "legacy/gen_negs.py",
@@ -136,7 +146,8 @@ class SyntheticTree(unittest.TestCase):
         f["grouse_data.py"] = "PATH_TEMPLATES = {}\n"
         probs = cp.p6_problems(self.make(f))
         self.assertIn("regions.BUFFER_M not defined as a literal", probs)
-        self.assertEqual(sum("PATH_TEMPLATES" in p for p in probs), 2)
+        self.assertEqual(sum("PATH_TEMPLATES" in p for p in probs),
+                         len(EXPECTED_PATH_TEMPLATES))
 
     def test_untracked_file_not_scanned(self):
         d = self.make(self.good())

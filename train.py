@@ -241,6 +241,12 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
                    seed=0, train_year_gap=2, distill_models=None,
                    flip_tta=True):
     import numpy as np
+    # CR-0012 section 5: refuse data that has not passed CR-0013's
+    # acceptance (record digests, split invariants) and a window larger
+    # than the WINDOW_PX every record was checked for. Covers every
+    # caller: train.py, calibrate.py, bench_pipeline.py.
+    import acceptance_split
+    acceptance_split.standing_checks(img_size, jitter, augment)
     cat_f, cont_f = split_features(features)
     train_parts, val_parts, train_labels = [], [], []
     aug = dict(cache_dir=cache_dir, jitter=jitter, augment=augment)

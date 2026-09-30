@@ -56,12 +56,17 @@ Each stage consumes the previous stage's files. Paths are all defined in
 non-vegetated records, fits habitat envelopes, runs the KDE stage.
 
 **4. Prepare positives** — `prepare_training_data.py` → `thinned_positives`,
-`train_positives`, `val_positives`, `block_assignments`. Minimum-spacing
-thinning plus a spatial-block train/val split.
+`train_positives`, `val_positives` (per region), one global
+`block_assignments.csv`, and the `positives` section of
+`split_manifest.json`. Pooled minimum-spacing thinning plus one pooled
+spatial-block train/val split on a single global grid (CR-0012). No flags.
 
-**5. Prepare negatives** — `generate_negatives.py` → `negatives_{region}.csv`
-+ train/val splits. Needs stages 3 and 4 (envelope metrics, block
-assignments).
+**5. Prepare negatives** — `generate_negatives.py` → `candidate_pool.csv`,
+`negatives_{region}.csv` + train/val splits, and the manifest's
+`negatives` section. Needs stages 3 and 4 (envelope metrics, block
+assignments, positives manifest). `acceptance_split.py` (CR-0013) must
+then pass before `train.py`/`calibrate.py`/`bench_pipeline.py` will run
+(`build_datasets` calls `acceptance_split.standing_checks`).
 
 **6. Train** — `train.py` → checkpoint (default `grouse_single_best.pth`)
 + `<path>.resume` sidecar. `pretrain.py` is the optional SSL warm-start.
@@ -95,7 +100,7 @@ and `Edge/` breakdowns over a predicted region.
 Superseded files, kept for history, imported by nothing:
 
 - `audit.py` — byte-identical to `analyze_grouse.py`
-- `gen_negs.py` — older `generate_negatives.py`; **lacks the `NONVEG_MAX_FRAC` cap**
+- `gen_negs.py` — older `generate_negatives.py`; exits on run (`SystemExit`, CR-0012 §6). The root `clean.py` (old `prepare_training_data.py`) is guarded the same way
 - `download.py`, `download_landfire{,_2,_3}.py` — predate fdist/ch/cc
 - `download_more.py` — `download_rev.py` minus empty-raster validation
 

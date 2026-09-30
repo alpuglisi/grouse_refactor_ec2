@@ -601,7 +601,9 @@ def check_p8(x):
 # ---------------------------------------------------------------------------
 P6_NAMES = ("REGIONS", "STATE_FIPS", "STATE_NAMES", "TIGER_YEAR",
             "COUNTY_POLYGONS_YEAR", "MIN_SPACING_M", "BLOCK_SIZE_M",
-            "BUFFER_M", "BOXES")
+            "BUFFER_M", "BOXES",
+            # CR-0012 section 1 (PA-0025: names grow with each constant)
+            "BLOCK_ORIGIN_5070", "VAL_FRACTION", "SPLIT_SEED", "WINDOW_PX")
 
 # path -> reason. Each entry is named in CR-0007 "P6"; nothing else is exempt.
 P6_EXEMPT = {

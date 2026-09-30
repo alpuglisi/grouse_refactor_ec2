@@ -1,0 +1,15 @@
+== predicted tree: exit 0 (expected 0)
+MC: PASS (39/39 checks pass)
+== no-op (live as NEW): exit 1 (expected 1)
+MC: FAIL (29/39 checks pass)
+    MC1 ME rows: FAIL new 3660, pre-registered 2854, missing 8, extra 814, differing 7
+    MC1 ME kept lines: FAIL header equal=True; 7 kept rows differ beyond the pre-registered split changes (7 split changes)
+    MC1 NH rows: FAIL new 1079, pre-registered 827, missing 4, extra 256, differing 0
+    MC1 VT rows: FAIL new 1493, pre-registered 1128, missing 2, extra 367, differing 1
+    MC1 VT kept lines: FAIL header equal=True; 1 kept rows differ beyond the pre-registered split changes (1 split changes)
+    MC2: FAIL new 3861 rows, pre-registered 3205
+    MC3: FAIL header/rows equal length=True; 501/501 pre-registered split changes found; 501 rows differ otherwise
+    MC4 ME rows: FAIL new 3660, pre-registered 2854, missing 0, extra 806
+    MC4 NH rows: FAIL new 1079, pre-registered 827, missing 1, extra 253
+    MC4 VT rows: FAIL new 1493, pre-registered 1128, missing 0, extra 365
+SELFTEST PASS

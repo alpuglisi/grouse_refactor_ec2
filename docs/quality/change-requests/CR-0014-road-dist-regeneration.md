@@ -1,6 +1,6 @@
 # CR-0014: Regenerate `road_dist` from every intersecting county at TIGER 2023, with nodata where Canadian roads could be nearer
 
-**Status: IMPLEMENTED (v3), 2026-09-30 — all deliverables complete; 153 gate rows, 0 failures (`docs/quality/evidence/CR-0014-gates.txt`).** Nothing implemented.
+**Status: IMPLEMENTED (v3), 2026-09-30 — all deliverables complete; 153 gate rows, 0 failures (`docs/quality/evidence/CR-0014-gates.txt`).**
 History and dispositions: `CR-0014-review-log.md`. This document states
 only current intent.
 

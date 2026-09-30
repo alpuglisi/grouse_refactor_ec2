@@ -335,20 +335,22 @@ def load_evt_crosswalk(raster_dir):
               Conifer, Grassland, Riparian, Developed, ...)
       group : EVT_GP_N  (collapsed vegetation-type group name, coarser
               than raw EVT but finer than physiognomy)
-    Returns None if no table is on disk."""
-    files = sorted(glob.glob(os.path.join(raster_dir, "attribute_tables", "LF*_EVT.csv")))
+    The crosswalk is a required input (CR-0013 pins it): a missing,
+    unreadable or malformed table raises - it never degrades to None /
+    'Unmapped' (BUG-0053, PA-0027). Never returns None."""
+    pattern = os.path.join(raster_dir, "attribute_tables", "LF*_EVT.csv")
+    files = sorted(glob.glob(pattern))
     if not files:
-        return None
+        raise FileNotFoundError(
+            f"no EVT attribute table matches {pattern} - run "
+            f"download_attribute_tables.py first (required input; "
+            f"BUG-0053)")
     path = files[-1]  # lexicographic sort puts the newest LF year last
-    try:
-        tbl = pd.read_csv(path)
-    except Exception as e:
-        print(f"  [!] Could not read {path}: {e}")
-        return None
+    tbl = pd.read_csv(path)   # a read error propagates (BUG-0053)
     tbl.columns = [c.upper().strip() for c in tbl.columns]
     if "VALUE" not in tbl.columns or "EVT_PHYS" not in tbl.columns:
-        print(f"  [!] {os.path.basename(path)} lacks VALUE/EVT_PHYS columns.")
-        return None
+        raise ValueError(f"{path} lacks VALUE/EVT_PHYS columns "
+                         f"(has {list(tbl.columns)}) (BUG-0053)")
     phys = dict(zip(tbl["VALUE"].astype(int), tbl["EVT_PHYS"].astype(str)))
     group_col = "EVT_GP_N" if "EVT_GP_N" in tbl.columns else "EVT_PHYS"
     group = dict(zip(tbl["VALUE"].astype(int), tbl[group_col].astype(str)))

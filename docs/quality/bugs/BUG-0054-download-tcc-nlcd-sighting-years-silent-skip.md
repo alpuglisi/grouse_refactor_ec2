@@ -55,15 +55,24 @@ def sighting_years(rd):
 "continue" branch (BUG-0049's mechanism).
 
 ## 6. Corrective action
-**None yet.** The fix is confined to one function:
-- catch only `MissingDataError`;
-- print which class was skipped;
-- let anything else propagate.
+Commit `4683e3c` (trivial fix, no CR; confirmed confined: the function
+body plus one name, `MissingDataError`, added to the existing
+`from grouse_data import (...)` line; no signature, CLI or output
+change).
 
-That meets the trivial-fix test, so no CR is needed; a BUG is required.
-Owner: the next change to `download_tcc_nlcd.py` (tracker).
+`download_tcc_nlcd.sighting_years` now catches only `MissingDataError`
+(the expected "class not on disk yet" case). It prints
+`[warn] <region>: <positives|negatives> not on disk - their years are not
+used to choose vintages (...)` and continues. Any other error (schema,
+parser, programming error) propagates and stops the run. The caller's
+"both missing" fallback is unchanged.
 
-Status: **OPEN** (low).
+Test: `tests/test_pa0027_fixes.py::Bug0054SightingYears`: both classes'
+years are unioned; a missing class is skipped with the notice; a
+`ParserError` or `RuntimeError` in either class propagates. The two
+defect tests fail on the pre-fix code.
+
+Status: **FIXED** (`4683e3c`).
 
 ## 7. Recurrence review
 - **BUG-0049** (same pass): same mechanism.

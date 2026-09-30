@@ -111,10 +111,12 @@ def bbox_str(region):
 
 
 def _raster_valid_fraction(path):
-    """Fraction of non-nodata pixels in a raster's first band. Returns
-    None (skip the check) if the file can't be opened as a raster at all
-    - that's a different failure mode, already handled by the zip/tif
-    checks above."""
+    """Fraction of non-nodata pixels in a raster's first band. A file
+    that can't be opened or read as a raster returns 0.0 (invalid): the
+    zip CRC check upstream proves only that the bytes match the archive,
+    not that they are a readable GeoTIFF, so an unreadable file must be
+    rejected (after a download) or re-fetched (--refetch-empty), never
+    accepted (BUG-0052, PA-0027). Any other error propagates."""
     try:
         with rasterio.open(path) as src:
             data = src.read(1)
@@ -122,8 +124,10 @@ def _raster_valid_fraction(path):
                 return 1.0   # no nodata value defined - can't judge, allow it
             n_valid = int((data != src.nodata).sum())
             return n_valid / data.size if data.size else 0.0
-    except Exception:
-        return None
+    except (rasterio.errors.RasterioIOError, OSError) as e:
+        log(f"  [!] {path}: cannot be read as a raster "
+            f"({type(e).__name__}: {e}) - treated as invalid (0% valid)")
+        return 0.0
 
 
 def published_products(year, session=None):

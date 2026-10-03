@@ -195,3 +195,23 @@ Tests: `python -m unittest tests.test_cr0021` → 27 tests OK.
   `generate_negatives.run`; its fixtures use years outside S1, so both
   CR-0012 and CR-0017 fixtures run under a test-only single stratum
   (`tests/test_cr0012.py: fixture_strata`). Added to the code table.
+- **I3 (LOW, transcription; found by the deliverable-2 author).** The Test
+  plan's expected FAIL list for the read-only run on today's files omitted
+  E9: today's unstratified N exceeds the per-stratum NonVeg cap in some
+  strata, and the pre-top-up pool is short of habitat in single-year
+  strata (`preregister.txt` §3 "before", e.g. ME train 2024 143 < 213).
+  E9 is a consequence of the amended gate, not a new requirement; the
+  list now reads E9, E11, E15(b), R4, and `acceptance_prefix.py` asserts
+  it (E9 only per-stratum problems, count clause holding). The scratch-tree
+  run starts at `prepare_training_data.py` (I1).
+
+## Deliverable 2 (acceptance changes, `afd36fe`, separate author)
+Merged into the CR branch after deliverable 3 (`81cc603`). Author choices
+accepted: R4 compares the draw entry with exact JSON types and stratum key
+order (§2 B "keys and types are exact"); overlapping strata resolve to the
+first match for lookups while E15(a) fails the config; O11 keys
+`O11.a.<split|pooled>.<region|pooled>`, `O11.w` "n/a" under S1; concrete
+wrong implementations chosen for the NonVeg-cap-per-cell and
+boundary-off-by-one attack rows; the four CR-0019 year-floor attacks that
+the stratified draw now refuses run on the unstratified draw and also
+assert the refusal.

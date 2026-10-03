@@ -450,10 +450,11 @@ feasible at S3. The regeneration is how they land together.
   amended, E15, O11, attack rows, config pins); the existing suites.
 
 **On the EC2 host (real data):** §4; read-only acceptance on today's
-files gives exactly the expected FAILs (E11 for the missing constant,
-E15(b), R4); scratch-tree run of `generate_negatives.py` then
-`acceptance_split.py` → all GATEs PASS, MC PASS, second run
-byte-identical.
+files (`docs/quality/evidence/CR-0021/acceptance_prefix.py`) gives
+exactly the expected FAILs (E9 per-stratum clauses, E11 for the missing
+constant, E15(b), R4); scratch-tree run of `prepare_training_data.py`
+and `generate_negatives.py` (§2 B), then `acceptance_split.py` → all
+GATEs PASS, MC PASS, second run byte-identical.
 
 **Not validatable under this CR:** how much model separation came from
 vintage (needs CR-0020's retrain and a seed-varied comparison, BUG-0039's

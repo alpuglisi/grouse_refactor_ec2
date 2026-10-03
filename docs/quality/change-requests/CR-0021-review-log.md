@@ -10,12 +10,17 @@ when the scope changed). The CR states only current intent (CR-0011 A4).
 |---|---|---|---|---|
 | 1 | v1 (`9422a38`) | A: correctness of diagnosis and fix (fresh agent; read-only; no data) | APPROVE WITH FOLLOW-UPS | 0 (2 MAJOR, 4 MEDIUM, 3 LOW) |
 | 1 | v1 (`9422a38`) | B: implementability, composition, acceptance (fresh agent; read-only; no data; pytest not installed, suites not run) | APPROVE WITH FOLLOW-UPS | 0 (3 MAJOR, 5 MEDIUM, 3 LOW) |
-| 2 | v2 | A, B (bounded per CR-0011 A2; §2–§5 rewritten, so in scope in full) | pending | – |
+| 2 | v2 (`4bb44bc`) | A (bounded per CR-0011 A2; §2–§5 rewritten, so reviewed in full) | APPROVE WITH FOLLOW-UPS | 0 (1 MAJOR, 3 MEDIUM, 3 LOW); A1, A2 resolved |
+| 2 | v2 (`4bb44bc`) | B (same bounds; pytest not installed, suites not run) | APPROVE WITH FOLLOW-UPS | 0 (1 MAJOR, 3 MEDIUM, 3 LOW); B1, B2, B3 resolved |
+| 3 | v3 | A, B: **last round under A2**, bounded to A10, B12 and v3's changed text | pending | – |
 
-**Approval: not reached.** Waits on round 2 and on deliverable 1 (the
+**Approval: not reached.** Waits on round 3 and on deliverable 1 (the
 top-up fetch and the pre-registration on the EC2 host), which has not
-run. Both round-1 reviewers accept a pre-registration-gated approval as
-CR-0011 A3 practice (CR-0019 precedent).
+run. Both reviewers accept a pre-registration-gated approval as CR-0011
+A3 practice (CR-0019 precedent). After deliverable 1, writing its
+results into the CR is a **transcription verified by a reviewer**, not a
+fourth design round. Anything non-mechanical goes to the user (CR §4;
+B18).
 
 ## Scope decision (user, 2026-10-03)
 Round 1 showed that A1, A2/B1, A3, A4, A6, B2 and B3 all follow from part
@@ -65,3 +70,25 @@ which keeps (ii) as the last fallback entry.
   fetches nothing (`get_negatives.py:245-249, 287-290`). v2 uses a
   one-off evidence script, run once in a scratch tree, with its output
   pinned (§2 C).
+
+## Round 2, reviewer A: new concerns and dispositions (as of v3)
+| id | sev | concern (short) | disposition | where (v3) |
+|---|---|---|---|---|
+| A10 | MAJOR | O11 tolerance (pooled ≤ 0.55) cannot fail: cross-stratum pairs score exactly 0.5, so pooled AUC = 0.5 + f·(within − 0.5) with f ≈ 0.12 (S2) / 0.35 (S3); worst case under S2 ≈ 0.534; the 0.5584 justification is a different statistic (PA-0021(c)) | accepted: O11 split into O11a (pooled, report-only, stated as unable to detect a within-stratum residual) and O11w (within each merged stratum) with a within-cell permutation null; criterion = pooled O11w above its null's 99th percentile → user decision. No fixed AUC threshold | §3 O11, §4 |
+| A11 | MEDIUM | Root cause half 1 (rules differ) stays: a per-year composition asymmetry; dropping BUG-0073 §8's "same rule" needs justification | accepted: BUG-0073's root cause restated as confirmed (the unmatched draw + no distribution check); the rule asymmetry filed as a tracked residual with an owner (PA-0022), not "accepted"; the PA wording keeps "made identical or recorded as a tracked residual" and BUG-0073 §8 justifies the change | § Fixes, §5, deliverable 8 |
+| A12 | MEDIUM | Top-up can reduce 2020–2022 supply: 5 dp key wins, thinning displacement, two-state keys | accepted: reported separately by mechanism; § Risk row | §4, § Risk |
+| A13 | MEDIUM | "roughly triples" overstates pool yield; `e = 0` partitions get nothing | accepted: reworded (raw rows only; S1 uncertain); per-partition yield and zero-`e` reported | §2 C, §4 |
+| A14 | LOW | E9's `n_hab_k` undefined | accepted (with B14): formula stated, from the pool, strata from the config | §3 E9 |
+| A15 | LOW | Relative paths in `load_existing`; unchecked GBIF `year` | accepted (with B13): realpath check; rows outside {2023, 2024} refused; tested | §2 C, § Test plan |
+| A16 | LOW | `n_hab / supply > 0.8` has no consequence | accepted: report-only, does not block, stated | §4 |
+
+## Round 2, reviewer B: new concerns and dispositions (as of v3)
+| id | sev | concern (short) | disposition | where (v3) |
+|---|---|---|---|---|
+| B12 | MAJOR | The top-up is a second acquisition pass for two years only; PA-0020(ii) requires comparing separately acquired strata on every axis (species, space, `coord_uncertainty_m`), not only year | accepted: per-region comparison of new vs existing 2023–2024 rows (and 2020–2022 for context) on species shares, block and county occupancy, non-null `coord_uncertainty_m`, raw and pool survivors; tolerance TVD ≤ 0.10 (species, blocks) and ±10 pp (uncertainty) → else user decision. Per-species quotas preserve species mix by construction unless exhausted | §2 C, §4, § Risk |
+| B13 | MEDIUM | Two producers of the raw files (PA-0026); path-equality guard weak; later `get_negatives.py` runs count top-up rows | accepted: single-use by construction (refuses unless target files equal the pinned pre-top-up sha256, and realpath ≠ live tree); disabled after deliverable 1; second producer recorded in `ARCHITECTURE.md`/`CHANGELOG.md` | §2 C, § Risk, deliverable 7 |
+| B14 | MEDIUM | E9 supply clause ambiguous; E9 redundant with E15(b); add E9 to the shortfall attack row | accepted | §3 E9, Attacks |
+| B15 | LOW | Attack fixtures do not force the named failure | accepted: each row asserts the effect on the attacked output | §3 Attacks |
+| B16 | LOW | MC0's old tree ambiguous; MC2 prefix needs the same writer | accepted: old tree = deliverable 5's backup of today's live tree (record `ed27583b…`); append with `csv.DictWriter`, `CSV_FIELDS`, `\r\n` | §2 C, §3 MC |
+| B17 | LOW | `e = 0` partitions get no top-up | accepted (with A13): reported | §2 C, §4 |
+| B18 | LOW | v3 is round 3 (last under A2) | accepted: round 3 bounded to A10, B12 and v3's changed text; the post-pre-registration write-in is a reviewer-verified transcription; non-mechanical changes go to the user | CR status, §4 |

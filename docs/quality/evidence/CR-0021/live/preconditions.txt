@@ -1,0 +1,5 @@
+CR-0021 deliverable 5 preconditions, 2026-10-03T08:51:54Z
+live HEAD: 75370aeefc5da4543a10ad4277e177db9e74c8ce (claude/nice-cori-creqpb); tracked changes: []
+live record: ed27583beb8b9f95b23ce3c51d18817ee1d9a1a42043b0c773138b028da9c42a (CR-0019 live record ed27583b...)
+no other CR mid-data-write: CR-0019 IMPLEMENTED (3b3e7d1)
+backup /home/ec2-user/grouse_backup/CR-0021 sha256 verified: 42 files

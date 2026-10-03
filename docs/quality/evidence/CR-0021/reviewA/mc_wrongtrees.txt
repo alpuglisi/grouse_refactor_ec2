@@ -1,0 +1,80 @@
+CR-0021 MC wrong-tree runs (reviewer A); live /home/ec2-user/grouse2; scratch /home/ec2-user/cr0021_scratch; strata S1 [[2020], [2021], [2022], [2023], [2024]]
+
+== correct: expected exit 0, actual 0 -> OK
+   MC: PASS (63/63 checks pass)
+== noop: expected exit 1 (via MC2), actual 1 -> OK
+   MC: FAIL (26/63 checks pass)
+     MC2 data/negatives/gbif_negatives_ME.csv: FAIL old bytes a prefix=True; post sha pinned=False; bad appended rows 0
+     MC2 data/negatives/gbif_negatives_NH.csv: FAIL old bytes a prefix=True; post sha pinned=False; bad appended rows 0
+     MC2 data/negatives/gbif_negatives_VT.csv: FAIL old bytes a prefix=True; post sha pinned=False; bad appended rows 0
+     MC3: FAIL header equal=True; new 22099 rows, pre-registered 24853; rows equal in order=False
+     MC4 ME rows: FAIL new 2854, pre-registered 2854, missing 668, extra 668
+     MC4 ME train stratum 2020: FAIL P 469, N {'n': 980, 'n_nv': 312, 'n_hab': 668}, pre-registered {'n': 469, 'n_hab': 328, 'n_nv': 141}
+     MC4 ME train stratum 2021: FAIL P 588, N {'n': 566, 'n_nv': 146, 'n_hab': 420}, pre-registered {'n': 588, 'n_hab': 412, 'n_nv': 176}
+     MC4 ME train stratum 2022: FAIL P 648, N {'n': 485, 'n_nv': 147, 'n_hab': 338}, pre-registered {'n': 648, 'n_hab': 454, 'n_nv': 194}
+     MC4 ME train stratum 2023: FAIL P 282, N {'n': 167, 'n_nv': 53, 'n_hab': 114}, pre-registered {'n': 282, 'n_hab': 197, 'n_nv': 85}
+     MC4 ME train stratum 2024: FAIL P 304, N {'n': 93, 'n_nv': 29, 'n_hab': 64}, pre-registered {'n': 304, 'n_hab': 213, 'n_nv': 91}
+     MC4 ME val stratum 2020: FAIL P 132, N {'n': 237, 'n_nv': 77, 'n_hab': 160}, pre-registered {'n': 132, 'n_hab': 92, 'n_nv': 40}
+     MC4 ME val stratum 2021: FAIL P 141, N {'n': 149, 'n_nv': 44, 'n_hab': 105}, pre-registered {'n': 141, 'n_hab': 99, 'n_nv': 42}
+     ... 25 more FAIL lines
+== unstratified: expected exit 1 (via MC4), actual 1 -> OK
+   MC: FAIL (30/63 checks pass)
+     MC4 ME rows: FAIL new 2854, pre-registered 2854, missing 526, extra 526
+     MC4 ME train stratum 2020: FAIL P 469, N {'n': 876, 'n_nv': 282, 'n_hab': 594}, pre-registered {'n': 469, 'n_hab': 328, 'n_nv': 141}
+     MC4 ME train stratum 2021: FAIL P 588, N {'n': 495, 'n_nv': 130, 'n_hab': 365}, pre-registered {'n': 588, 'n_hab': 412, 'n_nv': 176}
+     MC4 ME train stratum 2022: FAIL P 648, N {'n': 428, 'n_nv': 138, 'n_hab': 290}, pre-registered {'n': 648, 'n_hab': 454, 'n_nv': 194}
+     MC4 ME train stratum 2023: FAIL P 282, N {'n': 303, 'n_nv': 88, 'n_hab': 215}, pre-registered {'n': 282, 'n_hab': 197, 'n_nv': 85}
+     MC4 ME train stratum 2024: FAIL P 304, N {'n': 189, 'n_nv': 49, 'n_hab': 140}, pre-registered {'n': 304, 'n_hab': 213, 'n_nv': 91}
+     MC4 ME val stratum 2020: FAIL P 132, N {'n': 219, 'n_nv': 72, 'n_hab': 147}, pre-registered {'n': 132, 'n_hab': 92, 'n_nv': 40}
+     MC4 ME val stratum 2021: FAIL P 141, N {'n': 129, 'n_nv': 40, 'n_hab': 89}, pre-registered {'n': 141, 'n_hab': 99, 'n_nv': 42}
+     MC4 ME val stratum 2022: FAIL P 146, N {'n': 103, 'n_nv': 25, 'n_hab': 78}, pre-registered {'n': 146, 'n_hab': 102, 'n_nv': 44}
+     MC4 ME val stratum 2023: FAIL P 63, N {'n': 74, 'n_nv': 22, 'n_hab': 52}, pre-registered {'n': 63, 'n_hab': 44, 'n_nv': 19}
+     MC4 ME val stratum 2024: FAIL P 81, N {'n': 38, 'n_nv': 10, 'n_hab': 28}, pre-registered {'n': 81, 'n_hab': 57, 'n_nv': 24}
+     MC4 NH rows: FAIL new 827, pre-registered 827, missing 183, extra 183
+     ... 21 more FAIL lines
+== nonveg_cap_cell: expected exit 1 (via MC4), actual 1 -> OK
+   MC: FAIL (59/63 checks pass)
+     MC4 NH rows: FAIL new 827, pre-registered 827, missing 1, extra 1
+     MC4 NH train stratum 2020: FAIL P 97, N {'n': 97, 'n_nv': 30, 'n_hab': 67}, pre-registered {'n': 97, 'n_hab': 68, 'n_nv': 29}
+     MC4 VT rows: FAIL new 1128, pre-registered 1128, missing 1, extra 1
+     MC4 VT train stratum 2020: FAIL P 163, N {'n': 163, 'n_nv': 50, 'n_hab': 113}, pre-registered {'n': 163, 'n_hab': 114, 'n_nv': 49}
+== raw_not_topped_up: expected exit 1 (via MC2), actual 1 -> OK
+   live raw files copied over the topped-up ones
+   MC: FAIL (60/63 checks pass)
+     MC2 data/negatives/gbif_negatives_ME.csv: FAIL old bytes a prefix=True; post sha pinned=False; bad appended rows 0
+     MC2 data/negatives/gbif_negatives_NH.csv: FAIL old bytes a prefix=True; post sha pinned=False; bad appended rows 0
+     MC2 data/negatives/gbif_negatives_VT.csv: FAIL old bytes a prefix=True; post sha pinned=False; bad appended rows 0
+== raw_append_dropped: expected exit 1 (via MC2), actual 1 -> OK
+   data/negatives/gbif_negatives_ME.csv: last appended row removed (114876 lines left)
+   MC: FAIL (62/63 checks pass)
+     MC2 data/negatives/gbif_negatives_ME.csv: FAIL old bytes a prefix=True; post sha pinned=False; bad appended rows 0
+== raw_old_altered: expected exit 1 (via MC2), actual 1 -> OK
+   data/negatives/gbif_negatives_ME.csv: first old row's longitude altered
+   MC: FAIL (62/63 checks pass)
+     MC2 data/negatives/gbif_negatives_ME.csv: FAIL old bytes a prefix=False; post sha pinned=False; bad appended rows 0
+== p_altered: expected exit 1 (via MC1), actual 1 -> OK
+   data/pipeline/thinned_positives_ME.csv: first row's longitude altered
+   MC: FAIL (62/63 checks pass)
+     MC1 data/pipeline/thinned_positives_ME.csv: FAIL
+== n_year_swap: expected exit 1 (via MC4), actual 1 -> OK
+   data/negatives/negatives_ME.csv: row (-71.04085, 45.177345) train 2021 nonveg=False replaced by pool row of year 2020
+   MC: FAIL (60/63 checks pass)
+     MC4 ME rows: FAIL new 2854, pre-registered 2854, missing 1, extra 1
+     MC4 ME train stratum 2020: FAIL P 469, N {'n': 470, 'n_nv': 141, 'n_hab': 329}, pre-registered {'n': 469, 'n_hab': 328, 'n_nv': 141}
+     MC4 ME train stratum 2021: FAIL P 588, N {'n': 587, 'n_nv': 176, 'n_hab': 411}, pre-registered {'n': 588, 'n_hab': 412, 'n_nv': 176}
+== n_nonveg_flip: expected exit 1 (via MC4), actual 1 -> OK
+   data/negatives/negatives_ME.csv: first row's is_nonveg False -> True
+   MC: FAIL (60/63 checks pass)
+     MC4 ME rows: FAIL new 2854, pre-registered 2854, missing 0, extra 0
+     MC4 ME equals C: FAIL 1 rows differ from their NEW C row
+     MC4 ME train stratum 2021: FAIL P 588, N {'n': 588, 'n_nv': 177, 'n_hab': 411}, pre-registered {'n': 588, 'n_hab': 412, 'n_nv': 176}
+== trainval_desync: expected exit 1 (via MC5), actual 1 -> OK
+   data/negatives/train_negatives_ME.csv: first data line dropped
+   MC: FAIL (62/63 checks pass)
+     MC5 train_negatives_ME: FAIL
+== c_split_flip: expected exit 1 (via MC3), actual 1 -> OK
+   data/negatives/candidate_pool.csv: first row's split train -> val
+   MC: FAIL (62/63 checks pass)
+     MC3: FAIL header equal=True; new 24853 rows, pre-registered 24853; rows equal in order=False
+
+WRONGTREES PASS

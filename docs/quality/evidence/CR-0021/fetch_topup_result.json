@@ -1,0 +1,630 @@
+{
+  "files": {
+    "data/negatives/gbif_negatives_ME.csv": {
+      "post_sha256": "95b2ec24e18351473e132cd4aa7bc3859ea85d7a697ec747fa4255f80221e282",
+      "pre_sha256": "8306d34296a79dae6e3aaa67f467b189d801fd0f6a753cf76e7b1b49e8329aa3",
+      "rows_appended": 22959,
+      "rows_before": 91917
+    },
+    "data/negatives/gbif_negatives_NH.csv": {
+      "post_sha256": "8f97a4a6fd7f246d8d3ba40fbd2a08a132d31a37a0ae8fd1c05b3409804bebaf",
+      "pre_sha256": "7f04aa41d9f0433e79bfb0c8e85f9a8a194fa82cf5b3affa445cbf6122ba9000",
+      "rows_appended": 11272,
+      "rows_before": 69219
+    },
+    "data/negatives/gbif_negatives_VT.csv": {
+      "post_sha256": "e52ac67509612ca0803ca76c0aa9ece8627647e9843c795e6e982c9834d2939a",
+      "pre_sha256": "cce1ebdc4508f3559a5cf8babb93582ecc653ae7b4e17e6f0d94a8645f59c362",
+      "rows_appended": 12290,
+      "rows_before": 104076
+    }
+  },
+  "multiple": 2,
+  "partitions": [
+    {
+      "exhausted": false,
+      "existing": 736,
+      "note": "",
+      "region": "ME",
+      "requested": 1472,
+      "species": "Ovenbird",
+      "written": 1472,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 736,
+      "note": "",
+      "region": "ME",
+      "requested": 1472,
+      "species": "Black-throated Blue Warbler",
+      "written": 1472,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 736,
+      "note": "",
+      "region": "ME",
+      "requested": 1472,
+      "species": "Hermit Thrush",
+      "written": 1472,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 736,
+      "note": "",
+      "region": "ME",
+      "requested": 1472,
+      "species": "Blue-headed Vireo",
+      "written": 1472,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 736,
+      "note": "",
+      "region": "ME",
+      "requested": 1472,
+      "species": "Brown Creeper",
+      "written": 1472,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 736,
+      "note": "",
+      "region": "ME",
+      "requested": 1472,
+      "species": "Pileated Woodpecker",
+      "written": 1472,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 661,
+      "note": "",
+      "region": "ME",
+      "requested": 1322,
+      "species": "Alder Flycatcher",
+      "written": 1322,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 661,
+      "note": "",
+      "region": "ME",
+      "requested": 1322,
+      "species": "Common Yellowthroat",
+      "written": 1322,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 661,
+      "note": "",
+      "region": "ME",
+      "requested": 1322,
+      "species": "Swamp Sparrow",
+      "written": 1322,
+      "year": 2023
+    },
+    {
+      "exhausted": true,
+      "existing": 1136,
+      "note": "",
+      "region": "ME",
+      "requested": 2272,
+      "species": "Northern Waterthrush",
+      "written": 925,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 428,
+      "note": "",
+      "region": "NH",
+      "requested": 856,
+      "species": "Ovenbird",
+      "written": 856,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 428,
+      "note": "",
+      "region": "NH",
+      "requested": 856,
+      "species": "Black-throated Blue Warbler",
+      "written": 856,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 428,
+      "note": "",
+      "region": "NH",
+      "requested": 856,
+      "species": "Hermit Thrush",
+      "written": 856,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 428,
+      "note": "",
+      "region": "NH",
+      "requested": 856,
+      "species": "Blue-headed Vireo",
+      "written": 856,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 428,
+      "note": "",
+      "region": "NH",
+      "requested": 856,
+      "species": "Brown Creeper",
+      "written": 856,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 428,
+      "note": "",
+      "region": "NH",
+      "requested": 856,
+      "species": "Pileated Woodpecker",
+      "written": 856,
+      "year": 2023
+    },
+    {
+      "exhausted": true,
+      "existing": 1546,
+      "note": "",
+      "region": "NH",
+      "requested": 3092,
+      "species": "Alder Flycatcher",
+      "written": 0,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 384,
+      "note": "",
+      "region": "NH",
+      "requested": 768,
+      "species": "Common Yellowthroat",
+      "written": 768,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 384,
+      "note": "",
+      "region": "NH",
+      "requested": 768,
+      "species": "Swamp Sparrow",
+      "written": 768,
+      "year": 2023
+    },
+    {
+      "exhausted": true,
+      "existing": 1171,
+      "note": "",
+      "region": "NH",
+      "requested": 2342,
+      "species": "Northern Waterthrush",
+      "written": 0,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 431,
+      "note": "",
+      "region": "VT",
+      "requested": 862,
+      "species": "Ovenbird",
+      "written": 862,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 431,
+      "note": "",
+      "region": "VT",
+      "requested": 862,
+      "species": "Black-throated Blue Warbler",
+      "written": 862,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 431,
+      "note": "",
+      "region": "VT",
+      "requested": 862,
+      "species": "Hermit Thrush",
+      "written": 862,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 431,
+      "note": "",
+      "region": "VT",
+      "requested": 862,
+      "species": "Blue-headed Vireo",
+      "written": 862,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 431,
+      "note": "",
+      "region": "VT",
+      "requested": 862,
+      "species": "Brown Creeper",
+      "written": 862,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 431,
+      "note": "",
+      "region": "VT",
+      "requested": 862,
+      "species": "Pileated Woodpecker",
+      "written": 862,
+      "year": 2023
+    },
+    {
+      "exhausted": true,
+      "existing": 2318,
+      "note": "",
+      "region": "VT",
+      "requested": 4636,
+      "species": "Alder Flycatcher",
+      "written": 218,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 387,
+      "note": "",
+      "region": "VT",
+      "requested": 774,
+      "species": "Common Yellowthroat",
+      "written": 774,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 387,
+      "note": "",
+      "region": "VT",
+      "requested": 774,
+      "species": "Swamp Sparrow",
+      "written": 774,
+      "year": 2023
+    },
+    {
+      "exhausted": true,
+      "existing": 1429,
+      "note": "",
+      "region": "VT",
+      "requested": 2858,
+      "species": "Northern Waterthrush",
+      "written": 0,
+      "year": 2023
+    },
+    {
+      "exhausted": false,
+      "existing": 549,
+      "note": "",
+      "region": "ME",
+      "requested": 1098,
+      "species": "Ovenbird",
+      "written": 1098,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 549,
+      "note": "",
+      "region": "ME",
+      "requested": 1098,
+      "species": "Black-throated Blue Warbler",
+      "written": 1098,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 549,
+      "note": "",
+      "region": "ME",
+      "requested": 1098,
+      "species": "Hermit Thrush",
+      "written": 1098,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 549,
+      "note": "",
+      "region": "ME",
+      "requested": 1098,
+      "species": "Blue-headed Vireo",
+      "written": 1098,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 549,
+      "note": "",
+      "region": "ME",
+      "requested": 1098,
+      "species": "Brown Creeper",
+      "written": 1098,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 549,
+      "note": "",
+      "region": "ME",
+      "requested": 1098,
+      "species": "Pileated Woodpecker",
+      "written": 1098,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 331,
+      "note": "",
+      "region": "ME",
+      "requested": 662,
+      "species": "Alder Flycatcher",
+      "written": 662,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 331,
+      "note": "",
+      "region": "ME",
+      "requested": 662,
+      "species": "Common Yellowthroat",
+      "written": 662,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 331,
+      "note": "",
+      "region": "ME",
+      "requested": 662,
+      "species": "Swamp Sparrow",
+      "written": 662,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 331,
+      "note": "",
+      "region": "ME",
+      "requested": 662,
+      "species": "Northern Waterthrush",
+      "written": 662,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 319,
+      "note": "",
+      "region": "NH",
+      "requested": 638,
+      "species": "Ovenbird",
+      "written": 638,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 319,
+      "note": "",
+      "region": "NH",
+      "requested": 638,
+      "species": "Black-throated Blue Warbler",
+      "written": 638,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 319,
+      "note": "",
+      "region": "NH",
+      "requested": 638,
+      "species": "Hermit Thrush",
+      "written": 638,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 319,
+      "note": "",
+      "region": "NH",
+      "requested": 638,
+      "species": "Blue-headed Vireo",
+      "written": 638,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 319,
+      "note": "",
+      "region": "NH",
+      "requested": 638,
+      "species": "Brown Creeper",
+      "written": 638,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 319,
+      "note": "",
+      "region": "NH",
+      "requested": 638,
+      "species": "Pileated Woodpecker",
+      "written": 638,
+      "year": 2024
+    },
+    {
+      "exhausted": true,
+      "existing": 1719,
+      "note": "",
+      "region": "NH",
+      "requested": 3438,
+      "species": "Alder Flycatcher",
+      "written": 0,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 193,
+      "note": "",
+      "region": "NH",
+      "requested": 386,
+      "species": "Common Yellowthroat",
+      "written": 386,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 193,
+      "note": "",
+      "region": "NH",
+      "requested": 386,
+      "species": "Swamp Sparrow",
+      "written": 386,
+      "year": 2024
+    },
+    {
+      "exhausted": true,
+      "existing": 1223,
+      "note": "",
+      "region": "NH",
+      "requested": 2446,
+      "species": "Northern Waterthrush",
+      "written": 0,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 323,
+      "note": "",
+      "region": "VT",
+      "requested": 646,
+      "species": "Ovenbird",
+      "written": 646,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 323,
+      "note": "",
+      "region": "VT",
+      "requested": 646,
+      "species": "Black-throated Blue Warbler",
+      "written": 646,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 323,
+      "note": "",
+      "region": "VT",
+      "requested": 646,
+      "species": "Hermit Thrush",
+      "written": 646,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 323,
+      "note": "",
+      "region": "VT",
+      "requested": 646,
+      "species": "Blue-headed Vireo",
+      "written": 646,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 323,
+      "note": "",
+      "region": "VT",
+      "requested": 646,
+      "species": "Brown Creeper",
+      "written": 646,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 323,
+      "note": "",
+      "region": "VT",
+      "requested": 646,
+      "species": "Pileated Woodpecker",
+      "written": 646,
+      "year": 2024
+    },
+    {
+      "exhausted": true,
+      "existing": 1745,
+      "note": "",
+      "region": "VT",
+      "requested": 3490,
+      "species": "Alder Flycatcher",
+      "written": 700,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 194,
+      "note": "",
+      "region": "VT",
+      "requested": 388,
+      "species": "Common Yellowthroat",
+      "written": 388,
+      "year": 2024
+    },
+    {
+      "exhausted": false,
+      "existing": 194,
+      "note": "",
+      "region": "VT",
+      "requested": 388,
+      "species": "Swamp Sparrow",
+      "written": 388,
+      "year": 2024
+    },
+    {
+      "exhausted": true,
+      "existing": 1373,
+      "note": "",
+      "region": "VT",
+      "requested": 2746,
+      "species": "Northern Waterthrush",
+      "written": 0,
+      "year": 2024
+    }
+  ],
+  "record_sha256": "ed27583beb8b9f95b23ce3c51d18817ee1d9a1a42043b0c773138b028da9c42a",
+  "years": [
+    2023,
+    2024
+  ]
+}

@@ -1,0 +1,126 @@
+CR-0021 top-up: years (2023, 2024), multiple 2, tree /home/ec2-user/cr0021_scratch
+  [ME] Ovenbird 2023: requested 1472, got 1472
+  [ME] Black-throated Blue Warbler 2023: requested 1472, got 1472
+  [ME] Hermit Thrush 2023: requested 1472, got 1472
+  [ME] Blue-headed Vireo 2023: requested 1472, got 1472
+  [ME] Brown Creeper 2023: requested 1472, got 1472
+  [ME] Pileated Woodpecker 2023: requested 1472, got 1472
+  [ME] Alder Flycatcher 2023: requested 1322, got 1322
+  [ME] Common Yellowthroat 2023: requested 1322, got 1322
+  [ME] Swamp Sparrow 2023: requested 1322, got 1322
+  [ME] Northern Waterthrush 2023: requested 2272, got 925 [exhausted]
+  [NH] Ovenbird 2023: requested 856, got 856
+  [NH] Black-throated Blue Warbler 2023: requested 856, got 856
+  [NH] Hermit Thrush 2023: requested 856, got 856
+  [NH] Blue-headed Vireo 2023: requested 856, got 856
+  [NH] Brown Creeper 2023: requested 856, got 856
+  [NH] Pileated Woodpecker 2023: requested 856, got 856
+  [NH] Alder Flycatcher 2023: requested 3092, got 0 [exhausted]
+  [NH] Common Yellowthroat 2023: requested 768, got 768
+  [NH] Swamp Sparrow 2023: requested 768, got 768
+  [NH] Northern Waterthrush 2023: requested 2342, got 0 [exhausted]
+  [VT] Ovenbird 2023: requested 862, got 862
+  [VT] Black-throated Blue Warbler 2023: requested 862, got 862
+  [VT] Hermit Thrush 2023: requested 862, got 862
+  [VT] Blue-headed Vireo 2023: requested 862, got 862
+  [VT] Brown Creeper 2023: requested 862, got 862
+  [VT] Pileated Woodpecker 2023: requested 862, got 862
+  [VT] Alder Flycatcher 2023: requested 4636, got 218 [exhausted]
+  [VT] Common Yellowthroat 2023: requested 774, got 774
+  [VT] Swamp Sparrow 2023: requested 774, got 774
+  [VT] Northern Waterthrush 2023: requested 2858, got 0 [exhausted]
+  [ME] Ovenbird 2024: requested 1098, got 1098
+  [ME] Black-throated Blue Warbler 2024: requested 1098, got 1098
+  [ME] Hermit Thrush 2024: requested 1098, got 1098
+  [ME] Blue-headed Vireo 2024: requested 1098, got 1098
+  [ME] Brown Creeper 2024: requested 1098, got 1098
+  [ME] Pileated Woodpecker 2024: requested 1098, got 1098
+  [ME] Alder Flycatcher 2024: requested 662, got 662
+  [ME] Common Yellowthroat 2024: requested 662, got 662
+  [ME] Swamp Sparrow 2024: requested 662, got 662
+  [ME] Northern Waterthrush 2024: requested 662, got 662
+  [NH] Ovenbird 2024: requested 638, got 638
+  [NH] Black-throated Blue Warbler 2024: requested 638, got 638
+  [NH] Hermit Thrush 2024: requested 638, got 638
+  [NH] Blue-headed Vireo 2024: requested 638, got 638
+  [NH] Brown Creeper 2024: requested 638, got 638
+  [NH] Pileated Woodpecker 2024: requested 638, got 638
+  [NH] Alder Flycatcher 2024: requested 3438, got 0 [exhausted]
+  [NH] Common Yellowthroat 2024: requested 386, got 386
+  [NH] Swamp Sparrow 2024: requested 386, got 386
+  [NH] Northern Waterthrush 2024: requested 2446, got 0 [exhausted]
+  [VT] Ovenbird 2024: requested 646, got 646
+  [VT] Black-throated Blue Warbler 2024: requested 646, got 646
+  [VT] Hermit Thrush 2024: requested 646, got 646
+  [VT] Blue-headed Vireo 2024: requested 646, got 646
+  [VT] Brown Creeper 2024: requested 646, got 646
+  [VT] Pileated Woodpecker 2024: requested 646, got 646
+  [VT] Alder Flycatcher 2024: requested 3490, got 700 [exhausted]
+  [VT] Common Yellowthroat 2024: requested 388, got 388
+  [VT] Swamp Sparrow 2024: requested 388, got 388
+  [VT] Northern Waterthrush 2024: requested 2746, got 0 [exhausted]
+
+partition table: region species year existing requested written exhausted note
+  ME Ovenbird 2023 736 1472 1472 False 
+  ME Black-throated Blue Warbler 2023 736 1472 1472 False 
+  ME Hermit Thrush 2023 736 1472 1472 False 
+  ME Blue-headed Vireo 2023 736 1472 1472 False 
+  ME Brown Creeper 2023 736 1472 1472 False 
+  ME Pileated Woodpecker 2023 736 1472 1472 False 
+  ME Alder Flycatcher 2023 661 1322 1322 False 
+  ME Common Yellowthroat 2023 661 1322 1322 False 
+  ME Swamp Sparrow 2023 661 1322 1322 False 
+  ME Northern Waterthrush 2023 1136 2272 925 True 
+  NH Ovenbird 2023 428 856 856 False 
+  NH Black-throated Blue Warbler 2023 428 856 856 False 
+  NH Hermit Thrush 2023 428 856 856 False 
+  NH Blue-headed Vireo 2023 428 856 856 False 
+  NH Brown Creeper 2023 428 856 856 False 
+  NH Pileated Woodpecker 2023 428 856 856 False 
+  NH Alder Flycatcher 2023 1546 3092 0 True 
+  NH Common Yellowthroat 2023 384 768 768 False 
+  NH Swamp Sparrow 2023 384 768 768 False 
+  NH Northern Waterthrush 2023 1171 2342 0 True 
+  VT Ovenbird 2023 431 862 862 False 
+  VT Black-throated Blue Warbler 2023 431 862 862 False 
+  VT Hermit Thrush 2023 431 862 862 False 
+  VT Blue-headed Vireo 2023 431 862 862 False 
+  VT Brown Creeper 2023 431 862 862 False 
+  VT Pileated Woodpecker 2023 431 862 862 False 
+  VT Alder Flycatcher 2023 2318 4636 218 True 
+  VT Common Yellowthroat 2023 387 774 774 False 
+  VT Swamp Sparrow 2023 387 774 774 False 
+  VT Northern Waterthrush 2023 1429 2858 0 True 
+  ME Ovenbird 2024 549 1098 1098 False 
+  ME Black-throated Blue Warbler 2024 549 1098 1098 False 
+  ME Hermit Thrush 2024 549 1098 1098 False 
+  ME Blue-headed Vireo 2024 549 1098 1098 False 
+  ME Brown Creeper 2024 549 1098 1098 False 
+  ME Pileated Woodpecker 2024 549 1098 1098 False 
+  ME Alder Flycatcher 2024 331 662 662 False 
+  ME Common Yellowthroat 2024 331 662 662 False 
+  ME Swamp Sparrow 2024 331 662 662 False 
+  ME Northern Waterthrush 2024 331 662 662 False 
+  NH Ovenbird 2024 319 638 638 False 
+  NH Black-throated Blue Warbler 2024 319 638 638 False 
+  NH Hermit Thrush 2024 319 638 638 False 
+  NH Blue-headed Vireo 2024 319 638 638 False 
+  NH Brown Creeper 2024 319 638 638 False 
+  NH Pileated Woodpecker 2024 319 638 638 False 
+  NH Alder Flycatcher 2024 1719 3438 0 True 
+  NH Common Yellowthroat 2024 193 386 386 False 
+  NH Swamp Sparrow 2024 193 386 386 False 
+  NH Northern Waterthrush 2024 1223 2446 0 True 
+  VT Ovenbird 2024 323 646 646 False 
+  VT Black-throated Blue Warbler 2024 323 646 646 False 
+  VT Hermit Thrush 2024 323 646 646 False 
+  VT Blue-headed Vireo 2024 323 646 646 False 
+  VT Brown Creeper 2024 323 646 646 False 
+  VT Pileated Woodpecker 2024 323 646 646 False 
+  VT Alder Flycatcher 2024 1745 3490 700 True 
+  VT Common Yellowthroat 2024 194 388 388 False 
+  VT Swamp Sparrow 2024 194 388 388 False 
+  VT Northern Waterthrush 2024 1373 2746 0 True 
+data/negatives/gbif_negatives_ME.csv: 91917 + 22959 rows; sha256 8306d34296a7... -> 95b2ec24e18351473e132cd4aa7bc3859ea85d7a697ec747fa4255f80221e282
+data/negatives/gbif_negatives_NH.csv: 69219 + 11272 rows; sha256 7f04aa41d9f0... -> 8f97a4a6fd7f246d8d3ba40fbd2a08a132d31a37a0ae8fd1c05b3409804bebaf
+data/negatives/gbif_negatives_VT.csv: 104076 + 12290 rows; sha256 cce1ebdc4508... -> e52ac67509612ca0803ca76c0aa9ece8627647e9843c795e6e982c9834d2939a

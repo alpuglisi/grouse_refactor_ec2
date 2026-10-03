@@ -1,0 +1,201 @@
+CR-0021 pre-registration; config sha256 07e417f2870210b9d03c0823793e0496a9fe4bcda99d62ca5e191298003c9c41; scratch /home/ec2-user/cr0021_scratch
+0. trees
+  trees ok: True
+1. CONTROL (unmodified replay on the live tree)
+  control thinned_positives  ME: replay == disk: True
+  control negatives          ME: replay == disk: True
+  control thinned_positives  NH: replay == disk: True
+  control negatives          NH: replay == disk: True
+  control thinned_positives  VT: replay == disk: True
+  control negatives          VT: replay == disk: True
+  control block_assignments: True; candidate_pool (keys, split, year): True
+2. two-state keys in the topped-up candidates
+  keys under two states: 0
+3. topped-up pool (replay on SCRATCH, draw not run)
+  positives and blocks unchanged by the top-up: P True, B True
+  pool supply before (region split year: habitat / NonVeg):
+    ME train 2020: 1324 / 2798
+    ME train 2021: 822 / 1213
+    ME train 2022: 704 / 1230
+    ME train 2023: 224 / 463
+    ME train 2024: 143 / 271
+    ME val 2020: 345 / 638
+    ME val 2021: 203 / 290
+    ME val 2022: 185 / 279
+    ME val 2023: 49 / 81
+    ME val 2024: 34 / 81
+    NH train 2020: 512 / 821
+    NH train 2021: 427 / 805
+    NH train 2022: 326 / 549
+    NH train 2023: 153 / 252
+    NH train 2024: 122 / 242
+    NH val 2020: 134 / 219
+    NH val 2021: 98 / 180
+    NH val 2022: 68 / 123
+    NH val 2023: 39 / 39
+    NH val 2024: 31 / 60
+    VT train 2020: 459 / 985
+    VT train 2021: 401 / 1010
+    VT train 2022: 276 / 547
+    VT train 2023: 111 / 304
+    VT train 2024: 111 / 266
+    VT val 2020: 99 / 220
+    VT val 2021: 89 / 260
+    VT val 2022: 61 / 144
+    VT val 2023: 39 / 70
+    VT val 2024: 22 / 48
+  pool supply after (region split year: habitat / NonVeg):
+    ME train 2020: 1319 / 2774
+    ME train 2021: 818 / 1207
+    ME train 2022: 703 / 1218
+    ME train 2023: 476 / 953
+    ME train 2024: 326 / 575
+    ME val 2020: 343 / 636
+    ME val 2021: 203 / 288
+    ME val 2022: 185 / 277
+    ME val 2023: 100 / 176
+    ME val 2024: 72 / 129
+    NH train 2020: 508 / 816
+    NH train 2021: 426 / 799
+    NH train 2022: 326 / 543
+    NH train 2023: 277 / 443
+    NH train 2024: 236 / 401
+    NH val 2020: 134 / 216
+    NH val 2021: 96 / 179
+    NH val 2022: 68 / 123
+    NH val 2023: 72 / 84
+    NH val 2024: 52 / 95
+    VT train 2020: 453 / 977
+    VT train 2021: 398 / 1000
+    VT train 2022: 272 / 541
+    VT train 2023: 191 / 509
+    VT train 2024: 201 / 450
+    VT val 2020: 97 / 217
+    VT val 2021: 87 / 255
+    VT val 2022: 60 / 141
+    VT val 2023: 56 / 129
+    VT val 2024: 46 / 101
+  new raw rows: 46521
+  existing pool rows affected by the new rows:
+    (1) key won by a new row (smaller gbif_id): 739 keys; year relabels (region split old->new: n): {('ME', 'train', 2020, 2023): 1, ('ME', 'train', 2020, 2024): 5, ('ME', 'train', 2021, 2023): 1, ('ME', 'train', 2021, 2024): 1, ('ME', 'train', 2022, 2023): 3, ('ME', 'train', 2022, 2024): 2, ('ME', 'train', 2023, 2023): 55, ('ME', 'train', 2023, 2024): 1, ('ME', 'train', 2024, 2023): 21, ('ME', 'train', 2024, 2024): 45, ('ME', 'val', 2020, 2023): 1, ('ME', 'val', 2021, 2023): 1, ('ME', 'val', 2022, 2023): 1, ('ME', 'val', 2023, 2023): 9, ('ME', 'val', 2024, 2023): 4, ('ME', 'val', 2024, 2024): 9, ('NH', 'train', 2020, 2023): 3, ('NH', 'train', 2020, 2024): 3, ('NH', 'train', 2021, 2023): 1, ('NH', 'train', 2021, 2024): 1, ('NH', 'train', 2022, 2023): 1, ('NH', 'train', 2022, 2024): 1, ('NH', 'train', 2023, 2023): 33, ('NH', 'train', 2023, 2024): 2, ('NH', 'train', 2024, 2023): 7, ('NH', 'train', 2024, 2024): 35, ('NH', 'val', 2021, 2023): 2, ('NH', 'val', 2023, 2023): 9, ('NH', 'val', 2024, 2023): 2, ('NH', 'val', 2024, 2024): 12, ('VT', 'train', 2020, 2023): 4, ('VT', 'train', 2020, 2024): 5, ('VT', 'train', 2021, 2023): 3, ('VT', 'train', 2021, 2024): 4, ('VT', 'train', 2022, 2023): 2, ('VT', 'train', 2022, 2024): 5, ('VT', 'train', 2023, 2023): 34, ('VT', 'train', 2023, 2024): 2, ('VT', 'train', 2024, 2023): 11, ('VT', 'train', 2024, 2024): 30, ('VT', 'val', 2020, 2023): 1, ('VT', 'val', 2020, 2024): 1, ('VT', 'val', 2021, 2023): 3, ('VT', 'val', 2021, 2024): 2, ('VT', 'val', 2022, 2023): 1, ('VT', 'val', 2022, 2024): 1, ('VT', 'val', 2023, 2023): 11, ('VT', 'val', 2024, 2023): 1, ('VT', 'val', 2024, 2024): 6}
+    lost from the pool via key_won: 3 {'ME train 2023': np.int64(1), 'ME train 2024': np.int64(1), 'NH train 2024': np.int64(1)}
+    lost from the pool via thinning: 121 {'ME train 2020': np.int64(23), 'ME train 2021': np.int64(9), 'ME train 2022': np.int64(8), 'ME train 2023': np.int64(10), 'ME train 2024': np.int64(9), 'ME val 2020': np.int64(3), 'ME val 2021': np.int64(1), 'ME val 2022': np.int64(1), 'ME val 2023': np.int64(3), 'ME val 2024': np.int64(2), 'NH train 2020': np.int64(3), 'NH train 2021': np.int64(5), 'NH train 2022': np.int64(4), 'NH train 2023': np.int64(1), 'NH train 2024': np.int64(4), 'NH val 2020': np.int64(3), 'NH val 2021': np.int64(1), 'NH val 2023': np.int64(3), 'VT train 2020': np.int64(6), 'VT train 2021': np.int64(6), 'VT train 2022': np.int64(3), 'VT train 2023': np.int64(1), 'VT train 2024': np.int64(3), 'VT val 2020': np.int64(4), 'VT val 2021': np.int64(2), 'VT val 2022': np.int64(2), 'VT val 2023': np.int64(1)}
+    lost from the pool via other: 0 {}
+  per-partition yield of the new rows (raw -> pool rows):
+    ME Alder Flycatcher 2023: 1322 -> 121
+    ME Alder Flycatcher 2024: 662 -> 16
+    ME Black-throated Blue Warbler 2023: 1472 -> 76
+    ME Black-throated Blue Warbler 2024: 1098 -> 61
+    ME Blue-headed Vireo 2023: 1472 -> 47
+    ME Blue-headed Vireo 2024: 1098 -> 75
+    ME Brown Creeper 2023: 1472 -> 140
+    ME Brown Creeper 2024: 1098 -> 99
+    ME Common Yellowthroat 2023: 1322 -> 72
+    ME Common Yellowthroat 2024: 662 -> 58
+    ME Hermit Thrush 2023: 1472 -> 82
+    ME Hermit Thrush 2024: 1098 -> 76
+    ME Northern Waterthrush 2023: 925 -> 76
+    ME Northern Waterthrush 2024: 662 -> 47
+    ME Ovenbird 2023: 1472 -> 89
+    ME Ovenbird 2024: 1098 -> 80
+    ME Pileated Woodpecker 2023: 1472 -> 215
+    ME Pileated Woodpecker 2024: 1098 -> 123
+    ME Swamp Sparrow 2023: 1322 -> 48
+    ME Swamp Sparrow 2024: 662 -> 28
+    NH Black-throated Blue Warbler 2023: 856 -> 32
+    NH Black-throated Blue Warbler 2024: 638 -> 40
+    NH Blue-headed Vireo 2023: 856 -> 73
+    NH Blue-headed Vireo 2024: 638 -> 59
+    NH Brown Creeper 2023: 856 -> 69
+    NH Brown Creeper 2024: 638 -> 51
+    NH Common Yellowthroat 2023: 768 -> 55
+    NH Common Yellowthroat 2024: 386 -> 46
+    NH Hermit Thrush 2023: 856 -> 42
+    NH Hermit Thrush 2024: 638 -> 41
+    NH Ovenbird 2023: 856 -> 52
+    NH Ovenbird 2024: 638 -> 68
+    NH Pileated Woodpecker 2023: 856 -> 87
+    NH Pileated Woodpecker 2024: 638 -> 66
+    NH Swamp Sparrow 2023: 768 -> 31
+    NH Swamp Sparrow 2024: 386 -> 18
+    VT Alder Flycatcher 2023: 218 -> 12
+    VT Alder Flycatcher 2024: 700 -> 56
+    VT Black-throated Blue Warbler 2023: 862 -> 30
+    VT Black-throated Blue Warbler 2024: 646 -> 37
+    VT Blue-headed Vireo 2023: 862 -> 31
+    VT Blue-headed Vireo 2024: 646 -> 38
+    VT Brown Creeper 2023: 862 -> 37
+    VT Brown Creeper 2024: 646 -> 39
+    VT Common Yellowthroat 2023: 774 -> 71
+    VT Common Yellowthroat 2024: 388 -> 53
+    VT Hermit Thrush 2023: 862 -> 32
+    VT Hermit Thrush 2024: 646 -> 28
+    VT Ovenbird 2023: 862 -> 64
+    VT Ovenbird 2024: 646 -> 75
+    VT Pileated Woodpecker 2023: 862 -> 112
+    VT Pileated Woodpecker 2024: 646 -> 64
+    VT Swamp Sparrow 2023: 774 -> 21
+    VT Swamp Sparrow 2024: 388 -> 12
+  zero-e partitions (no top-up): []
+  exhausted partitions: [('ME', 'Northern Waterthrush', 2023), ('NH', 'Alder Flycatcher', 2023), ('NH', 'Northern Waterthrush', 2023), ('VT', 'Alder Flycatcher', 2023), ('VT', 'Northern Waterthrush', 2023), ('NH', 'Alder Flycatcher', 2024), ('NH', 'Northern Waterthrush', 2024), ('VT', 'Alder Flycatcher', 2024), ('VT', 'Northern Waterthrush', 2024)]
+  comparability (a = new 2023-24, b = existing 2023-24, c = existing 2020-22):
+    ME raw: n a/b/c 22959/12153/79764; species TVD(a,b) 0.0516 (tol 0.1); non-null coord_uncertainty_m % a/b/c 0.0/0.0/0.0 (tol +/-10.0 pp a vs b); block TVD(a,b) 0.2228, county TVD(a,b) 0.0546 (report-only); species TVD(a,c) 0.0548 (context)
+    ME pool: n a/b/c 1629/1178/9971; species TVD(a,b) 0.0884 (tol 0.1); non-null coord_uncertainty_m % a/b/c 0.0/0.0/0.0 (tol +/-10.0 pp a vs b); block TVD(a,b) 0.6554, county TVD(a,b) 0.0629 (report-only); species TVD(a,c) 0.1446 (context)
+    NH raw: n a/b/c 11272/11295/57924; species TVD(a,b) 0.5010 (tol 0.1); non-null coord_uncertainty_m % a/b/c 0.0/0.0/0.0 (tol +/-10.0 pp a vs b); block TVD(a,b) 0.3037, county TVD(a,b) 0.1156 (report-only); species TVD(a,c) 0.1288 (context)
+    NH pool: n a/b/c 830/830/4234; species TVD(a,b) 0.3795 (tol 0.1); non-null coord_uncertainty_m % a/b/c 0.0/0.0/0.0 (tol +/-10.0 pp a vs b); block TVD(a,b) 0.6446, county TVD(a,b) 0.0807 (report-only); species TVD(a,c) 0.1476 (context)
+    VT raw: n a/b/c 12290/12551/91525; species TVD(a,b) 0.4723 (tol 0.1); non-null coord_uncertainty_m % a/b/c 0.0/0.0/0.0 (tol +/-10.0 pp a vs b); block TVD(a,b) 0.2773, county TVD(a,b) 0.0982 (report-only); species TVD(a,c) 0.0747 (context)
+    VT pool: n a/b/c 812/871/4498; species TVD(a,b) 0.3916 (tol 0.1); non-null coord_uncertainty_m % a/b/c 0.0/0.0/0.0 (tol +/-10.0 pp a vs b); block TVD(a,b) 0.6297, county TVD(a,b) 0.0463 (report-only); species TVD(a,c) 0.1198 (context)
+  comparability tolerances: EXCEEDED -> user decision
+    NH raw: species TVD 0.5010 > 0.1
+    VT raw: species TVD 0.4723 > 0.1
+4. strata selection (S1 -> S2 -> S3; first with zero SHORT; before any AUC)
+  S1 ((2020,), (2021,), (2022,), (2023,), (2024,)): SHORT cells 0, total shortfall 0
+    ME train 2020: n_pos 469 n 469 n_nv 141 n_hab 328 | NonVeg 2774 habitat 1319 ratio 0.25
+    ME train 2021: n_pos 588 n 588 n_nv 176 n_hab 412 | NonVeg 1207 habitat 818 ratio 0.50
+    ME train 2022: n_pos 648 n 648 n_nv 194 n_hab 454 | NonVeg 1218 habitat 703 ratio 0.65
+    ME train 2023: n_pos 282 n 282 n_nv 85 n_hab 197 | NonVeg 953 habitat 476 ratio 0.41
+    ME train 2024: n_pos 304 n 304 n_nv 91 n_hab 213 | NonVeg 575 habitat 326 ratio 0.65
+    ME val 2020: n_pos 132 n 132 n_nv 40 n_hab 92 | NonVeg 636 habitat 343 ratio 0.27
+    ME val 2021: n_pos 141 n 141 n_nv 42 n_hab 99 | NonVeg 288 habitat 203 ratio 0.49
+    ME val 2022: n_pos 146 n 146 n_nv 44 n_hab 102 | NonVeg 277 habitat 185 ratio 0.55
+    ME val 2023: n_pos 63 n 63 n_nv 19 n_hab 44 | NonVeg 176 habitat 100 ratio 0.44
+    ME val 2024: n_pos 81 n 81 n_nv 24 n_hab 57 | NonVeg 129 habitat 72 ratio 0.79
+    NH train 2020: n_pos 97 n 97 n_nv 29 n_hab 68 | NonVeg 816 habitat 508 ratio 0.13
+    NH train 2021: n_pos 118 n 118 n_nv 35 n_hab 83 | NonVeg 799 habitat 426 ratio 0.19
+    NH train 2022: n_pos 137 n 137 n_nv 41 n_hab 96 | NonVeg 543 habitat 326 ratio 0.29
+    NH train 2023: n_pos 118 n 118 n_nv 35 n_hab 83 | NonVeg 443 habitat 277 ratio 0.30
+    NH train 2024: n_pos 164 n 164 n_nv 49 n_hab 115 | NonVeg 401 habitat 236 ratio 0.49
+    NH val 2020: n_pos 35 n 35 n_nv 10 n_hab 25 | NonVeg 216 habitat 134 ratio 0.19
+    NH val 2021: n_pos 29 n 29 n_nv 9 n_hab 20 | NonVeg 179 habitat 96 ratio 0.21
+    NH val 2022: n_pos 30 n 30 n_nv 9 n_hab 21 | NonVeg 123 habitat 68 ratio 0.31
+    NH val 2023: n_pos 33 n 33 n_nv 10 n_hab 23 | NonVeg 84 habitat 72 ratio 0.32
+    NH val 2024: n_pos 66 n 66 n_nv 20 n_hab 46 | NonVeg 95 habitat 52 ratio 0.88  [n_hab/supply 0.88 > 0.8]
+    VT train 2020: n_pos 163 n 163 n_nv 49 n_hab 114 | NonVeg 977 habitat 453 ratio 0.25
+    VT train 2021: n_pos 147 n 147 n_nv 44 n_hab 103 | NonVeg 1000 habitat 398 ratio 0.26
+    VT train 2022: n_pos 170 n 170 n_nv 51 n_hab 119 | NonVeg 541 habitat 272 ratio 0.44
+    VT train 2023: n_pos 174 n 174 n_nv 52 n_hab 122 | NonVeg 509 habitat 191 ratio 0.64
+    VT train 2024: n_pos 268 n 268 n_nv 80 n_hab 188 | NonVeg 450 habitat 201 ratio 0.94  [n_hab/supply 0.94 > 0.8]
+    VT val 2020: n_pos 32 n 32 n_nv 10 n_hab 22 | NonVeg 217 habitat 97 ratio 0.23
+    VT val 2021: n_pos 34 n 34 n_nv 10 n_hab 24 | NonVeg 255 habitat 87 ratio 0.28
+    VT val 2022: n_pos 43 n 43 n_nv 13 n_hab 30 | NonVeg 141 habitat 60 ratio 0.50
+    VT val 2023: n_pos 38 n 38 n_nv 11 n_hab 27 | NonVeg 129 habitat 56 ratio 0.48
+    VT val 2024: n_pos 59 n 59 n_nv 18 n_hab 41 | NonVeg 101 habitat 46 ratio 0.89  [n_hab/supply 0.89 > 0.8]
+  CHOSEN: S1 ((2020,), (2021,), (2022,), (2023,), (2024,))
+5. stratified draw on SCRATCH
+  draw: {"ME": {"train": {"n": 2291, "n_hab": 1604, "n_nv": 687, "strata": {"2020": {"n": 469, "n_hab": 328, "n_nv": 141}, "2021": {"n": 588, "n_hab": 412, "n_nv": 176}, "2022": {"n": 648, "n_hab": 454, "n_nv": 194}, "2023": {"n": 282, "n_hab": 197, "n_nv": 85}, "2024": {"n": 304, "n_hab": 213, "n_nv": 91}}}, "val": {"n": 563, "n_hab": 394, "n_nv": 169, "strata": {"2020": {"n": 132, "n_hab": 92, "n_nv": 40}, "2021": {"n": 141, "n_hab": 99, "n_nv": 42}, "2022": {"n": 146, "n_hab": 102, "n_nv": 44}, "2023": {"n": 63, "n_hab": 44, "n_nv": 19}, "2024": {"n": 81, "n_hab": 57, "n_nv": 24}}}}, "NH": {"train": {"n": 634, "n_hab": 445, "n_nv": 189, "strata": {"2020": {"n": 97, "n_hab": 68, "n_nv": 29}, "2021": {"n": 118, "n_hab": 83, "n_nv": 35}, "2022": {"n": 137, "n_hab": 96, "n_nv": 41}, "2023": {"n": 118, "n_hab": 83, "n_nv": 35}, "2024": {"n": 164, "n_hab": 115, "n_nv": 49}}}, "val": {"n": 193, "n_hab": 135, "n_nv": 58, "strata": {"2020": {"n": 35, "n_hab": 25, "n_nv": 10}, "2021": {"n": 29, "n_hab": 20, "n_nv": 9}, "2022": {"n": 30, "n_hab": 21, "n_nv": 9}, "2023": {"n": 33, "n_hab": 23, "n_nv": 10}, "2024": {"n": 66, "n_hab": 46, "n_nv": 20}}}}, "VT": {"train": {"n": 922, "n_hab": 646, "n_nv": 276, "strata": {"2020": {"n": 163, "n_hab": 114, "n_nv": 49}, "2021": {"n": 147, "n_hab": 103, "n_nv": 44}, "2022": {"n": 170, "n_hab": 119, "n_nv": 51}, "2023": {"n": 174, "n_hab": 122, "n_nv": 52}, "2024": {"n": 268, "n_hab": 188, "n_nv": 80}}}, "val": {"n": 206, "n_hab": 144, "n_nv": 62, "strata": {"2020": {"n": 32, "n_hab": 22, "n_nv": 10}, "2021": {"n": 34, "n_hab": 24, "n_nv": 10}, "2022": {"n": 43, "n_hab": 30, "n_nv": 13}, "2023": {"n": 38, "n_hab": 27, "n_nv": 11}, "2024": {"n": 59, "n_hab": 41, "n_nv": 18}}}}}
+6. O11 (after the strata are fixed)
+  O11a today [train]: pooled 0.6629; ME 0.6497, NH 0.6748, VT 0.6942
+  O11a today [val]: pooled 0.6558; ME 0.6371, NH 0.7004, VT 0.6728
+  O11a today [pooled]: pooled 0.6615; ME 0.6473, NH 0.6813, VT 0.6905
+  O11a predicted [train]: pooled 0.5000; ME 0.5000, NH 0.5000, VT 0.5000
+  O11a predicted [val]: pooled 0.5000; ME 0.5000, NH 0.5000, VT 0.5000
+  O11a predicted [pooled]: pooled 0.5000; ME 0.5000, NH 0.5000, VT 0.5000
+  O11w criterion (pooled O11w <= null p99 for every merged stratum): n/a (no merged stratum)
+7. N keys
+  kept 3532, removed 1277, added 1277
+  N today years: {2020: np.int64(1861), 2021: np.int64(1293), 2022: np.int64(1010), 2023: np.int64(380), 2024: np.int64(265)}
+  N predicted years: {2020: np.int64(928), 2021: np.int64(1057), 2022: np.int64(1174), 2023: np.int64(708), 2024: np.int64(942)}
+  P years: {2020: np.int64(928), 2021: np.int64(1057), 2022: np.int64(1174), 2023: np.int64(708), 2024: np.int64(942)}
+
+SUMMARY: strata S1; comparability tolerances EXCEEDED; O11w criterion n/a
+exit 0

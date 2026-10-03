@@ -15,6 +15,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import numpy as np
 import pandas as pd
@@ -315,10 +316,6 @@ class StratifiedDraw(unittest.TestCase):
         self.assertNotEqual(flat, strat)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class FetchCappedWithCollector(unittest.TestCase):
     """The real get_negatives.fetch_capped driving Collector and a shared seen set."""
 
@@ -500,6 +497,34 @@ class PipelineStratifiedDraw(unittest.TestCase):
         self.assertNotEqual(d["n_nv"], int(round(20 * 0.3)))
         self.assertEqual(int(got["is_nonveg"].sum()), 5)
 
+    def test_non_integer_year_raises(self):
+        """BUG-0076: 2020.5 is refused, not truncated into 2020 (the
+        replay's stratum_index_of refuses it too); 2020.0 is a year."""
+        pool = _gn_pool(2020, 10, 0)
+        bad = pool.copy()
+        bad["year"] = bad["year"].astype(float)
+        bad.loc[0, "year"] = 2020.5
+        with self.assertRaisesRegex(ValueError, "not an integer"):
+            gn.draw_region_split(bad, [2020] * 3)
+        with self.assertRaisesRegex(ValueError, "not an integer"):
+            gn.draw_region_split(pool, [2020.5, 2020, 2020])
+        ok = pool.copy()
+        ok["year"] = ok["year"].astype(float)
+        got, d = gn.draw_region_split(ok, [2020.0] * 3)
+        self.assertEqual(d["n"], 3)
+
+    def test_non_integer_neg_ratio_totals_are_sums(self):
+        """Review C2: with NEG_RATIO 1.5 the cell total is the sum of the
+        per-stratum rounds (4 here), not round(n_pos x NEG_RATIO) (3)."""
+        pool = pd.concat([_gn_pool(2020, 10, 0), _gn_pool(2021, 10, 0, 100)],
+                         ignore_index=True)
+        with mock.patch.object(gn, "NEG_RATIO", 1.5):
+            got, d = gn.draw_region_split(pool, [2020, 2021])
+        self.assertEqual(d["n"], len(got))
+        self.assertEqual(d["n"], sum(v["n"] for v in d["strata"].values()))
+        self.assertEqual(d["n"], 4)
+        self.assertNotEqual(d["n"], int(round(2 * 1.5)))
+
     def test_shortfall_in_one_stratum_raises_despite_surplus(self):
         pool = pd.concat([_gn_pool(2020, 50, 0), _gn_pool(2024, 2, 0, 100)], ignore_index=True)
         with self.assertRaises(RuntimeError):
@@ -577,3 +602,7 @@ class PipelineEndToEndStratified(unittest.TestCase):
                 self.assertEqual(sorted(cell["strata"]), ["2023", "2024", "2025"])
                 for key in ("n", "n_nv", "n_hab"):
                     self.assertEqual(cell[key], sum(v[key] for v in cell["strata"].values()))
+
+
+if __name__ == "__main__":
+    unittest.main()

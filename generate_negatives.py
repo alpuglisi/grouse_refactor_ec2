@@ -300,11 +300,15 @@ def es_select(sub, n):
 
 
 def _strata_of(years, what):
-    """regions.year_stratum per year; a year in no stratum raises."""
+    """regions.year_stratum per year; a null, non-integer or unstratified
+    year raises (CR-0021 section 2 B: every row maps to a stratum)."""
     out = []
     for y in years:
         if pd.isna(y):
             raise ValueError(f"{what}: a row has no year (CR-0021 draw)")
+        if float(y) != int(y):                    # BUG-0076: no truncation
+            raise ValueError(f"{what}: year {y!r} is not an integer "
+                             f"(CR-0021 draw)")
         try:
             out.append(regions.year_stratum(int(y)))
         except ValueError as e:

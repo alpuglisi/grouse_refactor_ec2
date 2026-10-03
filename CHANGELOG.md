@@ -85,7 +85,11 @@ standing checks pass on `main` (`fbc6c10`).
 review or implementation: a hard-linked scratch copy would have let the
 top-up append reach the live raw files (guarded: link count and
 `samefile`); the CR omitted the `prepare_training_data.py` re-run that
-E11 needs (I1) and E9 from the expected FAIL list (I3).
+E11 needs (I1) and E9 from the expected FAIL list (I3). The
+implementation code review (APPROVE WITH FOLLOW-UPS) found BUG-0076 (the
+draw truncated a non-integer year into a stratum instead of refusing it;
+latent) and BUG-0077 (`tests/test_cr0021.py` run as a script skipped 15
+tests behind a mid-file `__main__` block), both fixed; PA-0034, PA-0035.
 
 ## One year floor for both classes; the year-gap filter refuses instead of dropping (CR-0019, 2026-09-30)
 

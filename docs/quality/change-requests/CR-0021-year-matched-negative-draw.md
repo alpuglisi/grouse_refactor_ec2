@@ -1,14 +1,14 @@
 # CR-0021: Year-matched negative draw, with a one-off 2023–2024 negative top-up
 
-**Status: APPROVED, 2026-10-03** (v4 text). Scope (iii) chosen by the
+**Status: IMPLEMENTED, 2026-10-03** (approved v4 text). Scope (iii) chosen by the
 user; design approved with follow-ups by reviewers A and B (round 3, the
 last under CR-0011 A2); deliverable 1 complete: top-up and
 pre-registration run on the EC2 host, transcription verified by reviewer
 A, `mc_selftest` PASS (63/63; no-op FAILs), reviewer A's PA-0021(a)
 wrong-tree runs PASS (11 wrong trees each FAIL via the expected check).
-User decisions recorded (§4 Result). Deliverables 2–8 done (live run
-`e85f5e1`, standing checks on `main` `fbc6c10`); 9 (close-out) waits
-for the implementation code review.
+User decisions recorded (§4 Result). **IMPLEMENTED, 2026-10-03:**
+deliverables 1–9 done (live run `e85f5e1`, standing checks on `main`
+`fbc6c10`; implementation code review APPROVE WITH FOLLOW-UPS).
 Verdicts and dispositions: `CR-0021-review-log.md`. This document states
 only current intent.
 
@@ -100,7 +100,8 @@ de-duplication against the existing rows:
   (§4 Result). `regions.year_stratum(year)`
   returns the index of the stratum holding `year` and raises
   `ValueError` for any other year (fails closed). `tests/test_shared_constants.py`
-  pins both names.
+  pins `YEAR_STRATA` (it pins literals only); `year_stratum` is tested in
+  `tests/test_cr0021.py` (`RegionsYearStrata`).
 - **Draw.** `draw_region_split(pool_rs, pos_years)` takes the cell's
   positives' `year` values (instead of their count). For each stratum `k`:
   `n_k = round(n_pos_k × NEG_RATIO)`; NonVeg cap
@@ -137,7 +138,7 @@ de-duplication against the existing rows:
 | `prepare_training_data.py` | `measured_constants` (shared by both manifest sections) gains `YEAR_STRATA` |
 | `tests/test_cr0012.py`, `tests/test_cr0017.py` | calls of `draw_region_split(sub, int)` updated to the new signature; fixtures run under one stratum holding every fixture year, so expectations are unchanged apart from the `draw` breakdown |
 | `tests/test_cr0021.py` (new) | § Test plan |
-| `tests/test_shared_constants.py` | pin `YEAR_STRATA`, `year_stratum` |
+| `tests/test_shared_constants.py` | pin `YEAR_STRATA` |
 | `docs/quality/evidence/CR-0021/fetch_topup.py` (new, evidence) | C |
 
 ### 3. Acceptance (amends CR-0013; normative for the replay author)
@@ -520,7 +521,12 @@ lesson).
       BUG-0073 FIXED (root cause) with §5 restated, §6, §7 re-check, §8;
       `BUG_LOG.md`; PA-0033 (extends PA-0020) with its sweep, no new BUG;
       tracker § CR-0021.
-- [ ] 9. Close-out.
+- [x] 9. Close-out.
+      — Implementation code review (independent agent, heads `81cc603`,
+      `afd36fe`): APPROVE WITH FOLLOW-UPS, 0 BLOCKING/MAJOR/MEDIUM, 5 LOW
+      (review log). C1 → BUG-0076, C4 → BUG-0077 (fixed, PA-0034,
+      PA-0035); C2 test added; C5 text corrected; C3 and the O11w note
+      tracked. Suites pass.
 
 ## Out of scope
 - The retrain, calibration and baseline: CR-0020.

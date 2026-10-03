@@ -227,3 +227,23 @@ assert the refusal.
   (`scratch_rerun2.txt`, `f540d1e`): 40 files, 0 mismatches; the manifest
   from the earlier commit equals the new one apart from `commit`. No code
   change. The live run (deliverable 6) commits nothing between its steps.
+
+## Implementation code review (independent agent, heads `81cc603` / `afd36fe`, 2026-10-03)
+Verdict **APPROVE WITH FOLLOW-UPS** (0 BLOCKING, 0 MAJOR, 0 MEDIUM, 5 LOW).
+Checked and found correct: pipeline/replay agreement on non-integer
+`NEG_RATIO`, zero-positive strata, empty NonVeg pool, empty cell, null
+year, unstratified year, overlapping strata; manifest shape (string keys
+in stratum order, zeros present, ints); R4 exact-type and key-order
+checks; E9/E15 fail closed on an unparsable config; no new `except`;
+attack-row mutants killed.
+
+| id | sev | finding (short) | disposition |
+|---|---|---|---|
+| C1 | LOW | `_strata_of` truncates a non-integer year (`int(2020.5)` → stratum 2020); replay refuses; §2 B says raise | fixed: refuse `float(y) != int(y)`; test `test_non_integer_year_raises`; **BUG-0076**, PA-0034 |
+| C2 | LOW | No test with non-integer `NEG_RATIO`; a "cell total = round(n_pos × NEG_RATIO)" mutant survives | fixed: `test_non_integer_neg_ratio_totals_are_sums` (NEG_RATIO 1.5: total 4 = Σ n_k, not 3) |
+| C3 | LOW | OBS O7 headroom is per cell; the binding constraint is now per stratum, so O7 can show headroom while a stratum is short | tracked (tracker § CR-0021, owner lead): report O7 worst ratio per (R, s, stratum) or label it per cell |
+| C4 | LOW | `tests/test_cr0021.py` had `__main__` mid-file: run as a script, 15 of 39 tests skipped, OK reported | fixed: block moved to the end (41 tests either way); **BUG-0077**, PA-0035, sweep `sweep_main_last.py` 0 hits |
+| C5 | LOW | CR §2 B said `test_shared_constants.py` pins `year_stratum`; it pins literals only | fixed: CR text corrected (§2 B, code table) |
+| note | – | O11w criterion is one-sided ("exceeds p99"); n/a under S1 | tracked: revisit if a merged stratum (S2/S3) is ever adopted |
+
+Close-out: deliverable 9 checked; status IMPLEMENTED.

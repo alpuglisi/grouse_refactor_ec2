@@ -12,7 +12,8 @@ when the scope changed). The CR states only current intent (CR-0011 A4).
 | 1 | v1 (`9422a38`) | B: implementability, composition, acceptance (fresh agent; read-only; no data; pytest not installed, suites not run) | APPROVE WITH FOLLOW-UPS | 0 (3 MAJOR, 5 MEDIUM, 3 LOW) |
 | 2 | v2 (`4bb44bc`) | A (bounded per CR-0011 A2; §2–§5 rewritten, so reviewed in full) | APPROVE WITH FOLLOW-UPS | 0 (1 MAJOR, 3 MEDIUM, 3 LOW); A1, A2 resolved |
 | 2 | v2 (`4bb44bc`) | B (same bounds; pytest not installed, suites not run) | APPROVE WITH FOLLOW-UPS | 0 (1 MAJOR, 3 MEDIUM, 3 LOW); B1, B2, B3 resolved |
-| 3 | v3 | A, B: **last round under A2**, bounded to A10, B12 and v3's changed text | pending | – |
+| 3 | v3 (`75dc4bd`) | A (last round under A2; bounded) | APPROVE WITH FOLLOW-UPS | 0 (1 MAJOR, 2 LOW); A10 resolved |
+| 3 | v3 (`75dc4bd`) | B (last round under A2; bounded) | APPROVE WITH FOLLOW-UPS | 0 (1 MAJOR, 1 LOW); B12 partly resolved (block tolerance, see B19) |
 
 **Approval: not reached.** Waits on round 3 and on deliverable 1 (the
 top-up fetch and the pre-registration on the EC2 host), which has not
@@ -92,3 +93,12 @@ which keeps (ii) as the last fallback entry.
 | B16 | LOW | MC0's old tree ambiguous; MC2 prefix needs the same writer | accepted: old tree = deliverable 5's backup of today's live tree (record `ed27583b…`); append with `csv.DictWriter`, `CSV_FIELDS`, `\r\n` | §2 C, §3 MC |
 | B17 | LOW | `e = 0` partitions get no top-up | accepted (with A13): reported | §2 C, §4 |
 | B18 | LOW | v3 is round 3 (last under A2) | accepted: round 3 bounded to A10, B12 and v3's changed text; the post-pre-registration write-in is a reviewer-verified transcription; non-mechanical changes go to the user | CR status, §4 |
+
+## Round 3 (final under CR-0011 A2): concerns and dispositions
+| id | sev | concern (short) | disposition |
+|---|---|---|---|
+| A17 / B19 | MAJOR (raised independently by both) | The block-occupancy tolerance (TVD ≤ 0.10 on 3 km blocks, from B12) is uncalibrated and fails on a fair top-up: two samples of 1–3 thousand rows over thousands of blocks differ by TVD far above 0.10 by sampling alone (B's simulation on made-up distributions: median 0.53–0.80 over 10,000 cells, ~0.19 over 1,000). PA-0021(c). Fails safe (to the user), so not BLOCKING. Fix proposed by both: a permutation null (pool (a) and (b), random splits of the same sizes, ≥ 100 / 1,000 draws, flag above p99), with counties as the coarser axis | **escalated to the user** (no fourth round): a change to a pre-registered criterion must land before deliverable 1 runs |
+| A18 | LOW | O11w significance is not effect size | applied: effect size (O11w − 0.5) reported next to the percentile (§3) |
+| A19 / B20 | LOW | Stale lines: §5 "O11's tolerance"; deliverable 1 "then v3" | applied: §5 "subject to the O11w criterion (§3)"; deliverable 1 "then v4: transcription only" |
+
+A13–A16 and B13–B18 dispositions: accepted by their reviewers in round 3.

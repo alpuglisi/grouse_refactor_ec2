@@ -185,8 +185,10 @@ statistics, each per region and pooled:
 99th percentile of its null, the merged stratum carries a year–label
 residual the gate cannot see. The CR is then **not approvable without a
 user decision**: accept the residual, top up further, or stop. No fixed
-AUC threshold is used. The pre-registration computes the values, after
-the strata are chosen.
+AUC threshold is used. O11w's effect size (O11w − 0.5) is reported next
+to its null percentile, so that the decision is taken on size, not only
+significance (a large stratum makes a negligible skew significant). The
+pre-registration computes the values, after the strata are chosen.
 
 **Attack rows** (`tests/test_acceptance_split.py`, synthetic). Each
 names the fixture rows it needs. The test asserts on the **attacked
@@ -296,8 +298,8 @@ round (CR-0011 A2).
   trained at another). It is filed at deliverable 8 as a **tracked
   residual with an owner** (lead; a tracker entry under PA-0022), not
   closed as accepted.
-- **Inside a merged stratum** (only if S2 or S3 is chosen): bounded by
-  O11's tolerance.
+- **Inside a merged stratum** (only if S2 or S3 is chosen): subject to
+  the O11w criterion (§3).
 - **The acquisition order** (`get_negatives.py` rollover) still
   front-loads the raw pool; after B it only affects supply, not N's year
   mix. It stays a recorded candidate cause in BUG-0073; the fix does not
@@ -404,7 +406,8 @@ lesson).
       `mc_selftest.py` committed; run on the EC2 host by the user
       (network): `fetch_topup.log`, `preregister.txt` and CSVs, the
       pinned raw files' sha256, `mc_selftest.txt`; a reviewer's
-      PA-0021(a) wrong-tree runs of MC. Then v3 with the chosen strata.
+      PA-0021(a) wrong-tree runs of MC. Then v4: transcription only
+      (§4 "Writing the result in").
 - [ ] 2. Acceptance changes (§3) on an unmerged CR-0021 branch by a fresh
       agent that does not write deliverable 3 (CR-0013 rule 4); read-only
       run on today's files gives exactly the expected FAILs.

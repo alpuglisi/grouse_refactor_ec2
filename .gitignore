@@ -42,3 +42,13 @@
 #    CR-0007, copied verbatim (the directory itself is already allowed by
 #    rule 4; only its .py files are added). Their CSV outputs stay ignored.
 !/docs/quality/evidence/CR-0007-r7/*.py
+
+# 10. CR-0021 deliverable 1: evidence scripts and the pre-registration
+#     outputs MC pins (preregister_*.csv/.json, fetch_topup_result.json),
+#     plus their logs and reports.
+!/docs/quality/evidence/CR-0021/
+!/docs/quality/evidence/CR-0021/*.py
+!/docs/quality/evidence/CR-0021/*.txt
+!/docs/quality/evidence/CR-0021/*.log
+!/docs/quality/evidence/CR-0021/*.json
+!/docs/quality/evidence/CR-0021/preregister_*.csv

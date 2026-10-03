@@ -148,6 +148,12 @@ Conventions:
 - `n_hab = n − n_nv`.
 - A habitat pool smaller than `n_hab` **raises**. This replaces the
   top-up at `:278-286`.
+- **Amended by CR-0021** (§2 B): the draw is made per year stratum `k`
+  of `regions.YEAR_STRATA` (single years 2020–2024): `n_k`, `n_nv_k`,
+  `n_hab_k` as above from the positives of (R, s) in stratum `k`, each
+  sub-pool restricted to the stratum; a habitat shortfall in any stratum
+  raises; the cell totals are sums over strata; the manifest `draw`
+  entry gains a `strata` breakdown.
 - In each sub-pool, select the `n_*` rows with the largest
   `log(u)/weight`, where `u = (order_key("neg:" + coord) + 0.5) / 2**64`.
   Ties are broken by ascending `order_key("neg:" + coord)`. This is

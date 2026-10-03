@@ -16,6 +16,77 @@ the diff.
 
 ---
 
+## Negatives drawn year-matched to the positives; year alone no longer predicts the label (CR-0021, 2026-10-03)
+
+**Defect (BUG-0073).** After CR-0019 both classes spanned 2020–2024, but
+within that span negatives were front-loaded on 2020 (1,861 of 4,809)
+and positives peaked in 2022: year alone predicted the label at AUC
+0.6615. A record's year selects its raster vintage, so vintage carried
+label information. The draw matched counts per (region, split) only, and
+no gate compared the classes' year distributions (E14 compares supports).
+
+**Disproven / rejected.** Harmonising the two representative-year rules
+(positives' latest visit vs negatives' smallest `gbif_id`) was the first
+proposal: the measured variants still leave AUC 0.5584 / 0.6125, and
+judging a positive's habitat at one vintage while training it
+at another adds its own asymmetry (CR-0021 review A1). A year-matched
+draw from the existing pool was infeasible: single-year strata were
+short of habitat candidates in 2023–2024 (e.g. ME train 2024: 143 <
+213). Both rules stay; their difference is a tracked residual.
+
+**Change.**
+- **Top-up (one-off).** `docs/quality/evidence/CR-0021/fetch_topup.py`
+  appended 2023–2024 candidates to the raw files (ME +22,959, NH +11,272,
+  VT +12,290 rows; append only, old bytes an exact prefix), then was
+  disabled. Post-top-up sha256: ME `95b2ec24…`, NH `8f97a4a6…`, VT
+  `e52ac675…` (`preregister_draw.json`, pinned in `check_must_change.py`;
+  the acceptance record's `inputs`). It is the raw files' second
+  producer: a later `get_negatives.py` run counts these rows toward its
+  (state, species) caps.
+- **Draw.** `regions.YEAR_STRATA` (single years 2020–2024, chosen by the
+  pre-registration before any AUC was seen) and `year_stratum`;
+  `generate_negatives.draw_region_split` draws per (region, split, year)
+  with the NonVeg cap per stratum and a raise on any habitat shortfall;
+  the manifest's `draw` entry carries the per-year breakdown. Code
+  `81cc603`.
+- **Acceptance.** E9 per stratum; new exact gate E15 (strata well formed;
+  per (region, split, year) N count = P count), also standing; R4
+  compares the draw entry with exact JSON types; OBS O11 (year-only AUC).
+  Written by a separate author (`afd36fe`, CR-0013 rule 4).
+
+**Data (live run, `docs/quality/evidence/CR-0021/live/`, `e85f5e1`).**
+P and B byte-identical (MC1; `prepare_training_data.py` re-run only to
+put `YEAR_STRATA` into the manifest's positives section). Negatives
+still 4,809, now with exactly the positives' year histogram in every
+region and split (OBS O9); year-only AUC **0.5000** in every cell (O11,
+was 0.6615). Must-change gate 63/63 against the backup
+`/home/ec2-user/grouse_backup/CR-0021`; acceptance 21/21 GATEs;
+`--calibrate` 21/21, OBS references recalibrated; record `fc376877…`;
+standing checks pass on `main` (`fbc6c10`).
+
+**Consequences.**
+- **Validation metrics are not comparable with earlier ones** and are
+  expected to be lower by whatever part of the old separation came from
+  vintage. That is not a regression. The retrain, calibration refit and
+  baseline are CR-0020, on this split.
+- **Warning (CR-0021 §6):** do not use a checkpoint trained on an earlier
+  split in any BUG-0060 entry point (`calibrate.py --model`, `train.py
+  --distill-from`, `--init-from`, `--resume`) or evaluate one on the new
+  validation set: the validation negatives changed.
+- **Residuals (tracked, owner lead):** the representative-year rules
+  still differ (a per-year composition asymmetry, no year–label
+  correlation); the negatives' wetland-guild share differs between
+  2020–2022 and 2023–2024 (`wetland_mix.txt`; follow-up CR for a
+  wetland-balanced draw within each year).
+- `train.sample_background_points` (BUG-0074) is unaffected: still no
+  run with `--an-background > 0`.
+
+**Bugs introduced during this work.** None reached a run. Found in
+review or implementation: a hard-linked scratch copy would have let the
+top-up append reach the live raw files (guarded: link count and
+`samefile`); the CR omitted the `prepare_training_data.py` re-run that
+E11 needs (I1) and E9 from the expected FAIL list (I3).
+
 ## One year floor for both classes; the year-gap filter refuses instead of dropping (CR-0019, 2026-09-30)
 
 **Defect (BUG-0034).** Positives were acquired from 2016

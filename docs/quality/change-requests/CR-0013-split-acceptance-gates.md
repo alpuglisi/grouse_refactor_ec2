@@ -210,7 +210,15 @@ rule (b) in R3's pool step 6, and config entry `paths.domain_edge`.
 P/N year and every non-null C year `≥ YEAR_MIN`; (b) pooled P and N year
 sets equal); R1/R3 replay the positives step 2 and pool step 1 floor;
 config `constants.YEAR_MIN` and `regions_py.names.YEAR_MIN` (E11(c), (e)).
-20 GATEs.
+
+**Amended by CR-0021** (§3): E9's NonVeg-cap and habitat-supply clauses
+are per (R, split, year stratum), its count clause the sum over strata;
+new exact gate E15 ((a) the config's `YEAR_STRATA` well formed and
+covering every P, N and C year; (b) per (R, split, stratum) N's count
+equals `round(P's count × NEG_RATIO)`); R4 replays the stratified draw
+and compares the draw entry with exact JSON types; config
+`constants.YEAR_STRATA`, `regions_py.names.YEAR_STRATA`; OBS O11
+(year-only AUC, report-only).20 GATEs.
 
 **Replay gates.** From S, I and the config, the script produces P, B, C and
 N, the same files CR-0012 writes. Equality is **full-row**: every
@@ -267,6 +275,9 @@ data_root=None, config=None)` is called by CR-0012 §5.
 
 **Amended by CR-0019** (§3): E14 (P and N only) joins the standing subset;
 C's E14 check is covered by the record digests.
+
+**Amended by CR-0021** (§3): E15 joins the standing subset (P and N
+only; C covered by the record digests).
 
 ## CLI and report
 `acceptance_split.py` takes these options:
@@ -330,6 +341,8 @@ committed by deliverable 1.
 **Amended by CR-0017** (§3): five domain-edge attack rows.
 
 **Amended by CR-0019** (§3): seven year-floor attack rows (CR-0019 § 3 attack table).
+
+**Amended by CR-0021** (§3): year-stratum attack rows (CR-0021 § 3 attack table).
 
 ## Observations (OBS: reported, never blocking)
 Terms used below:

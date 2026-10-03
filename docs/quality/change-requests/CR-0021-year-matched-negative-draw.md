@@ -6,8 +6,9 @@ last under CR-0011 A2); deliverable 1 complete: top-up and
 pre-registration run on the EC2 host, transcription verified by reviewer
 A, `mc_selftest` PASS (63/63; no-op FAILs), reviewer A's PA-0021(a)
 wrong-tree runs PASS (11 wrong trees each FAIL via the expected check).
-User decisions recorded (§4 Result). Implementation (deliverables 2–9)
-not started.
+User decisions recorded (§4 Result). Deliverables 2–8 done (live run
+`e85f5e1`, standing checks on `main` `fbc6c10`); 9 (close-out) waits
+for the implementation code review.
 Verdicts and dispositions: `CR-0021-review-log.md`. This document states
 only current intent.
 
@@ -481,17 +482,28 @@ lesson).
       cell; `scratch_mc.txt` MC 63/63 PASS; `scratch_rerun2.txt` (`f540d1e`)
       second run at one commit byte-identical over 40 files, manifest equal
       apart from `commit` against a run at another commit (review log I4).
-- [ ] 5. Preconditions and backup (to
+- [x] 5. Preconditions and backup (to
       `/home/ec2-user/grouse_backup/CR-0021/`, sha256 verified),
       including the three raw files.
-- [ ] 6. Live run (user-authorised): copy the pinned raw files, then as
+      — Done (`e5dad22`): `live/preconditions.txt` (no tracked changes,
+      live record `ed27583b…`), backup 42 files sha256 verified
+      (`live/live_before.sha256`), MC0 PASS with old = backup
+      (`live/mc0_backup.txt`).
+- [x] 6. Live run (user-authorised): copy the pinned raw files, then as
       CR-0019 deliverable 6 from `prepare_training_data.py` on (§2 B);
       restore on any FAIL.
-- [ ] 7. Pointer lines, `ARCHITECTURE.md`, `CHANGELOG.md` (data change,
+      — Done (user ran the authorised script, 2026-10-03): MC 63/63 vs
+      backup (`live/mc_live.txt`); 21/21 GATEs, record `12554744…`
+      (`live/acceptance.log`); `--calibrate` 21/21, OBS rewritten, record
+      `fc376877…` (`live/calibrate.log`, `live/acceptance_record.json`);
+      evidence `e85f5e1`; `main` fast-forwarded, standing checks pass
+      (`live/standing_main.txt`, `fbc6c10`). O9: N's year histogram equals
+      P's in every region; O11a 0.5 in every cell.
+- [x] 7. Pointer lines, `ARCHITECTURE.md`, `CHANGELOG.md` (data change,
       metrics not comparable, §6 warning; the raw files' second producer
       `fetch_topup.py` and the pinned sha256 values, so the provenance
       chain MC2 → E11 input digests → acceptance record stays traceable).
-- [ ] 8. Bookkeeping: BUG-0073's root cause restated as confirmed (§ Fixes)
+- [x] 8. Bookkeeping: BUG-0073's root cause restated as confirmed (§ Fixes)
       with its corrective action, recurrence review and status; the
       representative-year rule asymmetry filed as a tracked residual with
       an owner (§5, PA-0022); `BUG_LOG.md`; the PA-0020 extension written
@@ -503,6 +515,11 @@ lesson).
       tracked residual"), with BUG-0073 §8 updated to justify the change
       from its draft wording ("must be the same rule"); a sweep by
       mechanism; tracker.
+      — Done: pointer lines in CR-0012 §2 (Draw) and CR-0013 (E9/E15,
+      standing subset, attacks); `ARCHITECTURE.md`; `CHANGELOG.md`;
+      BUG-0073 FIXED (root cause) with §5 restated, §6, §7 re-check, §8;
+      `BUG_LOG.md`; PA-0033 (extends PA-0020) with its sweep, no new BUG;
+      tracker § CR-0021.
 - [ ] 9. Close-out.
 
 ## Out of scope

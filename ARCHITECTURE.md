@@ -35,7 +35,13 @@ Each stage consumes the previous stage's files. Paths are all defined in
 **1. Acquire points**
 - `sightings.py` — grouse presence records, GBIF bulk download (eBird dataset)
 - `ebird.py` — same species via the eBird API directly
-- `get_negatives.py` — *other* bird species as target-group background candidates → `data/negatives/gbif_negatives_{region}.csv`
+- `get_negatives.py` — *other* bird species as target-group background candidates → `data/negatives/gbif_negatives_{region}.csv`.
+  Second producer (one-off, CR-0021): `docs/quality/evidence/CR-0021/fetch_topup.py`
+  appended 2023–2024 candidates to the three raw files (disabled since;
+  post-top-up sha256 pinned in `docs/quality/evidence/CR-0021/preregister_draw.json`,
+  itself pinned in `check_must_change.py`, and recorded as inputs in the
+  acceptance record). A later `get_negatives.py`
+  run would count those rows toward its (state, species) caps.
 
 **2. Acquire rasters** → `data/landfire/{REGION}_{YEAR}_{feature}.tif`
 - `download_rev.py` — LANDFIRE: evt, evh, evc, sclass, fdist, ch, cc, slope, gradient
@@ -71,7 +77,11 @@ and the envelope metrics still use them.
 assignments, positives manifest). Candidates with a non-null
 `year < regions.YEAR_MIN` are dropped at pool step 1, so both classes carry
 one year floor (CR-0019; acceptance gate E14 checks it and that the pooled
-positive and negative year sets are equal). `acceptance_split.py` (CR-0013) must
+positive and negative year sets are equal). The draw is year-matched: per
+region, split and year stratum (`regions.YEAR_STRATA`, single years
+2020–2024) the negatives' count equals the positives' (CR-0021; gate E15),
+so year alone carries no label information (OBS O11, AUC 0.5).
+`acceptance_split.py` (CR-0013) must
 then pass before `train.py`/`calibrate.py`/`bench_pipeline.py` will run
 (`build_datasets` calls `acceptance_split.standing_checks`).
 

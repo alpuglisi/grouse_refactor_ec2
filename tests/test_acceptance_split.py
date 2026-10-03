@@ -60,13 +60,20 @@ G_COLS = ["common_name", "scientific_name", "longitude", "latitude", "obs_date",
           "month", "state", "gbif_id", "how_many", "coord_uncertainty_m"]
 RASTER_YEARS = {"evt": [2022, 2023], "evh": [2022, 2023], "sclass": [2021, 2022, 2023]}
 with open(PROD_CONFIG, encoding="utf-8") as _f:
-    YEAR_MIN = json.load(_f)["constants"]["YEAR_MIN"]      # CR-0019
+    _PROD_C = json.load(_f)["constants"]
+YEAR_MIN = _PROD_C["YEAR_MIN"]                            # CR-0019
+YEAR_STRATA = [list(s) for s in _PROD_C["YEAR_STRATA"]]   # CR-0021
 # CR-0019 (review A4): fixture years are set deterministically. Both classes
 # cycle over the same years >= YEAR_MIN, so the correct tree's pooled P and N
 # year sets are equal by construction (asserted in TestYearFloorUnits); a
 # few sightings and candidates carry LOW_YEAR (< YEAR_MIN) for the attacks.
 FIX_YEARS = [YEAR_MIN + k for k in range(4)]
 LOW_YEAR = YEAR_MIN - 1
+# CR-0021: the candidates' year mix differs from the positives' (which cycle
+# FIX_YEARS uniformly): early years are over-represented in the pool, so an
+# unstratified draw takes the pool's mix and its per-year N counts differ
+# from P's, while every (region, split, year) stays feasible.
+CAND_YEAR_CYCLE = [FIX_YEARS[i] for i in (0, 0, 0, 1, 1, 2, 2, 3, 3)]
 REGIONS_PY = '''"""fixture regions.py (CR-0007/CR-0012/CR-0019 constants)."""
 REGIONS = ("ME", "NH", "VT")
 STATE_FIPS = {"ME": "23", "NH": "33", "VT": "50"}
@@ -78,7 +85,8 @@ BLOCK_ORIGIN_5070 = (0.0, 0.0)
 VAL_FRACTION = 0.2
 SPLIT_SEED = 42
 WINDOW_PX = 64
-''' + f"YEAR_MIN = {YEAR_MIN}\n"
+''' + f"YEAR_MIN = {YEAR_MIN}\n" + (
+    "YEAR_STRATA = (" + ", ".join("(" + ", ".join(map(str, s)) + ",)" for s in YEAR_STRATA) + ")\n")
 
 
 def _seed(*parts):
@@ -320,7 +328,7 @@ def _write_candidates(root, S):
             lat.append(NH_IN_ME[1])
         n = len(lon)
         rng.integers(2019, 2024, n)                      # consumed: keeps the other columns' draws
-        yr = np.array([FIX_YEARS[i % len(FIX_YEARS)] for i in range(n)])     # CR-0019
+        yr = np.array([CAND_YEAR_CYCLE[i % len(CAND_YEAR_CYCLE)] for i in range(n)])  # CR-0019/0021
         yr[[i for i in range(min(n, 650)) if i % 13 == 6]] = LOW_YEAR       # pool step 1 drops these
         unc = rng.choice([10.0, 50.0, 250.0, np.nan], n)
         unc[rng.random(n) < 0.04] = 5000.0
@@ -678,9 +686,10 @@ class SortedIdSplit(A.Replay):
 
 class InterRegionSkew(A.Replay):
     def draw_targets(self, R, s):
-        n = A.Replay.draw_targets(self, R, s)
+        n = list(A.Replay.draw_targets(self, R, s))      # CR-0021: per-stratum targets
         if s == "train":
-            n += {"ME": 3, "NH": -3}.get(R, 0)
+            k = int(np.argmax(n))
+            n[k] += {"ME": 3, "NH": -3}.get(R, 0)
         return n
 
 
@@ -861,8 +870,33 @@ class WindowlessKept(A.Replay):
         return df.copy()
 
 
+class UnstratifiedDraw(A.Replay):
+    """Today's (pre-CR-0021) draw: per (region, split) only, not per stratum;
+    the manifest draw entry without the per-stratum breakdown. Also the draw
+    of the CR-0019 year-floor attack pipelines below, written before CR-0021:
+    with a stratified draw a year below YEAR_MIN lies in no stratum and the
+    draw raises (asserted in those tests), so they are re-seeded on today's
+    draw rather than deleted (CR-0021 section 3)."""
+    def draw_select(self, seed=None, record=True):
+        seed = self.seed() if seed is None else seed
+        pool = self.pool_full
+        nv_all = A.bool_array(pool["is_nonveg"])
+        picked = []
+        for R in self.regions:
+            for s in A.SPLITS:
+                n = A.py_round(int((self.pos[R]["split"] == s).sum()) * self.C["NEG_RATIO"])
+                m = ((pool["region"] == R) & (pool["split"] == s)).to_numpy()
+                nv, hab = pool[m & nv_all], pool[m & ~nv_all]
+                n_nv = min(A.py_round(n * self.C["NONVEG_MAX_FRAC"]), len(nv))
+                n_hab = n - n_nv
+                picked += [self.es_take(hab, n_hab, seed), self.es_take(nv, n_nv, seed)]
+                if record:
+                    self.draw_counts.setdefault(R, {})[s] = {"n": n, "n_nv": n_nv, "n_hab": n_hab}
+        return pd.concat(picked, ignore_index=True)
+
+
 # --- CR-0019 section 3: year-floor attack pipelines -------------------------
-class NoYearFloor(A.Replay):
+class NoYearFloor(UnstratifiedDraw):
     """Positives step 2 unchanged (no year floor)."""
     def year_floor(self, df):
         return np.ones(len(df), bool)
@@ -894,7 +928,7 @@ class SourceLevelFloor(A.Replay):
         return S[S["year"] >= self.C["YEAR_MIN"]].copy()
 
 
-class TrainOnlyFloor(A.Replay):
+class TrainOnlyFloor(UnstratifiedDraw):
     """The floor applied to the train split only (after the split)."""
     def year_floor(self, df):
         return np.ones(len(df), bool)
@@ -906,7 +940,7 @@ class TrainOnlyFloor(A.Replay):
             self.pos[R] = p[~((p["split"] == "train") & (p["year"] < self.C["YEAR_MIN"]))]
 
 
-class NoPoolFloor(A.Replay):
+class NoPoolFloor(UnstratifiedDraw):
     """Pool step 1 unchanged (no candidate year floor)."""
     def pool_year_floor(self, cand):
         return cand
@@ -1573,7 +1607,7 @@ class TestDomainEdgeUnits(unittest.TestCase):
         src = inspect.getsource(A.standing_checks)
         self.assertNotIn("E13", src)
         self.assertIn("E13", A.GATE_IDS)
-        self.assertEqual(len(A.GATE_IDS), 20)          # CR-0019: + E14
+        self.assertEqual(len(A.GATE_IDS), 21)          # CR-0019: + E14; CR-0021: + E15
 
 
 # --------------------------------------------------------------------------
@@ -1622,7 +1656,16 @@ class TestYearFloorAttacks(unittest.TestCase):
         self.assertEqual(res["E14"]["status"], "FAIL", res["E14"])
         return res["E14"]["problems"]
 
+    def _stratified_raises(self, cls):
+        """CR-0021: the same wrong pipeline with the stratified draw refuses
+        (a year below YEAR_MIN lies in no stratum)."""
+        stratified = type(cls.__name__ + "Stratified", (cls,), {"draw_select": A.Replay.draw_select})
+        with self.assertRaises(A.ReplayError) as cm:
+            stratified(BASE, CFG).run(stop_on_error=True)
+        self.assertIn("no YEAR_STRATA stratum", str(cm.exception))
+
     def test_no_floor(self):
+        self._stratified_raises(NoYearFloor)
         root = fresh()
         emit_attack(root, NoYearFloor)
         P, N = _files(root, "thinned_positives"), _files(root, "negatives")
@@ -1687,6 +1730,7 @@ class TestYearFloorAttacks(unittest.TestCase):
         self.assertFails(root, {"R3": "rows not in the replay", "R4": "rows not in the replay"})
 
     def test_floor_on_the_train_split_only(self):
+        self._stratified_raises(TrainOnlyFloor)
         root = fresh()
         emit_attack(root, TrainOnlyFloor)
         P = _files(root, "thinned_positives")
@@ -1713,7 +1757,13 @@ class TestYearFloorAttacks(unittest.TestCase):
         self.assertEqual(int(m.sum()), 3)
         S.loc[m, "year"] = late
         S.to_csv(sp, index=False)
-        emit_attack(root, A.Replay)
+        # CR-0021: the correct (stratified) pipeline refuses these inputs (the
+        # positives' late stratum has no candidate); re-seeded on today's draw
+        # (UnstratifiedDraw), whose positives stage is the correct one
+        with self.assertRaises(A.ReplayError) as cm:
+            A.Replay(root, CFG).run(stop_on_error=True)
+        self.assertIn(f"/{late}] habitat pool 0 < habitat target", str(cm.exception))
+        emit_attack(root, UnstratifiedDraw)
         P = _files(root, "thinned_positives")
         above = P[(P["year"] > G["year"].max()) & ~P["nonveg_landcover"].astype(bool)]
         self.assertGreater(len(above), 0, "fixture: no habitat positive above every candidate "
@@ -1721,11 +1771,12 @@ class TestYearFloorAttacks(unittest.TestCase):
         self.assertFails(root, {"E14": "distinct years differ"})
         res = gates(root, only={"E14", "R1"})
         self.assertFalse(any("combined, pooled" in x for x in res["E14"]["problems"]))  # (a) holds
-        self.assertEqual(res["R1"]["status"], "PASS", res["R1"])                      # pipeline right
+        self.assertEqual(res["R1"]["status"], "PASS", res["R1"])                      # positives stage right
 
     def test_no_pool_floor(self):
         G = read(BASE, "gbif_candidates", "ME")
         self.assertTrue((G["year"] < YEAR_MIN).any(), "fixture: no raw candidate below YEAR_MIN")
+        self._stratified_raises(NoPoolFloor)
         root = fresh()
         emit_attack(root, NoPoolFloor)
         C = read(root, "candidate_pool")
@@ -1907,6 +1958,648 @@ class TestYearFloorUnits(unittest.TestCase):
         self.assertTrue(any("constants differs" in x and "YEAR_MIN" in x for x in res["E11"]["problems"]))
 
 
+# --------------------------------------------------------------------------
+# CR-0021 section 3: the year-stratified draw, E9 amended, E15, O11
+# --------------------------------------------------------------------------
+STRATA = [tuple(s) for s in YEAR_STRATA]
+LABELS = [str(s[0]) for s in STRATA]
+
+
+def _stratum_of_year(y):
+    """The stratum holding year y, from the config's YEAR_STRATA, computed
+    here independently of acceptance_split (-1: in no stratum)."""
+    for i, st in enumerate(STRATA):
+        if int(y) in st:
+            return i
+    return -1
+
+
+def _cell_stratum_counts(df, strata=None):
+    """{(region, split, stratum label): rows}, pandas only."""
+    strata = STRATA if strata is None else strata
+    out = {}
+    for (R, s, y), n in df.groupby(["_R", "split", "year"]).size().items():
+        k = next((i for i, st in enumerate(strata) if int(y) in st), -1)
+        key = (R, s, str(strata[k][0]) if k >= 0 else None)
+        out[key] = out.get(key, 0) + int(n)
+    return out
+
+
+def _nonveg_cell_stratum_counts(N):
+    nv = N[N["is_nonveg"].astype(str).str.lower().isin(["true", "1"])]
+    return _cell_stratum_counts(nv) if len(nv) else {}
+
+
+def _write_cfg(name, mutate):
+    with open(CFG_PATH) as f:
+        c = json.load(f)
+    mutate(c)
+    p = os.path.join(TMP, name)
+    with open(p, "w") as f:
+        json.dump(c, f)
+    return A.load_config(p)
+
+
+class NonVegCapPerCell(A.Replay):
+    """Strata right, NonVeg cap per cell: the per-stratum caps are trimmed
+    (from the last stratum) or topped up (from the first) until their sum is
+    min(round(n x NONVEG_MAX_FRAC), NonVeg supply of the cell)."""
+    def stratum_counts(self, R, s, targets, nv_supply, hab_supply):
+        frac = self.C["NONVEG_MAX_FRAC"]
+        cap = min(A.py_round(sum(targets) * frac), sum(nv_supply))
+        n_nv = [min(A.py_round(t * frac), v) for t, v in zip(targets, nv_supply)]
+        k = len(targets) - 1
+        while sum(n_nv) > cap and k >= 0:
+            if n_nv[k] > 0:
+                n_nv[k] -= 1
+            else:
+                k -= 1
+        k = 0
+        while sum(n_nv) < cap and k < len(targets):
+            if n_nv[k] < min(nv_supply[k], targets[k]):
+                n_nv[k] += 1
+            else:
+                k += 1
+        return [(t, v, t - v) for t, v in zip(targets, n_nv)]
+
+
+class BoundaryOffByOne(A.Replay):
+    """Stratum lookup off by one (bisect_left on the strata's first years,
+    minus 1, clamped at 0): year y is counted in the stratum of y - 1, so
+    2020 and 2021 share the first stratum."""
+    def stratum_index(self, years, what):
+        import bisect
+        A.Replay.stratum_index(self, years, what)        # same validation
+        firsts = [st[0] for st in self.strata()]
+        y = pd.to_numeric(pd.Series(list(years))).to_numpy()
+        return np.array([max(bisect.bisect_left(firsts, int(v)) - 1, 0) for v in y], dtype=np.int64)
+
+
+class TopUpFromOtherStratum(A.Replay):
+    """A habitat shortfall in a stratum is not raised: the stratum takes its
+    whole habitat supply and the shortfall is drawn from the cell's other
+    strata."""
+    def stratum_counts(self, R, s, targets, nv_supply, hab_supply):
+        out, short = [], 0
+        for k, n_k in enumerate(targets):
+            n_nv = min(A.py_round(n_k * self.C["NONVEG_MAX_FRAC"]), nv_supply[k])
+            take = min(n_k - n_nv, hab_supply[k])
+            short += n_k - n_nv - take
+            out.append((n_k, n_nv, take))
+        self.short = getattr(self, "short", {})
+        self.short[(R, s)] = short
+        return out
+
+    def draw_select(self, seed=None, record=True):
+        sel = A.Replay.draw_select(self, seed, record)
+        seed = self.seed() if seed is None else seed
+        pool = self.pool_full
+        nv_all = A.bool_array(pool["is_nonveg"])
+        taken = set(A.key_list(sel, 5))
+        extra = []
+        for (R, s), short in self.short.items():
+            if short:
+                free = np.array([k not in taken for k in A.key_list(pool, 5)])
+                m = ((pool["region"] == R) & (pool["split"] == s)).to_numpy() & ~nv_all & free
+                extra.append(self.es_take(pool[m], short, seed))
+        return pd.concat([sel] + extra, ignore_index=True)
+
+
+def _short_stratum_root():
+    """Fixture variant (CR-0021 attack row 4): every VT candidate of the
+    last fixture year removed from the raw file, so VT's stratum of that
+    year has no habitat supply while VT's other strata have surplus."""
+    root = fresh()
+    p = os.path.join(root, A.rpath(CFG, "gbif_candidates", "VT"))
+    g = pd.read_csv(p, float_precision="round_trip")
+    g[g["year"] != FIX_YEARS[-1]].to_csv(p, index=False)
+    return root
+
+
+class TestStratifiedDrawAttacks(unittest.TestCase):
+    """CR-0021 section 3 attack rows. Each first asserts, with pandas on the
+    files (not with the gate under test), that the fixture holds the rows the
+    row needs and that the attack changes what the named gate reads
+    (PA-0021(a): no attack may pass vacuously); then that the named gates
+    fail for the intended reason."""
+
+    assertFails = TestAttacks.assertFails
+
+    def test_reference_is_stratified_and_exercised(self):
+        """The correct tree: per (region, split, stratum) N = P; the pool's
+        year mix differs from the positives' (so stratification bites); a
+        stratum with no rows (2024) is present in the manifest with zeros."""
+        P, N = _files(BASE, "thinned_positives"), _files(BASE, "negatives")
+        self.assertEqual(_cell_stratum_counts(P), _cell_stratum_counts(N))
+        self.assertGreater(len({k[2] for k in _cell_stratum_counts(P)}), 2)
+        C = read(BASE, "candidate_pool")
+        p_share = P["year"].value_counts(normalize=True)
+        c_share = C["year"].value_counts(normalize=True)
+        self.assertGreater((c_share - p_share).abs().max(), 0.05, "fixture: pool year mix equals P's")
+        with open(os.path.join(BASE, A.rpath(CFG, "split_manifest"))) as f:
+            draw = json.load(f)["negatives"]["draw"]
+        for R in REGIONS3:
+            for s in A.SPLITS:
+                d = draw[R][s]
+                self.assertEqual(list(d["strata"]), LABELS)
+                for f_ in ("n", "n_nv", "n_hab"):
+                    self.assertEqual(d[f_], sum(v[f_] for v in d["strata"].values()))
+        self.assertEqual(draw["ME"]["train"]["strata"][LABELS[-1]], {"n": 0, "n_nv": 0, "n_hab": 0})
+
+    def test_draw_not_stratified(self):
+        root = fresh()
+        emit_attack(root, UnstratifiedDraw)
+        P, N = _files(root, "thinned_positives"), _files(root, "negatives")
+        self.assertEqual(len(P), len(N))                      # totals still match
+        self.assertNotEqual(_cell_stratum_counts(P), _cell_stratum_counts(N),
+                            "attack: the unstratified draw's per-stratum N counts equal P's")
+        self.assertFails(root, {"E15": "E15(b) [", "R4": "rows not in the replay"})
+        self.assertFails(root, {"R4": "draw: manifest counts differ"})
+
+    def test_nonveg_cap_per_cell(self):
+        P, C = _files(BASE, "thinned_positives"), read(BASE, "candidate_pool")
+        frac = CFG["constants"]["NONVEG_MAX_FRAC"]
+        pc = _cell_stratum_counts(P)
+        cnv = C[C["is_nonveg"].astype(str).str.lower().isin(["true", "1"])].assign(_R=C["region"])
+        nvsup = _cell_stratum_counts(cnv)
+        need = []
+        for R in REGIONS3:
+            for s in A.SPLITS:
+                n_k = [pc.get((R, s, L), 0) for L in LABELS]
+                caps = [round(v * frac) for v in n_k]
+                slack = any(caps[k] < nvsup.get((R, s, L), 0) for k, L in enumerate(LABELS) if n_k[k])
+                if sum(caps) != round(sum(n_k) * frac) and slack:
+                    need.append((R, s))
+        self.assertTrue(need, "fixture: no cell where sum_k round(n_k x 0.3) != round(n x 0.3) "
+                              "with NonVeg supply not binding in some stratum")
+        root = fresh()
+        emit_attack(root, NonVegCapPerCell)
+        got = _nonveg_cell_stratum_counts(_files(root, "negatives"))
+        ref = _nonveg_cell_stratum_counts(_files(BASE, "negatives"))
+        self.assertNotEqual(got, ref, "attack: the per-stratum NonVeg counts are unchanged")
+        self.assertTrue(any(got.get((R, s, L), 0) != ref.get((R, s, L), 0)
+                            for R, s in need for L in LABELS))
+        self.assertFails(root, {"R4": "rows not in the replay"})
+
+    def test_stratum_boundary_off_by_one(self):
+        P = _files(BASE, "thinned_positives")
+        C = read(BASE, "candidate_pool").rename(columns={"region": "_R"})
+        y0, y1 = STRATA[0][-1], STRATA[1][0]                  # the boundary between strata 0 and 1
+        mix = lambda df: (df["year"] == y0).sum() / max(1, df["year"].isin([y0, y1]).sum())
+        self.assertGreater(abs(mix(C) - mix(P)), 0.05, "fixture: the pool and positives have the "
+                                                        "same mix across the boundary year")
+        root = fresh()
+        rep = emit_attack(root, BoundaryOffByOne)
+        Pa, Na = _files(root, "thinned_positives"), _files(root, "negatives")
+        pc, nc = _cell_stratum_counts(Pa), _cell_stratum_counts(Na)
+        self.assertTrue(any(pc.get(k, 0) != nc.get(k, 0) for k in set(pc) | set(nc)
+                            if k[2] in (str(y0), str(y1))),
+                        "attack: the per-stratum counts are unchanged")
+        ref = A.Replay(BASE, CFG).run(stop_on_error=True)
+        self.assertNotEqual(rep.draw_counts, ref.draw_counts)
+        self.assertFails(root, {"E15": "E15(b) [", "R4": "rows not in the replay"})
+
+    def test_shortfall_topped_up_from_another_stratum(self):
+        root = _short_stratum_root()
+        y = FIX_YEARS[-1]
+        Pb = _files(BASE, "thinned_positives")
+        self.assertGreater(int(((Pb["_R"] == "VT") & (Pb["year"] == y)).sum()), 0,
+                           "fixture: VT has no positive in the emptied stratum")
+        g = read(root, "gbif_candidates", "VT")
+        self.assertFalse((g["year"] == y).any())
+        Cb = read(BASE, "candidate_pool")
+        hab = Cb[(Cb["region"] == "VT") & ~Cb["is_nonveg"].astype(str).str.lower().isin(["true", "1"])]
+        self.assertGreater(len(hab[hab["year"] != y]), 2 * int(((Pb["_R"] == "VT")).sum()),
+                           "fixture: VT's other strata have no surplus")
+        with self.assertRaises(A.ReplayError) as cm:                # the replay raises
+            A.Replay(root, CFG).run(stop_on_error=True)
+        self.assertIn("habitat pool 0 < habitat target", str(cm.exception))
+        self.assertIn(f"/{y}]", str(cm.exception))
+        emit_attack(root, TopUpFromOtherStratum)
+        P, N = _files(root, "thinned_positives"), _files(root, "negatives")
+        self.assertEqual(len(P[P["_R"] == "VT"]), len(N[N["_R"] == "VT"]))     # total topped up
+        pc, nc = _cell_stratum_counts(P), _cell_stratum_counts(N)
+        self.assertTrue(any(pc.get(("VT", s, str(y)), 0) > nc.get(("VT", s, str(y)), 0) for s in A.SPLITS),
+                        "attack: the short stratum was not short in the output")
+        self.assertFails(root, {"E9": f"habitat pool 0 < habitat target", "E15": "E15(b) [VT/"})
+        res = gates(root, only={"R4"})
+        self.assertTrue(any("replay stage 'draw' raised ReplayError" in x for x in res["R4"]["problems"]))
+
+    def test_year_strata_in_config_differ_from_regions_py(self):
+        merged = [list(s) for s in STRATA[:-2]] + [list(STRATA[-2]) + list(STRATA[-1])]
+        cfg = _write_cfg("strata_s2.json", lambda c: c["constants"].update(YEAR_STRATA=merged))
+        lit = A.parse_regions_py(cfg["regions_py"]["path"])["YEAR_STRATA"]
+        self.assertNotEqual([list(s) for s in lit], cfg["constants"]["YEAR_STRATA"])
+        self.assertEqual([list(s) for s in lit], [list(s) for s in STRATA])
+        self.assertFails(fresh(), {"E11": "regions.py: YEAR_STRATA"}, cfg=cfg)
+
+    def test_strata_overlapping_gapped_or_not_at_year_min(self):
+        cases = {
+            "overlapping": ([[YEAR_MIN, YEAR_MIN + 1], [YEAR_MIN + 1, YEAR_MIN + 2]] +
+                            [[y] for y in range(YEAR_MIN + 3, YEAR_MIN + 5)], "not disjoint"),
+            "gapped": ([[YEAR_MIN], [YEAR_MIN + 1]] + [[y] for y in range(YEAR_MIN + 3, YEAR_MIN + 5)],
+                       "not contiguous"),
+            "late_start": ([[y] for y in range(YEAR_MIN + 1, YEAR_MIN + 5)], "does not start at YEAR_MIN"),
+            "early_start": ([[YEAR_MIN - 1]] + [list(s) for s in STRATA], "does not start at YEAR_MIN"),
+            "decreasing": ([list(s) for s in STRATA][::-1], "not increasing"),
+        }
+        root = fresh()
+        for name, (strata, why) in cases.items():
+            cfg = _write_cfg(f"strata_{name}.json", lambda c: c["constants"].update(YEAR_STRATA=strata))
+            self.assertNotEqual(cfg["constants"]["YEAR_STRATA"], [list(s) for s in STRATA])
+            with self.subTest(name):
+                res = self.assertFails(root, {"E15": why}, cfg=cfg)
+                self.assertTrue(any(x.startswith("E15(a) config: YEAR_STRATA") and why in x
+                                    for x in res["E15"]["problems"]), res["E15"]["problems"])
+
+    def test_c_year_outside_every_stratum(self):
+        root = fresh()
+        out_year = STRATA[-1][-1] + 1
+        self.assertEqual(_stratum_of_year(out_year), -1)
+        c = read(root, "candidate_pool")
+        c.loc[c.index[0], "year"] = out_year
+        c.to_csv(os.path.join(root, A.rpath(CFG, "candidate_pool")), index=False)
+        c2 = read(root, "candidate_pool")
+        self.assertEqual(int((c2["year"].map(_stratum_of_year) < 0).sum()), 1)
+        self.assertFails(root, {"E15": "E15(a) C: 1 rows with a non-null year in no YEAR_STRATA stratum"})
+        self.assertEqual(gates(root, only={"E14"})["E14"]["status"], "PASS")    # >= YEAR_MIN
+
+    def test_manifest_breakdown_missing_or_wrong(self):
+        def drop_strata(d):
+            del d["ME"]["train"]["strata"]
+
+        def wrong_value(d):
+            d["NH"]["val"]["strata"][LABELS[0]]["n_nv"] += 1
+
+        def drop_zero_stratum(d):
+            del d["VT"]["train"]["strata"][LABELS[-1]]
+
+        def float_type(d):
+            d["ME"]["val"]["strata"][LABELS[0]]["n"] = float(d["ME"]["val"]["strata"][LABELS[0]]["n"])
+
+        def out_of_order(d):
+            st = d["NH"]["train"]["strata"]
+            d["NH"]["train"]["strata"] = {k: st[k] for k in reversed(list(st))}
+
+        def int_key(d):
+            st = d["VT"]["val"]["strata"]
+            d["VT"]["val"]["strata"] = {(k + ".0" if i == 0 else k): v for i, (k, v) in enumerate(st.items())}
+
+        for name, mut, why in (("drop_strata", drop_strata, "manifest counts differ"),
+                               ("wrong_value", wrong_value, "manifest counts differ"),
+                               ("drop_zero_stratum", drop_zero_stratum, "manifest counts differ"),
+                               ("float_type", float_type, "JSON types differ"),
+                               ("out_of_order", out_of_order, "not in stratum order"),
+                               ("key_text", int_key, "manifest counts differ")):
+            with self.subTest(name):
+                root = fresh()
+                mp = os.path.join(root, A.rpath(CFG, "split_manifest"))
+                with open(mp) as f:
+                    m = json.load(f)
+                before = json.dumps(m["negatives"]["draw"])
+                mut(m["negatives"]["draw"])
+                with open(mp, "w") as f:
+                    json.dump(m, f)
+                with open(mp) as f:
+                    self.assertNotEqual(json.dumps(json.load(f)["negatives"]["draw"]), before)
+                self.assertFails(root, {"R4": why})
+
+    def test_existing_draw_attacks_still_bite(self):
+        """Every pre-CR-0021 draw attack row changes the drawn rows under the
+        stratified replay (re-seeded rather than deleted)."""
+        ref = _keys(_files(BASE, "negatives"))
+        for cls in (SouthernHalfDraw, NHOnlySkew, InterRegionSkew, NonVegTopUp):
+            with self.subTest(cls.__name__):
+                root = fresh()
+                emit_attack(root, cls)
+                self.assertNotEqual(_keys(_files(root, "negatives")), ref)
+
+
+class TestStratifiedReplayUnits(unittest.TestCase):
+    def test_strata_read_from_the_config(self):
+        """The replay's strata are the config's (here a merged S3-like
+        override), not regions.year_stratum."""
+        merged = [list(STRATA[0]), list(STRATA[1]), [y for s in STRATA[2:] for y in s]]
+        rep = A.Replay(BASE, CFG, constants={"YEAR_STRATA": merged}).run(stop_on_error=True)
+        self.assertEqual(list(rep.draw_counts["ME"]["train"]["strata"]), [str(s[0]) for s in merged])
+        ref = A.Replay(BASE, CFG).run(stop_on_error=True)
+        self.assertEqual(list(ref.draw_counts["ME"]["train"]["strata"]), LABELS)
+
+    def test_targets_are_per_stratum_and_totals_sums(self):
+        rep = A.Replay(BASE, CFG).run(stop_on_error=True)
+        P = _files(BASE, "thinned_positives")
+        pc = _cell_stratum_counts(P)
+        for R in REGIONS3:
+            for s in A.SPLITS:
+                t = rep.draw_targets(R, s)
+                self.assertEqual(t, [round(pc.get((R, s, L), 0) * CFG["constants"]["NEG_RATIO"])
+                                     for L in LABELS])
+                d = rep.draw_counts[R][s]
+                self.assertEqual(d["n"], sum(t))
+                frac = CFG["constants"]["NONVEG_MAX_FRAC"]
+                for L, n_k in zip(LABELS, t):
+                    self.assertLessEqual(d["strata"][L]["n_nv"], round(n_k * frac))
+                    self.assertEqual(d["strata"][L]["n"], n_k)
+
+    def test_positive_year_in_no_stratum_raises(self):
+        short = [list(s) for s in STRATA if max(s) < FIX_YEARS[-1]]
+        rep = A.Replay(BASE, CFG, constants={"YEAR_STRATA": short})
+        with self.assertRaises(A.ReplayError):
+            rep.run(stop_on_error=True)
+        # the replay raises at the draw (positives and the pool do not read strata)
+        rep = A.Replay(BASE, CFG, constants={"YEAR_STRATA": short}).run()
+        self.assertIsNone(rep.errors.get("pool"))
+        self.assertIn("no YEAR_STRATA stratum", str(rep.errors["draw"]))
+        # a positive year in no stratum raises by itself (draw_targets)
+        rep = A.Replay(BASE, CFG).run(stop_on_error=True)
+        rep.C["YEAR_STRATA"] = short
+        with self.assertRaises(A.ReplayError) as cm:
+            rep.draw_targets("ME", "train")
+        self.assertIn("positives", str(cm.exception))
+
+    def test_pool_year_in_no_stratum_raises(self):
+        rep = A.Replay(BASE, CFG).run(stop_on_error=True)
+        rep.pool_full = rep.pool_full.copy()
+        rep.pool_full.loc[rep.pool_full.index[0], "year"] = STRATA[-1][-1] + 1
+        with self.assertRaises(A.ReplayError) as cm:
+            rep.draw_select(record=False)
+        self.assertIn("candidate pool", str(cm.exception))
+
+    def test_malformed_strata_raise(self):
+        for bad in ([], [[YEAR_MIN], []], [[YEAR_MIN, YEAR_MIN + 1], [YEAR_MIN + 1]], "2020"):
+            with self.subTest(bad):
+                rep = A.Replay(BASE, CFG, constants={"YEAR_STRATA": bad})
+                with self.assertRaises(A.ReplayError):
+                    rep.strata()
+
+    def test_parse_strata(self):
+        C = {"YEAR_MIN": 2020}
+        self.assertEqual(A.parse_strata(dict(C, YEAR_STRATA=[[2020], [2021, 2022]])),
+                         ([(2020,), (2021, 2022)], []))
+        self.assertEqual(A.parse_strata(C), (None, ["config constants lack YEAR_STRATA"]))
+        s, p = A.parse_strata(dict(C, YEAR_STRATA=[[2020], [True]]))
+        self.assertIsNone(s)
+        s, p = A.parse_strata(dict(C, YEAR_STRATA=[[2020, 2021], [2021]]))
+        self.assertTrue(any("not disjoint" in x for x in p))
+        s, p = A.parse_strata(dict(C, YEAR_STRATA=[[2020], [2022]]))
+        self.assertTrue(any("not contiguous" in x for x in p) and len(p) == 1)
+        s, p = A.parse_strata(dict(C, YEAR_STRATA=[[2021], [2020]]))
+        self.assertTrue(any("not increasing" in x for x in p))
+        self.assertTrue(any("does not start at YEAR_MIN" in x for x in p))
+        self.assertEqual(list(A.stratum_index_of([2020, 2021.0, 2021.5, np.nan, 2030, "x"],
+                                                 [(2020,), (2021, 2022)])), [0, 1, -1, -1, -1, -1])
+
+
+class TestE9Amended(unittest.TestCase):
+    def _e9(self, root, cfg=None):
+        return gates(root, only={"E9"}, cfg=cfg)["E9"]
+
+    def test_reference_passes_where_the_per_cell_cap_would_fail(self):
+        """A correct stratified draw can exceed the per-cell cap by rounding
+        (CR-0021 section 3); the fixture holds such a cell and E9 passes."""
+        N = _files(BASE, "negatives")
+        P = _files(BASE, "thinned_positives")
+        frac = CFG["constants"]["NONVEG_MAX_FRAC"]
+        over = []
+        for R in REGIONS3:
+            for s in A.SPLITS:
+                n = int(((P["_R"] == R) & (P["split"] == s)).sum())
+                Ns = N[(N["_R"] == R) & (N["split"] == s)]
+                nv = int(Ns["is_nonveg"].astype(str).str.lower().isin(["true", "1"]).sum())
+                if nv > round(n * frac):
+                    over.append((R, s))
+        self.assertTrue(over, "fixture: no cell where the per-stratum caps sum above the cell cap")
+        self.assertEqual(self._e9(fresh())["status"], "PASS")
+
+    def test_per_stratum_nonveg_cap(self):
+        root = fresh()
+        n = read(root, "negatives", "ME")
+        frac = CFG["constants"]["NONVEG_MAX_FRAC"]
+        nv = n["is_nonveg"].astype(str).str.lower().isin(["true", "1"])
+        hit = None
+        for L, st in zip(LABELS, STRATA):
+            m = (n["split"] == "train") & n["year"].isin(st)
+            n_k = int(m.sum())
+            if n_k and int((m & nv).sum()) == round(n_k * frac) and (m & ~nv).any():
+                hit = (L, n.index[m & ~nv][0])
+                break
+        self.assertIsNotNone(hit, "fixture: no ME train stratum at its NonVeg cap")
+        n.loc[hit[1], "is_nonveg"] = True
+        write_set(root, A.N_KINDS, "ME", n)
+        cell = n[n["split"] == "train"]
+        cell_nv = int(cell["is_nonveg"].astype(str).str.lower().isin(["true", "1"]).sum())
+        r = self._e9(root)
+        # today's per-cell cap would not see it: the cell total stays within round(n x 0.3)
+        self.assertLessEqual(cell_nv, round(len(cell) * frac))
+        self.assertEqual(r["status"], "FAIL")
+        self.assertTrue(any(x.startswith(f"[ME/train/{hit[0]}]") and "NonVeg negatives > cap" in x
+                            for x in r["problems"]), r["problems"])
+
+    def test_count_is_a_sum_over_strata(self):
+        root = fresh()
+        n = read(root, "negatives", "NH")
+        write_set(root, A.N_KINDS, "NH", n.drop(index=n.index[n["split"] == "val"][0]))
+        r = self._e9(root)
+        self.assertTrue(any(x.startswith("[NH/val]") and "sum over strata" in x for x in r["problems"]),
+                        r["problems"])
+
+    def test_supply_clause_per_stratum_from_the_pool(self):
+        """Habitat supply removed from one stratum of C only: E9 fails on that
+        stratum although the cell's total supply is ample."""
+        root = fresh()
+        c = read(root, "candidate_pool")
+        y = FIX_YEARS[1]
+        nv = c["is_nonveg"].astype(str).str.lower().isin(["true", "1"])
+        drop = (c["region"] == "NH") & (c["split"] == "train") & (c["year"] == y) & ~nv
+        self.assertGreater(int(drop.sum()), 0)
+        c[~drop].to_csv(os.path.join(root, A.rpath(CFG, "candidate_pool")), index=False)
+        r = self._e9(root)
+        self.assertTrue(any(x.startswith(f"[NH/train/{y}] habitat pool 0 < habitat target")
+                            for x in r["problems"]), r["problems"])
+
+    def test_strata_from_the_config(self):
+        """With merged strata in the config, E9 checks the merged cells."""
+        merged = [[y for s in STRATA for y in s]]
+        cfg = _write_cfg("e9_one_stratum.json", lambda c: c["constants"].update(YEAR_STRATA=merged))
+        r = self._e9(fresh(), cfg=cfg)
+        # one stratum: the cap is the cell cap again, which the stratified draw exceeds by rounding
+        self.assertTrue(any(f"/{merged[0][0]}] " in x and "NonVeg negatives > cap" in x
+                            for x in r["problems"]), r["problems"])
+
+
+class TestE15Units(unittest.TestCase):
+    def _e15(self, root, **kw):
+        return gates(root, only={"E15"}, **kw)["E15"]
+
+    def test_reference_passes(self):
+        self.assertEqual(self._e15(fresh())["status"], "PASS")
+
+    def test_b_one_negative_moved_to_another_stratum(self):
+        root = fresh()
+        n = read(root, "negatives", "VT")
+        i = n.index[(n["split"] == "train") & (n["year"] == FIX_YEARS[0])][0]
+        n.loc[i, "year"] = FIX_YEARS[1]
+        write_set(root, A.N_KINDS, "VT", n)
+        r = self._e15(root)
+        self.assertEqual(r["status"], "FAIL")
+        self.assertEqual(sorted(x.split("]")[0] for x in r["problems"]),
+                         [f"E15(b) [VT/train/{FIX_YEARS[0]}", f"E15(b) [VT/train/{FIX_YEARS[1]}"])
+        self.assertEqual(gates(root, only={"E14"})["E14"]["status"], "PASS")
+
+    def test_a_positive_and_negative_year_outside(self):
+        out_year = STRATA[-1][-1] + 1
+        for kind, kinds, cls in (("thinned_positives", A.P_KINDS, "P"), ("negatives", A.N_KINDS, "N")):
+            with self.subTest(cls):
+                root = fresh()
+                df = read(root, kind, "ME")
+                df.loc[df.index[0], "year"] = out_year
+                write_set(root, kinds, "ME", df)
+                r = self._e15(root)
+                self.assertTrue(any(x.startswith(f"E15(a) {cls}: 1 rows") and "ME 1" in x
+                                    for x in r["problems"]), r["problems"])
+
+    def test_null_year_is_not_E15s(self):
+        """A null year is E14's (E15(a) reads non-null years only)."""
+        root = fresh()
+        c = read(root, "candidate_pool")
+        c["year"] = c["year"].astype(float)
+        c.loc[c.index[0], "year"] = np.nan
+        c.to_csv(os.path.join(root, A.rpath(CFG, "candidate_pool")), index=False)
+        self.assertEqual(self._e15(root)["status"], "PASS")
+
+    def test_missing_strata_in_config(self):
+        cfg = _write_cfg("no_strata.json", lambda c: c["constants"].pop("YEAR_STRATA"))
+        r = gates(fresh(), only={"E15", "E9"}, cfg=cfg)
+        self.assertEqual(r["E15"]["status"], "FAIL")
+        self.assertEqual(r["E9"]["status"], "FAIL")
+        self.assertTrue(any("lack YEAR_STRATA" in x for x in r["E15"]["problems"]))
+
+    def test_in_standing_subset_without_C(self):
+        import inspect
+        self.assertIn('("E15", gate_E15, {"include_C": False})', inspect.getsource(A.standing_checks))
+        root = fresh()
+        c = read(root, "candidate_pool")
+        c.loc[c.index[0], "year"] = STRATA[-1][-1] + 1
+        c.to_csv(os.path.join(root, A.rpath(CFG, "candidate_pool")), index=False)
+        ctx = A.Context(root, CFG, coords="columns")
+        self.assertEqual(A.evaluate(A.gate_E15, ctx, include_C=False)[0], "PASS")
+        self.assertEqual(A.evaluate(A.gate_E15, ctx)[0], "FAIL")
+
+    def test_standing_checks_fail_on_an_unstratified_split(self):
+        root = fresh(copy_rasters=True)
+        emit_attack(root, UnstratifiedDraw)
+        with self.assertRaises(A.AcceptanceError) as cm:
+            A.standing_checks(64, 0, False, data_root=root, config=CFG_PATH)
+        self.assertIn("E15: E15(b)", str(cm.exception))
+
+    def test_gate_ids(self):
+        self.assertIn("E15", A.GATE_IDS)
+        self.assertEqual(A.GATE_IDS.index("E15"), A.GATE_IDS.index("E14") + 1)
+        self.assertEqual([g for g, _ in A.GATES].count("E15"), 1)
+        self.assertEqual(A.OBS_IDS[-1], "O11")
+        self.assertEqual(len(A.OBS_IDS), 11)
+
+
+class TestYearStrataConfig(unittest.TestCase):
+    def test_config_strata_and_regions_py_name(self):
+        prod = A.load_config(PROD_CONFIG)
+        self.assertEqual(prod["constants"]["YEAR_STRATA"], [[2020], [2021], [2022], [2023], [2024]])
+        self.assertEqual(prod["regions_py"]["names"]["YEAR_STRATA"], "YEAR_STRATA")
+        self.assertEqual(A.parse_strata(prod["constants"])[1], [])
+        self.assertIn("strata", prod["manifest_schema"]["draw"])
+        self.assertIn("per (region, split, stratum k)", prod["rounding"])
+        self.assertEqual(prod["obs"]["O11"]["n_perm"], 1000)
+
+    def test_manifest_without_year_strata_fails_E11(self):
+        """Today's manifest shape (no YEAR_STRATA in either section)."""
+        root = fresh()
+        mp = os.path.join(root, A.rpath(CFG, "split_manifest"))
+        with open(mp) as f:
+            m = json.load(f)
+        for sec in ("positives", "negatives"):
+            m[sec]["constants"].pop("YEAR_STRATA")
+        with open(mp, "w") as f:
+            json.dump(m, f)
+        res = gates(root, only={"E11"})
+        self.assertEqual(res["E11"]["status"], "FAIL")
+        self.assertEqual(sorted(res["E11"]["problems"]),
+                         [f"manifest[{sec}].constants differs from the config (['YEAR_STRATA'])"
+                          for sec in ("negatives", "positives")])
+
+    def test_regions_py_without_year_strata_fails_E11(self):
+        rp = os.path.join(TMP, "regions_nostrata.py")
+        with open(rp, "w") as f:
+            f.write("\n".join(l for l in REGIONS_PY.splitlines() if not l.startswith("YEAR_STRATA")))
+        cfg = _write_cfg("nostrata_py.json", lambda c: c["regions_py"].update(path=rp))
+        res = gates(fresh(), only={"E11"}, cfg=cfg)
+        self.assertTrue(any("regions.py: YEAR_STRATA not defined" in x for x in res["E11"]["problems"]))
+
+
+class TestO11(unittest.TestCase):
+    def test_auc_discrete_matches_pairwise(self):
+        rng = np.random.default_rng(5)
+        for _ in range(20):
+            a = rng.integers(2020, 2025, rng.integers(1, 30))
+            b = rng.integers(2020, 2025, rng.integers(1, 30))
+            pw = np.mean([(x > y) + 0.5 * (x == y) for x in a for y in b])
+            self.assertAlmostEqual(A.auc_discrete(a, b), pw, places=12)
+        self.assertEqual(A.auc_discrete([2021], [2020]), 1.0)
+        self.assertTrue(math.isnan(A.auc_discrete([], [2020])))
+
+    def test_reference_o11a_is_exactly_half(self):
+        P, N = _files(BASE, "thinned_positives"), _files(BASE, "negatives")
+        out = A.stats_o11(P, N, CFG, list(REGIONS3))
+        a = {k: v for k, v in out.items() if k.startswith("O11.a.")}
+        self.assertEqual(len(a), 3 * 4)
+        self.assertTrue(all(v == 0.5 for v in a.values()), a)
+        self.assertEqual(out["O11.w"], "n/a (no merged stratum)")
+
+    def test_unstratified_o11a_is_not_half(self):
+        root = fresh()
+        emit_attack(root, UnstratifiedDraw)
+        out = A.stats_o11(_files(root, "thinned_positives"), _files(root, "negatives"), CFG, list(REGIONS3))
+        self.assertNotEqual(out["O11.a.pooled.pooled"], 0.5)
+
+    def _frames(self, pos_years, neg_years):
+        def f(years, R="ME", s="train"):
+            return pd.DataFrame({"_R": R, "split": s, "year": years})
+        P = pd.concat([f(pos_years), f(pos_years, s="val")], ignore_index=True)
+        N = pd.concat([f(neg_years), f(neg_years, s="val")], ignore_index=True)
+        return P, N
+
+    def _cfg(self, strata):
+        c = copy.deepcopy(CFG)
+        c["constants"]["YEAR_STRATA"] = strata
+        c["obs"]["O11"] = dict(c["obs"]["O11"], n_perm=200)
+        return c
+
+    def test_o11w_within_a_merged_stratum(self):
+        cfg = self._cfg([[2020], [2021, 2022]])
+        # equal per-stratum counts; inside the merged stratum positives are all 2022
+        P, N = self._frames([2020] * 10 + [2022] * 20, [2020] * 10 + [2021] * 20)
+        out = A.stats_o11(P, N, cfg, ["ME"])
+        self.assertEqual(out["O11.w.2021-2022.pooled.pooled"], 1.0)
+        self.assertEqual(out["O11.w_effect.2021-2022.pooled.pooled"], 0.5)
+        self.assertLess(out["O11.w_null_p99.2021-2022.pooled.pooled"], 1.0)
+        self.assertEqual(out["O11.w_null_pct.2021-2022.pooled.pooled"], 100.0)
+        self.assertTrue(out["O11.w_criterion.2021-2022"].startswith("EXCEEDS"))
+        # O11a is diluted: cross-stratum pairs score 0.5
+        self.assertLess(out["O11.a.pooled.pooled"], out["O11.w.2021-2022.pooled.pooled"])
+        P, N = self._frames([2020] * 10 + [2021, 2022] * 10, [2020] * 10 + [2022, 2021] * 10)
+        out = A.stats_o11(P, N, cfg, ["ME"])
+        self.assertEqual(out["O11.w.2021-2022.pooled.pooled"], 0.5)
+        self.assertEqual(out["O11.w_criterion.2021-2022"], "within null p99")
+
+    def test_o11_reported_once_in_the_obs_report(self):
+        root = fresh()
+        lines = []
+        A.full_run(root, CFG, do_obs=True, out=lines.append)
+        o11 = [l for l in lines if l.split()[:1] == ["O11"]]
+        self.assertEqual(len(o11), 1)
+        self.assertIn("a.pooled.pooled=0.5", o11[0])
+        self.assertIn("w=n/a (no merged stratum)", o11[0])
+
+
 class TestStanding(unittest.TestCase):
     """Standing checks: val file edited after acceptance; pre-CR file
     swapped in; raster touched; --jitter 8 with augmentation."""
@@ -2019,20 +2712,20 @@ GATE_SECTION_SHA256 = {
     "block_id": "1d9284b22bd75dc1206e5ef865fbd0ca260988c69c5340ee9630173ad78f2402",
     "columns": "a2ad2a0c13194c6a17f0a4e845b343f7c205f6f62fa49c50725f1a44e1d46e73",
     "comparison": "84998a87573c00d01683c92413b58c3d848ca6a684e4fe7fb2006c1882999296",
-    "constants": "09dc9f9142497863e554a68aac4395868b235f83e7ce2625d9f9864abce73422",   # CR-0019: + YEAR_MIN
+    "constants": "111b5a94e08c72d13a65a3f2a5a0c3d2518e966bcb977f402b65097466929c38",   # CR-0019: + YEAR_MIN; CR-0021: + YEAR_STRATA
     "dedup": "1dd8c5068b95ed5e7bdebcdfae84bf6930d389a93225a372938573d185ccb8a0",
     "distance": "942007efe795b0e9d5725a24582819cdf481eb807e8c4a4c2a7367ee36f02375",
     "envelope": "184dffd4e3a4e7a489db2ecf8de86c0d2a45c56becf1ab7c064a6223d9df0502",
     "environment": "af840e02d1d7d6612a7c1ab4a3d49968db23362cbc16846d58e52c894d548249",
     "feature_spec_keys": "6a19f9b03a49f704a8cb59f2a7bb77f85d3f8e06af56087a14c38f9a1b2e7e43",
     "hash_spec": "b23ed261b2a27647b9cd4dccf71c9638448efc2338d0d2889013807ab44f82e1",
-    "manifest_schema": "652b8c0262fec0070c7216e8ceeb9053445c5deef3bb8cd98692e7c8732d3e2a",
+    "manifest_schema": "dc18f2496fd88160a0590c805c702cfb86256d72ff8ec92f8b0c6c6c0391fe06",   # CR-0021: draw strata
     "parsing": "4acb340c20cf9c16404cefd22555a3a626a799808d6d1eee1283e2aa929129b8",
     "paths": "14f974c9fe084aa1db73b74ab038888816f91b7bc17002c215e7f62366355ef5",   # CR-0017: + domain_edge
     "pins": "9957bf9f9161c6a2d61d9573b91d952e5e4e77db26e9f0158adad3725354f0d9",
     "raster": "f05264dd8932f962a54552e8db3a77264158357b5744c4c4029f1aa70173dca8",
-    "regions_py": "6359cff9feaa57c7ebbc6479bb06b9609c5b727b749a5390ad12a26b4344acd4",   # CR-0019: + YEAR_MIN
-    "rounding": "63aa62dd917e18ec81b13f0ecbf4539db5f3a884d7fe22ee0d366cc79d01e120",
+    "regions_py": "c4b2eede4c5f82b99d474713bace5c667c48fb61225fa4d434bc6f1b21dbd267",   # CR-0019: + YEAR_MIN; CR-0021: + YEAR_STRATA
+    "rounding": "d85fa8a30948080a9d25f5710ecce1286ef3e19688f829dc17493a476e5baeeb",   # CR-0021: per stratum
     "row_order": "add25a56f55a254fca815b698cfa3598997e946ec6627b13a70538c0959b91f6",
     "schema_version": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
     "split_for_unassigned": "4ad4b874fdcfadff6d3e35749a3bd1ec950e3a978c73d7ca66f9b17c50f6947c",
@@ -2231,7 +2924,7 @@ class TestUnits(unittest.TestCase):
         need = {"REGIONS", "MIN_SPACING_M", "BLOCK_SIZE_M", "BLOCK_ORIGIN_5070", "BUFFER_M",
                 "VAL_FRACTION", "SPLIT_SEED", "WINDOW_PX", "NEG_RATIO", "NONVEG_MAX_FRAC",
                 "W_FLOOR", "W_CAP", "NEUTRAL_WEIGHT", "NONVEG_WEIGHT", "MAX_COORD_UNCERTAINTY_M",
-                "KEY_DECIMALS", "YEAR_MIN"}
+                "KEY_DECIMALS", "YEAR_MIN", "YEAR_STRATA"}
         prod = A.load_config(PROD_CONFIG)
         self.assertEqual(set(prod["constants"]), need)
         self.assertEqual(prod["obs"]["OBS_Z"], 4)

@@ -32,7 +32,24 @@
     "NONVEG_WEIGHT": 10.0,
     "MAX_COORD_UNCERTAINTY_M": 1000,
     "KEY_DECIMALS": 5,
-    "YEAR_MIN": 2020
+    "YEAR_MIN": 2020,
+    "YEAR_STRATA": [
+      [
+        2020
+      ],
+      [
+        2021
+      ],
+      [
+        2022
+      ],
+      [
+        2023
+      ],
+      [
+        2024
+      ]
+    ]
   },
   "hash_spec": {
     "algorithm": "blake2b",
@@ -75,7 +92,7 @@
     "spacing_violation": "d2 < MIN_SPACING_M**2",
     "buffer_drop": "d2 <= BUFFER_M**2 to any row of any evaluated_sightings_R"
   },
-  "rounding": "Python built-in round() on the float64 product (half to even): int(round(VAL_FRACTION * N)), int(round(n_pos * NEG_RATIO)), int(round(n * NONVEG_MAX_FRAC))",
+  "rounding": "Python built-in round() on the float64 product (half to even): int(round(VAL_FRACTION * N)); per (region, split, stratum k) (CR-0021): n_k = int(round(n_pos_k * NEG_RATIO)) and the NonVeg cap int(round(n_k * NONVEG_MAX_FRAC)); cell totals n, n_nv, n_hab are sums over strata (never rounded at cell level)",
   "parsing": {
     "read_csv": {
       "float_precision": "round_trip"
@@ -253,7 +270,8 @@
       "VAL_FRACTION": "VAL_FRACTION",
       "SPLIT_SEED": "SPLIT_SEED",
       "WINDOW_PX": "WINDOW_PX",
-      "YEAR_MIN": "YEAR_MIN"
+      "YEAR_MIN": "YEAR_MIN",
+      "YEAR_STRATA": "YEAR_STRATA"
     },
     "extra": {
       "COUNTY_POLYGONS_YEAR": "paths.county_polygons.year",
@@ -354,7 +372,7 @@
     "inputs": "object {repo-relative path, formed exactly as paths/raster.template form it: sha256 hex} for every input read, rasters included. 'Every raster read' includes every raster that raster_path's content validation opens, INCLUDING rejected fallback candidates (e.g. an on-disk vintage that fails validation, such as today's 12 *_2025_{cc,ch,evc,fdist}.tif placeholders, whenever a lookup resolves to it), as well as every raster whose header or values are read (window predicate, extraction). E11(a)/(b) fail if any such file is not listed.",
     "outputs": "object {relative path: sha256 hex} for every output written (positives: 9 positive CSVs + block_assignments.csv; negatives: 9 negative CSVs + candidate_pool.csv)",
     "counts": "object {region: {step number as string: rows of that region remaining after the step}}; positives steps 1-6, negatives (pool) steps 1-11",
-    "draw": "negatives section only: object {region: {split: {n, n_nv, n_hab}}}",
+    "draw": "negatives section only (CR-0021 section 2 B): object {region: {split: {\"n\": int, \"n_nv\": int, \"n_hab\": int, \"strata\": {\"<first year of stratum>\": {\"n\": int, \"n_nv\": int, \"n_hab\": int}, ...}}}}; totals are sums over strata; strata keys are strings, in stratum order (constants.YEAR_STRATA), every stratum present (zeros included); R4 compares the whole object, keys and JSON types exact",
     "dropped": "negatives section only: list of [longitude, latitude] of the rows pool step 4 dropped, sorted ascending by (longitude, latitude)",
     "commit": "git commit hash",
     "dirty": "bool"
@@ -399,6 +417,18 @@
     ],
     "sup_cell_m": 10000,
     "sup_min_positives": 5,
-    "sup_factor": 10
+    "sup_factor": 10,
+    "O11": {
+      "source": "CR-0021 section 3",
+      "class": "label",
+      "score": "year",
+      "subset": "P union N, each split separately and pooled over splits; each statistic per region and pooled over regions",
+      "statistics": "O11a: ROC AUC over all rows (report only; cannot detect a within-stratum residual). O11w: ROC AUC within each merged stratum of constants.YEAR_STRATA (more than one year), with effect size O11w - 0.5",
+      "null": "O11w under n_perm label permutations within the merged stratum's (region, split) cells",
+      "n_perm": 1000,
+      "null_quantile": 0.99,
+      "perm_seed": 42,
+      "criterion": "only if a merged stratum is chosen: pooled O11w (over regions and splits) above its null p99 -> not approvable without a user decision; no fixed AUC threshold"
+    }
   }
 }

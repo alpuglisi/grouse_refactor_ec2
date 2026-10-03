@@ -11,7 +11,7 @@ functions that use them, so `standing_checks` pulls in only numpy, pandas
 and scipy. The normative functions CR-0013 lists (pinned at 05d788d) are
 re-implemented here from their source; regions.py is parsed, not imported.
 
-Gates (GATE, exact): E0-E14 (incl. E1p) on the pipeline's files and R1-R4,
+Gates (GATE, exact): E0-E15 (incl. E1p) on the pipeline's files and R1-R4,
 which replay CR-0012 section 2 from the inputs and compare full rows.
 CR-0017 section 3 adds E13 (no N or C row within BUFFER_M of the
 sightings' acquisition-domain edge) and rule (b) of pool step 6 to the
@@ -24,7 +24,16 @@ year >= YEAR_MIN (before thinning; a null evaluated-sighting year raises)
 and pool step 1 drops candidates with a non-null year < YEAR_MIN. YEAR_MIN
 is the config constant; E11 checks the regions.py literal (parsed, not
 imported).
-Observations (OBS, never blocking): O1-O10.
+CR-0021 section 3 stratifies the replay's negative draw per (region, split,
+year stratum), with the strata read from the config's YEAR_STRATA (never
+from regions.year_stratum; E11 checks the regions.py literal), amends E9 to
+per-stratum counts, NonVeg caps and habitat supply, and adds E15 ((a) the
+config's strata are increasing, contiguous, disjoint and start at YEAR_MIN,
+and every non-null P, N and C year lies in a stratum; (b) per (region, split,
+stratum) the N count equals round(P count x NEG_RATIO)) and O11 (year as a
+label score: O11a over all rows, O11w within each merged stratum with a
+within-cell label-permutation null).
+Observations (OBS, never blocking): O1-O11.
 
 Usage:
     python acceptance_split.py [--data-root DIR] [--config PATH]
@@ -61,8 +70,8 @@ ENV_KEYS = ("pandas", "numpy", "scipy", "pyproj", "PROJ", "rasterio", "GDAL", "g
             "shapely", "pyogrio", "op_4326_5070")
 ENV_DESCRIPTIVE = ("op_rule",)     # config-only text, not a measured value
 GATE_IDS = ("E0", "E1", "E1p", "E2", "E3", "E4", "E5", "E6", "E7", "E8",
-            "E9", "E10", "E11", "E12", "E13", "E14", "R1", "R2", "R3", "R4")
-OBS_IDS = tuple(f"O{i}" for i in range(1, 11))
+            "E9", "E10", "E11", "E12", "E13", "E14", "E15", "R1", "R2", "R3", "R4")
+OBS_IDS = tuple(f"O{i}" for i in range(1, 12))
 
 
 class AcceptanceError(RuntimeError):
@@ -258,6 +267,77 @@ def md5_is_val(block_id, seed, vf):
 def py_round(x):
     """Python's built-in round() on the float64 product (half to even)."""
     return int(round(float(x)))
+
+
+# ==========================================================================
+# Year strata (CR-0021 section 2 B / section 3), from the config only
+# ==========================================================================
+def _is_int_year(v):
+    return isinstance(v, int) and not isinstance(v, bool)
+
+
+def parse_strata(C):
+    """(strata, problems) for the config's YEAR_STRATA. `strata` is a list of
+    tuples of int years whenever the value has the shape of a list of
+    non-empty lists of integers (even if the strata overlap, have gaps or
+    start elsewhere), else None. `problems` lists every violation of E15(a)'s
+    config clause: increasing, contiguous, disjoint, starting at YEAR_MIN."""
+    if "YEAR_STRATA" not in C:
+        return None, ["config constants lack YEAR_STRATA"]
+    S = C["YEAR_STRATA"]
+    if not isinstance(S, (list, tuple)) or not S:
+        return None, [f"YEAR_STRATA {S!r} is not a non-empty list of strata"]
+    bad = [i for i, st in enumerate(S)
+           if not isinstance(st, (list, tuple)) or not st or not all(_is_int_year(y) for y in st)]
+    if bad:
+        return None, [f"YEAR_STRATA stratum {i} ({S[i]!r}) is not a non-empty list of integer years"
+                      for i in bad]
+    strata = [tuple(int(y) for y in st) for st in S]
+    flat = [y for st in strata for y in st]
+    problems = []
+    owner = {}
+    for i, st in enumerate(strata):
+        for y in st:
+            owner.setdefault(y, []).append(i)
+    shared = sorted(y for y, o in owner.items() if len(o) > 1)
+    if shared:
+        problems.append(f"YEAR_STRATA strata are not disjoint: year(s) {shared} in more than one stratum")
+    if any(b <= a for a, b in zip(flat, flat[1:])):
+        problems.append(f"YEAR_STRATA years are not increasing in stratum order: {flat}")
+    u = sorted(set(flat))
+    gaps = sorted(set(range(u[0], u[-1] + 1)) - set(u))
+    if gaps:
+        problems.append(f"YEAR_STRATA strata are not contiguous: year(s) {gaps} lie in no stratum")
+    ymin = C.get("YEAR_MIN")
+    if flat[0] != ymin or u[0] != ymin:
+        problems.append(f"YEAR_STRATA does not start at YEAR_MIN {ymin}: first year {flat[0]}, "
+                        f"smallest {u[0]}")
+    return strata, problems
+
+
+def stratum_labels(strata):
+    """Manifest keys (CR-0021 section 2 B): the first year of each stratum, as a string."""
+    return [str(st[0]) for st in strata]
+
+
+def stratum_index_of(values, strata):
+    """Index of the stratum holding each value, -1 for a null, non-integral
+    or unparsable value or a year in no stratum. On overlapping strata the
+    first stratum wins (E15(a) fails such a config)."""
+    import numpy as np
+    import pandas as pd
+    lookup = {}
+    for i, st in enumerate(strata):
+        for y in st:
+            lookup.setdefault(int(y), i)
+    v = pd.to_numeric(pd.Series(list(values) if not isinstance(values, pd.Series) else values),
+                      errors="coerce").to_numpy(dtype=float)
+    out = np.full(len(v), -1, dtype=np.int64)
+    with np.errstate(invalid="ignore"):
+        ok = np.isfinite(v) & (v == np.floor(v))
+    for y, i in lookup.items():
+        out[ok & (v == float(y))] = i
+    return out
 
 
 _T5070 = []
@@ -1271,32 +1351,84 @@ class Replay:
         order = sorted(range(len(sub)), key=lambda i: (-scores[i], keys[i]))
         return sub.iloc[sorted(order[:k])]
 
+    def strata(self):
+        """CR-0021: the YEAR_STRATA of the replay's constants (the config),
+        never regions.year_stratum. A config that fails E15(a)'s config
+        clause cannot define a draw: ReplayError."""
+        strata, problems = parse_strata(self.C)
+        if problems:
+            raise ReplayError("config YEAR_STRATA: " + "; ".join(problems))
+        return strata
+
+    def stratum_index(self, years, what):
+        """CR-0021 section 2 B: the index of the stratum holding each year.
+        Every positive and pool row must map to a stratum, else ReplayError
+        (a null or non-integral year included)."""
+        import numpy as np
+        idx = stratum_index_of(years, self.strata())
+        bad = idx < 0
+        if bad.any():
+            vals = np.asarray(list(years), dtype=object)[bad]
+            raise ReplayError(f"{what}: {int(bad.sum())} rows whose year lies in no YEAR_STRATA "
+                              f"stratum (CR-0021 section 2 B), e.g. year={vals[0]!r}")
+        return idx
+
     def draw_targets(self, R, s):
-        n_pos = int((self.pos[R]["split"] == s).sum())
-        return py_round(n_pos * self.C["NEG_RATIO"])
+        """[n_k for each stratum k]: n_k = round(n_pos_k x NEG_RATIO), n_pos_k
+        the cell's positives whose year lies in stratum k (CR-0021 section 2 B)."""
+        ps = self.pos[R][self.pos[R]["split"] == s]
+        k = self.stratum_index(ps["year"], f"[{R}/{s}] positives")
+        return [py_round(int((k == i).sum()) * self.C["NEG_RATIO"])
+                for i in range(len(self.strata()))]
+
+    def stratum_counts(self, R, s, targets, nv_supply, hab_supply):
+        """[(n_k, n_nv_k, n_hab_k)]: the NonVeg cap per stratum, n_nv_k =
+        min(round(n_k x NONVEG_MAX_FRAC), NonVeg supply in k), n_hab_k = n_k -
+        n_nv_k; a habitat shortfall in any stratum raises (no top-up from
+        another stratum, no NonVeg top-up; CR-0012 policy)."""
+        labels = stratum_labels(self.strata())
+        out = []
+        for k, n_k in enumerate(targets):
+            n_nv = min(py_round(n_k * self.C["NONVEG_MAX_FRAC"]), nv_supply[k])
+            n_hab = n_k - n_nv
+            if hab_supply[k] < n_hab:
+                raise ReplayError(f"[{R}/{s}/{labels[k]}] habitat pool {hab_supply[k]} < habitat "
+                                  f"target {n_hab} (stratum {labels[k]}; CR-0021: no top-up from "
+                                  f"another stratum)")
+            out.append((n_k, n_nv, n_hab))
+        return out
 
     def draw_select(self, seed=None, record=True):
+        """CR-0021 section 2 B: per (region, split, stratum), the NonVeg and
+        habitat sub-pools restricted to the stratum, each sampled by es_take.
+        draw_counts[R][s] = {n, n_nv, n_hab, strata: {first year: {n, n_nv,
+        n_hab}}}, totals as sums over strata, every stratum present."""
         import pandas as pd
         seed = self.seed() if seed is None else seed
         pool = self.pool_full
         nv_all = bool_array(pool["is_nonveg"])
+        strata = self.strata()
+        labels = stratum_labels(strata)
+        k_all = self.stratum_index(pool["year"], "candidate pool")
         picked = []
         for R in self.regions:
             for s in SPLITS:
-                n = self.draw_targets(R, s)
+                targets = self.draw_targets(R, s)
                 m = ((pool["region"] == R) & (pool["split"] == s)).to_numpy()
-                nv = pool[m & nv_all]
-                hab = pool[m & ~nv_all]
-                n_nv = min(py_round(n * self.C["NONVEG_MAX_FRAC"]), len(nv))
-                n_hab = n - n_nv
-                if len(hab) < n_hab:
-                    raise ReplayError(f"[{R}/{s}] habitat pool {len(hab)} < habitat target {n_hab}")
-                take_h = self.es_take(hab, n_hab, seed)
-                take_n = self.es_take(nv, n_nv, seed)
+                nv_k = [m & nv_all & (k_all == k) for k in range(len(strata))]
+                hab_k = [m & ~nv_all & (k_all == k) for k in range(len(strata))]
+                counts = self.stratum_counts(R, s, targets, [int(x.sum()) for x in nv_k],
+                                             [int(x.sum()) for x in hab_k])
+                rec = {"n": 0, "n_nv": 0, "n_hab": 0, "strata": {}}
+                for k, (n_k, n_nv, n_hab) in enumerate(counts):
+                    picked.append(self.es_take(pool[hab_k[k]], n_hab, seed))
+                    picked.append(self.es_take(pool[nv_k[k]], n_nv, seed))
+                    rec["strata"][labels[k]] = {"n": int(n_k), "n_nv": int(n_nv), "n_hab": int(n_hab)}
+                    rec["n"] += int(n_k)
+                    rec["n_nv"] += int(n_nv)
+                    rec["n_hab"] += int(n_hab)
                 if record:
-                    self.draw_counts.setdefault(R, {})[s] = {"n": int(n), "n_nv": int(n_nv),
-                                                            "n_hab": int(n_hab)}
-                picked.extend([take_h, take_n])
+                    self.draw_counts.setdefault(R, {})[s] = rec
         return pd.concat(picked, ignore_index=True)
 
     def run_draw(self):
@@ -1960,32 +2092,134 @@ def gate_E8(ctx):
 
 
 def gate_E9(ctx):
+    """CR-0013 E9 as amended by CR-0021 section 3 (strata from the config).
+    Per (region, split): the negative count equals sum_k round(n_pos_k x
+    NEG_RATIO). Per (region, split, stratum k), n_k = round(n_pos_k x
+    NEG_RATIO): NonVeg count in N <= round(n_k x NONVEG_MAX_FRAC); habitat
+    pool supply in C >= n_hab_k = n_k - min(round(n_k x NONVEG_MAX_FRAC),
+    NonVeg rows of C in k) (computed from the pool, not from N)."""
+    import numpy as np
     problems, missing = [], []
+    strata, sp = parse_strata(ctx.C)
+    if strata is None:
+        problems.append(f"per-stratum clauses not evaluable: {'; '.join(sp)}")
+        return problems, missing
+    labels = stratum_labels(strata)
+    K = len(strata)
     c = ctx.try_csv(rpath(ctx.cfg, "candidate_pool"), missing)
+    c_ok = c is not None and {"region", "split", "is_nonveg", "year"} <= set(c)
+    if c is not None and not c_ok:
+        problems.append("C: region/split/is_nonveg/year columns absent; supply clause not evaluable")
+    if c_ok:
+        c_nv = bool_array(c["is_nonveg"])
+        c_k = stratum_index_of(c["year"], strata)
+        c_r = c["region"].astype(str).to_numpy()
+        c_s = c["split"].astype(str).to_numpy()
     for R in ctx.regions:
         P = ctx.try_csv(rpath(ctx.cfg, "thinned_positives", R), missing)
         N = ctx.try_csv(rpath(ctx.cfg, "negatives", R), missing)
         if P is None or N is None:
             continue
-        if "split" not in P or "split" not in N or "is_nonveg" not in N:
-            problems.append(f"[{R}] split/is_nonveg columns absent")
+        if not ({"split", "year"} <= set(P) and {"split", "year", "is_nonveg"} <= set(N)):
+            problems.append(f"[{R}] split/year/is_nonveg columns absent")
             continue
+        pk = stratum_index_of(P["year"], strata)
+        nk = stratum_index_of(N["year"], strata)
+        n_out = int((pk < 0).sum()) + int((nk < 0).sum())
+        if n_out:
+            problems.append(f"[{R}] {int((pk < 0).sum())} P and {int((nk < 0).sum())} N rows whose year "
+                            f"lies in no YEAR_STRATA stratum (per-stratum clauses ignore them; E15(a))")
+        psp = P["split"].astype(str).to_numpy()
+        nsp = N["split"].astype(str).to_numpy()
+        nnv = bool_array(N["is_nonveg"]) if len(N) else np.zeros(0, bool)
         for s in SPLITS:
-            n_pos = int((P["split"].astype(str) == s).sum())
-            n = py_round(n_pos * ctx.C["NEG_RATIO"])
-            Ns = N[N["split"].astype(str) == s]
-            if len(Ns) != n:
-                problems.append(f"[{R}/{s}] {len(Ns)} negatives != round(n_pos {n_pos} x NEG_RATIO) = {n}")
-            nv = int(bool_array(Ns["is_nonveg"]).sum()) if len(Ns) else 0
-            cap = py_round(n * ctx.C["NONVEG_MAX_FRAC"])
-            if nv > cap:
-                problems.append(f"[{R}/{s}] {nv} NonVeg negatives > cap {cap}")
-            if c is not None and {"region", "split", "is_nonveg"} <= set(c):
-                cs = c[(c["region"].astype(str) == R) & (c["split"].astype(str) == s)]
-                nvp = int(bool_array(cs["is_nonveg"]).sum()) if len(cs) else 0
-                n_hab = n - min(cap, nvp)
-                if len(cs) - nvp < n_hab:
-                    problems.append(f"[{R}/{s}] habitat pool {len(cs) - nvp} < habitat target {n_hab}")
+            n_pos_k = [int(((psp == s) & (pk == k)).sum()) for k in range(K)]
+            n_k = [py_round(v * ctx.C["NEG_RATIO"]) for v in n_pos_k]
+            n = sum(n_k)
+            n_neg = int((nsp == s).sum())
+            if n_neg != n:
+                problems.append(f"[{R}/{s}] {n_neg} negatives != sum over strata of round(n_pos_k x "
+                                f"NEG_RATIO) = {n} (n_pos_k {dict(zip(labels, n_pos_k))})")
+            for k in range(K):
+                cap = py_round(n_k[k] * ctx.C["NONVEG_MAX_FRAC"])
+                nv = int(((nsp == s) & (nk == k) & nnv).sum())
+                if nv > cap:
+                    problems.append(f"[{R}/{s}/{labels[k]}] {nv} NonVeg negatives > cap {cap} "
+                                    f"(per stratum, round(n_k {n_k[k]} x NONVEG_MAX_FRAC))")
+                if c_ok:
+                    m = (c_r == R) & (c_s == s) & (c_k == k)
+                    nvp = int((m & c_nv).sum())
+                    hab = int((m & ~c_nv).sum())
+                    n_hab = n_k[k] - min(cap, nvp)
+                    if hab < n_hab:
+                        problems.append(f"[{R}/{s}/{labels[k]}] habitat pool {hab} < habitat target "
+                                        f"{n_hab} (stratum {labels[k]})")
+    return problems, missing
+
+
+def gate_E15(ctx, include_C=True):
+    """CR-0021 section 3 (exact; standing subset without C). (a) the
+    config's strata are increasing, contiguous, disjoint and start at
+    YEAR_MIN; every non-null year of P, N (combined, pooled) and C lies in a
+    stratum. (b) per (region, split, stratum): count of N = round(count of P
+    x NEG_RATIO). pandas/numpy only."""
+    import numpy as np
+    problems, missing = [], []
+    strata, sp = parse_strata(ctx.C)
+    problems.extend(f"E15(a) config: {p}" for p in sp)
+    if strata is None:
+        problems.append("E15(b) not evaluable: YEAR_STRATA is not a list of lists of integer years")
+        return problems, missing
+    labels = stratum_labels(strata)
+    frames = {}
+    for cls, kind in (("P", "thinned_positives"), ("N", "negatives")):
+        df = ctx.pooled(kind, missing)
+        if df is None:
+            continue
+        if "year" not in df or "split" not in df:
+            problems.append(f"E15 {cls}: year/split columns absent")
+            continue
+        frames[cls] = df
+    targets = [(cls, df) for cls, df in frames.items()]
+    if include_C:
+        c = ctx.try_csv(rpath(ctx.cfg, "candidate_pool"), missing)
+        if c is not None:
+            if "year" not in c:
+                problems.append("E15 C: no 'year' column")
+            else:
+                targets.append(("C", c))
+    idx = {}
+    for cls, df in targets:
+        k = stratum_index_of(df["year"], strata)
+        idx[cls] = k
+        out = df["year"].notna().to_numpy() & (k == -1)        # -1: in no stratum
+        if out.any():
+            i = int(out.nonzero()[0][0])
+            if "_R" in df:
+                regs = df["_R"].astype(str).to_numpy()
+            elif "region" in df:
+                regs = df["region"].astype(str).to_numpy()
+            else:
+                regs = np.full(len(df), "?", dtype=object)
+            by_r = {R: int((out & (regs == R)).sum()) for R in sorted(set(regs[out].tolist()))}
+            yrs = sorted({str(v) for v in df["year"][out].tolist()})
+            problems.append(f"E15(a) {cls}: {int(out.sum())} rows with a non-null year in no YEAR_STRATA "
+                            f"stratum ({', '.join(f'{R} {n}' for R, n in by_r.items())}; years "
+                            f"{yrs[:6]}), e.g. ({df['longitude'].iloc[i]}, {df['latitude'].iloc[i]}) "
+                            f"year={df['year'].iloc[i]}")
+    if "P" in frames and "N" in frames:
+        P, N = frames["P"], frames["N"]
+        pr, nr = P["_R"].astype(str).to_numpy(), N["_R"].astype(str).to_numpy()
+        ps, ns = P["split"].astype(str).to_numpy(), N["split"].astype(str).to_numpy()
+        for R in ctx.regions:
+            for s in SPLITS:
+                for k, lab in enumerate(labels):
+                    n_p = int(((pr == R) & (ps == s) & (idx["P"] == k)).sum())
+                    n_n = int(((nr == R) & (ns == s) & (idx["N"] == k)).sum())
+                    want = py_round(n_p * ctx.C["NEG_RATIO"])
+                    if n_n != want:
+                        problems.append(f"E15(b) [{R}/{s}/{lab}] N {n_n} != round(P {n_p} x NEG_RATIO) "
+                                        f"= {want}")
     return problems, missing
 
 
@@ -2326,14 +2560,36 @@ def gate_R4(ctx):
         return problems, missing
     _compare_region_files(ctx, N_KINDS, rep.neg, problems, missing)
     _check_counts(ctx, M, "negatives", rep.draw_counts, "draw", problems, extra_key="draw")
+    if M is not None:
+        problems.extend(_draw_exact_problems((M.get("negatives") or {}).get("draw"), rep.draw_counts))
     return problems, missing
+
+
+def _draw_exact_problems(got, exp):
+    """CR-0021 section 2 B: the manifest's draw entry has exactly the
+    replay's keys and JSON types (an int written as 5.0 or true differs),
+    and each cell's strata keys are in stratum order. Value differences are
+    reported by _check_counts."""
+    if got is None or _norm_json(got) != _norm_json(exp):
+        return []
+    out = []
+    if json.dumps(got, sort_keys=True) != json.dumps(exp, sort_keys=True):
+        out.append("draw: manifest values equal the replay's but their JSON types differ "
+                   "(CR-0021: keys and types are exact)")
+    for R, cells in exp.items():
+        for s, e in cells.items():
+            g = got[R][s].get("strata") if isinstance(got[R][s], dict) else None
+            if isinstance(g, dict) and list(g) != list(e["strata"]):
+                out.append(f"draw: [{R}/{s}] strata keys {list(g)} not in stratum order "
+                           f"{list(e['strata'])}")
+    return out
 
 
 GATES = [("E0", gate_E0), ("E1", gate_E1), ("E1p", gate_E1p), ("E2", gate_E2), ("E3", gate_E3),
          ("E4", gate_E4), ("E5", gate_E5), ("E6", gate_E6), ("E7", gate_E7), ("E8", gate_E8),
          ("E9", gate_E9), ("E10", gate_E10), ("R1", gate_R1), ("R2", gate_R2), ("R3", gate_R3),
          ("R4", gate_R4), ("E11", gate_E11), ("E12", gate_E12), ("E13", gate_E13),
-         ("E14", gate_E14)]
+         ("E14", gate_E14), ("E15", gate_E15)]
 
 
 def evaluate(fn, ctx, **kw):
@@ -2602,7 +2858,108 @@ def stats_fixed(P, Nsel, Cp, cfg, regions, perm=True):
             if "split" in df:
                 out[f"O10.val_fraction.{cls}.{R}"] = (float((df["split"][m].astype(str) == "val").mean())
                                                       if m.any() else float("nan"))
+    if Nsel is not None:
+        out.update(stats_o11(P, Nsel, cfg, regions, perm=perm))
     return out, zs
+
+
+def auc_discrete(pos, neg):
+    """ROC AUC of score `pos` (label 1) vs `neg` (label 0), ties counted
+    1/2, in exact integer arithmetic over the distinct scores (years)."""
+    import numpy as np
+    pos = np.asarray(pos, dtype=float)
+    neg = np.asarray(neg, dtype=float)
+    pos, neg = pos[~np.isnan(pos)], neg[~np.isnan(neg)]
+    if len(pos) == 0 or len(neg) == 0:
+        return float("nan")
+    vals = np.unique(np.concatenate([pos, neg]))
+    pc = np.searchsorted(vals, pos)
+    nc = np.searchsorted(vals, neg)
+    p = np.bincount(pc, minlength=len(vals)).tolist()
+    q = np.bincount(nc, minlength=len(vals)).tolist()
+    num2, below = 0, 0
+    for pv, qv in zip(p, q):
+        num2 += 2 * pv * below + pv * qv
+        below += qv
+    return num2 / (2 * len(pos) * len(neg))
+
+
+def stats_o11(P, N, cfg, regions, perm=True):
+    """O11 (CR-0021 section 3; reported, never blocking). Class: label;
+    score: year; subset: P union N, each split separately and pooled over
+    splits; each statistic per region and pooled over regions.
+    O11a: ROC AUC over all rows (diluted by cross-stratum pairs, which score
+    exactly 0.5 when per-stratum counts are equal; cannot detect a
+    within-stratum residual). O11w: ROC AUC within each merged stratum (more
+    than one year), with its null from obs.O11.n_perm label permutations
+    within the stratum's (region, split) cells; reported with its effect
+    size (O11w - 0.5), the null's p99 and the value's null percentile. The
+    criterion (pooled O11w above its null p99 -> a user decision) is read on
+    the scope pooled over regions and splits."""
+    import numpy as np
+    import pandas as pd
+    out = {}
+    o = cfg["obs"].get("O11", {})
+    strata, _ = parse_strata(cfg["constants"])
+    rows = pd.DataFrame({
+        "R": np.concatenate([_region_col(P).to_numpy(), _region_col(N).to_numpy()]),
+        "split": np.concatenate([P["split"].astype(str).to_numpy(), N["split"].astype(str).to_numpy()]),
+        "year": np.concatenate([pd.to_numeric(P["year"], errors="coerce").to_numpy(dtype=float),
+                                pd.to_numeric(N["year"], errors="coerce").to_numpy(dtype=float)]),
+        "label": np.concatenate([np.ones(len(P), np.int8), np.zeros(len(N), np.int8)])})
+    scopes = [(s, rows["split"].to_numpy() == s) for s in SPLITS]
+    scopes.append(("pooled", np.ones(len(rows), bool)))
+    reg = rows["R"].to_numpy()
+    yr = rows["year"].to_numpy()
+
+    def aucs(lab, sel):
+        res = {}
+        for sname, sm in scopes:
+            for R in ["pooled"] + list(regions):
+                m = sel & sm & (np.ones(len(rows), bool) if R == "pooled" else reg == R)
+                res[(sname, R)] = auc_discrete(yr[m & (lab == 1)], yr[m & (lab == 0)])
+        return res
+
+    lab0 = rows["label"].to_numpy()
+    for (sname, R), v in aucs(lab0, np.ones(len(rows), bool)).items():
+        out[f"O11.a.{sname}.{R}"] = v
+    merged = [st for st in (strata or []) if len(st) > 1]
+    if not merged:
+        out["O11.w"] = "n/a (no merged stratum)"
+        return out
+    n_perm = int(o.get("n_perm", cfg["obs"]["n_perm"]))
+    q = float(o.get("null_quantile", 0.99))
+    rng = np.random.default_rng(o.get("perm_seed", cfg["obs"]["perm_seed"]))
+    for st in merged:
+        lab_name = f"{st[0]}-{st[-1]}"
+        sel = np.isin(yr, np.asarray(st, dtype=float))
+        obs = aucs(lab0, sel)
+        cells = [np.nonzero(sel & (reg == R) & (rows["split"].to_numpy() == s))[0]
+                 for R in regions for s in SPLITS]
+        null = {k: [] for k in obs}
+        if perm:
+            for _ in range(n_perm):
+                lab = lab0.copy()
+                for c in cells:
+                    if len(c) > 1:
+                        lab[c] = lab0[c][rng.permutation(len(c))]
+                for k, v in aucs(lab, sel).items():
+                    null[k].append(v)
+        for (sname, R), v in obs.items():
+            key = f"{lab_name}.{sname}.{R}"
+            out[f"O11.w.{key}"] = v
+            out[f"O11.w_effect.{key}"] = v - 0.5 if v == v else float("nan")
+            nv = np.asarray([x for x in null[(sname, R)] if x == x], dtype=float)
+            if len(nv) and v == v:
+                out[f"O11.w_null_p{q * 100:g}.{key}"] = float(np.quantile(nv, q))
+                out[f"O11.w_null_pct.{key}"] = float(100.0 * (nv < v).mean())
+        nv = np.asarray([x for x in null[("pooled", "pooled")] if x == x], dtype=float)
+        v = obs[("pooled", "pooled")]
+        if len(nv) and v == v:
+            out[f"O11.w_criterion.{lab_name}"] = (
+                "EXCEEDS null p99: residual the gate cannot see; user decision (CR-0021 section 3)"
+                if v > float(np.quantile(nv, q)) else "within null p99")
+    return out
 
 
 def _prep_obs_frame(df, cfg, xy_fn):
@@ -2838,7 +3195,8 @@ def standing_checks(img_size, jitter, augment, *, data_root=None, config=None):
                         ("E1p", gate_E1p, {}), ("E3", gate_E3, {"include_C": False}),
                         ("E4", gate_E4, {}), ("E5", gate_E5, {}),
                         ("E6", gate_E6, {"include_C": False, "include_B": False}),
-                        ("E14", gate_E14, {"include_C": False})):
+                        ("E14", gate_E14, {"include_C": False}),
+                        ("E15", gate_E15, {"include_C": False})):
         status, problems, missing = evaluate(fn, ctx, **kw)
         if status != "PASS":
             failures.extend(f"{gid}: missing {m}" for m in missing)

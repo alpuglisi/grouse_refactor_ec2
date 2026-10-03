@@ -1,0 +1,42 @@
+== predicted tree: exit 0 (expected 0)
+MC: PASS (63/63 checks pass)
+== no-op (live as NEW): exit 1 (expected 1)
+MC: FAIL (26/63 checks pass)
+    MC2 data/negatives/gbif_negatives_ME.csv: FAIL old bytes a prefix=True; post sha pinned=False; bad appended rows 0
+    MC2 data/negatives/gbif_negatives_NH.csv: FAIL old bytes a prefix=True; post sha pinned=False; bad appended rows 0
+    MC2 data/negatives/gbif_negatives_VT.csv: FAIL old bytes a prefix=True; post sha pinned=False; bad appended rows 0
+    MC3: FAIL header equal=True; new 22099 rows, pre-registered 24853; rows equal in order=False
+    MC4 ME rows: FAIL new 2854, pre-registered 2854, missing 668, extra 668
+    MC4 ME train stratum 2020: FAIL P 469, N {'n': 980, 'n_nv': 312, 'n_hab': 668}, pre-registered {'n': 469, 'n_hab': 328, 'n_nv': 141}
+    MC4 ME train stratum 2021: FAIL P 588, N {'n': 566, 'n_nv': 146, 'n_hab': 420}, pre-registered {'n': 588, 'n_hab': 412, 'n_nv': 176}
+    MC4 ME train stratum 2022: FAIL P 648, N {'n': 485, 'n_nv': 147, 'n_hab': 338}, pre-registered {'n': 648, 'n_hab': 454, 'n_nv': 194}
+    MC4 ME train stratum 2023: FAIL P 282, N {'n': 167, 'n_nv': 53, 'n_hab': 114}, pre-registered {'n': 282, 'n_hab': 197, 'n_nv': 85}
+    MC4 ME train stratum 2024: FAIL P 304, N {'n': 93, 'n_nv': 29, 'n_hab': 64}, pre-registered {'n': 304, 'n_hab': 213, 'n_nv': 91}
+    MC4 ME val stratum 2020: FAIL P 132, N {'n': 237, 'n_nv': 77, 'n_hab': 160}, pre-registered {'n': 132, 'n_hab': 92, 'n_nv': 40}
+    MC4 ME val stratum 2021: FAIL P 141, N {'n': 149, 'n_nv': 44, 'n_hab': 105}, pre-registered {'n': 141, 'n_hab': 99, 'n_nv': 42}
+    MC4 ME val stratum 2022: FAIL P 146, N {'n': 116, 'n_nv': 27, 'n_hab': 89}, pre-registered {'n': 146, 'n_hab': 102, 'n_nv': 44}
+    MC4 ME val stratum 2023: FAIL P 63, N {'n': 39, 'n_nv': 13, 'n_hab': 26}, pre-registered {'n': 63, 'n_hab': 44, 'n_nv': 19}
+    MC4 ME val stratum 2024: FAIL P 81, N {'n': 22, 'n_nv': 8, 'n_hab': 14}, pre-registered {'n': 81, 'n_hab': 57, 'n_nv': 24}
+    MC4 NH rows: FAIL new 827, pre-registered 827, missing 245, extra 245
+    MC4 NH train stratum 2020: FAIL P 97, N {'n': 205, 'n_nv': 64, 'n_hab': 141}, pre-registered {'n': 97, 'n_hab': 68, 'n_nv': 29}
+    MC4 NH train stratum 2021: FAIL P 118, N {'n': 184, 'n_nv': 46, 'n_hab': 138}, pre-registered {'n': 118, 'n_hab': 83, 'n_nv': 35}
+    MC4 NH train stratum 2022: FAIL P 137, N {'n': 125, 'n_nv': 48, 'n_hab': 77}, pre-registered {'n': 137, 'n_hab': 96, 'n_nv': 41}
+    MC4 NH train stratum 2023: FAIL P 118, N {'n': 68, 'n_nv': 18, 'n_hab': 50}, pre-registered {'n': 118, 'n_hab': 83, 'n_nv': 35}
+    MC4 NH train stratum 2024: FAIL P 164, N {'n': 52, 'n_nv': 14, 'n_hab': 38}, pre-registered {'n': 164, 'n_hab': 115, 'n_nv': 49}
+    MC4 NH val stratum 2020: FAIL P 35, N {'n': 77, 'n_nv': 24, 'n_hab': 53}, pre-registered {'n': 35, 'n_hab': 25, 'n_nv': 10}
+    MC4 NH val stratum 2021: FAIL P 29, N {'n': 49, 'n_nv': 15, 'n_hab': 34}, pre-registered {'n': 29, 'n_hab': 20, 'n_nv': 9}
+    MC4 NH val stratum 2022: FAIL P 30, N {'n': 32, 'n_nv': 9, 'n_hab': 23}, pre-registered {'n': 30, 'n_hab': 21, 'n_nv': 9}
+    MC4 NH val stratum 2023: FAIL P 33, N {'n': 15, 'n_nv': 3, 'n_hab': 12}, pre-registered {'n': 33, 'n_hab': 23, 'n_nv': 10}
+    MC4 NH val stratum 2024: FAIL P 66, N {'n': 20, 'n_nv': 7, 'n_hab': 13}, pre-registered {'n': 66, 'n_hab': 46, 'n_nv': 20}
+    MC4 VT rows: FAIL new 1128, pre-registered 1128, missing 364, extra 364
+    MC4 VT train stratum 2020: FAIL P 163, N {'n': 306, 'n_nv': 77, 'n_hab': 229}, pre-registered {'n': 163, 'n_hab': 114, 'n_nv': 49}
+    MC4 VT train stratum 2021: FAIL P 147, N {'n': 283, 'n_nv': 103, 'n_hab': 180}, pre-registered {'n': 147, 'n_hab': 103, 'n_nv': 44}
+    MC4 VT train stratum 2022: FAIL P 170, N {'n': 204, 'n_nv': 52, 'n_hab': 152}, pre-registered {'n': 170, 'n_hab': 119, 'n_nv': 51}
+    MC4 VT train stratum 2023: FAIL P 174, N {'n': 64, 'n_nv': 23, 'n_hab': 41}, pre-registered {'n': 174, 'n_hab': 122, 'n_nv': 52}
+    MC4 VT train stratum 2024: FAIL P 268, N {'n': 65, 'n_nv': 22, 'n_hab': 43}, pre-registered {'n': 268, 'n_hab': 188, 'n_nv': 80}
+    MC4 VT val stratum 2020: FAIL P 32, N {'n': 56, 'n_nv': 16, 'n_hab': 40}, pre-registered {'n': 32, 'n_hab': 22, 'n_nv': 10}
+    MC4 VT val stratum 2021: FAIL P 34, N {'n': 62, 'n_nv': 24, 'n_hab': 38}, pre-registered {'n': 34, 'n_hab': 24, 'n_nv': 10}
+    MC4 VT val stratum 2022: FAIL P 43, N {'n': 48, 'n_nv': 13, 'n_hab': 35}, pre-registered {'n': 43, 'n_hab': 30, 'n_nv': 13}
+    MC4 VT val stratum 2023: FAIL P 38, N {'n': 27, 'n_nv': 5, 'n_hab': 22}, pre-registered {'n': 38, 'n_hab': 27, 'n_nv': 11}
+    MC4 VT val stratum 2024: FAIL P 59, N {'n': 13, 'n_nv': 4, 'n_hab': 9}, pre-registered {'n': 59, 'n_hab': 41, 'n_nv': 18}
+SELFTEST PASS

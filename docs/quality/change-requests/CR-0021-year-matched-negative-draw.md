@@ -1,12 +1,13 @@
 # CR-0021: Year-matched negative draw, with a one-off 2023–2024 negative top-up
 
-**Status: DRAFT v4 (transcription), 2026-10-03.** Scope (iii) chosen by
-the user after round 1; design approved with follow-ups in round 3 (the
-last under CR-0011 A2); deliverable 1's fetch and pre-registration ran on
-the EC2 host and are transcribed here (§4 Result), with two user decisions.
-Not yet APPROVED: waits on a reviewer's verification of this
-transcription, `mc_selftest` on the EC2 host, and the reviewer's
-PA-0021(a) wrong-tree runs of MC (deliverable 1).
+**Status: APPROVED, 2026-10-03** (v4 text). Scope (iii) chosen by the
+user; design approved with follow-ups by reviewers A and B (round 3, the
+last under CR-0011 A2); deliverable 1 complete: top-up and
+pre-registration run on the EC2 host, transcription verified by reviewer
+A, `mc_selftest` PASS (63/63; no-op FAILs), reviewer A's PA-0021(a)
+wrong-tree runs PASS (11 wrong trees each FAIL via the expected check).
+User decisions recorded (§4 Result). Implementation (deliverables 2–9)
+not started.
 Verdicts and dispositions: `CR-0021-review-log.md`. This document states
 only current intent.
 
@@ -455,18 +456,12 @@ vintage (needs CR-0020's retrain and a seed-varied comparison, BUG-0039's
 lesson).
 
 ## Deliverables (in execution order)
-- [ ] 1. Pre-approval (CR-0011 A3), reviewed with this CR. Done so far:
-      scripts committed (`8a0ad4c`, code review fixes `0bc173c`); top-up
-      and pre-registration run on the EC2 host (`224d3c3`, `e955fa1`);
-      wetland-mix check (`wetland_mix.txt`); v4 transcription. Pending:
-      transcription verified by a reviewer; `mc_selftest.txt`; the
-      reviewer's PA-0021(a) wrong-tree runs. Full item:
-      `fetch_topup.py`, `preregister.py`, `check_must_change.py`,
-      `mc_selftest.py` committed; run on the EC2 host by the user
-      (network): `fetch_topup.log`, `preregister.txt` and CSVs, the
-      pinned raw files' sha256, `mc_selftest.txt`; a reviewer's
-      PA-0021(a) wrong-tree runs of MC. Then v4: transcription only
-      (§4 "Writing the result in").
+- [x] 1. Pre-approval (CR-0011 A3), reviewed with this CR: scripts
+      (`8a0ad4c`; code review fixes `0bc173c`); top-up and
+      pre-registration on the EC2 host (`224d3c3`, `e955fa1`); wetland-mix
+      check (`wetland_mix.txt`); v4 transcription (`e7ef673`), verified by
+      reviewer A (`d590abd`); `mc_selftest.txt` PASS (`37dd9f8`); reviewer
+      A's wrong-tree runs `reviewA/mc_wrongtrees.txt` PASS (`75370ae`).
 - [ ] 2. Acceptance changes (§3) on an unmerged CR-0021 branch by a fresh
       agent that does not write deliverable 3 (CR-0013 rule 4); read-only
       run on today's files gives exactly the expected FAILs.

@@ -164,3 +164,19 @@ Tests: `python -m unittest tests.test_cr0021` → 27 tests OK.
   plus 11 wrong trees, each mapped to the MC check it must trip). Compiled;
   five text mutations exercised on a synthetic tree. **Pending:** the run
   on the EC2 host (`reviewA/mc_wrongtrees.txt`).
+
+## Approval (2026-10-03)
+- `mc_selftest.txt` (`37dd9f8`): predicted tree PASS 63/63; no-op (live
+  as NEW) FAIL. `reviewA/mc_wrongtrees.txt` (`75370ae`): correct tree
+  PASS; noop, unstratified, nonveg_cap_cell, raw_not_topped_up,
+  raw_append_dropped, raw_old_altered, p_altered, n_year_swap,
+  n_nonveg_flip, trainval_desync, c_split_flip each FAIL via the expected
+  MC check; WRONGTREES PASS.
+- Quorum (CLAUDE.md §1.4): author and both reviewers who commented.
+  A: APPROVE WITH FOLLOW-UPS (round 3) and transcription verified.
+  B: APPROVE WITH FOLLOW-UPS (round 3). No BLOCKING concern in any round;
+  every MAJOR concern resolved or decided by the user (A17/B19, the
+  species tolerance and the wetland-mix residual).
+- **CR-0021 APPROVED.** Deliverables 2–9 follow, in order; deliverable 2
+  (acceptance changes) by a fresh agent that does not write deliverable 3
+  (CR-0013 rule 4).

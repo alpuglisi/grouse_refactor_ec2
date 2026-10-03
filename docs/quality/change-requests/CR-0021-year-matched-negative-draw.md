@@ -467,11 +467,20 @@ lesson).
       check (`wetland_mix.txt`); v4 transcription (`e7ef673`), verified by
       reviewer A (`d590abd`); `mc_selftest.txt` PASS (`37dd9f8`); reviewer
       A's wrong-tree runs `reviewA/mc_wrongtrees.txt` PASS (`75370ae`).
-- [ ] 2. Acceptance changes (§3) on an unmerged CR-0021 branch by a fresh
+- [x] 2. Acceptance changes (§3) on an unmerged CR-0021 branch by a fresh
       agent that does not write deliverable 3 (CR-0013 rule 4); read-only
       run on today's files gives exactly the expected FAILs.
-- [ ] 3. Pipeline changes (§2 B) and tests; suites pass.
-- [ ] 4. Scratch-tree run with the code of 2–3 (§ Test plan).
+      — Done: `afd36fe` (merged `f5ae8c5`); `acceptance_prefix.txt`
+      (`8b8bdca`): FAIL set {E9, E11, E15, R4} as expected, live record
+      unchanged; O11a on today's files 0.6615.
+- [x] 3. Pipeline changes (§2 B) and tests; suites pass.
+      — Done: `81cc603`; all suites pass on the merged tree (review log,
+      deliverable 2).
+- [x] 4. Scratch-tree run with the code of 2–3 (§ Test plan).
+      — Done: `scratch_run.txt` 21/21 GATEs, ACCEPTED, O11a 0.5 in every
+      cell; `scratch_mc.txt` MC 63/63 PASS; `scratch_rerun2.txt` (`f540d1e`)
+      second run at one commit byte-identical over 40 files, manifest equal
+      apart from `commit` against a run at another commit (review log I4).
 - [ ] 5. Preconditions and backup (to
       `/home/ec2-user/grouse_backup/CR-0021/`, sha256 verified),
       including the three raw files.

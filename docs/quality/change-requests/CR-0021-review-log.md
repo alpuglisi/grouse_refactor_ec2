@@ -215,3 +215,15 @@ wrong implementations chosen for the NonVeg-cap-per-cell and
 boundary-off-by-one attack rows; the four CR-0019 year-floor attacks that
 the stratified draw now refuses run on the unstratified draw and also
 assert the refusal.
+
+## Deliverable 4 (scratch tree, EC2 host)
+- **I4 (LOW, test-procedure note).** The first byte-identity check
+  (`scratch_rerun.txt`, `9c2b02c`) reported two differences, both by
+  design: `acceptance_record.json` is deleted by `prepare_training_data.py`
+  (stale-record rule, `prepare_training_data.py:431-437`) and was hashed
+  after the acceptance step; `split_manifest.json` records the code commit
+  (`git_state()`), which moved between the runs because the evidence was
+  committed in the worktree in between. Repeated at one commit
+  (`scratch_rerun2.txt`, `f540d1e`): 40 files, 0 mismatches; the manifest
+  from the earlier commit equals the new one apart from `commit`. No code
+  change. The live run (deliverable 6) commits nothing between its steps.

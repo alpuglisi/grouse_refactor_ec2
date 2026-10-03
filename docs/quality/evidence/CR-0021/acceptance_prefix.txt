@@ -1,0 +1,126 @@
+CR-0021 deliverable 2: acceptance_split.py GATEs on today's live files (read-only)
+data root : /home/ec2-user/grouse2
+config    : docs/quality/acceptance_split.json (sha256 63b33da951d8cd00c8437362d97e350f6d10dc21f45cd1982ec4a75354422587)
+code      : 3fd82694a9ee4581121ee682b556ea6cc5dab738 + working tree (acceptance_split.py sha256 e1372543f7cd4b69cf5c45926eeb97341f13e9d271e78026924029111a60d8c1)
+strata    : config YEAR_STRATA [[2020], [2021], [2022], [2023], [2024]]
+regions.py: /home/ec2-user/cr0021_wt/regions.py (YEAR_STRATA ((2020,), (2021,), (2022,), (2023,), (2024,)))
+started   : 2026-10-03T08:08:24.330511+00:00
+driver    : run_gates() only; OBS rows not computed (O11a below); no record written
+live record sha256 ed27583beb8b9f95b23ce3c51d18817ee1d9a1a42043b0c773138b028da9c42a; its config_sha256 07e417f2870210b9d03c0823793e0496a9fe4bcda99d62ca5e191298003c9c41
+
+CHECK today's 20 digested artifacts equal the live record's: ok
+CHECK today's raw gbif_negatives_R.csv equal the live record's inputs (pre-top-up): ok
+
+GATES (exact)
+E0   PASS
+E1   PASS
+E1p  PASS
+E2   PASS
+E3   PASS
+E4   PASS
+E5   PASS
+E6   PASS
+E7   PASS
+E8   PASS
+E9   FAIL
+       - [ME/train/2020] 312 NonVeg negatives > cap 141 (per stratum, round(n_k 469 x NONVEG_MAX_FRAC))
+       - [ME/train/2024] habitat pool 143 < habitat target 213 (stratum 2024)
+       - [ME/val/2020] 77 NonVeg negatives > cap 40 (per stratum, round(n_k 132 x NONVEG_MAX_FRAC))
+       - [ME/val/2021] 44 NonVeg negatives > cap 42 (per stratum, round(n_k 141 x NONVEG_MAX_FRAC))
+       - [ME/val/2024] habitat pool 34 < habitat target 57 (stratum 2024)
+       - [NH/train/2020] 64 NonVeg negatives > cap 29 (per stratum, round(n_k 97 x NONVEG_MAX_FRAC))
+       - [NH/train/2021] 46 NonVeg negatives > cap 35 (per stratum, round(n_k 118 x NONVEG_MAX_FRAC))
+       - [NH/train/2022] 48 NonVeg negatives > cap 41 (per stratum, round(n_k 137 x NONVEG_MAX_FRAC))
+       - [NH/val/2020] 24 NonVeg negatives > cap 10 (per stratum, round(n_k 35 x NONVEG_MAX_FRAC))
+       - [NH/val/2021] 15 NonVeg negatives > cap 9 (per stratum, round(n_k 29 x NONVEG_MAX_FRAC))
+       - [NH/val/2024] habitat pool 31 < habitat target 46 (stratum 2024)
+       - [VT/train/2020] 77 NonVeg negatives > cap 49 (per stratum, round(n_k 163 x NONVEG_MAX_FRAC))
+       ... 7 more
+E10  PASS
+E11  FAIL
+       - manifest[positives].constants differs from the config (['YEAR_STRATA'])
+       - manifest[negatives].constants differs from the config (['YEAR_STRATA'])
+E12  PASS
+E13  PASS
+E14  PASS
+E15  FAIL
+       - E15(b) [ME/train/2020] N 980 != round(P 469 x NEG_RATIO) = 469
+       - E15(b) [ME/train/2021] N 566 != round(P 588 x NEG_RATIO) = 588
+       - E15(b) [ME/train/2022] N 485 != round(P 648 x NEG_RATIO) = 648
+       - E15(b) [ME/train/2023] N 167 != round(P 282 x NEG_RATIO) = 282
+       - E15(b) [ME/train/2024] N 93 != round(P 304 x NEG_RATIO) = 304
+       - E15(b) [ME/val/2020] N 237 != round(P 132 x NEG_RATIO) = 132
+       - E15(b) [ME/val/2021] N 149 != round(P 141 x NEG_RATIO) = 141
+       - E15(b) [ME/val/2022] N 116 != round(P 146 x NEG_RATIO) = 146
+       - E15(b) [ME/val/2023] N 39 != round(P 63 x NEG_RATIO) = 63
+       - E15(b) [ME/val/2024] N 22 != round(P 81 x NEG_RATIO) = 81
+       - E15(b) [NH/train/2020] N 205 != round(P 97 x NEG_RATIO) = 97
+       - E15(b) [NH/train/2021] N 184 != round(P 118 x NEG_RATIO) = 118
+       ... 18 more
+R1   PASS
+R2   PASS
+R3   PASS
+R4   FAIL
+       - replay stage 'draw' raised ReplayError: [ME/train/2024] habitat pool 143 < habitat target 213 (stratum 2024; CR-0021: no top-up from another stratum)
+
+SUMMARY: 17/21 GATEs pass; FAIL: E11, E15, E9, R4
+runtime: 24.4 s
+
+VERDICTS vs expected
+CHECK E0 PASS (expected PASS): ok
+CHECK E1 PASS (expected PASS): ok
+CHECK E1p PASS (expected PASS): ok
+CHECK E2 PASS (expected PASS): ok
+CHECK E3 PASS (expected PASS): ok
+CHECK E4 PASS (expected PASS): ok
+CHECK E5 PASS (expected PASS): ok
+CHECK E6 PASS (expected PASS): ok
+CHECK E7 PASS (expected PASS): ok
+CHECK E8 PASS (expected PASS): ok
+CHECK E9 FAIL (expected FAIL): ok
+CHECK E10 PASS (expected PASS): ok
+CHECK E11 FAIL (expected FAIL): ok
+CHECK E12 PASS (expected PASS): ok
+CHECK E13 PASS (expected PASS): ok
+CHECK E14 PASS (expected PASS): ok
+CHECK E15 FAIL (expected FAIL): ok
+CHECK R1 PASS (expected PASS): ok
+CHECK R2 PASS (expected PASS): ok
+CHECK R3 PASS (expected PASS): ok
+CHECK R4 FAIL (expected FAIL): ok
+CHECK FAIL set ['E11', 'E15', 'E9', 'R4'] == expected ['E11', 'E15', 'E9', 'R4']: ok
+
+REASONS
+CHECK E11: no missing input: ok - []
+CHECK E15: no missing input: ok - []
+CHECK E9: no missing input: ok - []
+CHECK R4: no missing input: ok - []
+CHECK regions.py YEAR_STRATA equals the config (deliverable 3 merged): ok
+CHECK E11: both manifest sections lack YEAR_STRATA: ok
+CHECK E11: no other problem: ok - []
+CHECK E15: every problem is E15(b): ok - []
+CHECK E9: every problem is a per-stratum clause (NonVeg cap or habitat supply): ok - []
+CHECK E9: the count clause holds: ok
+  E9: 13 NonVeg-cap and 6 habitat-supply problems
+  replay stage errors: {draw: ReplayError: [ME/train/2024] habitat pool 143 < habitat target 213 (stratum 2024; CR-0021: no top-up from another stratum)}
+CHECK R4: replay positives and pool stages ran: ok
+CHECK R4: the stratified draw raised ReplayError on a habitat shortfall: ok
+CHECK R4: reported as the draw stage's failure: ok
+
+DETAIL 1: per (region, split, stratum) counts, recomputed here with pandas (E15(b))
+  ME train: 2020: P 469 N 980; 2021: P 588 N 566; 2022: P 648 N 485; 2023: P 282 N 167; 2024: P 304 N 93
+  ME val: 2020: P 132 N 237; 2021: P 141 N 149; 2022: P 146 N 116; 2023: P 63 N 39; 2024: P 81 N 22
+  NH train: 2020: P 97 N 205; 2021: P 118 N 184; 2022: P 137 N 125; 2023: P 118 N 68; 2024: P 164 N 52
+  NH val: 2020: P 35 N 77; 2021: P 29 N 49; 2022: P 30 N 32; 2023: P 33 N 15; 2024: P 66 N 20
+  VT train: 2020: P 163 N 306; 2021: P 147 N 283; 2022: P 170 N 204; 2023: P 174 N 64; 2024: P 268 N 65
+  VT val: 2020: P 32 N 56; 2021: P 34 N 62; 2022: P 43 N 48; 2023: P 38 N 27; 2024: P 59 N 13
+CHECK E15(b) problem count 30 == cells with P != N recomputed here 30: ok
+DETAIL 2: O11a on today's files (report-only; BUG-0073 / preregister.txt: pooled 0.6615)
+  O11a [train]: pooled 0.6629; ME 0.6497, NH 0.6748, VT 0.6942
+  O11a [val]: pooled 0.6558; ME 0.6371, NH 0.7004, VT 0.6728
+  O11a [pooled]: pooled 0.6615; ME 0.6473, NH 0.6813, VT 0.6905
+  O11w: n/a (no merged stratum)
+
+CHECK live record unchanged at end: ok
+
+RESULT: AS EXPECTED

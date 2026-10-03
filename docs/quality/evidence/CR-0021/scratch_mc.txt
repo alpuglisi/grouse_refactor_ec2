@@ -1,0 +1,64 @@
+MC0: PASS record sha ok=True; 23 files; mismatched []
+MC1 data/pipeline/thinned_positives_ME.csv: PASS
+MC1 data/pipeline/train_positives_ME.csv: PASS
+MC1 data/pipeline/val_positives_ME.csv: PASS
+MC1 data/pipeline/thinned_positives_NH.csv: PASS
+MC1 data/pipeline/train_positives_NH.csv: PASS
+MC1 data/pipeline/val_positives_NH.csv: PASS
+MC1 data/pipeline/thinned_positives_VT.csv: PASS
+MC1 data/pipeline/train_positives_VT.csv: PASS
+MC1 data/pipeline/val_positives_VT.csv: PASS
+MC1 data/pipeline/block_assignments.csv: PASS
+MC2 data/negatives/gbif_negatives_ME.csv: PASS old bytes a prefix=True; post sha pinned=True; bad appended rows 0
+MC2 data/negatives/gbif_negatives_NH.csv: PASS old bytes a prefix=True; post sha pinned=True; bad appended rows 0
+MC2 data/negatives/gbif_negatives_VT.csv: PASS old bytes a prefix=True; post sha pinned=True; bad appended rows 0
+MC3: PASS header equal=True; new 24853 rows, pre-registered 24853; rows equal in order=True
+MC4 ME rows: PASS new 2854, pre-registered 2854, missing 0, extra 0
+MC4 ME equals C: PASS 0 rows differ from their NEW C row
+MC4 ME label: PASS
+MC4 ME order: PASS
+MC4 ME train stratum 2020: PASS P 469, N {'n': 469, 'n_nv': 141, 'n_hab': 328}, pre-registered {'n': 469, 'n_hab': 328, 'n_nv': 141}
+MC4 ME train stratum 2021: PASS P 588, N {'n': 588, 'n_nv': 176, 'n_hab': 412}, pre-registered {'n': 588, 'n_hab': 412, 'n_nv': 176}
+MC4 ME train stratum 2022: PASS P 648, N {'n': 648, 'n_nv': 194, 'n_hab': 454}, pre-registered {'n': 648, 'n_hab': 454, 'n_nv': 194}
+MC4 ME train stratum 2023: PASS P 282, N {'n': 282, 'n_nv': 85, 'n_hab': 197}, pre-registered {'n': 282, 'n_hab': 197, 'n_nv': 85}
+MC4 ME train stratum 2024: PASS P 304, N {'n': 304, 'n_nv': 91, 'n_hab': 213}, pre-registered {'n': 304, 'n_hab': 213, 'n_nv': 91}
+MC4 ME val stratum 2020: PASS P 132, N {'n': 132, 'n_nv': 40, 'n_hab': 92}, pre-registered {'n': 132, 'n_hab': 92, 'n_nv': 40}
+MC4 ME val stratum 2021: PASS P 141, N {'n': 141, 'n_nv': 42, 'n_hab': 99}, pre-registered {'n': 141, 'n_hab': 99, 'n_nv': 42}
+MC4 ME val stratum 2022: PASS P 146, N {'n': 146, 'n_nv': 44, 'n_hab': 102}, pre-registered {'n': 146, 'n_hab': 102, 'n_nv': 44}
+MC4 ME val stratum 2023: PASS P 63, N {'n': 63, 'n_nv': 19, 'n_hab': 44}, pre-registered {'n': 63, 'n_hab': 44, 'n_nv': 19}
+MC4 ME val stratum 2024: PASS P 81, N {'n': 81, 'n_nv': 24, 'n_hab': 57}, pre-registered {'n': 81, 'n_hab': 57, 'n_nv': 24}
+MC5 train_negatives_ME: PASS
+MC5 val_negatives_ME: PASS
+MC4 NH rows: PASS new 827, pre-registered 827, missing 0, extra 0
+MC4 NH equals C: PASS 0 rows differ from their NEW C row
+MC4 NH label: PASS
+MC4 NH order: PASS
+MC4 NH train stratum 2020: PASS P 97, N {'n': 97, 'n_nv': 29, 'n_hab': 68}, pre-registered {'n': 97, 'n_hab': 68, 'n_nv': 29}
+MC4 NH train stratum 2021: PASS P 118, N {'n': 118, 'n_nv': 35, 'n_hab': 83}, pre-registered {'n': 118, 'n_hab': 83, 'n_nv': 35}
+MC4 NH train stratum 2022: PASS P 137, N {'n': 137, 'n_nv': 41, 'n_hab': 96}, pre-registered {'n': 137, 'n_hab': 96, 'n_nv': 41}
+MC4 NH train stratum 2023: PASS P 118, N {'n': 118, 'n_nv': 35, 'n_hab': 83}, pre-registered {'n': 118, 'n_hab': 83, 'n_nv': 35}
+MC4 NH train stratum 2024: PASS P 164, N {'n': 164, 'n_nv': 49, 'n_hab': 115}, pre-registered {'n': 164, 'n_hab': 115, 'n_nv': 49}
+MC4 NH val stratum 2020: PASS P 35, N {'n': 35, 'n_nv': 10, 'n_hab': 25}, pre-registered {'n': 35, 'n_hab': 25, 'n_nv': 10}
+MC4 NH val stratum 2021: PASS P 29, N {'n': 29, 'n_nv': 9, 'n_hab': 20}, pre-registered {'n': 29, 'n_hab': 20, 'n_nv': 9}
+MC4 NH val stratum 2022: PASS P 30, N {'n': 30, 'n_nv': 9, 'n_hab': 21}, pre-registered {'n': 30, 'n_hab': 21, 'n_nv': 9}
+MC4 NH val stratum 2023: PASS P 33, N {'n': 33, 'n_nv': 10, 'n_hab': 23}, pre-registered {'n': 33, 'n_hab': 23, 'n_nv': 10}
+MC4 NH val stratum 2024: PASS P 66, N {'n': 66, 'n_nv': 20, 'n_hab': 46}, pre-registered {'n': 66, 'n_hab': 46, 'n_nv': 20}
+MC5 train_negatives_NH: PASS
+MC5 val_negatives_NH: PASS
+MC4 VT rows: PASS new 1128, pre-registered 1128, missing 0, extra 0
+MC4 VT equals C: PASS 0 rows differ from their NEW C row
+MC4 VT label: PASS
+MC4 VT order: PASS
+MC4 VT train stratum 2020: PASS P 163, N {'n': 163, 'n_nv': 49, 'n_hab': 114}, pre-registered {'n': 163, 'n_hab': 114, 'n_nv': 49}
+MC4 VT train stratum 2021: PASS P 147, N {'n': 147, 'n_nv': 44, 'n_hab': 103}, pre-registered {'n': 147, 'n_hab': 103, 'n_nv': 44}
+MC4 VT train stratum 2022: PASS P 170, N {'n': 170, 'n_nv': 51, 'n_hab': 119}, pre-registered {'n': 170, 'n_hab': 119, 'n_nv': 51}
+MC4 VT train stratum 2023: PASS P 174, N {'n': 174, 'n_nv': 52, 'n_hab': 122}, pre-registered {'n': 174, 'n_hab': 122, 'n_nv': 52}
+MC4 VT train stratum 2024: PASS P 268, N {'n': 268, 'n_nv': 80, 'n_hab': 188}, pre-registered {'n': 268, 'n_hab': 188, 'n_nv': 80}
+MC4 VT val stratum 2020: PASS P 32, N {'n': 32, 'n_nv': 10, 'n_hab': 22}, pre-registered {'n': 32, 'n_hab': 22, 'n_nv': 10}
+MC4 VT val stratum 2021: PASS P 34, N {'n': 34, 'n_nv': 10, 'n_hab': 24}, pre-registered {'n': 34, 'n_hab': 24, 'n_nv': 10}
+MC4 VT val stratum 2022: PASS P 43, N {'n': 43, 'n_nv': 13, 'n_hab': 30}, pre-registered {'n': 43, 'n_hab': 30, 'n_nv': 13}
+MC4 VT val stratum 2023: PASS P 38, N {'n': 38, 'n_nv': 11, 'n_hab': 27}, pre-registered {'n': 38, 'n_hab': 27, 'n_nv': 11}
+MC4 VT val stratum 2024: PASS P 59, N {'n': 59, 'n_nv': 18, 'n_hab': 41}, pre-registered {'n': 59, 'n_hab': 41, 'n_nv': 18}
+MC5 train_negatives_VT: PASS
+MC5 val_negatives_VT: PASS
+MC: PASS (63/63 checks pass)

@@ -361,7 +361,9 @@ class FetchTopupMain(unittest.TestCase):
             for R in ft.REGIONS:
                 _write(os.path.join(tree, ft.RAW.format(R=R)), rows[R])
         self.pinned = {R: _sha(os.path.join(self.scr, ft.RAW.format(R=R))) for R in ft.REGIONS}
-        self.saved = {k: getattr(ft, k) for k in ("ROOT", "RESULT", "HERE", "pinned_pre_topup")}
+        self.saved = {k: getattr(ft, k) for k in ("ROOT", "RESULT", "HERE", "pinned_pre_topup",
+                                               "DISABLED")}
+        ft.DISABLED = False          # the committed script is disabled after its one run
         ft.ROOT, ft.HERE = self.live, self.ev
         ft.RESULT = os.path.join(self.ev, "fetch_topup_result.json")
         ft.pinned_pre_topup = lambda: dict(self.pinned)
@@ -416,6 +418,16 @@ class FetchTopupMain(unittest.TestCase):
         self.assertTrue(os.path.exists(ft.RESULT))
         with self.assertRaises(SystemExit):                         # recorded: never again
             self._run(self._fake_G())
+
+    def test_disabled_script_refuses(self):
+        ft.DISABLED = True
+        with self.assertRaises(SystemExit):
+            self._run(self._fake_G())
+        for R in ft.REGIONS:
+            self.assertEqual(_sha(os.path.join(self.scr, ft.RAW.format(R=R))), self.pinned[R])
+
+    def test_committed_script_is_disabled(self):
+        self.assertTrue(self.saved["DISABLED"])
 
     def test_abort_writes_nothing_and_allows_retry(self):
         """Code review S2: an aborted attempt leaves a log but does not block a retry."""

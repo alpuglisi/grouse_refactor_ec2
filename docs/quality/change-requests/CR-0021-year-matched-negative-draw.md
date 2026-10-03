@@ -1,10 +1,12 @@
 # CR-0021: Year-matched negative draw, with a one-off 2023–2024 negative top-up
 
-**Status: DRAFT v3, 2026-10-03.** Scope (iii) chosen by the user
-(2026-10-03) after round 1; v3 dispositions round 2. Not approvable yet:
-waits on round 3 (the last under CR-0011 A2, bounded to the round-2
-MAJOR concerns and v3's changed text) and on deliverable 1 (the top-up
-fetch and the pre-registration on the EC2 host), which has not run.
+**Status: DRAFT v4 (transcription), 2026-10-03.** Scope (iii) chosen by
+the user after round 1; design approved with follow-ups in round 3 (the
+last under CR-0011 A2); deliverable 1's fetch and pre-registration ran on
+the EC2 host and are transcribed here (§4 Result), with two user decisions.
+Not yet APPROVED: waits on a reviewer's verification of this
+transcription, `mc_selftest` on the EC2 host, and the reviewer's
+PA-0021(a) wrong-tree runs of MC (deliverable 1).
 Verdicts and dispositions: `CR-0021-review-log.md`. This document states
 only current intent.
 
@@ -91,7 +93,9 @@ de-duplication against the existing rows:
   tuple of tuples of years (E11 reads it with `ast.literal_eval`,
   `acceptance_split.py:2043-2060`), increasing, contiguous, starting at
   `YEAR_MIN`. Its value is the first entry of the pre-fixed list in §4
-  that the pre-registration finds feasible. `regions.year_stratum(year)`
+  that the pre-registration finds feasible: **S1,
+  `YEAR_STRATA = ((2020,), (2021,), (2022,), (2023,), (2024,))`**
+  (§4 Result). `regions.year_stratum(year)`
   returns the index of the stratum holding `year` and raises
   `ValueError` for any other year (fails closed). `tests/test_shared_constants.py`
   pins both names.
@@ -289,6 +293,38 @@ non-mechanical change at that point (a rule not followed, a tolerance
 exceeded, a design change) goes to the user, not to a fourth review
 round (CR-0011 A2).
 
+**Result (transcribed from `docs/quality/evidence/CR-0021/`, commits
+`224d3c3` and `e955fa1`).** Numbers live in the evidence files; this
+section records only the verdicts against §4's conditions.
+- Top-up: ran once (`fetch_topup_20261003T071204Z.log`); post-top-up raw
+  sha256 in `fetch_topup_result.json`, pinned through
+  `preregister_draw.json` (MC2). Nine (region, species, year) partitions
+  were exhausted: the two wetland species in NH and VT, and Northern
+  Waterthrush in ME 2023.
+- Trees and CONTROL: pass (`preregister.txt` §0–1); no two-state key; P
+  and B unchanged by the top-up.
+- **Strata: S1 chosen** (zero SHORT cells). Cells with
+  `n_hab / supply > 0.8` (report-only): NH val 2024, VT train 2024, VT
+  val 2024.
+- O11a: today's value as BUG-0073 states; predicted exactly 0.5 in every
+  region and split (by construction under S1). O11w: not applicable (no
+  merged stratum).
+- Comparability: `coord_uncertainty_m` tolerance met; **species
+  tolerance exceeded in NH and VT** (raw rows), because the wetland
+  species are exhausted in GBIF for those states and years. Spatial
+  comparison reported (report-only, user decision).
+- **User decisions (2026-10-03).** (1) The species tolerance was exceeded,
+  so a follow-up check was defined with its rule fixed before any output
+  was seen: the wetland-guild share of the drawn habitat negatives in
+  2023 and in 2024 within ±10 pp of 2020–2022, per region
+  (`wetland_mix.txt`). It failed. The same statistic on today's accepted
+  negatives shows the difference pre-exists, larger than after this CR in
+  NH and VT and smaller in ME. (2) The user **accepted**: CR-0021 proceeds
+  with S1, and the year × wetland-guild mix of the negatives is recorded
+  as a tracked residual (§5) with a follow-up CR.
+- Pins transcribed: `check_must_change.PRE_SHA` (preregister_C.csv,
+  preregister_N.csv, preregister_draw.json); `fetch_topup.DISABLED = True`.
+
 ### 5. Residual (not fixed here)
 - **The two representative-year rules still differ** (positives: latest
   visit; negatives: smallest `gbif_id` ≈ earliest). With single-year
@@ -303,8 +339,17 @@ round (CR-0011 A2).
   trained at another). It is filed at deliverable 8 as a **tracked
   residual with an owner** (lead; a tracker entry under PA-0022), not
   closed as accepted.
-- **Inside a merged stratum** (only if S2 or S3 is chosen): subject to
-  the O11w criterion (§3).
+- **Inside a merged stratum:** none (S1 chosen).
+- **The negatives' habitat-type mix still differs by year** (user
+  decision, §4 Result; `wetland_mix.txt`). The year→label marginal is
+  removed exactly, but the share of wetland-guild negatives differs
+  between 2020–2022 and 2023–2024 in every region. That difference comes
+  from the original acquisition and exists in today's split, where it is
+  larger in NH and VT than after this CR and smaller in ME. A model can
+  therefore still meet a second-order vintage × habitat-mix interaction.
+  Filed at deliverable 8 as a **tracked residual with an owner** (lead),
+  with a **follow-up CR** for a draw that also balances wetland vs upland
+  negatives within each year.
 - **The acquisition order** (`get_negatives.py` rollover) still
   front-loads the raw pool; after B it only affects supply, not N's year
   mix. It stays a recorded candidate cause in BUG-0073; the fix does not
@@ -406,7 +451,12 @@ vintage (needs CR-0020's retrain and a seed-varied comparison, BUG-0039's
 lesson).
 
 ## Deliverables (in execution order)
-- [ ] 1. Pre-approval (CR-0011 A3), reviewed with this CR:
+- [ ] 1. Pre-approval (CR-0011 A3), reviewed with this CR. Done so far:
+      scripts committed (`8a0ad4c`, code review fixes `0bc173c`); top-up
+      and pre-registration run on the EC2 host (`224d3c3`, `e955fa1`);
+      wetland-mix check (`wetland_mix.txt`); v4 transcription. Pending:
+      transcription verified by a reviewer; `mc_selftest.txt`; the
+      reviewer's PA-0021(a) wrong-tree runs. Full item:
       `fetch_topup.py`, `preregister.py`, `check_must_change.py`,
       `mc_selftest.py` committed; run on the EC2 host by the user
       (network): `fetch_topup.log`, `preregister.txt` and CSVs, the
@@ -448,6 +498,8 @@ lesson).
   CR if needed again.
 - Harmonising the representative-year rules (round 1's part A).
 - BUG-0074 (`sample_background_points` single vintage): its own CR.
+- Balancing the negatives' wetland vs upland mix within each year (§5):
+  its own follow-up CR.
 - BUG-0075 (`START_YEAR` duplicated in `sightings.py`/`ebird.py`): its own
   small CR, as the tracker allows; positives' acquisition is not touched
   here.

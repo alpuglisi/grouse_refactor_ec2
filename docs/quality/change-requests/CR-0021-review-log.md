@@ -129,3 +129,22 @@ before any run on the EC2 host.
 | S7 | LOW | An I/O error during the appends is fail-closed but undocumented | fixed: docstring says re-copy the scratch tree |
 
 Tests: `python -m unittest tests.test_cr0021` → 27 tests OK.
+
+## Deliverable 1 results and user decisions (v4 transcription)
+- Top-up (`224d3c3`) and pre-registration (`e955fa1`) ran on the EC2 host;
+  control passed; **S1 chosen** by the pre-fixed rule; O11a predicted 0.5.
+- **Species tolerance exceeded** (NH, VT; wetland species exhausted in
+  GBIF). Follow-up check with its rule fixed before outputs were seen
+  (wetland-guild share of drawn habitat negatives, 2023 and 2024 within
+  ±10 pp of 2020–2022): **failed**; today's split shows the difference
+  pre-exists (`wetland_mix.txt`).
+- **User decision (2026-10-03): accept**; record the year × wetland-guild
+  mix as a tracked residual with an owner, follow-up CR for a
+  within-year wetland/upland-balanced draw. Not a design change to CR-0021,
+  so no further review round (CR-0011 A2); the residual is written into
+  CR §5 and § Out of scope.
+- Transcribed: `YEAR_STRATA` = S1; `check_must_change.PRE_SHA` pinned to
+  the committed outputs; `fetch_topup.DISABLED = True`; tests updated
+  (29 OK).
+- **Pending for approval:** reviewer verification of this transcription;
+  `mc_selftest` on the EC2 host; the reviewer's PA-0021(a) wrong-tree runs.

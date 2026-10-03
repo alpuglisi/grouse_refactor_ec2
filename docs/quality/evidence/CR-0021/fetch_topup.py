@@ -56,9 +56,9 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", "..", ".."))
 
-# Set to True in the commit that records deliverable 1's outputs
-# (CR-0021 section 2 C: single use).
-DISABLED = False
+# CR-0021 section 2 C: single use. The one top-up ran on 2026-10-03
+# (fetch_topup_20261003T071204Z.log, fetch_topup_result.json at 224d3c3).
+DISABLED = True
 
 RECORD = os.path.join(HERE, "..", "CR-0019", "live", "acceptance_record.json")
 RECORD_SHA = "ed27583beb8b9f95b23ce3c51d18817ee1d9a1a42043b0c773138b028da9c42a"

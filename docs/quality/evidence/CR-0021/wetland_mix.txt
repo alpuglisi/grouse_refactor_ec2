@@ -1,0 +1,53 @@
+CR-0021 deliverable 1: wetland-guild mix of the drawn habitat negatives by year
+(follow-up to the species-comparability tolerance being exceeded in NH and VT;
+preregister.txt section 3). Run by the user on the EC2 host, 2026-10-03;
+outputs transcribed verbatim from the user's terminal.
+
+Rule fixed BEFORE either output was seen: per region, the share of the four
+wetland-guild species (Alder Flycatcher, Common Yellowthroat, Swamp Sparrow,
+Northern Waterthrush) among the drawn habitat (is_nonveg False) negatives in
+2023 and in 2024 must be within 10 percentage points of the 2020-2022 share.
+
+== 1. Predicted N (preregister_N.csv joined to preregister_C.csv gbif_id and
+==    the scratch raw files' common_name)
+python - <<'EOF'
+import pandas as pd
+E="docs/quality/evidence/CR-0021/"
+W={"Alder Flycatcher","Common Yellowthroat","Swamp Sparrow","Northern Waterthrush"}
+raw=pd.concat([pd.read_csv(f"/home/ec2-user/cr0021_scratch/data/negatives/gbif_negatives_{r}.csv",usecols=["gbif_id","common_name"]) for r in ["ME","NH","VT"]])
+sp=dict(zip(raw.gbif_id.astype(str),raw.common_name))
+C=pd.read_csv(E+"preregister_C.csv"); N=pd.read_csv(E+"preregister_N.csv")
+C["key"]=list(zip(C.longitude.round(6),C.latitude.round(6))); N["key"]=list(zip(N.longitude.round(6),N.latitude.round(6)))
+N=N.merge(C[["key","gbif_id"]],on="key",how="left")
+N["wet"]=N.gbif_id.astype("Int64").astype(str).map(sp).isin(W)
+h=N[~N.is_nonveg]
+for r,g in h.groupby("region"):
+    base=g[g.year<=2022].wet.mean()*100
+    print(r,"2020-22 %.1f%%"%base, " ".join("%d: %.1f%% (%+.1f pp)"%(y,g[g.year==y].wet.mean()*100,g[g.year==y].wet.mean()*100-base) for y in (2023,2024)), "| unmatched", int(g.gbif_id.isna().sum()))
+EOF
+ME 2020-22 38.7% 2023: 27.4% (-11.3 pp) 2024: 18.1% (-20.6 pp) | unmatched 0
+NH 2020-22 16.9% 2023: 28.3% (+11.4 pp) 2024: 26.1% (+9.2 pp) | unmatched 0
+VT 2020-22 15.0% 2023: 38.9% (+23.9 pp) 2024: 36.7% (+21.6 pp) | unmatched 0
+
+Verdict: rule NOT met (ME 2023, ME 2024, NH 2023, VT 2023, VT 2024).
+
+== 2. Today's N (the accepted CR-0019 split), same statistic, for comparison
+python - <<'EOF'
+import pandas as pd
+W={"Alder Flycatcher","Common Yellowthroat","Swamp Sparrow","Northern Waterthrush"}
+for r in ["ME","NH","VT"]:
+    g=pd.read_csv(f"data/negatives/negatives_{r}.csv"); g=g[~g.is_nonveg]; g["wet"]=g.common_name.isin(W)
+    base=g[g.year<=2022].wet.mean()*100
+    print(r,"TODAY 2020-22 %.1f%%"%base, " ".join("%d: %.1f%% (%+.1f pp, n=%d)"%(y,g[g.year==y].wet.mean()*100,g[g.year==y].wet.mean()*100-base,(g.year==y).sum()) for y in (2023,2024)))
+EOF
+ME TODAY 2020-22 34.7% 2023: 29.3% (-5.4 pp, n=140) 2024: 20.5% (-14.2 pp, n=78)
+NH TODAY 2020-22 18.7% 2023: 45.2% (+26.5 pp, n=62) 2024: 37.3% (+18.6 pp, n=51)
+VT TODAY 2020-22 15.6% 2023: 52.4% (+36.8 pp, n=63) 2024: 48.1% (+32.5 pp, n=52)
+
+Reading: the year x wetland-guild difference exists in today's accepted
+negatives (it comes from the original acquisition), larger in NH and VT than
+after CR-0021, smaller in ME (by about 6 pp in each year).
+
+User decision (2026-10-03): accept; record the year x wetland-guild mix of the
+negatives as a tracked residual with an owner, and open a follow-up CR for a
+draw that also balances wetland vs upland within each year.

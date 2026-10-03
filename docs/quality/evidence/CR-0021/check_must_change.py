@@ -53,10 +53,10 @@ P_FILES = ([f"data/pipeline/{k}_positives_{R}.csv" for R in REGIONS
 
 # Pinned at transcription (CR-0021 section 4, "Writing the result in"),
 # from the files preregister.py wrote on the EC2 host. None = not yet run.
-PRE_SHA = {
-    "preregister_C.csv": None,
-    "preregister_N.csv": None,
-    "preregister_draw.json": None,
+PRE_SHA = {  # transcribed from the files committed at e955fa1 (deliverable 1)
+    "preregister_C.csv": "20e07e951814623e4f00340e0be4d7aba93a562d3280f65af4217126d0cc583c",
+    "preregister_N.csv": "5f394402c595283a207d77b0fbe17a8a105980e8dea476285a1d8e6274ece63c",
+    "preregister_draw.json": "28e2e8bc4c5ab9726dc70cad6290e949747d8a8812292b665b256b0e1f3706de",
 }
 
 

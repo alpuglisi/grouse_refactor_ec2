@@ -1,0 +1,7 @@
+files hashed: 22
+sha256sum: data/pipeline/acceptance_record.json: No such file or directory
+data/pipeline/acceptance_record.json: FAILED open or read
+data/pipeline/split_manifest.json: FAILED
+sha256sum: WARNING: 1 listed file could not be read
+sha256sum: WARNING: 1 computed checksum did NOT match
+mismatches: 5

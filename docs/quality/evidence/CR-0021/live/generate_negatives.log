@@ -1,0 +1,5 @@
+  Pool: 24,853 candidates; 6 partition exception(s) dropped; 10,501 within 300 m of a grouse location dropped (a); 95 more within 300 m of the acquisition-domain edge dropped (b only); 20 in both (a) and (b).
+  ME: train 2,291 (1,604 habitat + 687 NonVeg); val 563 (394 habitat + 169 NonVeg)
+  NH: train 634 (445 habitat + 189 NonVeg); val 193 (135 habitat + 58 NonVeg)
+  VT: train 922 (646 habitat + 276 NonVeg); val 206 (144 habitat + 62 NonVeg)
+  Wrote 10 files and the manifest's negatives section.

@@ -1,0 +1,48 @@
+CR-0013 acceptance_split.py report
+data root : /home/ec2-user/grouse2
+config    : /home/ec2-user/grouse2/docs/quality/acceptance_split.json (sha256 63b33da951d8cd00c8437362d97e350f6d10dc21f45cd1982ec4a75354422587)
+commit    : e5dad22d2afb15cb4b23d674c6d40e58bc6e6165 (dirty tracked .py: False)
+started   : 2026-10-03T09:16:01.467497+00:00
+
+GATES (exact)
+E0   PASS
+E1   PASS
+E1p  PASS
+E2   PASS
+E3   PASS
+E4   PASS
+E5   PASS
+E6   PASS
+E7   PASS
+E8   PASS
+E9   PASS
+E10  PASS
+E11  PASS
+E12  PASS
+E13  PASS
+E14  PASS
+E15  PASS
+R1   PASS
+R2   PASS
+R3   PASS
+R4   PASS
+
+OBSERVATIONS (reported, never blocking)
+OBS references: references stale (footing changed); flags |z| > 4: 0
+O1   OBS   median_m=2820 (delta=+0)
+O2   OBS   records_per_val_block=1.527 (delta=+0); share_gap=0.003474 (delta=+0)
+O3   OBS   moran_k4.positive_blocks=-0.00374 (z=-0.28); moran_k8.positive_blocks=-0.00232 (z=-0.23)
+O4   OBS   moran_k4.pool_blocks=0.005023 (z=+0.67); moran_k4.selected-record_blocks=-0.003344 (z=-0.43); moran_k8.pool_blocks=0.001413 (z=+0.30); moran_k8.selected-record_blocks=-0.0009189 (z=-0.11)
+O5   OBS   Exc.ME=1.534 (delta=+0); Exc.NH=1.317 (delta=+0); Exc.VT=0.8286 (delta=+0); Excws_val.ME=5.281 (delta=+0); Excws_val.NH=3.588 (delta=+0); Excws_val.VT=3.472 (delta=+0); S.ME=0.6079 (delta=+0); S.NH=0.5949 (delta=+0); S.VT=0.4991 (delta=+0); Sws_val.ME=0.698 (delta=+0); Sws_val.NH=0.6218 (delta=+0); Sws_val.VT=0.6165 (delta=+0)
+O6   OBS   basis_tv_sel_vs_wpool.ME=0.649 (delta=+0); basis_tv_sel_vs_wpool.NH=0.6427 (delta=+0); basis_tv_sel_vs_wpool.VT=0.655 (delta=+0); basis_tv_train_val.ME=0.004721 (delta=+0); basis_tv_train_val.NH=0.01612 (delta=+0); basis_tv_train_val.VT=0.005118 (delta=+0); evtphys_tv_nonveg.ME=0.02518 (delta=+0); evtphys_tv_nonveg.NH=0.07056 (delta=+0); evtphys_tv_nonveg.VT=0.05819 (delta=+0); hab_weight_sel_over_pool.ME=1.129 (delta=+0); hab_weight_sel_over_pool.NH=1.219 (delta=+0); hab_weight_sel_over_pool.VT=1.139 (delta=+0); nonveg_val_minus_train.ME=0.0003086 (delta=+0); nonveg_val_minus_train.NH=0.002411 (delta=+0); nonveg_val_minus_train.VT=0.001622 (delta=+0); species_tv.ME=0.04024 (delta=+0); species_tv.NH=0.07468 (delta=+0); species_tv.VT=0.09515 (delta=+0)
+O7   OBS   SUP_O.ME=2 (delta=+0); SUP_O.NH=0 (delta=+0); SUP_O.VT=0 (delta=+0); SUP_R.ME=4.548 (delta=+0); SUP_R.NH=2.291 (delta=+0); SUP_R.VT=2.629 (delta=+0); hab_pool_over_target_worst.ME=2.271 (delta=+0); hab_pool_over_target_worst.NH=3.126 (delta=+0); hab_pool_over_target_worst.VT=2.349 (delta=+0); pool_over_target.ME=4.477 (delta=+0); pool_over_target.NH=7.127 (delta=+0); pool_over_target.VT=5.48 (delta=+0)
+O8   OBS   neg_ks.ME=0.03985 (delta=+0); neg_ks.NH=0.1029 (delta=+0); neg_ks.VT=0.09299 (delta=+0); neg_ks.pooled=0.0309 (delta=+0); neg_smd.ME=0.09312 (delta=+0); neg_smd.NH=0.1696 (delta=+0); neg_smd.VT=0.1232 (delta=+0); neg_smd.pooled=0.08276 (delta=+0); neghab_ks.ME=0.06029 (delta=+0); neghab_ks.NH=0.1199 (delta=+0); neghab_ks.VT=0.1097 (delta=+0); neghab_ks.pooled=0.04031 (delta=+0); pos_ks.ME=0.05376 (delta=+0); pos_ks.NH=0.1346 (delta=+0); pos_ks.VT=0.1043 (delta=+0); pos_ks.pooled=0.04404 (delta=+0); pos_smd.ME=0.04855 (delta=+0); pos_smd.NH=0.2545 (delta=+0); pos_smd.VT=0.1888 (delta=+0); pos_smd.pooled=0.04115 (delta=+0)
+O9   OBS   year_hist.neg.ME={"2020":601,"2021":729,"2022":794,"2023":345,"2024":385}; year_hist.neg.NH={"2020":132,"2021":147,"2022":167,"2023":151,"2024":230}; year_hist.neg.VT={"2020":195,"2021":181,"2022":213,"2023":212,"2024":327}; year_hist.pos.ME={"2020":601,"2021":729,"2022":794,"2023":345,"2024":385}; year_hist.pos.NH={"2020":132,"2021":147,"2022":167,"2023":151,"2024":230}; year_hist.pos.VT={"2020":195,"2021":181,"2022":213,"2023":212,"2024":327}
+O10  OBS   val_fraction.neg.ME=0.1973 (delta=+0); val_fraction.neg.NH=0.2334 (delta=+0); val_fraction.neg.VT=0.1826 (delta=+0); val_fraction.pos.ME=0.1973 (delta=+0); val_fraction.pos.NH=0.2334 (delta=+0); val_fraction.pos.VT=0.1826 (delta=+0)
+O11  OBS   a.pooled.ME=0.5 (delta=+0); a.pooled.NH=0.5 (delta=+0); a.pooled.VT=0.5 (delta=+0); a.pooled.pooled=0.5 (delta=+0); a.train.ME=0.5 (delta=+0); a.train.NH=0.5 (delta=+0); a.train.VT=0.5 (delta=+0); a.train.pooled=0.5 (delta=+0); a.val.ME=0.5 (delta=+0); a.val.NH=0.5 (delta=+0); a.val.VT=0.5 (delta=+0); a.val.pooled=0.5 (delta=+0); w=n/a (no merged stratum)
+
+SUMMARY: 21/21 GATEs pass; FAIL: none
+calibration written: /home/ec2-user/grouse2/docs/quality/acceptance_split_obs.json
+ACCEPTED. record written: /home/ec2-user/grouse2/data/pipeline/acceptance_record.json
+record sha256: fc376877cd9850705b99fb43d92333be67505d0232b83c94c79d8fa0f718f9d8
+runtime: 193.6 s

@@ -1,0 +1,5 @@
+HEAD: 9c2b02cad353b3372e26a197313349f19d779114
+files hashed: 40
+mismatches (same commit): 0
+previous-run manifest commits: {'negatives': '8b8bdca', 'positives': '8b8bdca'} now: {'negatives': '9c2b02c', 'positives': '9c2b02c'}
+manifest equal apart from commit: True

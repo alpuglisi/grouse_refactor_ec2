@@ -246,12 +246,16 @@ zip symlinked, no output path a symlink):
      the 3 km blocks and of counties, and the share of non-null
      `coord_uncertainty_m`, each for (a) new 2023–2024 rows, (b) existing
      2023–2024 rows, (c) existing 2020–2022 rows, on the raw rows and on
-     their pool survivors. **Tolerance:** total-variation distance
-     between (a) and (b) ≤ 0.10 on species shares and on block occupancy,
-     and non-null `coord_uncertainty_m` share within 10 percentage points
-     of (b). Beyond any of these, the CR is not approvable without a user
-     decision. (c) is reported for context; it differs from (a) and (b)
-     by year by design;
+     their pool survivors. **Tolerances:** total-variation distance
+     between (a) and (b) ≤ 0.10 on species shares, and non-null
+     `coord_uncertainty_m` share within 10 percentage points of (b);
+     beyond either, the CR is not approvable without a user decision.
+     **Block and county occupancy are report-only** (user decision,
+     2026-10-03, review log A17/B19): a fixed TVD limit over thousands of
+     sparsely sampled blocks fails on a fair top-up from sampling noise
+     alone, so the user judges the reported spatial comparison when the
+     pre-registration is read. (c) is reported for context; it differs
+     from (a) and (b) by year by design;
    - **strata selection, by a rule fixed here, before any AUC is
      computed:** evaluate, in this order,
      `S1 = ((2020,),(2021,),(2022,),(2023,),(2024,))`,
@@ -269,8 +273,9 @@ zip symlinked, no output path a symlink):
 3. `mc_selftest.py`: MC PASSes on the predicted tree and FAILs with the
    live tree as NEW.
 
-**Approval conditions:** a feasible entry among S1–S3; the comparability
-tolerance met; if S2 or S3, the O11w criterion met (§3). If none of S1–S3
+**Approval conditions:** a feasible entry among S1–S3; the species and
+`coord_uncertainty_m` tolerances met; the user has read the
+report-only spatial comparison; if S2 or S3, the O11w criterion met (§3). If none of S1–S3
 is feasible, or a tolerance or criterion is exceeded, the CR returns to
 the user (accept, top up further, or a different design). The strata
 are never coarsened past S3 (a single stratum is today's draw).
@@ -366,7 +371,7 @@ feasible at S3. The regeneration is how they land together.
 |---|---|
 | GBIF has too few 2023–2024 records (partition exhausted) | `fetch_topup.log` reports it; the S1→S3 rule absorbs a partial shortfall; none feasible → back to the user |
 | New candidates reduce earlier-year supply (a 5 dp key won, a thinning neighbour displaced, a two-state key) | Measured per mechanism by the pre-registration and pinned (MC3); a resulting SHORT cell moves the S1→S3 rule on |
-| The top-up rows differ from earlier negatives by more than year (species, space, coordinate precision) | Per-species quotas preserve species mix; the §4 comparability tolerance; beyond it, a user decision |
+| The top-up rows differ from earlier negatives by more than year (species, space, coordinate precision) | Per-species quotas preserve species mix; §4's species and `coord_uncertainty_m` tolerances (beyond them, a user decision); spatial comparison reported for the user to judge |
 | `fetch_topup.py` re-run or run on the live tree | Refuses unless the target files equal the pinned pre-top-up hashes and the path is not the live tree; disabled after deliverable 1 |
 | A later `get_negatives.py` run counts the top-up rows toward its (state, species) caps | Recorded as the raw files' second producer in `ARCHITECTURE.md` and `CHANGELOG.md` (deliverable 7) |
 | The live raw files differ from the pre-registered ones | The live run copies the scratch files; MC2 pins their sha256 |

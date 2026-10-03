@@ -97,8 +97,19 @@ which keeps (ii) as the last fallback entry.
 ## Round 3 (final under CR-0011 A2): concerns and dispositions
 | id | sev | concern (short) | disposition |
 |---|---|---|---|
-| A17 / B19 | MAJOR (raised independently by both) | The block-occupancy tolerance (TVD ≤ 0.10 on 3 km blocks, from B12) is uncalibrated and fails on a fair top-up: two samples of 1–3 thousand rows over thousands of blocks differ by TVD far above 0.10 by sampling alone (B's simulation on made-up distributions: median 0.53–0.80 over 10,000 cells, ~0.19 over 1,000). PA-0021(c). Fails safe (to the user), so not BLOCKING. Fix proposed by both: a permutation null (pool (a) and (b), random splits of the same sizes, ≥ 100 / 1,000 draws, flag above p99), with counties as the coarser axis | **escalated to the user** (no fourth round): a change to a pre-registered criterion must land before deliverable 1 runs |
+| A17 / B19 | MAJOR (raised independently by both) | The block-occupancy tolerance (TVD ≤ 0.10 on 3 km blocks, from B12) is uncalibrated and fails on a fair top-up: two samples of 1–3 thousand rows over thousands of blocks differ by TVD far above 0.10 by sampling alone (B's simulation on made-up distributions: median 0.53–0.80 over 10,000 cells, ~0.19 over 1,000). PA-0021(c). Fails safe (to the user), so not BLOCKING. Fix proposed by both: a permutation null (pool (a) and (b), random splits of the same sizes, ≥ 100 / 1,000 draws, flag above p99), with counties as the coarser axis | escalated to the user (no fourth round). **User decision (2026-10-03): block and county occupancy are report-only;** the species (TVD ≤ 0.10) and `coord_uncertainty_m` (±10 pp) tolerances stay. Applied to CR §4 and § Risk before deliverable 1 runs |
 | A18 | LOW | O11w significance is not effect size | applied: effect size (O11w − 0.5) reported next to the percentile (§3) |
 | A19 / B20 | LOW | Stale lines: §5 "O11's tolerance"; deliverable 1 "then v3" | applied: §5 "subject to the O11w criterion (§3)"; deliverable 1 "then v4: transcription only" |
 
 A13–A16 and B13–B18 dispositions: accepted by their reviewers in round 3.
+
+## Approval status after round 3
+- **Design:** both reviewers APPROVE WITH FOLLOW-UPS in round 3; no
+  BLOCKING concern in any round; every MAJOR concern resolved or decided
+  by the user (A17/B19). Author signs off on the design.
+- **Not yet APPROVED:** deliverable 1 (scripts written and reviewed; the
+  top-up fetch and pre-registration run on the EC2 host) must complete,
+  and its results be transcribed (v4) and verified by a reviewer against
+  `preregister.txt` (CR §4 "Writing the result in"). No code outside
+  `docs/quality/evidence/CR-0021/` and nothing under `data/` is written
+  before that.

@@ -72,6 +72,25 @@ WINDOW_PX = 64
 # regenerates the split files).
 YEAR_MIN = 2020
 
+# CR-0021 section 2 B: the year strata of the negative draw. Each (region,
+# split) draws, per stratum, as many negatives as it has positives, so the
+# two classes' year distributions are equal per stratum. A pure literal
+# (E11 reads it with ast.literal_eval): increasing, contiguous, from
+# YEAR_MIN. The value is the pre-registration's choice (S1, single years;
+# docs/quality/evidence/CR-0021/preregister.txt); changing it is a reviewed
+# change that regenerates the negatives.
+YEAR_STRATA = ((2020,), (2021,), (2022,), (2023,), (2024,))
+
+
+def year_stratum(year):
+    """Index of the YEAR_STRATA stratum holding `year`; ValueError for any
+    other year (a year outside the strata fails closed)."""
+    for i, stratum in enumerate(YEAR_STRATA):
+        if year in stratum:
+            return i
+    raise ValueError(f"year {year!r} lies in no stratum of YEAR_STRATA "
+                     f"{YEAR_STRATA} (CR-0021)")
+
 BOXES = {
     "ME": (-71.158, 42.889, -66.852, 47.555),
     "NH": (-72.626, 42.605, -70.600, 45.398),

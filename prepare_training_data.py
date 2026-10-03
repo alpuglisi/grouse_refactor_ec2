@@ -269,6 +269,7 @@ def measured_constants():
         "SPLIT_SEED": SPLIT_SEED,
         "WINDOW_PX": WINDOW_PX,
         "YEAR_MIN": regions.YEAR_MIN,
+        "YEAR_STRATA": [list(s) for s in regions.YEAR_STRATA],
         "NEG_RATIO": gn.NEG_RATIO,
         "NONVEG_MAX_FRAC": gn.NONVEG_MAX_FRAC,
         "W_FLOOR": gn.W_FLOOR,

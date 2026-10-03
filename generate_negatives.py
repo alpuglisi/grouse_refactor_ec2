@@ -38,11 +38,15 @@ Candidate pool (data/negatives/candidate_pool.csv), pooled over regions:
       iff md5(f"{SPLIT_SEED}:{block_id}") % 10000 < vf x 10000
   11. write the pool
 
-Draw, per region R and split s: n = round(n_pos(R, s) x NEG_RATIO);
-NonVeg is capped at round(n x NONVEG_MAX_FRAC); the rest must come from
-the habitat pool, and a habitat shortfall RAISES (no top-up). Each
-sub-pool is sampled without replacement by Efraimidis-Spirakis keys
-log(u)/weight, u from the seeded coordinate hash.
+Draw, per region R, split s and year stratum k of regions.YEAR_STRATA
+(CR-0021): n_k = round(n_pos(R, s, k) x NEG_RATIO), so the two classes'
+year distributions are equal per stratum; NonVeg is capped at
+round(n_k x NONVEG_MAX_FRAC) per stratum; the rest must come from that
+stratum's habitat pool, and a habitat shortfall RAISES (no top-up from
+NonVeg or another stratum); a positive or pool year in no stratum raises.
+Each sub-pool is sampled without replacement by Efraimidis-Spirakis keys
+log(u)/weight, u from the seeded coordinate hash. The manifest's draw
+entry per (R, s) holds the totals and a per-stratum breakdown.
 
 Outputs (per region):
     negatives_{region}.csv         - all selected negatives + split column
@@ -295,22 +299,54 @@ def es_select(sub, n):
     return sub.iloc[take]
 
 
-def draw_region_split(pool_rs, n_pos):
-    """Draw one (region, split): returns (selected rows, {n, n_nv, n_hab}).
-    Raises when the habitat pool cannot supply its share."""
-    n = int(round(n_pos * NEG_RATIO))
-    nv = pool_rs["is_nonveg"].astype(bool)
-    nv_pool, hab_pool = pool_rs[nv], pool_rs[~nv]
-    n_nv = min(int(round(n * NONVEG_MAX_FRAC)), len(nv_pool))
-    n_hab = n - n_nv
-    if len(hab_pool) < n_hab:
-        raise RuntimeError(
-            f"habitat pool undersupplied: {len(hab_pool):,} candidates for "
-            f"a habitat target of {n_hab:,} (n={n:,}, NonVeg {n_nv:,}); "
-            f"raise the download headroom (CR-0012: no NonVeg top-up)")
-    got = pd.concat([es_select(hab_pool, n_hab), es_select(nv_pool, n_nv)],
-                    ignore_index=True)
-    return got, {"n": n, "n_nv": n_nv, "n_hab": n_hab}
+def _strata_of(years, what):
+    """regions.year_stratum per year; a year in no stratum raises."""
+    out = []
+    for y in years:
+        if pd.isna(y):
+            raise ValueError(f"{what}: a row has no year (CR-0021 draw)")
+        try:
+            out.append(regions.year_stratum(int(y)))
+        except ValueError as e:
+            raise ValueError(f"{what}: {e}") from None
+    return np.array(out, dtype=np.int64)
+
+
+def draw_region_split(pool_rs, pos_years):
+    """Draw one (region, split), per year stratum (CR-0021 section 2 B).
+
+    pos_years: the cell's positives' years. For each stratum k of
+    regions.YEAR_STRATA: n_k = round(n_pos_k x NEG_RATIO); NonVeg capped
+    at round(n_k x NONVEG_MAX_FRAC) or its supply in k; the rest from the
+    stratum's habitat pool. A habitat shortfall in any stratum RAISES (no
+    top-up from another stratum, no NonVeg top-up). Returns (selected
+    rows, {n, n_nv, n_hab, strata: {"<first year>": {n, n_nv, n_hab}}}),
+    totals as sums over strata, every stratum present."""
+    strata = regions.YEAR_STRATA          # read at call time (test seam)
+    pk = _strata_of(pos_years, "positives")
+    ck = _strata_of(pool_rs["year"].to_numpy(), "candidate pool")
+    nv = pool_rs["is_nonveg"].astype(bool).to_numpy()
+    picked = []
+    total = {"n": 0, "n_nv": 0, "n_hab": 0}
+    per = {}
+    for k, stratum in enumerate(strata):
+        n = int(round(int((pk == k).sum()) * NEG_RATIO))
+        nv_pool = pool_rs[(ck == k) & nv]
+        hab_pool = pool_rs[(ck == k) & ~nv]
+        n_nv = min(int(round(n * NONVEG_MAX_FRAC)), len(nv_pool))
+        n_hab = n - n_nv
+        if len(hab_pool) < n_hab:
+            raise RuntimeError(
+                f"habitat pool undersupplied in year stratum {stratum}: "
+                f"{len(hab_pool):,} candidates for a habitat target of "
+                f"{n_hab:,} (n={n:,}, NonVeg {n_nv:,}); CR-0012/CR-0021: no "
+                f"top-up from NonVeg or another stratum")
+        picked += [es_select(hab_pool, n_hab), es_select(nv_pool, n_nv)]
+        per[str(stratum[0])] = {"n": n, "n_nv": n_nv, "n_hab": n_hab}
+        for key, v in (("n", n), ("n_nv", n_nv), ("n_hab", n_hab)):
+            total[key] += v
+    got = pd.concat(picked, ignore_index=True)
+    return got, {**total, "strata": per}
 
 
 # ---------------------------------------------------------------------------
@@ -464,9 +500,9 @@ def build(data, root):
         rd = data[r]
         picked, draw[r] = [], {}
         for s in SPLITS:
-            n_pos = len(read_csv(digest(rd.path(f"{s}_positives"))))
+            pos_years = read_csv(digest(rd.path(f"{s}_positives")))["year"]
             sub = pool[(pool["region"] == r) & (pool["split"] == s)]
-            got, draw[r][s] = draw_region_split(sub, n_pos)
+            got, draw[r][s] = draw_region_split(sub, pos_years.to_numpy())
             picked.append(got)
         sel = pd.concat(picked, ignore_index=True)
         sel["label"] = 0

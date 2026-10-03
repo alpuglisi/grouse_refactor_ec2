@@ -270,7 +270,7 @@ class Step6Union(unittest.TestCase):
             ptd.run(cls.d)
         with mock.patch.object(gn, "verify_partition", vp), \
                 mock.patch.object(regions, "_domain_5070", lambda: far), \
-                redirect_stdout(io.StringIO()):
+                t12.fixture_strata(), redirect_stdout(io.StringIO()):
             gn.run(cls.d)
         cls.base = t12.output_bytes(cls.d)
 
@@ -293,7 +293,7 @@ class Step6Union(unittest.TestCase):
                                   lambda: cls.dom), \
                 mock.patch.object(gn, "buffer_drop_mask", spy_a), \
                 mock.patch.object(gn, "domain_edge_drop_mask", spy_b), \
-                redirect_stdout(buf):
+                t12.fixture_strata(), redirect_stdout(buf):
             gn.run(cls.d)
         cls.log = buf.getvalue()
         cls.new = t12.output_bytes(cls.d)

@@ -332,7 +332,8 @@ class Draw(unittest.TestCase):
             "longitude": np.round(rng.uniform(-70, -69, n), 6),
             "latitude": np.round(rng.uniform(44, 45, n), 6),
             "weight": rng.choice([0.1, 1.0, 2.5, 10.0], n),
-            "is_nonveg": rng.uniform(size=n) < nonveg_frac},
+            "is_nonveg": rng.uniform(size=n) < nonveg_frac,
+            "year": 2020},       # one year stratum: CR-0021 leaves counts as here
             index=[7] * n)       # duplicate labels: selection is positional
 
     def reference(self, sub, n):
@@ -359,22 +360,23 @@ class Draw(unittest.TestCase):
 
     def test_counts_and_cap(self):
         sub = self.sub(400, seed=2)
-        got, d = gn.draw_region_split(sub, 101)
+        got, d = gn.draw_region_split(sub, [2020] * 101)
         n = int(round(101 * 1.0))
         n_nv = min(int(round(n * 0.3)), int(sub.is_nonveg.sum()))
-        self.assertEqual(d, {"n": n, "n_nv": n_nv, "n_hab": n - n_nv})
+        self.assertEqual({k: d[k] for k in ("n", "n_nv", "n_hab")},
+                         {"n": n, "n_nv": n_nv, "n_hab": n - n_nv})
         self.assertEqual(len(got), n)
         self.assertEqual(int(got.is_nonveg.sum()), n_nv)
         # NonVeg pool smaller than the cap: the rest comes from habitat
         sub2 = self.sub(400, seed=3, nonveg_frac=0.02)
-        got, d = gn.draw_region_split(sub2, 100)
+        got, d = gn.draw_region_split(sub2, [2020] * 100)
         self.assertEqual(d["n_nv"], int(sub2.is_nonveg.sum()))
         self.assertEqual(d["n_hab"], 100 - d["n_nv"])
 
     def test_habitat_shortfall_raises(self):
         sub = self.sub(40, seed=4, nonveg_frac=0.5)
         with self.assertRaises(RuntimeError):
-            gn.draw_region_split(sub, 100)
+            gn.draw_region_split(sub, [2020] * 100)
 
 
 class StandingCheckCallSites(unittest.TestCase):
@@ -634,9 +636,20 @@ def fake_verify_partition(bad):
     return vp
 
 
+# CR-0021: these end-to-end fixtures span 2023-2025 (2025 also exercises the
+# raster fallback) and test CR-0012's draw. They run with ONE year stratum
+# covering every fixture year, which is exactly that draw. The stratified
+# draw is tested in tests/test_cr0021.py and by the acceptance attack rows.
+FIXTURE_STRATA = (tuple(range(2000, 2031)),)
+
+
+def fixture_strata():
+    return mock.patch.object(regions, "YEAR_STRATA", FIXTURE_STRATA)
+
+
 def run_both(d, bad):
     with mock.patch.object(gn, "verify_partition", fake_verify_partition(bad)), \
-            redirect_stdout(io.StringIO()):
+            fixture_strata(), redirect_stdout(io.StringIO()):
         ptd.run(d)
         gn.run(d)
 
@@ -721,7 +734,10 @@ class EndToEnd(unittest.TestCase):
         env = {k: v for k, v in CONFIG["environment"].items() if k != "op_rule"}
         for sec, steps in (("positives", 6), ("negatives", 11)):
             s = m[sec]
-            self.assertEqual(s["constants"], CONFIG["constants"])
+            # the fixture runs with FIXTURE_STRATA (CR-0021), recorded as such
+            want = dict(CONFIG["constants"],
+                        YEAR_STRATA=[list(x) for x in FIXTURE_STRATA])
+            self.assertEqual(s["constants"], want)
             self.assertEqual(s["hash_spec"], CONFIG["hash_spec"])
             self.assertEqual(s["environment"], env)
             self.assertIsInstance(s["commit"], str)
@@ -768,8 +784,15 @@ class EndToEnd(unittest.TestCase):
         for r in regions.REGIONS:
             for s in ("train", "val"):
                 dd = m["negatives"]["draw"][r][s]
-                self.assertEqual(set(dd), {"n", "n_nv", "n_hab"})
+                self.assertEqual(set(dd), {"n", "n_nv", "n_hab", "strata"})
                 self.assertEqual(dd["n"], dd["n_nv"] + dd["n_hab"])
+                # CR-0021 section 2 B: one entry per stratum, keyed by its
+                # first year, summing to the totals
+                self.assertEqual(set(dd["strata"]),
+                                 {str(x[0]) for x in FIXTURE_STRATA})
+                for f in ("n", "n_nv", "n_hab"):
+                    self.assertEqual(
+                        sum(v[f] for v in dd["strata"].values()), dd[f])
 
     def test_canonical_order_and_columns(self):
         for r in regions.REGIONS:
@@ -891,7 +914,7 @@ class RunOrdering(unittest.TestCase):
             f.write("\n")
         with mock.patch.object(gn, "verify_partition",
                                fake_verify_partition(self.bad)), \
-                redirect_stdout(io.StringIO()):
+                fixture_strata(), redirect_stdout(io.StringIO()):
             with self.assertRaises(RuntimeError) as cm:
                 gn.run(self.d)
         self.assertIn("val_positives_NH", str(cm.exception))
@@ -901,7 +924,7 @@ class RunOrdering(unittest.TestCase):
         with mock.patch.object(gn, "NEG_RATIO", 50.0), \
                 mock.patch.object(gn, "verify_partition",
                                   fake_verify_partition(self.bad)), \
-                redirect_stdout(io.StringIO()):
+                fixture_strata(), redirect_stdout(io.StringIO()):
             with self.assertRaises(RuntimeError) as cm:
                 gn.run(self.d)
         self.assertIn("habitat pool undersupplied", str(cm.exception))

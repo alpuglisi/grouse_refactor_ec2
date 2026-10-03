@@ -438,3 +438,142 @@ class FetchTopupMain(unittest.TestCase):
         logs = [f for f in os.listdir(self.ev) if f.startswith("fetch_topup_")]
         self.assertEqual(len(logs), 1)
         self.assertEqual(self._run(self._fake_G()), 0)                # retry runs
+
+
+# ---------------------------------------------------------------------------
+# Deliverable 3: the pipeline's stratified draw (generate_negatives,
+# regions). Written from CR-0021 section 2 B; independent of the replay.
+# ---------------------------------------------------------------------------
+import regions  # noqa: E402
+import generate_negatives as gn  # noqa: E402
+
+
+def _gn_pool(year, n_hab, n_nv, start=0):
+    n = n_hab + n_nv
+    return pd.DataFrame({
+        "longitude": [round(-70.0 + (start + i) * 1e-3, 6) for i in range(n)],
+        "latitude": [44.0] * n,
+        "weight": [1.0] * n,
+        "is_nonveg": [i >= n_hab for i in range(n)],
+        "year": [year] * n})
+
+
+class RegionsYearStrata(unittest.TestCase):
+    def test_literal_and_shape(self):
+        s = regions.YEAR_STRATA
+        self.assertEqual(s, ((2020,), (2021,), (2022,), (2023,), (2024,)))
+        flat = [y for st in s for y in st]
+        self.assertEqual(flat, list(range(regions.YEAR_MIN, regions.YEAR_MIN + len(flat))))
+
+    def test_year_stratum(self):
+        self.assertEqual([regions.year_stratum(y) for y in range(2020, 2025)], [0, 1, 2, 3, 4])
+        for y in (2019, 2025):
+            with self.assertRaises(ValueError):
+                regions.year_stratum(y)
+
+    def test_measured_constants_carry_strata(self):
+        import prepare_training_data as ptd
+        self.assertEqual(ptd.measured_constants()["YEAR_STRATA"],
+                         [[2020], [2021], [2022], [2023], [2024]])
+
+
+class PipelineStratifiedDraw(unittest.TestCase):
+    def test_counts_per_stratum_equal_positives(self):
+        pool = pd.concat([_gn_pool(2020, 30, 10), _gn_pool(2023, 10, 5, 100),
+                          _gn_pool(2024, 10, 5, 200), _gn_pool(2021, 10, 0, 300)],
+                         ignore_index=True)
+        pos = [2020] * 10 + [2023] * 4 + [2024] * 6
+        got, d = gn.draw_region_split(pool, pos)
+        self.assertEqual(got["year"].value_counts().to_dict(), {2020: 10, 2023: 4, 2024: 6})
+        self.assertEqual(d["n"], 20)
+        self.assertEqual(sorted(d["strata"]), ["2020", "2021", "2022", "2023", "2024"])
+        self.assertEqual(d["strata"]["2020"], {"n": 10, "n_nv": 3, "n_hab": 7})
+        self.assertEqual(d["strata"]["2022"], {"n": 0, "n_nv": 0, "n_hab": 0})
+        for key in ("n", "n_nv", "n_hab"):
+            self.assertEqual(d[key], sum(v[key] for v in d["strata"].values()))
+
+    def test_nonveg_cap_per_stratum(self):
+        pool = pd.concat([_gn_pool(y, 10, 10, 100 * i) for i, y in enumerate(range(2020, 2025))],
+                         ignore_index=True)
+        got, d = gn.draw_region_split(pool, [2020, 2021, 2022, 2023, 2024] * 4)
+        self.assertEqual(d["n_nv"], 5)                     # 5 strata x round(4 x 0.3) = 1
+        self.assertNotEqual(d["n_nv"], int(round(20 * 0.3)))
+        self.assertEqual(int(got["is_nonveg"].sum()), 5)
+
+    def test_shortfall_in_one_stratum_raises_despite_surplus(self):
+        pool = pd.concat([_gn_pool(2020, 50, 0), _gn_pool(2024, 2, 0, 100)], ignore_index=True)
+        with self.assertRaises(RuntimeError):
+            gn.draw_region_split(pool, [2020] * 5 + [2024] * 5)
+
+    def test_year_outside_strata_raises(self):
+        with self.assertRaises(ValueError):
+            gn.draw_region_split(pd.concat([_gn_pool(2020, 5, 0), _gn_pool(2025, 1, 0, 50)],
+                                           ignore_index=True), [2020])
+        with self.assertRaises(ValueError):
+            gn.draw_region_split(_gn_pool(2020, 5, 0), [2019])
+
+    def test_matches_the_preregistered_replay(self):
+        """Same selection as preregister.Stratified (the evidence replay) on
+        one synthetic cell: the pipeline and the pre-registration agree."""
+        pool = pd.concat([_gn_pool(2020, 30, 10), _gn_pool(2023, 6, 5, 100),
+                          _gn_pool(2024, 10, 5, 200)], ignore_index=True)
+        pos = [2020] * 10 + [2023] * 4 + [2024] * 6
+        got, d = gn.draw_region_split(pool, pos)
+        rep = _stratified(pos, pool.assign(region="ME", split="train").to_dict("records"),
+                          regions.YEAR_STRATA)
+        sel = rep.draw_select()
+        self.assertEqual(sorted(zip(got.longitude, got.year)), sorted(zip(sel.longitude, sel.year)))
+        self.assertEqual(d, rep.draw_counts["ME"]["train"])
+
+
+class PipelineEndToEndStratified(unittest.TestCase):
+    """prepare_training_data + generate_negatives on tests/test_cr0012's
+    synthetic tree with single-year strata over its years: every (region,
+    split, year) holds as many negatives as positives, and the manifest
+    carries the per-stratum breakdown."""
+
+    STRATA = ((2023,), (2024,), (2025,))
+
+    @classmethod
+    def setUpClass(cls):
+        import io
+        import shutil
+        from contextlib import redirect_stdout
+        from unittest import mock
+        import shapely
+        import prepare_training_data as ptd
+        from tests.test_cr0012 import build_tree, fake_verify_partition
+        cls.d = tempfile.mkdtemp()
+        cls.addClassCleanup(shutil.rmtree, cls.d, True)
+        bad = build_tree(cls.d)
+        with mock.patch.object(gn, "verify_partition", fake_verify_partition(bad)), \
+                mock.patch.object(regions, "YEAR_STRATA", cls.STRATA), \
+                mock.patch.object(regions, "_domain_5070",
+                                  lambda: shapely.box(-1e8, -1e8, 1e8, 1e8)), \
+                redirect_stdout(io.StringIO()):
+            ptd.run(cls.d)
+            gn.run(cls.d)
+
+    def test_counts_equal_per_region_split_year(self):
+        checked = 0
+        for R in ("ME", "NH", "VT"):
+            P = pd.read_csv(os.path.join(self.d, f"data/pipeline/thinned_positives_{R}.csv"))
+            N = pd.read_csv(os.path.join(self.d, f"data/negatives/negatives_{R}.csv"))
+            for s in ("train", "val"):
+                pc = P[P.split == s]["year"].astype(int).value_counts().to_dict()
+                nc = N[N.split == s]["year"].astype(int).value_counts().to_dict()
+                self.assertEqual(pc, nc, f"{R} {s}")
+                checked += len(pc)
+        self.assertGreater(checked, 6)          # several years per cell exercised
+
+    def test_manifest_breakdown(self):
+        import json
+        with open(os.path.join(self.d, "data/pipeline/split_manifest.json")) as f:
+            m = json.load(f)
+        self.assertEqual(m["negatives"]["constants"]["YEAR_STRATA"], [[2023], [2024], [2025]])
+        self.assertEqual(m["positives"]["constants"]["YEAR_STRATA"], [[2023], [2024], [2025]])
+        for R, d in m["negatives"]["draw"].items():
+            for s, cell in d.items():
+                self.assertEqual(sorted(cell["strata"]), ["2023", "2024", "2025"])
+                for key in ("n", "n_nv", "n_hab"):
+                    self.assertEqual(cell[key], sum(v[key] for v in cell["strata"].values()))

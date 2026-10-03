@@ -40,6 +40,8 @@ EXPECTED_REGIONS = {
     "WINDOW_PX": 64,
     # CR-0019 section 2
     "YEAR_MIN": 2020,
+    # CR-0021 section 2 B (the pre-registration's S1)
+    "YEAR_STRATA": ((2020,), (2021,), (2022,), (2023,), (2024,)),
     "BOXES": {
         "ME": (-71.158, 42.889, -66.852, 47.555),
         "NH": (-72.626, 42.605, -70.600, 45.398),

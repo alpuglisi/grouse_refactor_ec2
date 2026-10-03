@@ -121,16 +121,20 @@ de-duplication against the existing rows:
   stratum>": {"n": int, "n_nv": int, "n_hab": int}, …}}`, strata keys
   as strings, in stratum order, every stratum present (zeros included).
 - **Unchanged:** the representative-year rules of both classes, every
-  pool step, the positives and their split. `analyze_grouse.py` and
-  `prepare_training_data.py` are **not** re-run.
+  pool step, the positives and their split. `analyze_grouse.py` is **not**
+  re-run. `prepare_training_data.py` **is** re-run (deliverable 6) only so
+  that the manifest's `positives` section carries `YEAR_STRATA` (E11(c),
+  §3); its outputs are unchanged and MC1 (P and B byte-identical) proves
+  it.
 
 **Code.**
 
 | file | change |
 |---|---|
 | `regions.py` | `YEAR_STRATA` (literal), `year_stratum` |
-| `generate_negatives.py` | `draw_region_split` stratified; call site passes the cell's positive years; manifest `draw` breakdown; `measured_constants` gains `YEAR_STRATA`; module docstring § Draw |
-| `tests/test_cr0012.py` | calls of `draw_region_split(sub, int)` (`:260-377`) updated to the new signature; expectations unchanged where one stratum holds every year |
+| `generate_negatives.py` | `draw_region_split` stratified; call site passes the cell's positive years; manifest `draw` breakdown; module docstring § Draw |
+| `prepare_training_data.py` | `measured_constants` (shared by both manifest sections) gains `YEAR_STRATA` |
+| `tests/test_cr0012.py`, `tests/test_cr0017.py` | calls of `draw_region_split(sub, int)` updated to the new signature; fixtures run under one stratum holding every fixture year, so expectations are unchanged apart from the `draw` breakdown |
 | `tests/test_cr0021.py` (new) | § Test plan |
 | `tests/test_shared_constants.py` | pin `YEAR_STRATA`, `year_stratum` |
 | `docs/quality/evidence/CR-0021/fetch_topup.py` (new, evidence) | C |
@@ -471,8 +475,8 @@ lesson).
       `/home/ec2-user/grouse_backup/CR-0021/`, sha256 verified),
       including the three raw files.
 - [ ] 6. Live run (user-authorised): copy the pinned raw files, then as
-      CR-0019 deliverable 6 from `generate_negatives.py` on; restore on
-      any FAIL.
+      CR-0019 deliverable 6 from `prepare_training_data.py` on (§2 B);
+      restore on any FAIL.
 - [ ] 7. Pointer lines, `ARCHITECTURE.md`, `CHANGELOG.md` (data change,
       metrics not comparable, §6 warning; the raw files' second producer
       `fetch_topup.py` and the pinned sha256 values, so the provenance

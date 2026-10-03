@@ -180,3 +180,18 @@ Tests: `python -m unittest tests.test_cr0021` → 27 tests OK.
 - **CR-0021 APPROVED.** Deliverables 2–9 follow, in order; deliverable 2
   (acceptance changes) by a fresh agent that does not write deliverable 3
   (CR-0013 rule 4).
+
+## Deliverable 3: implementation findings (author, 2026-10-03)
+- **I1 (MAJOR, resolved in the CR text).** §3 requires `YEAR_STRATA` in
+  both manifest sections (E11(c)), but §2 B said `prepare_training_data.py`
+  is not re-run, and only that script writes the `positives` section; the
+  live run as written would fail E11. `measured_constants()` lives in
+  `prepare_training_data.py` and is shared by both sections, so the
+  constant is added there (code table corrected). Resolution: deliverable
+  6 starts at `prepare_training_data.py`. It is deterministic on unchanged
+  inputs; MC1 (P and B byte-identical) is the check that the re-run
+  changes nothing but the manifest constants. No acceptance change.
+- **I2 (LOW).** `tests/test_cr0017.py` also calls the draw through
+  `generate_negatives.run`; its fixtures use years outside S1, so both
+  CR-0012 and CR-0017 fixtures run under a test-only single stratum
+  (`tests/test_cr0012.py: fixture_strata`). Added to the code table.

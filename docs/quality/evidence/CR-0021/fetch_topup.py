@@ -15,14 +15,18 @@ Guards (refuse before any network call):
   - DISABLED is True (set after the one run, CR-0021 deliverable 1);
   - the tree is the live repository root, or a target file resolves
     (realpath) into the live data/negatives/, or is a symlink;
+  - a target file is a hardlink (link count > 1, or the same file as the
+    live one): `cp -al` / `rsync --link-dest` copies would otherwise let
+    the append reach the live file;
   - a target file's sha256 differs from the pre-top-up hash pinned in the
     committed CR-0019 live acceptance record (itself pinned by sha256):
     so the script runs once per scratch copy, and never on a file that was
     already topped up;
   - a target file does not end with a newline, or its header is not
     get_negatives.CSV_FIELDS;
-  - the evidence outputs (fetch_topup.log, fetch_topup_result.json)
-    already exist.
+  - fetch_topup_result.json already exists (the top-up is recorded).
+Each attempt writes its own fetch_topup_<UTC>.log, so an aborted attempt
+stays on record and does not block a retry.
 Every fetched row is checked (state == R, common_name == s, year == y,
 non-empty unique gbif_id) BEFORE anything is written. All rows are
 collected in memory and appended only when every partition succeeded; a
@@ -30,7 +34,10 @@ partition that stopped on fetch failures aborts the run with nothing
 written (re-run: the hashes still match). Rows are appended with
 csv.DictWriter(CSV_FIELDS) in append mode, exactly as get_negatives.py
 writes (newline="", default "\\r\\n" line terminator), so the old bytes
-stay an exact prefix (MC2).
+stay an exact prefix (MC2). If an I/O error interrupts the appends
+themselves (after every fetch succeeded), the files no longer match the
+pinned hashes and a re-run is refused: re-copy the scratch tree from the
+live one and run again.
 
 Usage (repository root, on the EC2 host):
     PYTHONPATH=. python docs/quality/evidence/CR-0021/fetch_topup.py --tree SCRATCH
@@ -59,8 +66,13 @@ REGIONS = ("ME", "NH", "VT")
 TOPUP_YEARS = (2023, 2024)
 TOPUP_MULTIPLE = 2
 RAW = "data/negatives/gbif_negatives_{R}.csv"
-LOG = os.path.join(HERE, "fetch_topup.log")
 RESULT = os.path.join(HERE, "fetch_topup_result.json")
+
+
+def log_path():
+    import datetime as dt
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return os.path.join(HERE, f"fetch_topup_{stamp}.log")
 
 
 class Abort(Exception):
@@ -100,6 +112,12 @@ def check_tree(tree, live_root, pinned, fields):
             probs.append(f"{p}: is a symlink (copy the file into the scratch tree)")
         if os.path.dirname(os.path.realpath(p)) == live_neg:
             probs.append(f"{p}: resolves into the live data/negatives/")
+        live_p = os.path.join(live_root, RAW.format(R=R))
+        if os.path.exists(live_p) and os.path.samefile(p, live_p):
+            probs.append(f"{p}: is the same file as the live one (hardlink)")
+        if os.stat(p).st_nlink > 1:
+            probs.append(f"{p}: has {os.stat(p).st_nlink} hardlinks (make a real copy, "
+                         f"not cp -al / rsync --link-dest)")
         got = sha256_file(p)
         if got != pinned[R]:
             probs.append(f"{p}: sha256 {got[:12]}... is not the pinned pre-top-up "
@@ -205,12 +223,12 @@ def main(argv=None):
     a = ap.parse_args(argv)
     if DISABLED:
         raise SystemExit("fetch_topup.py is disabled: CR-0021's one-off top-up has run")
-    for p in (LOG, RESULT):
-        if os.path.exists(p):
-            raise SystemExit(f"{p} exists: the top-up evidence is already recorded")
+    if os.path.exists(RESULT):
+        raise SystemExit(f"{RESULT} exists: the top-up is already recorded")
     sys.path.insert(0, ROOT)
     import requests
     import get_negatives as G
+    LOG = log_path()
 
     pinned = pinned_pre_topup()
     probs = check_tree(a.tree, ROOT, pinned, G.CSV_FIELDS)

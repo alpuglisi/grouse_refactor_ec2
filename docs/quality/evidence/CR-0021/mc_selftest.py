@@ -34,6 +34,16 @@ def main():
         strata = json.load(f)["strata"]
     rep = pr.Stratified(scratch, cfg, strata).run(stop_on_error=True)
     rep.emit(out)
+    # The live run regenerates only C and N (generate_negatives.py); P and B
+    # stay the live files, so copy them rather than rely on emit's bytes
+    # (code review S4). The raw files are SCRATCH's (topped up).
+    keep = []
+    for R in cfg["constants"]["REGIONS"]:
+        keep += [A.rpath(cfg, k, R) for k in ("thinned_positives", "train_positives",
+                                              "val_positives")]
+    keep.append(A.rpath(cfg, "block_assignments"))
+    for rel in keep:
+        shutil.copyfile(os.path.join(ROOT, rel), os.path.join(out, rel))
     for R in cfg["constants"]["REGIONS"]:
         rel = pr.RAW.format(R=R)
         os.makedirs(os.path.dirname(os.path.join(out, rel)), exist_ok=True)

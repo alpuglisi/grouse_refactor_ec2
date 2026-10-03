@@ -113,3 +113,19 @@ A13–A16 and B13–B18 dispositions: accepted by their reviewers in round 3.
   `preregister.txt` (CR §4 "Writing the result in"). No code outside
   `docs/quality/evidence/CR-0021/` and nothing under `data/` is written
   before that.
+
+## Deliverable 1: code review of the evidence scripts (reviewer B, `8a0ad4c`)
+Verdict **FIX FIRST** (0 BLOCKING, 1 MAJOR, 4 MEDIUM, 2 LOW); all addressed
+before any run on the EC2 host.
+
+| id | sev | finding (short) | disposition |
+|---|---|---|---|
+| S1 | MAJOR | `fetch_topup.check_tree` misses a hardlinked scratch copy (`cp -al`, `rsync --link-dest`): sha pin passes, realpath differs, the append reaches the live raw file | fixed: refuse if `os.path.samefile(scratch, live)` or link count > 1; test with `os.link` |
+| S2 | MEDIUM | An aborted attempt's log blocked every retry | fixed: guard only on `fetch_topup_result.json`; one timestamped log per attempt; test: abort writes nothing, retry runs |
+| S3 | MEDIUM | Species TVD tolerance applied to pool survivors too, where a fair sample sits near 0.10 | fixed: tolerances apply to the raw rows (what the fetch controls); pool stage report-only. Reading of CR §4 recorded here; the v4 transcription states it |
+| S4 | MEDIUM | `mc_selftest` relied on `Replay.emit` writing P/B byte-identical to the live files | fixed: the self-test copies P and B from the live tree, as the live run (which regenerates only C and N) leaves them |
+| S5 | MEDIUM | Untested: real `fetch_capped` with `Collector`; `main`; MC on synthetic trees | partly fixed: tests for `fetch_capped` + `Collector` + shared `seen`, and `main` end to end with a fake module (success, record guard, abort, retry). MC on synthetic tree pairs: covered instead by the EC2 self-test and the reviewer's PA-0021(a) wrong-tree runs in deliverable 1 |
+| S6 | LOW | MC4 parsed `is_nonveg` with `bool()` and checked only per-stratum `n` | fixed: one `truthy()` parser for MC3/MC4; MC4 compares the whole per-stratum `{n, n_nv, n_hab}` |
+| S7 | LOW | An I/O error during the appends is fail-closed but undocumented | fixed: docstring says re-copy the scratch tree |
+
+Tests: `python -m unittest tests.test_cr0021` → 27 tests OK.

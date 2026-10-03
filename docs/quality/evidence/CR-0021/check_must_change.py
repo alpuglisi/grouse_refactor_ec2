@@ -88,6 +88,11 @@ def key(lon, lat):
     return (float(lon), float(lat))
 
 
+def truthy(v):
+    """is_nonveg as written by the pipeline (bool, or 'True'/'False' text)."""
+    return str(v).strip().lower() == "true"
+
+
 def stratum_index(year, strata):
     for i, s in enumerate(strata):
         if int(year) in s:
@@ -166,7 +171,7 @@ def main(argv=None):
     nc = read(a.new, POOL)
     hdr_ok = lines(a.old, POOL)[0] == lines(a.new, POOL)[0]
     def norm(df):
-        return [(str(r.region), str(r.split), int(r.year), str(r.is_nonveg).lower() == "true",
+        return [(str(r.region), str(r.split), int(r.year), truthy(r.is_nonveg),
                  float(r.longitude), float(r.latitude), str(int(float(r.gbif_id))))
                 for r in df.itertuples()]
     got, want = norm(nc), norm(C)
@@ -180,9 +185,9 @@ def main(argv=None):
         rel = f"data/negatives/negatives_{R}.csv"
         new = read(a.new, rel)
         exp = NP[NP["region"] == R]
-        e = {key(r.longitude, r.latitude): (r.split, int(r.year), bool(r.is_nonveg))
+        e = {key(r.longitude, r.latitude): (r.split, int(r.year), truthy(r.is_nonveg))
              for r in exp.itertuples()}
-        g = {key(r.longitude, r.latitude): (r.split, int(r.year), bool(r.is_nonveg))
+        g = {key(r.longitude, r.latitude): (r.split, int(r.year), truthy(r.is_nonveg))
              for r in new.itertuples()}
         check(f"MC4 {R} rows", e == g and len(new) == len(exp),
               f"new {len(new)}, pre-registered {len(exp)}, missing {len(set(e) - set(g))}, "
@@ -205,14 +210,18 @@ def main(argv=None):
         P = read(a.new, f"data/pipeline/thinned_positives_{R}.csv")
         for s in ("train", "val"):
             ps = P[P["split"] == s]["year"].map(lambda y: stratum_index(y, strata))
-            ns = new[new["split"] == s]["year"].map(lambda y: stratum_index(y, strata))
+            Ns = new[new["split"] == s]
+            ns = Ns["year"].map(lambda y: stratum_index(y, strata))
+            nvs = Ns["is_nonveg"].map(truthy)
             exp_d = draw["draw"][R][s]["strata"]
             for k, st in enumerate(strata):
                 n_pos, n_neg = int((ps == k).sum()), int((ns == k).sum())
+                n_nv = int(((ns == k) & nvs).sum())
+                got_d = {"n": n_neg, "n_nv": n_nv, "n_hab": n_neg - n_nv}
                 n_exp = int(round(n_pos * NEG_RATIO))
-                ok = n_neg == n_exp == exp_d[str(st[0])]["n"]
+                ok = n_neg == n_exp and got_d == exp_d[str(st[0])]
                 check(f"MC4 {R} {s} stratum {st[0]}", ok,
-                      f"P {n_pos}, N {n_neg}, pre-registered {exp_d[str(st[0])]['n']}")
+                      f"P {n_pos}, N {got_d}, pre-registered {exp_d[str(st[0])]}")
         nl = lines(a.new, rel)
         for s in ("train", "val"):
             relp = f"data/negatives/{s}_negatives_{R}.csv"

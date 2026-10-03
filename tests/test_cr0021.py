@@ -89,6 +89,15 @@ class FetchTopupTree(unittest.TestCase):
         self.assertTrue(any("symlink" in x for x in probs))
         self.assertTrue(any("resolves into the live" in x for x in probs))
 
+    def test_refuses_hardlinked_copy(self):
+        """Code review S1: cp -al / rsync --link-dest would let the append reach live."""
+        p = os.path.join(self.scr, ft.RAW.format(R="ME"))
+        os.remove(p)
+        os.link(os.path.join(self.live, ft.RAW.format(R="ME")), p)
+        self.assertEqual(_sha(p), self.pinned["ME"])     # the sha pin alone would pass
+        probs = ft.check_tree(self.scr, self.live, self.pinned, CSV_FIELDS)
+        self.assertTrue(any("hardlink" in x for x in probs))
+
     def test_refuses_already_topped_up(self):
         p = os.path.join(self.scr, ft.RAW.format(R="NH"))
         ft.append_rows(p, [_row("NH", "Ovenbird", 2023, 999)], CSV_FIELDS)
@@ -308,3 +317,112 @@ class StratifiedDraw(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FetchCappedWithCollector(unittest.TestCase):
+    """The real get_negatives.fetch_capped driving Collector and a shared seen set."""
+
+    def test_pages_dedup_and_quota(self):
+        import get_negatives as G
+        pages = [{"results": [{"gbifID": i, "decimalLatitude": 44.0, "decimalLongitude": -70.0,
+                               "eventDate": "2023-06-01", "year": 2023, "month": 6}
+                              for i in ids], "endOfRecords": end}
+                 for ids, end in (((1, 2, 3), False), ((4, 5), True))]
+        calls = []
+
+        def fake_get(session, path, params=None):
+            calls.append(params["offset"])
+            return pages[len(calls) - 1]
+        orig = G.api_get
+        G.api_get = fake_get
+        try:
+            col = ft.Collector()
+            n, stopped, exhausted, _ = G.fetch_capped(None, col, {}, "ME", "Ovenbird", "x",
+                                                      4, {"2"})
+        finally:
+            G.api_get = orig
+        self.assertEqual((n, stopped), (4, False))
+        self.assertEqual([r["gbif_id"] for r in col.rows], ["1", "3", "4", "5"])   # 2 seen
+        self.assertTrue(all(r["state"] == "ME" and r["year"] == 2023 for r in col.rows))
+
+
+class FetchTopupMain(unittest.TestCase):
+    """main() end to end with a fake get_negatives module (no network)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.live = os.path.join(self.tmp.name, "live")
+        self.scr = os.path.join(self.tmp.name, "scratch")
+        self.ev = os.path.join(self.tmp.name, "evidence")
+        os.makedirs(self.ev)
+        rows = {R: [_row(R, "Ovenbird", 2023, 10 * i + 1), _row(R, "Ovenbird", 2024, 10 * i + 2)]
+                for i, R in enumerate(ft.REGIONS)}
+        for tree in (self.live, self.scr):
+            for R in ft.REGIONS:
+                _write(os.path.join(tree, ft.RAW.format(R=R)), rows[R])
+        self.pinned = {R: _sha(os.path.join(self.scr, ft.RAW.format(R=R))) for R in ft.REGIONS}
+        self.saved = {k: getattr(ft, k) for k in ("ROOT", "RESULT", "HERE", "pinned_pre_topup")}
+        ft.ROOT, ft.HERE = self.live, self.ev
+        ft.RESULT = os.path.join(self.ev, "fetch_topup_result.json")
+        ft.pinned_pre_topup = lambda: dict(self.pinned)
+
+    def tearDown(self):
+        for k, v in self.saved.items():
+            setattr(ft, k, v)
+        sys.modules.pop("get_negatives_fake", None)
+        self.tmp.cleanup()
+
+    def _fake_G(self, stop_on=None):
+        import types
+        import get_negatives as real
+        G = types.SimpleNamespace(CSV_FIELDS=real.CSV_FIELDS, EOD_DATASET_KEY="k",
+                                  STATES={"ME": "Maine", "NH": "New Hampshire", "VT": "Vermont"},
+                                  TARGET_SPECIES={"Ovenbird": "Seiurus aurocapilla"},
+                                  verify_dataset=lambda s: None,
+                                  resolve_taxon_keys=lambda s: {"Ovenbird": 1})
+        nxt = [1000]
+
+        def fetch_capped(session, writer, params, st, common, sci, cap, seen, start_offset=0):
+            if stop_on == (st, params["year"]):
+                return 0, True, False, 0
+            for _ in range(cap):
+                nxt[0] += 1
+                seen.add(str(nxt[0]))
+                writer.writerow(_row(st, common, params["year"], nxt[0]))
+            return cap, False, False, 0
+        G.fetch_capped = fetch_capped
+        return G
+
+    def _run(self, G):
+        import types
+        real = sys.modules.get("get_negatives")
+        sys.modules["get_negatives"] = G
+        try:
+            return ft.main(["--tree", self.scr])
+        finally:
+            if real is not None:
+                sys.modules["get_negatives"] = real
+
+    def test_success_appends_and_records(self):
+        self.assertEqual(self._run(self._fake_G()), 0)
+        for R in ft.REGIONS:
+            p = os.path.join(self.scr, ft.RAW.format(R=R))
+            self.assertEqual(len(ft.read_rows(p)), 2 + 4)            # 2 x e per year
+            with open(os.path.join(self.live, ft.RAW.format(R=R)), "rb") as f:
+                live = f.read()
+            with open(p, "rb") as f:
+                self.assertTrue(f.read().startswith(live))
+            self.assertEqual(_sha(os.path.join(self.live, ft.RAW.format(R=R))), self.pinned[R])
+        self.assertTrue(os.path.exists(ft.RESULT))
+        with self.assertRaises(SystemExit):                         # recorded: never again
+            self._run(self._fake_G())
+
+    def test_abort_writes_nothing_and_allows_retry(self):
+        """Code review S2: an aborted attempt leaves a log but does not block a retry."""
+        self.assertEqual(self._run(self._fake_G(stop_on=("VT", 2024))), 1)
+        for R in ft.REGIONS:
+            self.assertEqual(_sha(os.path.join(self.scr, ft.RAW.format(R=R))), self.pinned[R])
+        self.assertFalse(os.path.exists(ft.RESULT))
+        logs = [f for f in os.listdir(self.ev) if f.startswith("fetch_topup_")]
+        self.assertEqual(len(logs), 1)
+        self.assertEqual(self._run(self._fake_G()), 0)                # retry runs

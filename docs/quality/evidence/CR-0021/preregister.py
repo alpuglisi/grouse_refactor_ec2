@@ -19,8 +19,9 @@ Order (CR-0021 section 4; the strata are chosen BEFORE any AUC):
   3. the topped-up pool (replay on SCRATCH): supply per (region, split,
      year), before and after; existing pool rows lost or relabelled, by
      mechanism; per-partition yield of the new rows; comparability of the
-     new rows (tolerances: species TVD and coord_uncertainty_m; blocks and
-     counties report-only, user decision 2026-10-03).
+     new rows (tolerances on the raw rows: species TVD and
+     coord_uncertainty_m; the pool-survivor stage, blocks and counties
+     report-only, user decision 2026-10-03 and code review S3).
   4. strata: S1, S2, S3 in this order; the first with zero SHORT cells.
      If none: stop here (exit 2), no AUC is computed.
   5. the stratified draw (Stratified) on SCRATCH with the chosen strata;
@@ -400,6 +401,11 @@ def comparability(live_raw, scr_raw, new_pool, cfg, root):
                 f"{un[0]:.1f}/{un[1]:.1f}/{un[2]:.1f} (tol +/-{UNCERT_PP_MAX} pp a vs b); "
                 f"block TVD(a,b) {blk:.4f}, county TVD(a,b) {cty:.4f} (report-only); "
                 f"species TVD(a,c) {tvd(aa['common_name'], cc['common_name']):.4f} (context)")
+            # Tolerances apply to the raw rows (what the fetch controls); the
+            # pool stage is report-only: a few hundred survivors per region
+            # give a fair-sample species TVD near the limit (code review S3).
+            if stage != "raw":
+                continue
             if not (sp <= SPECIES_TVD_MAX):
                 fails.append(f"{R} {stage}: species TVD {sp:.4f} > {SPECIES_TVD_MAX}")
             if not (abs(un[0] - un[1]) <= UNCERT_PP_MAX):

@@ -148,3 +148,19 @@ Tests: `python -m unittest tests.test_cr0021` → 27 tests OK.
   (29 OK).
 - **Pending for approval:** reviewer verification of this transcription;
   `mc_selftest` on the EC2 host; the reviewer's PA-0021(a) wrong-tree runs.
+
+## Deliverable 1: transcription verification and MC wrong-tree script (reviewer A)
+- **v4 transcription: verified** against the committed evidence: strata
+  (S1), control, > 0.8 cells, O11a, `PRE_SHA` (equal to `sha256sum` of the
+  three preregister files), post-top-up sha256 (`preregister_draw.json` =
+  `fetch_topup_result.json`), `DISABLED = True`, the user decision, and no
+  change beyond transcription.
+- Two LOW wording items, fixed: b1, name the exhausted species (Alder
+  Flycatcher, Northern Waterthrush) instead of "the two wetland species"
+  (the wetland guild has four); b2, state in CR §4 Result that the
+  tolerances were applied to raw rows (code review S3) and point to the
+  pool-stage values.
+- PA-0021(a): reviewer A wrote `reviewA/mc_wrongtrees.py` (a correct tree
+  plus 11 wrong trees, each mapped to the MC check it must trip). Compiled;
+  five text mutations exercised on a synthetic tree. **Pending:** the run
+  on the EC2 host (`reviewA/mc_wrongtrees.txt`).

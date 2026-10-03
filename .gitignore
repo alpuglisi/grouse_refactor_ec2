@@ -52,3 +52,6 @@
 !/docs/quality/evidence/CR-0021/*.log
 !/docs/quality/evidence/CR-0021/*.json
 !/docs/quality/evidence/CR-0021/preregister_*.csv
+!/docs/quality/evidence/CR-0021/reviewA/
+!/docs/quality/evidence/CR-0021/reviewA/*.py
+!/docs/quality/evidence/CR-0021/reviewA/*.txt

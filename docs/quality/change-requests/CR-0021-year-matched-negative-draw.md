@@ -299,8 +299,8 @@ section records only the verdicts against §4's conditions.
 - Top-up: ran once (`fetch_topup_20261003T071204Z.log`); post-top-up raw
   sha256 in `fetch_topup_result.json`, pinned through
   `preregister_draw.json` (MC2). Nine (region, species, year) partitions
-  were exhausted: the two wetland species in NH and VT, and Northern
-  Waterthrush in ME 2023.
+  were exhausted: Alder Flycatcher and Northern Waterthrush in NH and VT
+  (2023 and 2024), and Northern Waterthrush in ME 2023.
 - Trees and CONTROL: pass (`preregister.txt` §0–1); no two-state key; P
   and B unchanged by the top-up.
 - **Strata: S1 chosen** (zero SHORT cells). Cells with
@@ -309,10 +309,14 @@ section records only the verdicts against §4's conditions.
 - O11a: today's value as BUG-0073 states; predicted exactly 0.5 in every
   region and split (by construction under S1). O11w: not applicable (no
   merged stratum).
-- Comparability: `coord_uncertainty_m` tolerance met; **species
-  tolerance exceeded in NH and VT** (raw rows), because the wetland
-  species are exhausted in GBIF for those states and years. Spatial
-  comparison reported (report-only, user decision).
+- Comparability: the tolerances were applied to the **raw rows** (what
+  the fetch controls); the pool-survivor stage is report-only (code review
+  S3, review log). `coord_uncertainty_m` tolerance met; **species
+  tolerance exceeded in NH and VT**, because Alder Flycatcher and Northern
+  Waterthrush are exhausted in GBIF for those states and years. The
+  pool-stage species values, also above 0.10 in NH and VT, are in
+  `preregister.txt` §3. Spatial comparison reported (report-only, user
+  decision).
 - **User decisions (2026-10-03).** (1) The species tolerance was exceeded,
   so a follow-up check was defined with its rule fixed before any output
   was seen: the wetland-guild share of the drawn habitat negatives in

@@ -1,134 +1,180 @@
 # CR-0036: 3DEP lidar forest-structure generator (code, acceptance and NH pilot)
 
-**Status: DRAFT v1, 2026-10-05.** Not yet reviewed or approved. Verdicts and dispositions will be recorded in `CR-0036-review-log.md`. This document states only current intent.
+**Status: DRAFT v2, 2026-10-05.** Revised after review round 1, in which both reviewers returned REVISE. Verdicts and dispositions are in `CR-0036-review-log.md`. This document states only current intent.
 
 ## Scope
-Add a generator that turns USGS 3DEP airborne-lidar point clouds into 30 m understory and canopy-structure layers on each region's template grid. Each point is binned directly into a template cell, so there is no warp and no Earth Engine step. This CR delivers the generator, its acceptance checks and a one-window NH pilot written outside `data/`. The full ME/NH/VT build and the keep/remove evaluation follow as CR-0037.
+Add a generator that turns USGS 3DEP airborne-lidar point clouds into 30 m understory and canopy-structure layers on each region's template grid. Each point is binned directly into a template cell, with no warp and no Earth Engine. This CR delivers the generator, its pinned source table, its acceptance checks and an NH pilot of three windows. Pilot outputs are written outside `data/`.
+
+The full ME/NH/VT build, the registry entries and the keep/remove evaluation are CR-0037.
 
 ## Why now
-- **The structural gap.** Grouse select dense 0.5–5 m understory and stem density. No current layer measures it: LANDFIRE `ch`/`cc`/`evh` and TreeMap carry it coarsely, Meta `mch_*` (CR-0032) is imagery-derived, and GEDI added +0.000 AUC (`diagnose_lidar_features.py`). The research report (`evidence/CR-0036/ROUTE.md` §3) found that no ready-made product supplies understory return density for these states.
+- **The gap.** Grouse select dense understory and stems in the 0.5–5 m layer, and no current layer measures it. The lidar research (`evidence/CR-0036/ROUTE.md` §3) found that no ready-made product supplies understory return density for these states.
 - **Why the earlier attempt failed.** The earlier 3DEP attempt was reverted because Earth Engine exports were too slow (`CHANGELOG.md`, "LiDAR/3DEP terrain features — added then removed"). This design does not use Earth Engine.
-- **Owner request:** 2026-10-05.
+- **Request.** The owner asked for this on 2026-10-05.
 
-## Sources (evidence: `evidence/CR-0036/ROUTE.md`, `evidence/CR-0036/BANDWIDTH.md`)
-- **USGS 3DEP Entwine Point Tiles (EPT)** at `s3://usgs-lidar-public/<project>/ept.json`, in AWS us-west-2. The bucket is public. Points are stored in EPSG:3857, and class 2 is ground.
-- **3DEP projects not in EPT** are read as LAZ tiles from USGS rockyweb, located through each project's `.vpc` tile index. The projects are `ME_WesternMtns_1_B24`, `ME_CrownofMaine_B1_2018`, `ME_Eastern_B1/B2_2017`, `VT_Statewide_3_A23` and `NY_NHGaps_2_D24`. Rockyweb throughput from EC2 is **unverified**; the pilot measures it.
-- **USGS WESM** (`WESM.gpkg`/`WESM.csv`) supplies project footprints, collection dates and quality level.
-- **Which project fills each cell:** the newest acquisition covering the cell. Volume is about 1.65–2.0 T points (about 11–13 TB streamed); nothing is cached.
+## Sources (evidence: `evidence/CR-0036/ROUTE.md`, `BANDWIDTH.md`, `WESM.csv`)
+- **USGS 3DEP Entwine Point Tiles (EPT).** These are at `s3://usgs-lidar-public/<name>/ept.json`, in us-west-2. The bucket is public. Points are in EPSG:3857, with Z in metres.
+- **3DEP LAZ tiles on rockyweb.** These cover projects not in EPT, and each project's `.vpc` tile index lists its tiles. They are stored in **native CRSs**, for example UTM 19N (EPSG:6348) and VT State Plane (EPSG:6589), and some sources are in **US survey feet**.
+- **USGS WESM** gives each work unit's collection dates, `horiz_crs`, `vert_crs` and footprint polygon.
+- **Pinned source table: `lidar_sources.csv`.** It has one row per work unit covering ME, NH or VT, with these columns:
+  - WESM work unit;
+  - read location (EPT name or rockyweb path);
+  - `reader` (`ept` | `las`);
+  - horizontal CRS (EPSG);
+  - XY unit factor to metres;
+  - Z unit factor to metres;
+  - collection start and end dates;
+  - leaf-risk flag (set if the collection window overlaps 15 May – 15 October);
+  - the pinned PROJ pipeline string from the source CRS to the template CRS.
+
+  The table is produced by the committed script `build_lidar_sources.py` from a pinned WESM snapshot (sha256 recorded) and the source headers. It is committed and reviewed under PA-0048. The generator refuses any source whose header CRS or units differ from its row.
 
 ## The change
 
 ### 1. `generate_lidar_structure.py` (new)
-1. **Blocks.** Each region's template (its latest EVT clip, the same template as `generate_canopy_structure.py`) is split into blocks of 256 × 256 cells. Each block is assigned its newest covering project from WESM. A cell on a project boundary is assigned to exactly one project, the newest that covers the cell centre. The project assignment is written to the metadata raster (§3).
-2. **Reading.** A block is read from the 3857 bounding box of its template footprint, padded by 90 m.
-   - EPT projects use PDAL `readers.ept` with `requests` = 16. Rockyweb projects use `readers.las` on the intersecting tiles.
-   - `resolution` thinning is never used, because it biases the return-fraction metrics (`ROUTE.md` §2).
-   - A block whose point count exceeds `LIDAR_MAX_BLOCK_POINTS` is split into four sub-blocks, recursively, to bound memory.
-3. **Filtering and height.**
-   - `filters.range` with `Classification[0:6],Classification[8:17]` drops noise (7, 18), class 20 and withheld points.
-   - Height above ground comes from `filters.hag_nn`. Both the filter and the HAG method are pinned as module constants.
-4. **Binning onto the template.** Each point's (X, Y) is transformed from EPSG:3857 to the template CRS with one pinned `pyproj.Transformer(always_xy=True)`, an exact per-point transform.
-   - The cell is `col = floor(u)`, `row = floor(v)` with `(u, v) = ~T · (x, y)`, where `T` is the template transform. Cells are half-open on the template's own pixel edges.
-   - Points of the 90 m pad that fall outside the block are dropped after HAG, so the HAG triangulation sees ground beyond the block edge while each cell's value comes only from its own points. Block seams are therefore exact.
-   - There is no intermediate raster and no `reproject`, `WarpedVRT` or `writers.gdal` call (§5 lint).
-   - The output uses exactly `T`, so `grid_mismatch(out, template)` is `None` by construction.
-   - The PROJ pipeline description is recorded in the tags (`GROUSE_PROJ`).
-5. **Metrics per cell.** All are computed with `np.bincount` and an `np.lexsort` by (cell, HAG). "Returns" means all returns after filtering; HAG is in metres.
 
-   | Feature | Definition | Encoding (int16, nodata −9999) |
+1. **Cell assignment.** Each template cell is assigned to the newest work unit in `lidar_sources.csv` whose WESM footprint contains the cell centre. Newest means the latest `collect_end`. A cell with no covering work unit is NODATA and counted. Assignment is per cell, never per block. The assignment is written to the metadata raster (§3).
+2. **Blocks.** The template is processed in blocks of `LIDAR_BLOCK_CELLS` = 64 × 64 cells (1.92 km). At QL1 density that is about 80 M points.
+   - For each block, every work unit assigned to any of its cells is read over the block's footprint plus a pad of `LIDAR_PAD_M` = 60 m.
+   - EPT is read with `readers.ept` (`requests` = 8, no `resolution`).
+   - LAZ tiles are processed tile-major: each tile is downloaded once to local scratch, all blocks that touch it are completed, and the tile is then deleted.
+3. **PDAL reads only.** No PDAL filter or HAG stage is used. Points are kept if they are not withheld (`Withheld` == 0 where that dimension exists, else bit 3 of `ClassFlags` clear) and their `Classification` ∉ {6, 7, 13, 14, 15, 16, 17, 18}. A source lacking `ReturnNumber` is refused.
+4. **Coordinates.** Each source has a pinned pipeline in the table, built with `pyproj.Transformer.from_pipeline`. That pipeline transforms each point's XY from its source CRS to the template CRS, and Z is multiplied by the table's Z factor. Distances and heights from then on are in template metres.
+5. **Height above ground (numpy/scipy, pinned).** Ground points are those with class 2.
+   - For each other point, ground height is the inverse-distance-squared mean over the `LIDAR_HAG_K` = 6 nearest ground points within `LIDAR_HAG_MAXDIST_M` = 30 m in XY, found with `scipy.spatial.cKDTree`.
+   - HAG = Z − ground height. A point with no ground within the distance gets no HAG and is counted.
+   - Because `LIDAR_HAG_MAXDIST_M` ≤ `LIDAR_PAD_M`, every ground point that can influence an in-block point is in the padded read. **Block seams are therefore exact.**
+   - Points with HAG < −2 m or > `LIDAR_HAG_MAX_M` = 80 m are dropped as noise and counted.
+6. **Binning.** With template transform `T`, a point at template coordinates (x, y) goes to cell `col = floor(u)`, `row = floor(v)`, where `(u, v) = ~T · (x, y)`. That is, cells are half-open on the template's pixel edges. A point counts only toward its own cell, and only if that cell is assigned to the point's work unit. There is no intermediate raster, and no `reproject`, `WarpedVRT`, `writers.gdal` or thinning filter (§5 lint).
+7. **Features per cell.** Encoding is int16, nodata −9999. "Returns" means kept points with a valid HAG. `n(a,b)` is the count with a ≤ HAG < b.
+
+   | Feature | Definition | Encoding |
    |---|---|---|
-   | `lid_f05_5` | share of returns with 0.5 ≤ HAG < 5 | per mille |
-   | `lid_f1_3` | share of returns with 1 ≤ HAG < 3 | per mille |
-   | `lid_u1_3` | occlusion-adjusted understory: n(1 ≤ HAG < 3) / n(HAG < 3) | per mille |
-   | `lid_p95` | 95th percentile of HAG over returns with HAG ≥ 0.5 (0 if none) | decimetres, clipped to [0, 600] |
-   | `lid_cov5` | first returns with HAG > 5 / all first returns | per mille |
-   | `lid_sd` | standard deviation of HAG over returns with HAG ≥ 0.5 (0 if fewer than 2) | decimetres |
+   | `lid_u05_2` | n(0.5,2) / n(−2,2) | per mille |
+   | `lid_u1_3` | n(1,3) / n(−2,3) | per mille |
+   | `lid_u3_5` | n(3,5) / n(−2,5) | per mille |
+   | `lid_u5_10` | n(5,10) / n(−2,10) | per mille |
+   | `lid_p95` | 95th percentile (`numpy.percentile`, method `linear`) of HAG over returns with HAG ≥ 0.5; 0 if fewer than 5 such returns | decimetres |
+   | `lid_wcov5` | first returns with HAG > 5 / all first returns. Leaf-off, this measures woody and conifer cover, not canopy closure. | per mille |
+   | `lid_sd` | population SD (ddof 0) of HAG over returns with HAG ≥ 0.5; 0 if fewer than 5 such returns | decimetres |
 
-   The 100 m neighbourhood versions are out of scope (CR-0037).
-6. **Nodata.** A cell is NODATA in every feature when either:
-   - it has fewer than `LIDAR_MIN_RETURNS` returns (default 50), or
-   - it has no ground return within the block.
+   - The `lid_u*` fractions are occlusion-adjusted: the share of the returns that reached that height layer.
+   - A ratio feature is NODATA where its denominator is below `LIDAR_MIN_DENOM` = 20.
+   - Every feature is NODATA where the cell has fewer than `LIDAR_MIN_RETURNS` = 50 returns.
+   - Encoders refuse out-of-range values. They raise, following the `mch_*` precedent and PA-0034, and never clip.
+8. **Resume.** Each finished block is cached under a key that hashes all of:
+   - the template grid (CRS, transform, shape);
+   - the `lidar_sources.csv` sha256;
+   - the recipe constants;
+   - the work units read.
 
-   Cells outside any 3DEP footprint are also NODATA, and the share is reported as `GROUSE_COVERAGE`.
-7. **Resume.** Each finished block is written to a per-block cache file under a key of (region, block, project, recipe). An interrupted or spot-terminated run redoes only the missing blocks.
-8. **Assembly.** Blocks are assembled into staged `.tmp` files with windowed writes. A region is refused, with existing files left untouched, if fewer than 1% of template-valid cells are valid or if `grid_mismatch` is not `None`. Outputs are written with `os.replace`.
+   A change in any of these invalidates the cache.
+9. **Assembly.** Staged `.tmp` files are written with windowed writes, `grid_mismatch(out, template) is None` is asserted, and the files are moved into place with `os.replace`.
 
-### 2. Year policy: static layer, stale-cell mask
-- **Why static.** Lidar acquisition years are VT 2023, NH 2015–2019 (plus 2024 gaps) and ME 2016–2024. Most fall outside ±2 years (`YEAR_MATCH_TOLERANCE`) of the 2020–2025 vintages. A per-vintage policy would therefore drop most records.
-- **The policy.** Following the `road_dist` and `mch_*` precedent (`STATIC_FEATURES` in `generate_canopy_structure.py`), the layers are written for every vintage year Y of the region's other features.
-- **Stale-cell mask.** The copies differ in one way: in vintage Y, a cell is NODATA when the `tsd` raster for Y records a disturbance after the cell's acquisition year. The disturbance year is `Y − tsd_decode(tsd_Y)`. A cell at the undisturbed cap (`TSD_MAX_YEARS`) is never masked.
-- **Residual risk.** Disturbances after 2024 are invisible, because the LANDFIRE disturbance record ends in 2024 (evidence `CR-0035/step2_redownload_and_inventory.txt`).
+### 2. Year policy: a static layer with two masks
+Most acquisitions are far from the 2016–2025 vintages:
+- VT: 2023.
+- NH: 2015–2019, plus 2024 gaps.
+- ME: 2016–2024.
+
+The layers are therefore static (the `road_dist`/`mch_*` precedent): one acquisition, written for every vintage Y of the region. Two masks apply.
+
+**Mask A, disturbance between flight and vintage.**
+- `A` is the cell's acquisition year: the year of the median `GpsTime` of its returns, so a multi-year project is resolved per cell.
+- Let `M = max(Y, A)`. The disturbance year is `D = M − round(tsd_decode(tsd_M))`.
+- The cell is NODATA in vintage Y when `min(Y, A) ≤ D ≤ max(Y, A)`.
+- A cell at the undisturbed cap (`TSD_MAX_YEARS`) is never masked.
+- A cell where `tsd_M` is nodata is masked.
+
+Using `tsd_M` covers both directions: vintages after the flight, and vintages before it. Disturbances after 2024 are invisible, because the LANDFIRE disturbance record ends in 2024.
+
+**Mask B, regrowth in young stands.** The cell is NODATA in vintage Y when both:
+- `|Y − A| > YEAR_MATCH_TOLERANCE`, and
+- `tsd_A` records a disturbance within `LIDAR_REGEN_YEARS` = 20 years before A.
+
+Young regenerating stands change too fast for a stale measurement.
+
+Both masks remove grouse-relevant cells where the lidar is old. CR-0037 must report its evaluation within `|Y − A| ≤ 2` as well as overall.
 
 ### 3. Metadata raster (not a model feature)
-`data/landfire/{R}_lidar_meta.tif`, int16, with these bands:
-1. acquisition year;
-2. return count, capped at 32767;
-3. ground-return count;
-4. project index, keyed by a `GROUSE_LIDAR_PROJECTS` tag that lists the WESM project ids.
+- Path: `{R}_lidar_meta.tif`.
+- Bands, all int32:
+  1. acquisition year `A`;
+  2. median acquisition day of year;
+  3. return count;
+  4. ground-return count;
+  5. no-HAG point count;
+  6. work-unit index.
+- A `GROUSE_LIDAR_SOURCES` tag holds the source table's sha256 and the index-to-work-unit mapping.
 
-It is used by the stale mask, by QA and by CR-0037's per-project checks. It is not in `RASTER_FEATURES`.
+In this CR the raster is written only for pilot windows, outside `data/`. Its `PATH_TEMPLATES` entry is CR-0037.
 
-### 4. `models.py`
-- Add the six features to `FEATURE_SPEC` (continuous; scales 1000 for the shares, 600 for `lid_p95`, 200 for `lid_sd`), to `RASTER_FEATURES` and to the static-feature list.
-- Add encoders `lidar_share_encode` and `lidar_height_encode`, which raise on non-finite input, following `mch_*_encode`.
-- No training input changes until rasters exist on disk: `train.py` discovers features from disk, and `SPLIT_WINDOW_FEATURES` is pinned (CR-0033).
+### 4. Encoders
+`lidar_share_encode` and `lidar_height_encode` live in the generator for this CR. CR-0037 moves them, the features, `FEATURE_SPEC`, `RASTER_FEATURES` and `STATIC_FEATURES` into the shared registries, together with the `test_cr0032.py:163` update.
 
-### 5. Acceptance checks (written before approval, CR-0011 A3)
-**`tests/test_cr0036.py`** uses synthetic point arrays and a synthetic rotated template, with no network. It covers:
-1. **Binning.** Points on cell edges go to the higher cell (half-open), and a rotated-template case is included. Every point's cell is checked against brute-force polygon containment.
-2. **Metric correctness.** Each metric is checked against a brute-force per-cell computation. This includes `lid_u1_3` with an empty denominator and `lid_p95` against `np.percentile` (method pinned).
-3. **Seam exactness.** A block computed whole equals the same block computed as four sub-blocks, bit for bit.
-4. **Nodata.** The thresholds apply (returns < 50, no ground), and coverage is reported.
-5. **Stale mask.** A synthetic `tsd` stack in which the disturbance year is before, equal to and after the acquisition year, plus the undisturbed cap.
-6. **Encoders.** Encoders raise on NaN or inf, and their output stays within the int16 range.
-7. **Lint.** `generate_lidar_structure.py` contains no `reproject(`, `WarpedVRT`, `writers.gdal`, `"resolution"` or `calculate_default_transform`.
-8. **Resume.** The cache key changes when the recipe constants change.
+### 5. Acceptance checks (committed with this draft, CR-0011 A3)
+The gate script `check_lidar_structure.py` owns every threshold as a constant. Each GATE has a **negative control** that must fail (PA-0021(a)). `--self-test` runs the controls on synthetic data, and the pilot gate passes only if every real check passes and every control fails.
 
-**`check_lidar_structure.py`** is the pilot and region gate. It owns its thresholds as constants. It checks:
-- (a) `grid_mismatch(out, template)` is `None`.
-- (b) Content registration (PA-0049(b)). `diagnose_layer_registration`'s road sweep must peak at (0, 0) for `lid_cov5` and `lid_p95`.
-- (c) Plausibility. On forest cells (EVT forest classes), the Spearman correlation between `lid_p95` and LANDFIRE `ch` is ≥ `MIN_RHO_CH` = 0.5, and with `mch_mean` if that layer is on disk.
-- (d) Under 1% of forest cells fall below the return threshold, within the footprint.
-- (e) Points/s, wall-clock time and bytes read are logged. The full-run estimate is derived from them.
+| Check | Type | Real input | Negative control (must fail) |
+|---|---|---|---|
+| C1 grid | GATE | `grid_mismatch(out, template) is None` | transform offset by half a cell |
+| C2 registration | GATE | Road sweep (the `diagnose_layer_registration` method) reading the pilot file, ≥ `MIN_WINDOWS` = 8 windows of 128 cells, for `lid_wcov5` and `lid_p95`. The peak must be at (0, 0). | layer shifted 1 cell |
+| C3 height scale | GATE | Median of `lid_p95` ÷ LANDFIRE `ch` over forest cells (NLCD 41–43) where both are valid, within [`RATIO_LO`, `RATIO_HI`] = [0.5, 2.0]. Run per work unit. | `lid_p95` × 3.2808 (feet error) |
+| C4 understory contrast | GATE | Median `lid_u1_3` in regenerating forest (`tsd` 3–15 years) minus median in mature forest (undisturbed cap and `cc` ≥ 60%) ≥ `MIN_REGEN_CONTRAST` = 50 per mille | `lid_u1_3` permuted across cells |
+| C5 coverage | GATE | Per work unit: valid share of assigned forest cells ≥ 0.99 | one work unit's points dropped |
+| C6 seam | GATE (EC2) | Window W2 assembled from 64-cell blocks equals the same area computed as one 128-cell block, bit for bit | `LIDAR_HAG_MAXDIST_M` set above `LIDAR_PAD_M` |
+| C7 project offset | OBS | Per-work-unit medians of every feature on matched forest cells either side of a project boundary in W2 | — |
+| C8 throughput | OBS | Points/s per core, bytes read, rockyweb MB/s at 8 and 32 streams, a `usgs-lidar` requester-pays listing | — |
 
-### 6. NH pilot (after approval; writes outside `data/`)
-- **Window.** A 10 × 10 km window (334 × 334 cells) at Pawtuckaway State Park (−71.17, 43.08). It lies entirely in `NH_Coastal_1_2019`, which is QL1, about 22 points/m² and leaf-off. That is about 2.2 G points, or about 15 GB read.
-- **Output.** `--dry-run --pilot-out /tmp/lidar_pilot_NH.tif`.
-- **Where to run.** Either the us-east-2 host or a us-west-2 instance. Reading from us-west-2 into us-east-2 costs about $0.30 for the pilot.
-- **Pass criteria.** `check_lidar_structure.py --pilot` exits 0.
-- **Rockyweb throughput.** The pilot also downloads one rockyweb tile of `ME_WesternMtns_1_B24` and logs its throughput.
+`tests/test_cr0036.py` covers:
+- the gate script's controls on synthetic rasters;
+- the generator's pure functions, with brute-force oracles for:
+  - binning, including points exactly on edges;
+  - each metric, including empty and below-threshold denominators;
+  - HAG, including a slope, no ground within range, and a water case;
+  - seam exactness;
+  - both masks, for Y < A, Y = A and Y > A, the cap, and tsd nodata;
+  - CRS and units, with a feet source and a UTM source;
+  - encoder refusals;
+- the lint.
+
+Tests of the generator's functions skip until deliverable 2 lands. Deliverable 2 removes the skip, so they cannot pass vacuously after it.
+
+### 6. NH pilot (after approval; outputs under `/tmp/lidar_pilot/`)
+- **W1.** 20 × 20 km centred on Pawtuckaway State Park (−71.17, 43.08). It is mostly `NH_Coastal_1_2019` (EPT, QL1, leaf-off) and yields about 25 registration windows. It provides C1–C5.
+- **W2.** 128 × 128 cells (3.84 km). It is chosen by `--pilot-seam` from the source table as the NH block whose assigned cells are split most evenly between an EPT work unit and a rockyweb one. It provides C3, C5, C6 and C7 across both readers and CRSs.
+- **W3.** 128 × 128 cells for steep terrain, centred on the first covered candidate: Crawford Notch (−71.40, 44.20), Franconia Notch (−71.68, 44.15) or Pinkham Notch (−71.25, 44.26). The candidate list is pinned in the script. It provides C3–C5.
+- **Expected cost.** About 12 G points, 1–3 h on 16 cores in us-east-2, about $2 in cross-region transfer. The pilot sets the CR-0037 compute plan.
 
 ## Impact
-- **New dependency.** PDAL ≥ 2.6 and python-pdal, from conda-forge. It is imported lazily inside the generator only, so `train.py`, `predict.py` and the test suite do not need it; tests that need PDAL skip without it.
-- **No change to `data/`, the split or any model in this CR.** CR-0037 decides whether the layers enter training. A new feature is a geometry change and needs a cold start.
-- **CR-0032 interaction.** CR-0032 (`mch_*`) remains as approved. CR-0037 evaluates lidar alone, `mch_*` alone and both together against the CR-0035 "after" baseline.
+- **New dependency.** PDAL ≥ 2.6 and python-pdal (conda-forge, pinned in `envs/lidar.yml`), used only by the generator for reading. HAG and metrics need only numpy and scipy, which are already present.
+- **No change** to `data/`, the split, `models.py`, the registries or any model.
+- **Numbering.** `HYBRID_REPORT.md` §5 provisionally numbered its CRs from CR-0036. Those are not yet drafted and will take the next free numbers. Lidar is not in that plan's v1; CR-0037 decides lidar's role.
+- **CR-0038 source-year gate.** Lidar's source year is the per-cell `A` in the metadata raster.
 
 ## Risk
 **Medium.** Mitigations:
 
 | Risk | Mitigation |
 |---|---|
-| Registration | Binning on template pixel edges with an exact per-point transform; the §5 lint; checks (a) and (b) |
-| Leaf-on projects (`NY_NHGaps_2_D24`, `ME_CrownofMaine_2018`, `ME_Eastern_2017`, `ME_SouthCoastal_2020`) | The pilot uses a leaf-off project. The project index is carried in metadata. CR-0037 runs per-project distribution QA and decides exclusion or normalisation. |
-| Mixed point density (QL1 ≈ 22–33 pts/m², legacy ≈ 1) | Fractions and p95 rather than counts and max. Return-count threshold. |
-| Memory: dense tiles reach about 81 M points | Recursive block split (`LIDAR_MAX_BLOCK_POINTS`) |
-| Cost and time of the full build | Estimated at about 7 h and $12–50 on a spot c7a.48xlarge in us-west-2 (`BANDWIDTH.md`). Budgeted in CR-0037. |
-| Datum | Under 2 m between EPSG:3857/WGS84 and NAD83. The pipeline is pinned and recorded in `GROUSE_PROJ`. |
+| CRS and unit errors | Pinned per-source pipelines, header check, C3 per work unit, C5 per work unit, W2 spans both readers |
+| Registration | Edge binning plus C1 and C2, each with a control |
+| Leaf state, density and year offsets between projects | Per-cell `A` and day-of-year in metadata, C7, leaf-risk flag; CR-0037 must evaluate within project |
+| Steep-terrain HAG | IDW of k = 6 within 30 m; W3 |
+| Memory | 64-cell blocks |
+| Snow on early-spring flights | Tracked to CR-0037 QA |
 
 ## Test plan
-**Here:** `tests/test_cr0036.py`, the lint and all existing suites. PDAL tests skip if PDAL is unavailable.
-
-**On EC2 (owner):** install the conda environment, run the pilot, then `check_lidar_structure.py --pilot`. Commit the outputs to `evidence/CR-0036/`.
-
-**Cannot be validated here:** real point clouds, S3 and rockyweb throughput, PDAL HAG behaviour on steep terrain, and leaf condition per flight.
+- **Here:** `tests/test_cr0036.py` (controls, oracles, lint), `check_lidar_structure.py --self-test`, all existing suites.
+- **On EC2 (owner):** the pilot, then `check_lidar_structure.py --pilot /tmp/lidar_pilot`. Outputs are committed to `evidence/CR-0036/`.
+- **Cannot be validated here:** real point clouds, S3 and rockyweb throughput, real leaf state per flight.
 
 ## Deliverables
-- [ ] 1. This CR, the review log, `tests/test_cr0036.py`, `check_lidar_structure.py`; two independent reviews; approval.
-- [ ] 2. `generate_lidar_structure.py`, `models.py` additions; all suites pass.
-- [ ] 3. NH pilot on EC2; `check_lidar_structure.py --pilot` exits 0; evidence committed.
-- [ ] 4. Bookkeeping: `ARCHITECTURE.md` (pipeline step 2 note), `CHANGELOG.md`, tracker; CR-0037 drafted with the measured throughput.
+- [ ] 1. This CR, the review log, `check_lidar_structure.py`, `tests/test_cr0036.py`; reviews; approval.
+- [ ] 2. `build_lidar_sources.py`, `lidar_sources.csv` (pinned WESM sha256), `generate_lidar_structure.py`, `envs/lidar.yml`; skip guards removed; all suites pass.
+- [ ] 3. NH pilot on EC2; the C1–C6 gates and every control pass as specified; evidence committed (including `wesm_summary.txt` and `newest_points.txt`).
+- [ ] 4. Bookkeeping: `ARCHITECTURE.md`, `CHANGELOG.md`, tracker rows (CR-0037 must evaluate within work unit and within `|Y − A| ≤ 2`); CR-0037 drafted with the measured throughput.
 
 ## Out of scope
-- **CR-0037:** the full ME/NH/VT build, the 100 m neighbourhood layers, per-project leaf-condition QA and normalisation, and the keep/remove evaluation.
-- **Other data:** 3DEP terrain (DEM) features; state nDSM, NAIP-CHM and ORNL products.
-- **Disturbance after 2024:** detecting it, for example with LCMS 2025 (tracked).
+- **CR-0037:** the full build; registry, `PATH_TEMPLATES` and `models.py` entries; 100 m neighbourhood layers; per-project normalisation; snow QA; the keep/remove evaluation.
+- **Other data and corrections:** 3DEP terrain (DEM) features; state nDSM, NAIP-CHM and ORNL products; LCMS 2025 disturbance (tracked).

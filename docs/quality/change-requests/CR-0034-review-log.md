@@ -10,6 +10,12 @@ Companion to `CR-0034-ee-download-on-source-lattice.md` (CR-0011 A4).
 | 2 | v2 (`fb3a824`), bounded | A | APPROVE WITH FOLLOW-UPS | 0 (1 LOW) |
 | 2 | v2 (`fb3a824`), bounded | B (ran the standing suites; PA-0035 sweep) | APPROVE WITH FOLLOW-UPS | 0 (1 LOW) |
 
+| 3 | v3 (`8281e48`), bounded | A (reproduced BUG-0095: 0.943 default vs 1.000 at 1e-6, 20,000 cells) | APPROVE WITH FOLLOW-UPS | 0 (1 MEDIUM, 1 LOW) |
+| 3 | v3 (`8281e48`), bounded | B (measured the exact warp's cost: ~16x on the warp step) | APPROVE WITH FOLLOW-UPS | 0 (2 LOW) |
+
+Round 3: both reviewers and the author sign off on v3; approved. v4
+applies the follow-ups and the code lands with it.
+
 Round 2: both reviewers and the author sign off on v2. v3 applies the two
 LOW follow-ups and adds §5 (BUG-0095, raised in CR-0035's round 2), which
 is new text and goes to a bounded round-3 re-review before implementation.
@@ -44,3 +50,15 @@ All nine fail.
 Trial implementation (v3, not committed): `test_cr0034` (26) and
 `test_cr0018_candidates` (20) pass, 46/46; the ten mutants listed in the
 CR fail.
+
+## Round 3: concerns and dispositions (v4)
+| id | sev | concern (short) | disposition | where |
+|---|---|---|---|---|
+| A34-3-1 | MEDIUM | BUG-0095 sweep calls `generate_time_since_disturbance` harmless; it warps the CONUS grid onto the rotated template (`tsd` is a training channel) | accepted: confirmed instance **BUG-0096**; `tolerance=WARP_TOLERANCE_PX` in this CR's code, G11 pins it; `tsd` regenerated in CR-0035 step 2.5; coverage-repair, predict-map and diagnostic warps tracked | §5; BUG-0095 §8; BUG-0096 |
+| A34-3-2 | LOW | "real layers are smoother" understates categorical layers | accepted: BUG-0095 §3 reworded | BUG-0095 |
+| B34-3-1 | LOW | runtime cost of the exact transformer unstated | accepted: §5 states ~11-16x on the warp step, ~1-2 min per region-sized layer; CR-0035 records times | §5 |
+| B34-3-2 | LOW | G11 accepts only the bare-name spelling | accepted: bare name or module attribute | G11 |
+| B35-3-1 (CR-0035) | MEDIUM | TreeMap raw write not atomic | accepted here (the code is CR-0034's): stage `.tmp` + `os.replace` | §3 |
+
+Implementation: the trial code ported unchanged plus the v4 items; full
+suite 519 tests OK (6 skipped, real data); PA-0035 sweep 0 hits.

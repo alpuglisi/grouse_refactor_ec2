@@ -91,6 +91,7 @@ from rasterio.enums import Resampling
 from rasterio.windows import Window
 
 from grouse_data import GrouseData, NODATA_SENTINELS
+from realign_rasters import WARP_TOLERANCE_PX
 from models import TSD_MAX_YEARS, tsd_encode
 
 CACHE_DIR = "data/disturbance"
@@ -296,7 +297,8 @@ def process_region(region, data, dist_paths, block_rows,
             srcs.append(s)
             vrts[d] = WarpedVRT(s, crs=ref_crs, transform=ref_transform,
                                 width=width, height=height,
-                                resampling=Resampling.nearest)
+                                resampling=Resampling.nearest,
+                                tolerance=WARP_TOLERANCE_PX)  # BUG-0096
         for y in years:
             path = os.path.join(raster_dir, f"{region}_{y}_tsd.tif")
             outs[y] = rasterio.open(path, "w", **profile)

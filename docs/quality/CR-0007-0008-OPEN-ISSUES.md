@@ -308,3 +308,10 @@ Split window mask reads pinned `SPLIT_WINDOW_FEATURES` (BUG-0093, PA-0048).
 ## BUG-0094 (OPEN, 2026-10-05) — on-disk nlcd about one cell off the template grid, owner: lead
 - [ ] Full investigation (BUG-0094 doc): confirm on `tcc` and in ME/VT; sweep every layer downloaded by Earth Engine (`download_tcc_nlcd.py`, `download_treemap.py`, others) against `road_dist`.
 - [ ] CR: re-download affected layers straight onto the template grid; measure the training effect.
+
+## CR-0034 (IMPLEMENTED, 2026-10-05) / CR-0035 (APPROVED) — follow-ups, owner: lead
+- [ ] BUG-0095 sweep: `repair_coverage_rasters.py:130` and `check_raster_repair.py:121` warp CONUS vintages with the approximate transformer (CR-0010 coverage masks, edge cells) - fold into the CR-0010 re-run item below. Owner: lead
+- [ ] CR-0010 coverage masks were repaired from the shifted NLCD footprint (A35-5): re-run the CR-0010 repair after CR-0035 (own change). Owner: lead
+- [ ] BUG-0095 sweep: `predict.py:724` display reprojection of the output map uses the default transformer (map output only, low); `find_tsd_contrast_points.py:117` diagnostic (low). Owner: lead
+- [ ] TreeMap assets `USFS/GTAC/TreeMap/v20xx` deprecated; migrate to `projects/gtac-data-publish/assets/TreeMap/Product_Version/2023-1` (own CR). Owner: lead
+- [ ] PA-0049(b) follow-up: make the registration gate a standing check before training (CR candidate). Owner: lead

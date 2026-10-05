@@ -96,9 +96,9 @@ def point_sampler(src):
     return sample
 
 
-class RegistrationGate(unittest.TestCase):
-    """check_layer_registration passes registered files and fails
-    BUG-0094-shifted ones (half a pixel, via the measured SE tie)."""
+class GateFixture(unittest.TestCase):
+    """Shared fixture (no tests of its own): a rotated template and a
+    synthetic source on a 15 m-offset lattice."""
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tmp)
@@ -134,6 +134,9 @@ class RegistrationGate(unittest.TestCase):
         return {"crs": self.src.crs, "x0": float(self.src.sx0),
                 "y0": float(self.src.sy0)}
 
+class RegistrationGate(GateFixture):
+    """check_layer_registration passes registered files and fails
+    BUG-0094-shifted ones (half a pixel, via the measured SE tie)."""
     def test_template_file(self):
         fn = point_sampler(self.src)
         good = clr.check_template_file(self.on_template(self.lattice_copy(0)),
@@ -162,7 +165,7 @@ class RegistrationGate(unittest.TestCase):
         self.assertEqual(d.tolist(), [0.0, 15.0, 2.0])
 
 
-class DerivedGate(RegistrationGate):
+class DerivedGate(GateFixture):
     """Each derived TreeMap layer vs its own raw attributes, encoded as
     generate_treemap_features does (A35-2-1): includes harvested plots
     with down wood but no live basal area."""
@@ -228,6 +231,51 @@ class SplitGate(unittest.TestCase):
         self.assertTrue(csu.compare(same, {"a.csv": "1"}, same, paths))
         self.assertTrue(csu.compare(same, same, {"a.csv": "1", "b.csv": None}, paths))
         self.assertTrue(csu.compare({"a.csv": "1"}, same, same, paths))
+
+
+
+class DerivedGateRealGenerator(GateFixture):
+    """The derived check against the REAL generate_treemap_features
+    .write_vintage (review A35-3-2): every derived layer it writes from
+    native-lattice raw files must pass check_derived_file at 100 %."""
+    def test_write_vintage(self):
+        import generate_treemap_features as gtf
+        rng = np.random.default_rng(2)
+        h, w = self.src.h, self.src.w
+        raws = {"BALIVE": rng.uniform(0, 200, (h, w)),
+                "TPA_LIVE": rng.uniform(0, 900, (h, w)),
+                "CARBON_DWN": rng.uniform(0, 30, (h, w))}
+        raws["BALIVE"][::4, :] = 0.0
+        raws["TPA_LIVE"][::4, :] = 0.0
+        src_dir = os.path.join(self.tmp, "raw")
+        os.makedirs(src_dir)
+        paths = {}
+        for at, arr in raws.items():
+            p = os.path.join(src_dir, f"TreeMap2022_NH_{at}.tif")
+            with rasterio.open(p, "w", driver="GTiff", height=h, width=w,
+                               count=1, dtype="float32", crs=self.src.crs,
+                               transform=from_origin(self.src.sx0,
+                                                     self.src.sy0, 30, 30)) as d:
+                d.write(arr.astype(np.float32), 1)
+            paths[at] = p
+        with rasterio.open(self.tpl) as t:
+            prof = t.profile
+        prof.update(dtype="int16", nodata=-9999, count=1)
+        nlcd = os.path.join(self.tmp, "NH_2025_nlcd.tif")
+        with rasterio.open(nlcd, "w", **prof) as d:
+            d.write(np.full((prof["height"], prof["width"]), 41, np.int16), 1)
+        out_dir = os.path.join(self.tmp, "out")
+        os.makedirs(out_dir)
+        with mock.patch("builtins.print"):
+            gtf.write_vintage("NH", 2024, 2022, src_dir, self.tpl, prof,
+                              out_dir, 64, nlcd)
+        for feat in clr.DERIVED:
+            with self.subTest(feat=feat):
+                r = clr.check_derived_file(
+                    os.path.join(out_dir, f"NH_2024_{feat}.tif"), feat,
+                    {at: paths[at] for at in clr.NEEDS[feat]})
+                self.assertGreater(r["n"], 300)
+                self.assertEqual(r["equal"], 1.0)
 
 
 if __name__ == "__main__":

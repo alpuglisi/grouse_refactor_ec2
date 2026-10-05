@@ -80,7 +80,7 @@ def main():
 
     image, band = dtn.year_image(ee, cid, spec["bands"], year)
     bounds = gcs.template_bounds_lonlat(dtn.template_raster(rd))
-    x0, y0, x1, y1 = dtn.region_grid(bounds)
+    x0, y0, x1, y1 = dtn.region_grid(bounds, grid=dtn.BUG0094_ZERO_GRID)
     cx = x0 + ((x1 - x0) // 2 // 6000) * 6000
     cy = y0 + ((y1 - y0) // 2 // 6000) * 6000
     rect = (cx, cy, cx + 6000, cy + 6000)
@@ -89,8 +89,8 @@ def main():
              rect[2] + PIXEL_M + ox, rect[3] + PIXEL_M + oy)
     with tempfile.TemporaryDirectory() as td:
         pz, pn = os.path.join(td, "zero.tif"), os.path.join(td, "native.tif")
-        dtn.fetch_tile(ee, image, rect, pz)
-        dtn.fetch_tile(ee, image, nrect, pn)
+        dtn.fetch_tile(ee, image, rect, pz, crs="EPSG:5070")
+        dtn.fetch_tile(ee, image, nrect, pn, crs="EPSG:5070")
         with rasterio.open(pz) as s:
             z, zt = s.read(1), s.transform
         with rasterio.open(pn) as s:

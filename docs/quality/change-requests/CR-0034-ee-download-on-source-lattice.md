@@ -1,8 +1,8 @@
 # CR-0034: Earth Engine downloads requested on each source's own grid
 
-**Status: DRAFT v3, 2026-10-05** — round 2 approved v2 with follow-ups;
-v3 applies them and adds §5 (BUG-0095, found in round 2); awaiting a
-bounded re-review of §5. Verdicts and dispositions: `CR-0034-review-log.md`. This document states only current intent.
+**Status: IMPLEMENTED (code), 2026-10-05** — v4; round 3 approved v3 with
+follow-ups (both reviewers and the author), v4 applies them. Data repair:
+CR-0035. Verdicts and dispositions: `CR-0034-review-log.md`. This document states only current intent.
 
 ## Scope
 `download_tcc_nlcd.py` and `download_treemap.py` request every tile on the
@@ -12,7 +12,8 @@ nearest warp onto the region's template grid.
 
 ## Fixes
 BUG-0094 (root cause confirmed: `evidence/CR-0032/source_lattice_NH.txt`)
-and, on the same files, BUG-0095 (approximate warp transformer, §5).
+and, on the same files, BUG-0095 (approximate warp transformer, §5) and
+its sweep instance BUG-0096 (`tsd`).
 The data repair that uses this code is CR-0035.
 
 ## Why now
@@ -75,7 +76,9 @@ affected; CR-0032's canopy layers also wait on a registered NLCD.
   single Image, its own grid. `main` computes it per (vintage, region) and
   passes `grid=` (a required keyword) and `source="<asset> <band>"` to
   `build_raster`, which uses the same lattice check and writes the raw
-  file in `grid["crs"]` with the two tags.
+  file in `grid["crs"]` with the two tags, staged as `.tmp` then
+  `os.replace`d (a killed run never leaves a partial file under the final
+  name).
 - `generate_treemap_features.py` is unchanged (it already warps nearest
   onto the template from whatever CRS the raw file carries).
 
@@ -113,12 +116,16 @@ affected; CR-0032's canopy layers also wait on a registered NLCD.
 
 ### 5. Exact local warp (BUG-0095)
 `realign_rasters.WARP_TOLERANCE_PX = 1e-6`, passed as `tolerance=` by
-`warp_to_grid` and by `generate_treemap_features`' `WarpedVRT` (imported).
+`warp_to_grid`, by `generate_treemap_features`' `WarpedVRT` and by
+`generate_time_since_disturbance`'s (BUG-0096; imported).
 GDAL's default approximate transformer (0.125 px) sends ~7 % of nearest
 picks to a neighbouring pixel on a 60 km rotated grid (BUG-0095 §3);
 1e-6 px is exact in practice (`tolerance=0` with an explicit transform
 fails in rasterio 1.5's `WarpedVRT`). `warp_to_grid` is also used by
 `realign_rasters.py` for other files; exactness only removes error there.
+Cost: the exact transformer is ~11-16x slower on the warp step (reviewers
+measured 1.0 s vs 0.09 s and 4.2 s vs 0.26 s per 4-16 M cells), roughly
+1-2 minutes per region-sized layer; CR-0035 records the observed times.
 The other warps in the repository are swept in BUG-0095 §8 (tracked).
 
 ## One change per CR (CR-0011 A5)
@@ -163,8 +170,9 @@ with the source in EPSG:5070 and in a custom Albers WKT.
   grids; `vintage_native_grid` handles collection and Image.
 - G10 `warp_to_grid` on a 60 km rotated grid: every sampled cell takes the
   source pixel containing its centre (the default transformer: ~95 %).
-- G11 both repair-path `WarpedVRT` calls pass `WARP_TOLERANCE_PX`
-  (<= 1e-6).
+- G11 every repair-path `WarpedVRT` call (`realign_rasters`,
+  `generate_treemap_features`, `generate_time_since_disturbance`) passes
+  `WARP_TOLERANCE_PX` (<= 1e-6), as a bare name or module attribute.
 - Author's trial implementation (not committed): all pass; mutants fail -
   0-origin snap, hard-coded request `crs`, no lattice check, TreeMap's own
   `region_grid`, merged file labelled EPSG:5070, raw TreeMap labelled
@@ -177,10 +185,11 @@ with the source in EPSG:5070 and in a custom Albers WKT.
 `diagnose_layer_registration.py` must show every layer at (0, 0)).
 
 ## Deliverables
-- [ ] 1. This CR and `tests/test_cr0034.py`; two independent reviews;
-      approval.
-- [ ] 2. Code (§1-§4) and the `test_cr0018_candidates` update; all
-      suites pass.
+- [x] 1. This CR and `tests/test_cr0034.py`; two independent reviews;
+      approval (round 3).
+- [x] 2. Code (§1-§5) and the `test_cr0018_candidates` update; all
+      suites pass (519 tests, 6 skipped for missing real data; PA-0035
+      sweep 0 hits).
 - [ ] 3. BUG-0094 corrective action §6 updated; PA-0049 filed with CR-0035
       close-out (its sweep is done: `layer_registration_sweep.txt`).
 

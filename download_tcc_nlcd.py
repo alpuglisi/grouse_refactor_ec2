@@ -298,35 +298,128 @@ def choose_product_years(product_years, needed_years):
     return sorted(chosen)
 
 
-def region_grid(bounds_lonlat, pad_m=2000):
-    """(x0, y0, x1, y1) in EPSG:5070, padded and snapped to the 30 m
-    grid so every tile and the merged mosaic share pixel edges."""
-    t = Transformer.from_crs("EPSG:4326", "EPSG:5070", always_xy=True)
+# The 0-origin EPSG:5070 lattice the pre-CR-0034 downloads used. For the
+# diagnostics that REPRODUCE BUG-0094 only - never a download grid.
+BUG0094_ZERO_GRID = {"crs": "EPSG:5070", "x0": 0.0, "y0": 0.0}
+
+
+def parse_native_grid(info):
+    """A source's native grid from Earth Engine's projection().getInfo():
+    {"crs": EPSG code if given, else WKT, "x0", "y0": lattice origin}.
+    Refuses anything but a north-up 30 m affine (CR-0034, BUG-0094)."""
+    crs = info.get("crs") or info.get("wkt")
+    t = info.get("transform")
+    if not crs or not t or len(t) < 6:
+        raise ValueError(f"source projection has no CRS/affine transform: "
+                         f"{info}")
+    a, b, x0, d, e, y0 = (float(v) for v in t[:6])
+    if abs(a - PIXEL_M) > 1e-6 or abs(e + PIXEL_M) > 1e-6 or \
+            abs(b) > 1e-6 or abs(d) > 1e-6:
+        raise ValueError(f"source grid is not north-up {PIXEL_M} m: {t} "
+                         f"({crs if len(str(crs)) < 60 else str(crs)[:60]})")
+    return {"crs": crs, "x0": x0, "y0": y0}
+
+
+def common_native_grid(infos, what):
+    """The one native grid shared by every source image a request touches
+    (projection().getInfo() dicts). Refuses an empty list, or images on
+    different CRSs or lattices: a request can be on only one of them, and
+    the others would be resampled (CR-0034 review B34-1/A34-1)."""
+    from rasterio.crs import CRS
+    if not infos:
+        raise ValueError(f"{what}: no source image intersects the region")
+    grids = [parse_native_grid(i) for i in infos]
+    g0 = grids[0]
+    c0 = CRS.from_user_input(g0["crs"])
+    for g in grids[1:]:
+        dx = (g["x0"] - g0["x0"]) % PIXEL_M
+        dy = (g["y0"] - g0["y0"]) % PIXEL_M
+        if CRS.from_user_input(g["crs"]) != c0 or \
+                min(dx, PIXEL_M - dx) > 1e-6 or min(dy, PIXEL_M - dy) > 1e-6:
+            raise ValueError(f"{what}: source images on different grids "
+                             f"({g0['x0']}, {g0['y0']}) vs ({g['x0']}, "
+                             f"{g['y0']}) - not downloadable without "
+                             f"resampling one of them")
+    return g0
+
+
+def padded_lonlat(bounds_lonlat, pad_m):
+    """bounds grown by pad_m on every side (degrees, conservatively at the
+    box's widest latitude)."""
+    w, so, e, n = bounds_lonlat
+    dlat = pad_m / 111_000.0
+    dlon = dlat / max(math.cos(math.radians(max(abs(so), abs(n)))), 0.1)
+    return (w - dlon, so - dlat, e + dlon, n + dlat)
+
+
+def subset_projections(ee, subset):
+    """projection().getInfo() of every image in an ImageCollection."""
+    return subset.toList(1000).map(
+        lambda im: ee.Image(im).projection()).getInfo()
+
+
+def year_native_grid(ee, cid, year, bounds_lonlat):
+    """The native grid of the images of that year that intersect the
+    region (year_image mosaics the same subset; a mosaic has no native
+    projection of its own). All of them must share one grid."""
+    col = ee.ImageCollection(cid)
+    sub = col.filter(ee.Filter.calendarRange(year, year, "year"))
+    if sub.size().getInfo() == 0:
+        sub = col.filter(ee.Filter.stringContains("system:index",
+                                                  str(year)))
+    # padded like the tiles (region_grid pads 2 km): every image a tile
+    # touches must share the grid (CR-0034 review A34-2-1)
+    sub = sub.filterBounds(ee.Geometry.Rectangle(
+        list(padded_lonlat(bounds_lonlat, 4000))))
+    return common_native_grid(subset_projections(ee, sub),
+                              f"{cid} {year}")
+
+
+def _snap(v, origin, up):
+    k = (v - origin) / PIXEL_M
+    return origin + (math.ceil(k) if up else math.floor(k)) * PIXEL_M
+
+
+def region_grid(bounds_lonlat, *, grid, pad_m=2000):
+    """(x0, y0, x1, y1) in grid["crs"], padded and snapped to the
+    SOURCE's own lattice (grid x0/y0), so Earth Engine copies pixels
+    instead of resampling them. A lattice offset half a pixel from the
+    source makes every nearest-neighbour choice a tie (BUG-0094)."""
+    from rasterio.crs import CRS
+    crs = CRS.from_user_input(grid["crs"])
+    t = Transformer.from_crs("EPSG:4326", crs, always_xy=True)
     lons = [bounds_lonlat[0], bounds_lonlat[0],
             bounds_lonlat[2], bounds_lonlat[2]]
     lats = [bounds_lonlat[1], bounds_lonlat[3],
             bounds_lonlat[1], bounds_lonlat[3]]
     xs, ys = t.transform(lons, lats)
-    x0 = math.floor((min(xs) - pad_m) / PIXEL_M) * PIXEL_M
-    y0 = math.floor((min(ys) - pad_m) / PIXEL_M) * PIXEL_M
-    x1 = math.ceil((max(xs) + pad_m) / PIXEL_M) * PIXEL_M
-    y1 = math.ceil((max(ys) + pad_m) / PIXEL_M) * PIXEL_M
-    return x0, y0, x1, y1
+    return (_snap(min(xs) - pad_m, grid["x0"], False),
+            _snap(min(ys) - pad_m, grid["y0"], False),
+            _snap(max(xs) + pad_m, grid["x0"], True),
+            _snap(max(ys) + pad_m, grid["y0"], True))
 
 
 def tiles(x0, y0, x1, y1, tile_m):
-    for ty in range(int(y0), int(y1), int(tile_m)):
-        for tx in range(int(x0), int(x1), int(tile_m)):
+    """Tiles of tile_m (a multiple of the pixel size) from (x0, y0); every
+    edge stays on the lattice x0/y0 lie on."""
+    ty = y0
+    while ty < y1:
+        tx = x0
+        while tx < x1:
             yield tx, ty, min(tx + tile_m, x1), min(ty + tile_m, y1)
+            tx += tile_m
+        ty += tile_m
 
 
-def fetch_tile(ee, image, rect, dest, retries=4):
+def fetch_tile(ee, image, rect, dest, *, crs, retries=4):
     """One getDownloadURL request -> GeoTIFF on disk, with backoff.
-    crs_transform pins the global 30 m grid so tiles merge exactly."""
+    crs and crs_transform pin the SOURCE's own lattice (CR-0034), so the
+    tile is a copy of source pixels and tiles merge exactly."""
     params = {
-        "crs": "EPSG:5070",
+        "crs": crs,
         "crs_transform": [PIXEL_M, 0, rect[0], 0, -PIXEL_M, rect[3]],
-        "region": ee.Geometry.Rectangle(list(rect), "EPSG:5070", False),
+        "region": ee.Geometry.Rectangle(list(rect), ee.Projection(crs),
+                                        False),
         "format": "GEO_TIFF",
     }
     delay = 2.0
@@ -407,17 +500,30 @@ def _check_coverage(feature, staged, coverage_path, out_path):
             f"Earth Engine's mask was not exported as nodata. Not written.")
 
 
+def check_on_lattice(transform, grid, what):
+    """Refuse a mosaic whose origin is off the source lattice (CR-0034):
+    it would be resampled again, with BUG-0094's tie bias."""
+    for v, o in ((transform.c, grid["x0"]), (transform.f, grid["y0"])):
+        r = (v - o) % PIXEL_M
+        if min(r, PIXEL_M - r) > 1e-6:
+            raise RuntimeError(f"{what}: merged tiles at {tuple(transform)[:6]} "
+                               f"are off the source lattice ({grid['x0']}, "
+                               f"{grid['y0']}) - not written")
+
+
 def build_raster(ee, feature, spec, cid, year, bounds_lonlat, out_path,
                  tile_m, workers=8, template=None, coverage_path=None):
     image, band = year_image(ee, cid, spec["bands"], year)
-    x0, y0, x1, y1 = region_grid(bounds_lonlat)
+    grid = year_native_grid(ee, cid, year, bounds_lonlat)
+    x0, y0, x1, y1 = region_grid(bounds_lonlat, grid=grid)
     tile_list = list(tiles(x0, y0, x1, y1, tile_m))
     lo, hi = spec["valid_range"]
     with tempfile.TemporaryDirectory() as td:
         paths = [os.path.join(td, f"t{i}.tif")
                  for i in range(len(tile_list))]
         _fetch_all(len(tile_list),
-                   lambda i: fetch_tile(ee, image, tile_list[i], paths[i]),
+                   lambda i: fetch_tile(ee, image, tile_list[i], paths[i],
+                                        crs=grid["crs"]),
                    workers, f"   {os.path.basename(out_path)}")
         srcs = [rasterio.open(p) for p in paths]
         try:
@@ -425,6 +531,7 @@ def build_raster(ee, feature, spec, cid, year, bounds_lonlat, out_path,
         finally:
             for s in srcs:
                 s.close()
+        check_on_lattice(transform, grid, out_path)
         out = mask_to_valid(mosaic[0], lo, hi)
         valid_frac = float((out != NODATA).mean())
         if valid_frac < 0.01:
@@ -440,10 +547,12 @@ def build_raster(ee, feature, spec, cid, year, bounds_lonlat, out_path,
         # 5070 first, then warped onto the template exactly as
         # realign_rasters.py does for files already on disk. Nearest:
         # nlcd is categorical and tcc an integer percent.
-        merged = os.path.join(td, "merged_5070.tif")
+        merged = os.path.join(td, "merged_native.tif")
+        from rasterio.crs import CRS
         with rasterio.open(merged, "w", driver="GTiff",
                            height=out.shape[0], width=out.shape[1],
-                           count=1, dtype="int16", crs="EPSG:5070",
+                           count=1, dtype="int16",
+                           crs=CRS.from_user_input(grid["crs"]),
                            transform=transform, nodata=NODATA,
                            compress="lzw", tiled=True) as dst:
             dst.write(out, 1)
@@ -460,7 +569,9 @@ def build_raster(ee, feature, spec, cid, year, bounds_lonlat, out_path,
                                    f"template grid after warping: {why}")
             _check_coverage(feature, staged, coverage_path, out_path)
             with rasterio.open(staged, "r+") as dst:
-                dst.update_tags(GROUSE_COVERAGE="ee-mask")
+                dst.update_tags(GROUSE_COVERAGE="ee-mask",
+                                GROUSE_GRID="native-lattice",
+                                GROUSE_SOURCE=f"{cid} {year}")
             shutil.copyfile(staged, out_path + ".tmp")
             os.replace(out_path + ".tmp", out_path)
             grid_note = f"on template grid {os.path.basename(template)}"
@@ -508,7 +619,14 @@ def main():
                              "standard data/landfire.")
     parser.add_argument("--force", action="store_true",
                         help="Re-download files that already exist.")
+    parser.add_argument("--collection", default=None,
+                        help="Pin the Earth Engine collection id (one "
+                             "--features at a time) instead of the first "
+                             "readable candidate - e.g. to re-download "
+                             "with the version an earlier run used.")
     args = parser.parse_args()
+    if args.collection and len(args.features) != 1:
+        raise SystemExit("--collection needs exactly one --features")
 
     ee = ee_init(args.project)
     out_dir = args.out_dir or DataConfig().raster_dir
@@ -517,7 +635,7 @@ def main():
 
     for feature in args.features:
         spec = PRODUCTS[feature]
-        cid = resolve_collection(ee, spec["collections"])
+        cid = args.collection or resolve_collection(ee, spec["collections"])
         pub_years = collection_years(ee, cid)
         if not pub_years:
             raise SystemExit(f"Could not determine published years for "

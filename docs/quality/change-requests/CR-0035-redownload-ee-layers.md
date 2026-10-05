@@ -1,18 +1,20 @@
 # CR-0035: re-download the Earth Engine layers on the source grid, re-accept, measure
 
-**Status: DRAFT v3, 2026-10-05** — round 2 approved v2 with follow-ups;
-v3 applies them; awaiting a bounded re-review of the changed text. Depends on CR-0034 (code). Verdicts and dispositions:
+**Status: APPROVED WITH FOLLOW-UPS (v4), 2026-10-05** — round 3 approved
+v3 (both reviewers and the author); v4 applies the follow-ups. CR-0034's
+code is in (`download_tcc_nlcd`, `download_treemap`, exact warps). Depends on CR-0034 (code). Verdicts and dispositions:
 `CR-0035-review-log.md`. This document states only current intent.
 
 ## Scope
 Replace every on-disk Earth Engine layer file (`nlcd`, `tcc`, `balive`,
 `tpa_live`, `qmd`, `carbon_dwn`, every region and year, and the raw
-TreeMap files) with a CR-0034 download, prove each file is registered
+TreeMap files) with a CR-0034 download, regenerate `tsd` with the exact
+warp, prove each file is registered
 with its source, regenerate the split manifests and re-accept the split
 (split files unchanged), and measure the effect on the model.
 
 ## Fixes
-BUG-0094 and BUG-0095 (data half; the code half is CR-0034).
+BUG-0094, BUG-0095 and BUG-0096 (data half; the code half is CR-0034).
 
 ## Why now
 The six layers are ~half a cell off in every region
@@ -69,6 +71,9 @@ the collection id recorded in step 1:
 3. `download_treemap.py --regions R --vintages V(R)`
 4. `generate_treemap_features.py --src-dir data/treemap_raw --regions R
    --years Y_treemap(R)`
+5. `generate_time_since_disturbance.py --regions R --years Y_tsd(R)` (the
+   exact warp, BUG-0096; it always rewrites its outputs, so `tsd` is not
+   deleted in step 0.4, only snapshotted)
 The inventory after step 2 must equal step 0.3's (`inventory_after.txt`);
 every new NLCD/TCC/raw TreeMap file carries `GROUSE_GRID=native-lattice`.
 
@@ -77,7 +82,8 @@ every new NLCD/TCC/raw TreeMap file carries `GROUSE_GRID=native-lattice`.
 year, at least `MIN_EQUAL` of its sampled cells equal to the independent
 reference (the script owns its constants and method: Earth Engine point
 samples of the source at native scale for NLCD/TCC and the raw TreeMap
-files; the raw BALIVE forest mask for the derived TreeMap layers). The
+files; each derived TreeMap layer rebuilt from its own raw attributes as
+`generate_treemap_features` builds it). The
 same script run on the snapshot must exit 1 and report at least as many
 files as the inventory (`check_layer_registration.py --data-root
 ~/grouse2_before --collection-nlcd C_nlcd --collection-tcc C_tcc`); its
@@ -143,7 +149,7 @@ scripts); the code fix is CR-0034. The evaluation measures this repair.
 ## Risk: MEDIUM
 | risk | mitigation |
 |---|---|
-| A run fails midway | Files cleared in step 0.4, so missing = to do; per-file atomic writes; rerun without `--force` |
+| A run fails midway | Files cleared in step 0.4, so missing = to do; `download_tcc_nlcd` and `download_treemap` write atomically (stage + `os.replace`), so a file under its final name is complete; `generate_treemap_features` and `generate_time_since_disturbance` always rewrite their outputs (re-run them after any interruption) |
 | Earth Engine rejects a native WKT `crs` | Step 1 pilot |
 | Product versions moved since the first download | `--collection` pins the id recorded in step 1; `--years` pins the years; inventories compared |
 | The split changes | Gate 4.2 fails; rollback |
@@ -163,13 +169,13 @@ scripts); the code fix is CR-0034. The evaluation measures this repair.
 - EC2 evidence for steps 0-5.
 
 ## Deliverables
-- [ ] 1. This CR, `check_layer_registration.py`, `check_split_unchanged.py`,
-      `tests/test_cr0035.py`; two independent reviews; approval.
+- [x] 1. This CR, `check_layer_registration.py`, `check_split_unchanged.py`,
+      `tests/test_cr0035.py`; two independent reviews; approval (round 3).
 - [ ] 2. Steps 0-2 on EC2 (after CR-0034 lands), inventories equal.
 - [ ] 3. Gate 3 passes on the repaired data and fails on the snapshot.
 - [ ] 4. Gates 4.2 and 4.3 pass.
 - [ ] 5. Evaluation recorded.
-- [ ] 6. Bookkeeping: BUG-0094 FIXED, PA-0049, BUG_LOG, CHANGELOG,
+- [ ] 6. Bookkeeping: BUG-0094/0095/0096 FIXED, PA-0049, BUG_LOG, CHANGELOG,
       ARCHITECTURE (step 2 note), tracker; close-out.
 
 ## Out of scope

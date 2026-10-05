@@ -10,6 +10,12 @@ Companion to `CR-0035-redownload-ee-layers.md` (CR-0011 A4).
 | 2 | v2 (`fb3a824`), bounded | A | APPROVE WITH FOLLOW-UPS (A35-2-1 before step 3) | 0 (1 MAJOR, 2 MEDIUM, 2 LOW) |
 | 2 | v2 (`fb3a824`), bounded | B | APPROVE WITH FOLLOW-UPS (two MAJORs dispositioned before approval) | 0 (2 MAJOR, 3 MEDIUM, 3 LOW) |
 
+| 3 | v3 (`8281e48`), bounded | A | APPROVE WITH FOLLOW-UPS | 0 (3 LOW) |
+| 3 | v3 (`8281e48`), bounded | B | APPROVE WITH FOLLOW-UPS | 0 (1 MEDIUM) |
+
+Round 3: both reviewers and the author sign off on v3; approved. v4
+applies the follow-ups.
+
 Round 2: both reviewers and the author sign off on v2 subject to the
 MAJORs; v3 fixes all of them in code/text. Because v3 changes the gate
 script and the steps, the changed text goes to a bounded round 3.
@@ -44,3 +50,12 @@ script and the steps, the changed text goes to a bounded round 3.
 | B35-2-5 | MEDIUM | snapshot failure not attributable to the shift | accepted: gate reports equality at the BUG-0094 offset (+15, -15 m): high on shifted files, low on repaired ones (tested) | gate; step 3 |
 | B35-2-6 | LOW | hard links shared with live tree | accepted: `snapshot.sha256` recorded at step 0.1 and verified before step 3's snapshot run, the before arm and any rollback | step 0.1 |
 | B35-2-7 | LOW | TreeMap step without `--vintages` | accepted: `--vintages V(R)` | step 2.3 |
+
+## Round 3: concerns and dispositions (v4)
+| id | sev | concern (short) | disposition | where |
+|---|---|---|---|---|
+| A35-3-1 | LOW | step 3 still says "raw BALIVE forest mask" (CR-0011 A4) | accepted: reworded to the exact rebuild | step 3 |
+| A35-3-2 | LOW | derived test checks `rebuild_derived` against itself, not the generator | accepted: `DerivedGateRealGenerator` runs the real `generate_treemap_features.write_vintage` on native-lattice raw files; all four derived layers pass at 100 % (with CR-0034's exact warp) | tests |
+| A35-3-3 | LOW | `DerivedGate` re-ran the parent's tests | accepted: shared `GateFixture` base with no tests | tests |
+| B35-3-1 | MEDIUM | Risk row claims atomic writes everywhere; TreeMap raw and the generators write final paths | accepted: TreeMap raw write made atomic (CR-0034 §3); Risk row names the two rewrite-always generators | Risk; CR-0034 §3 |
+| A34-3-1 (CR-0034) | MEDIUM | `tsd` warp | step 2.5 regenerates `tsd` with the exact warp (BUG-0096) | step 2.5 |

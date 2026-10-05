@@ -108,6 +108,13 @@ _here = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _here)
 
 from regions import BOXES
+from rasterio.crs import CRS
+# CR-0034: one copy of the tile geometry, shared with download_tcc_nlcd
+# (this script's private copies are how BUG-0094 landed twice)
+from download_tcc_nlcd import (region_grid, tiles, fetch_tile,
+                               common_native_grid, subset_projections,
+                               padded_lonlat,
+                               check_on_lattice)
 
 DEFAULT_OUT_DIR = "data/treemap_raw"
 PIXEL_M = 30
@@ -221,66 +228,21 @@ def resolve_band(available, wanted):
     return hit
 
 
-def region_grid(bounds_lonlat, pad_m=2000):
-    """(x0, y0, x1, y1) in EPSG:5070, padded and snapped to the 30 m
-    grid - identical to download_tcc_nlcd.py's region_grid, so tiles
-    and any future cross-checking share pixel edges with tcc/nlcd."""
-    t = Transformer.from_crs("EPSG:4326", "EPSG:5070", always_xy=True)
-    lons = [bounds_lonlat[0], bounds_lonlat[0],
-            bounds_lonlat[2], bounds_lonlat[2]]
-    lats = [bounds_lonlat[1], bounds_lonlat[3],
-            bounds_lonlat[1], bounds_lonlat[3]]
-    xs, ys = t.transform(lons, lats)
-    x0 = math.floor((min(xs) - pad_m) / PIXEL_M) * PIXEL_M
-    y0 = math.floor((min(ys) - pad_m) / PIXEL_M) * PIXEL_M
-    x1 = math.ceil((max(xs) + pad_m) / PIXEL_M) * PIXEL_M
-    y1 = math.ceil((max(ys) + pad_m) / PIXEL_M) * PIXEL_M
-    return x0, y0, x1, y1
-
-
-def tiles(x0, y0, x1, y1, tile_m):
-    for ty in range(int(y0), int(y1), int(tile_m)):
-        for tx in range(int(x0), int(x1), int(tile_m)):
-            yield tx, ty, min(tx + tile_m, x1), min(ty + tile_m, y1)
-
-
-def fetch_tile(ee, image, rect, dest, retries=4):
-    """One getDownloadURL request -> GeoTIFF on disk, with backoff.
-    crs_transform pins the global 30 m grid so tiles merge exactly -
-    same approach as download_tcc_nlcd.fetch_tile."""
-    params = {
-        "crs": "EPSG:5070",
-        "crs_transform": [PIXEL_M, 0, rect[0], 0, -PIXEL_M, rect[3]],
-        "region": ee.Geometry.Rectangle(list(rect), "EPSG:5070", False),
-        "format": "GEO_TIFF",
-    }
-    delay = 2.0
-    for attempt in range(retries + 1):
-        try:
-            url = image.getDownloadURL(params)
-            r = requests.get(url, timeout=300)
-            r.raise_for_status()
-            with open(dest, "wb") as f:
-                f.write(r.content)
-            with rasterio.open(dest):     # parse check
-                pass
-            return
-        except (requests.exceptions.RequestException, ee.EEException,
-                rasterio.errors.RasterioIOError) as e:
-            # BUG-0066 (PA-0027 retry clause): only transient types are
-            # retried (network, EE server, truncated GeoTIFF); anything
-            # else propagates at once. Each retry is logged with its
-            # type and traceback; exhaustion raises.
-            if attempt == retries:
-                raise RuntimeError(f"tile {rect} failed after "
-                                   f"{retries + 1} attempts: "
-                                   f"{type(e).__name__}: {e}") from e
-            import traceback
-            print(f"   [retry {attempt + 1}/{retries}] tile {rect}: "
-                  f"{type(e).__name__}: {e}\n{traceback.format_exc()}",
-                  file=sys.stderr, flush=True)
-            time.sleep(delay)
-            delay *= 2
+def vintage_native_grid(ee, vintage, bounds_lonlat):
+    """The native grid of a TreeMap vintage over a region: every image of
+    the collection that intersects it (or the single Image) must share one
+    grid (CR-0034, BUG-0094)."""
+    asset_id = ASSET_TEMPLATE.format(year=vintage)
+    try:
+        col = ee.ImageCollection(asset_id)
+        if col.size().getInfo() > 0:
+            sub = col.filterBounds(ee.Geometry.Rectangle(
+                list(padded_lonlat(bounds_lonlat, 4000))))
+            return common_native_grid(subset_projections(ee, sub), asset_id)
+    except ee.EEException:
+        pass
+    return common_native_grid([ee.Image(asset_id).projection().getInfo()],
+                              asset_id)
 
 
 def _fetch_all(n_tiles, fetch_fn, workers, desc):
@@ -304,16 +266,16 @@ def _fetch_all(n_tiles, fetch_fn, workers, desc):
 
 
 def build_raster(ee, image, band, bounds_lonlat, out_path, tile_m,
-                 workers=8):
+                 workers=8, *, grid, source=""):
     single_band = image.select([band]).unmask(0).toFloat()
-    x0, y0, x1, y1 = region_grid(bounds_lonlat)
+    x0, y0, x1, y1 = region_grid(bounds_lonlat, grid=grid)
     tile_list = list(tiles(x0, y0, x1, y1, tile_m))
     with tempfile.TemporaryDirectory() as td:
         paths = [os.path.join(td, f"t{i}.tif")
                  for i in range(len(tile_list))]
         _fetch_all(len(tile_list),
                    lambda i: fetch_tile(ee, single_band, tile_list[i],
-                                       paths[i]),
+                                       paths[i], crs=grid["crs"]),
                    workers, f"   {os.path.basename(out_path)}")
         srcs = [rasterio.open(p) for p in paths]
         try:
@@ -321,6 +283,7 @@ def build_raster(ee, image, band, bounds_lonlat, out_path, tile_m,
         finally:
             for s in srcs:
                 s.close()
+        check_on_lattice(transform, grid, out_path)
         arr = mosaic[0].astype(np.float32)
         # Defensive only: unmask(0) already handles non-forest, so a
         # negative value here would mean something upstream is wrong,
@@ -328,12 +291,20 @@ def build_raster(ee, image, band, bounds_lonlat, out_path, tile_m,
         # over one bad pixel; the mean printed below makes a systemic
         # problem visible immediately.
         arr = np.clip(arr, 0, None)
-        with rasterio.open(out_path, "w", driver="GTiff",
+        # staged then renamed: a killed run never leaves a partial file
+        # under the final name, which a rerun would skip as done
+        # (CR-0035 review B35-3-1)
+        staged = out_path + ".tmp"
+        with rasterio.open(staged, "w", driver="GTiff",
                            height=arr.shape[0], width=arr.shape[1],
-                           count=1, dtype="float32", crs="EPSG:5070",
+                           count=1, dtype="float32",
+                           crs=CRS.from_user_input(grid["crs"]),
                            transform=transform, nodata=None,
                            compress="lzw", predictor=3, tiled=True) as dst:
             dst.write(arr, 1)
+            dst.update_tags(GROUSE_GRID="native-lattice",
+                            GROUSE_SOURCE=source)
+        os.replace(staged, out_path)
     nonzero = float((arr > 0).mean())
     print(f"   wrote {out_path} ({arr.shape[1]}x{arr.shape[0]} px, "
          f"{100 * nonzero:.1f}% forested, mean over forested "
@@ -411,6 +382,8 @@ def main():
 
         for region in args.regions:
             print(f"   {region}:")
+            grid = vintage_native_grid(ee, vintage, BOXES[region])
+            print(f"      native grid: origin ({grid['x0']}, {grid['y0']})")
             for attr, band in resolved.items():
                 out_path = os.path.join(args.out_dir,
                                         out_filename(vintage, attr,
@@ -420,7 +393,8 @@ def main():
                          f"(--force to redo).")
                     continue
                 build_raster(ee, image, band, BOXES[region], out_path,
-                            args.tile_m, workers=args.workers)
+                            args.tile_m, workers=args.workers, grid=grid,
+                            source=f"{asset_id} {band}")
 
     print(f"\nDone. Next:\n"
          f"    python generate_treemap_features.py --src-dir "

@@ -15,8 +15,15 @@ the GeoTIFF's own transform implies. Any constant difference is the
 route's offset; W is the reference convention (it registered at (0, 0)
 against TIGER roads).
 
+--native nlcd|tcc (CR-0034/CR-0035 pilot): instead, fetch pixelCoordinates
+on that source's own native lattice (download_tcc_nlcd.year_native_grid,
+latest year on disk) through fetch_tile and require every pixel centre to
+be within NATIVE_TOL_M of where the file's transform puts it (exit 1
+otherwise).
+
 Read-only; temporary files only. Usage (repository root):
     python diagnose_fetch_tile_offset.py --region NH
+    python diagnose_fetch_tile_offset.py --region NH --native nlcd
 """
 import argparse
 import os
@@ -32,6 +39,7 @@ import generate_canopy_structure as gcs
 from grouse_data import GrouseData
 
 PIXEL_M = 30
+NATIVE_TOL_M = 0.01
 
 
 def offsets(arr, transform, label):
@@ -47,16 +55,55 @@ def offsets(arr, transform, label):
     return dx.mean(), dy.mean()
 
 
+def run_native(ee, rd, feature, bounds):
+    """pixelCoordinates on the source's own lattice: exact or exit 1."""
+    import sys
+    spec = dtn.PRODUCTS[feature]
+    cid = dtn.resolve_collection(ee, spec["collections"])
+    years = rd.raster_years(feature)
+    year = max(years) if years else None
+    if year is None:
+        raise SystemExit(f"{rd.region}: no {feature} file on disk to take "
+                         f"the year from")
+    grid = dtn.year_native_grid(ee, cid, year, bounds)
+    print(f"{rd.region} {feature} {year}: {cid}, native grid origin "
+          f"({grid['x0']}, {grid['y0']}), crs "
+          f"{str(grid['crs'])[:60]}")
+    x0, y0, x1, y1 = dtn.region_grid(bounds, grid=grid)
+    cx = x0 + ((x1 - x0) // 2 // 6000) * 6000
+    cy = y0 + ((y1 - y0) // 2 // 6000) * 6000
+    rect = (cx, cy, cx + 6000, cy + 6000)
+    img = ee.Image.pixelCoordinates(ee.Projection(grid["crs"])).toDouble()
+    with tempfile.TemporaryDirectory() as td:
+        p = os.path.join(td, "native.tif")
+        dtn.fetch_tile(ee, img, rect, p, crs=grid["crs"])
+        with rasterio.open(p) as s:
+            arr, tr = s.read(), s.transform
+    dx, dy = offsets(arr, tr, f"native lattice tile {rect}")
+    h, w = arr.shape[1:]
+    cols, rows = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
+    err = max(np.abs(arr[0] - (tr.c + cols * tr.a)).max(),
+              np.abs(arr[1] - (tr.f + rows * tr.e)).max())
+    ok = err <= NATIVE_TOL_M
+    print(f"   max |EE - file centre| {err:.4f} m (need <= {NATIVE_TOL_M}): "
+          f"{'PASS' if ok else 'FAIL'}")
+    sys.exit(0 if ok else 1)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--region", default="NH")
     ap.add_argument("--project", default=os.environ.get("EARTHENGINE_PROJECT"))
+    ap.add_argument("--native", choices=("nlcd", "tcc"), default=None)
     args = ap.parse_args()
     ee = dtn.ee_init(args.project)
     rd = GrouseData()[args.region]
     template = dtn.template_raster(rd)
     bounds = gcs.template_bounds_lonlat(template)
-    x0, y0, x1, y1 = dtn.region_grid(bounds)
+    if args.native:
+        run_native(ee, rd, args.native, bounds)
+        return
+    x0, y0, x1, y1 = dtn.region_grid(bounds, grid=dtn.BUG0094_ZERO_GRID)
     # two vertically adjacent 6 km tiles near the grid's centre
     cx = x0 + ((x1 - x0) // 2 // 6000) * 6000
     cy = y0 + ((y1 - y0) // 2 // 6000) * 6000
@@ -68,8 +115,8 @@ def main():
         res = {}
         p1 = os.path.join(td, "t_lower.tif")
         p2 = os.path.join(td, "t_upper.tif")
-        dtn.fetch_tile(ee, img5070, lower, p1)
-        dtn.fetch_tile(ee, img5070, upper, p2)
+        dtn.fetch_tile(ee, img5070, lower, p1, crs="EPSG:5070")
+        dtn.fetch_tile(ee, img5070, upper, p2, crs="EPSG:5070")
         for p, lab in ((p1, "T1 fetch_tile lower"), (p2, "T1 fetch_tile upper")):
             with rasterio.open(p) as s:
                 print(f"   {lab}: requested top {lower[3] if 'lower' in p else upper[3]}"

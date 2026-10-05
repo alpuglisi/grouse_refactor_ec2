@@ -79,11 +79,13 @@ def route_b(ee, image, tpl, win, lo, hi, td):
     left, bottom, right, top = rasterio.windows.bounds(win, tpl.transform)
     lonlat = transform_bounds(tpl.crs, "EPSG:4326", left, bottom, right,
                               top, densify_pts=21)
-    x0, y0, x1, y1 = dtn.region_grid(lonlat, pad_m=300)
+    # BUG-0094's route, reproduced on purpose (the on-disk file's route)
+    x0, y0, x1, y1 = dtn.region_grid(lonlat, grid=dtn.BUG0094_ZERO_GRID,
+                                     pad_m=300)
     paths = []
     for i, rect in enumerate(dtn.tiles(x0, y0, x1, y1, 6000)):
         p = os.path.join(td, f"b{i}.tif")
-        dtn.fetch_tile(ee, image, rect, p)
+        dtn.fetch_tile(ee, image, rect, p, crs="EPSG:5070")
         paths.append(p)
     srcs = [rasterio.open(p) for p in paths]
     try:

@@ -64,6 +64,13 @@ from grouse_data import GrouseData, RASTER_FEATURES, grid_mismatch
 TEMPLATE_FEATURE = "evt"
 
 
+# BUG-0095: GDAL's default approximate transformer (0.125 px error) sends
+# ~7 % of nearest-neighbour picks to a neighbouring pixel on a large rotated
+# grid. 1e-6 px is exact for any practical purpose (tolerance=0 together
+# with an explicit transform fails in rasterio 1.5's WarpedVRT).
+WARP_TOLERANCE_PX = 1e-6
+
+
 def warp_to_grid(src_path, ref_path, out_path, block_rows=1024):
     """Resample `src_path` onto `ref_path`'s exact grid (CRS, transform,
     width, height) with nearest-neighbour, streaming by row blocks, and
@@ -86,7 +93,8 @@ def warp_to_grid(src_path, ref_path, out_path, block_rows=1024):
         with WarpedVRT(src, crs=ref.crs, transform=ref.transform,
                        width=ref.width, height=ref.height,
                        resampling=Resampling.nearest,
-                       src_nodata=nodata, nodata=nodata) as vrt, \
+                       src_nodata=nodata, nodata=nodata,
+                       tolerance=WARP_TOLERANCE_PX) as vrt, \
                 rasterio.open(tmp, "w", **profile) as dst:
             for r0 in range(0, ref.height, block_rows):
                 win = Window(0, r0, ref.width,

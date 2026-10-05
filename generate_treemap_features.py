@@ -124,6 +124,7 @@ from rasterio.enums import Resampling
 from rasterio.windows import Window
 
 from grouse_data import GrouseData, grid_mismatch
+from realign_rasters import WARP_TOLERANCE_PX
 from models import (TREEMAP_FIXED, qmd_from_balive_tpa, tpa_live_encode,
                     treemap_encode)
 
@@ -306,7 +307,8 @@ def write_vintage(region, year, vintage, src_dir, ref_path, profile,
             # all.
             vrts[attr] = WarpedVRT(s, crs=ref_crs, transform=ref_transform,
                                    width=width, height=height,
-                                   resampling=Resampling.nearest)
+                                   resampling=Resampling.nearest,
+                                   tolerance=WARP_TOLERANCE_PX)  # BUG-0095
         for feat in ("balive", "tpa_live", "qmd", "carbon_dwn"):
             path = os.path.join(raster_dir, f"{region}_{year}_{feat}.tif")
             outs[feat] = rasterio.open(path, "w", **profile)

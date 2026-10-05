@@ -483,7 +483,8 @@ class G11RepairPathWarpsExact(unittest.TestCase):
         import ast
         import realign_rasters
         self.assertLessEqual(realign_rasters.WARP_TOLERANCE_PX, 1e-6)
-        for name in ("realign_rasters.py", "generate_treemap_features.py"):
+        for name in ("realign_rasters.py", "generate_treemap_features.py",
+                     "generate_time_since_disturbance.py"):     # BUG-0096
             tree = ast.parse(open(os.path.join(REPO, name)).read())
             calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
                      and getattr(n.func, "id", getattr(n.func, "attr", ""))
@@ -493,7 +494,8 @@ class G11RepairPathWarpsExact(unittest.TestCase):
                 with self.subTest(file=name, line=call.lineno):
                     kw = {k.arg: k.value for k in call.keywords}
                     self.assertIn("tolerance", kw)
-                    self.assertEqual(getattr(kw["tolerance"], "id", None),
+                    t = kw["tolerance"]       # bare name or module attribute
+                    self.assertEqual(getattr(t, "id", getattr(t, "attr", None)),
                                      "WARP_TOLERANCE_PX")
 
 

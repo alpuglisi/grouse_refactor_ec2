@@ -20,9 +20,11 @@ Measured (author, 2026-10-05; synthetic random field, EPSG:5070 source
 with BUG-0094's 15 m lattice offset, 60 km local-Albers template like the
 LFPS grids): cells equal to the source pixel containing the cell centre -
 default 0.932, `tolerance` 0.01: 0.995, 1e-6: 1.000; `reproject(tolerance=0)`:
-1.000. On a 3 km grid the loss was 0.25 %. Real layers are spatially
-smoother, so fewer cells change value, but the displacement exists in every
-warped layer (`nlcd`, `tcc`, the TreeMap layers). It would also have
+1.000 (reviewer A reproduced 0.943 / 1.000 on 20,000 cells). On a 3 km
+grid the loss was 0.25 %. In a real layer a swap changes a value wherever
+a boundary lies within 0.125 px of a cell centre - for categorical layers
+such as NLCD every class boundary - so the displacement exists in every
+warped layer (`nlcd`, `tcc`, the TreeMap layers, `tsd`: BUG-0096). It would also have
 failed CR-0035's per-file gate on correctly re-downloaded data.
 
 ## 4. What the defect was
@@ -82,12 +84,17 @@ Sweep (2026-10-05, `git grep` for `WarpedVRT(`, `reproject(`,
 `warp_to_grid(` in tracked `*.py` minus `inv_*`/`res_*`/`docs/`/`legacy/`):
 - `realign_rasters.py:86`, `generate_treemap_features.py:307` - fixed by
   CR-0034 v3.
-- `generate_time_since_disturbance.py:297`, `repair_coverage_rasters.py:130`,
-  `check_raster_repair.py:121`, `predict.py:174`, `predict.py:724`,
-  `find_tsd_contrast_points.py:117` - to assess: each is harmless where
-  source and template share CRS and lattice (the transform is then
-  affine and exact). Tracked as one item with owner; each confirmed
-  instance gets its own BUG.
+- `generate_time_since_disturbance.py:297` - confirmed instance (CONUS
+  disturbance grid onto the rotated template): **BUG-0096**, fixed with
+  the CR-0034 code, data in CR-0035 step 2.5.
+- `repair_coverage_rasters.py:130`, `check_raster_repair.py:121` - warp
+  the CONUS vintages for CR-0010's coverage masks (edge cells only):
+  tracked with the CR-0010 residual (owner lead).
+- `predict.py:724` - display reprojection of the output map to EPSG:4326
+  (not a model input): tracked, low.
+- `predict.py:174` - warps only when a feature's grid differs from the
+  template, which `grid_mismatch` forbids for training data: harmless.
+- `find_tsd_contrast_points.py:117` - diagnostic: tracked, low.
 
 ## Cross-references
 BUG-0094; CR-0034 (fix), CR-0035 (data repair); PA-0049.

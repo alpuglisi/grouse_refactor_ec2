@@ -80,7 +80,8 @@ class _EE(Exception):
 def fake_ee():
     return types.SimpleNamespace(
         EEException=_EE,
-        Geometry=types.SimpleNamespace(Rectangle=lambda *a, **k: None))
+        Geometry=types.SimpleNamespace(Rectangle=lambda *a, **k: None),
+        Projection=lambda crs: crs)     # CR-0034: fetch_tile takes crs=
 
 
 class Bug0066FetchTileRetry(TmpDir):
@@ -93,7 +94,8 @@ class Bug0066FetchTileRetry(TmpDir):
         with mock.patch.object(mod.time, "sleep"), redirect_stderr(err), \
                 self.assertRaises(Exception) as cm:   # type checked by caller
             mod.fetch_tile(fake_ee(), image, (0, 0, 30, 30),
-                           os.path.join(self.d, "t.tif"), retries=retries)
+                           os.path.join(self.d, "t.tif"), crs="EPSG:5070",
+                           retries=retries)
         return cm.exception, image.getDownloadURL.call_count, err.getvalue()
 
     def test_programming_error_not_retried(self):
@@ -129,7 +131,7 @@ class Bug0066FetchTileRetry(TmpDir):
                     with self.assertRaises(RuntimeError) as cm:
                         mod.fetch_tile(fake_ee(), image, (0, 0, 30, 30),
                                        os.path.join(self.d, "t.tif"),
-                                       retries=1)
+                                       crs="EPSG:5070", retries=1)
                 self.assertIn("RasterioIOError", str(cm.exception))
                 self.assertEqual(image.getDownloadURL.call_count, 2)
 

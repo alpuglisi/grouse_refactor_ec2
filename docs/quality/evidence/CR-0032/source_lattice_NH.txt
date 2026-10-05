@@ -1,0 +1,16 @@
+# diagnose_source_lattice.py --region NH at 8e0933d (EC2, user, 2026-10-05); BUG-0094 root cause step 2
+Native grids:
+   nlcd 2025      crs PROJCS["AEA WGS84", ...]            transform [30, 0, -2415585, 0, -30, 3314805]; origin mod 30: x 15, y 15
+   tcc            crs PROJCS["Albers_Conical_Equal_Area", ...] transform [30, 0, -51285, 0, -30, 1319505]; origin mod 30: x 15, y 15
+   TreeMap v2016  crs PROJCS["NAD_1983_Albers", ...]       transform [30, 0, -2362845, 0, -30, 3180555]; origin mod 30: x 15, y 15
+   TreeMap v2020  crs EPSG:5070                            transform [30, 0, -2361585, 0, -30, 3177435.0000000037]; origin mod 30: x 15, y 15
+   TreeMap v2022  crs EPSG:5070                            transform [30, 0, -2361585, 0, -30, 3177435.0000000037]; origin mod 30: x 15, y 15
+   (TreeMap v2016/v2020/v2022 deprecated; superseded by projects/gtac-data-publish/assets/TreeMap/Product_Version/2023-1)
+NLCD 2025 tile (1925460, 2582310, 1931460, 2588310): 0-origin lattice vs native lattice (origin offset x 15, y 15 m)
+   decisive cells 1,400 (ambiguous 38,600); source pixel taken:
+      NW: 0 (0.0%)
+      NE: 0 (0.0%)
+      SW: 0 (0.0%)
+      SE: 1,400 (100.0%)
+# Conclusion: every 0-origin output centre sits on a source pixel corner; EE's nearest takes the SE pixel every time,
+# so each downloaded value comes from ~(+15 m, -15 m) and the content appears shifted ~21 m north-west.

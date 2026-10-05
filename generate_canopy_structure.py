@@ -136,7 +136,18 @@ def fetch_window(ee, image, crs_wkt, transform, width, height, dest,
         try:
             url = image.getDownloadURL(params)
             r = requests.get(url, timeout=300)
-            r.raise_for_status()
+            if r.status_code >= 400:
+                # Earth Engine puts the reason in the body; a 4xx other
+                # than 429 is the request itself and fails the same way
+                # on every retry, so it is raised at once, with the body.
+                body = r.text[:2000]
+                if r.status_code < 500 and r.status_code != 429:
+                    raise RuntimeError(
+                        f"window {transform.c:.0f},{transform.f:.0f}: "
+                        f"Earth Engine refused the request (HTTP "
+                        f"{r.status_code}, not retried): {body}")
+                raise requests.exceptions.HTTPError(
+                    f"HTTP {r.status_code}: {body}", response=r)
             with open(dest, "wb") as f:
                 f.write(r.content)
             with rasterio.open(dest):     # parse check

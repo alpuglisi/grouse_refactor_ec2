@@ -301,3 +301,4 @@ Split window mask reads pinned `SPLIT_WINDOW_FEATURES` (BUG-0093, PA-0048).
 - [ ] LOW (code review C2, C3): EE tile CRS equality and shape without `dimensions` - confirm on the EC2 pilot; both fail closed. Owner: lead
 - [x] LOW (review A10, done in deliverable 2): `--copy-only` mode to add a vintage without Earth Engine. In CR-0032 §3.4; tracked until implemented. Owner: lead
 - [ ] Out of scope, revisit if the pilot estimate exceeds 24 h for all regions: batch `Export.image` to Cloud Storage (review B4). Owner: lead
+- [ ] Pilot 1 (EC2, 2026-10-05): `fetch_window` got HTTP 400 from Earth Engine, discarded the response body and retried a deterministic 4xx four times. Fixed in `fetch_window` (body reported, 4xx other than 429 not retried; T6). To log as a BUG at close-out with a sweep of sibling fetchers (`download_tcc_nlcd.fetch_tile` has the same shape). Owner: lead

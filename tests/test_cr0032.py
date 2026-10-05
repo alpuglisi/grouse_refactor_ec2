@@ -414,6 +414,53 @@ class T3CopyOnly(Base):
             self.g.copy_only(self.rd)
 
 
+class T6FetchErrors(unittest.TestCase):
+    """fetch_window reports Earth Engine's error body; a 4xx (not 429) is
+    raised at once, a 5xx retried (EC2 pilot 2026-10-05: four blind
+    retries of an HTTP 400 with the reason discarded)."""
+    class FakeEE:
+        class EEException(Exception):
+            pass
+
+        @staticmethod
+        def Projection(wkt):
+            return wkt
+
+        class Geometry:
+            @staticmethod
+            def Rectangle(*a, **k):
+                return None
+
+    class Image:
+        def getDownloadURL(self, params):
+            return "https://example.invalid/x"
+
+    def call(self, status, text):
+        import requests
+        import generate_canopy_structure as g
+        resp = mock.Mock(status_code=status, text=text)
+        with mock.patch.object(requests, "get", return_value=resp) as get, \
+             mock.patch.object(g.time, "sleep"), \
+             mock.patch("sys.stderr"):
+            try:
+                g.fetch_window(self.FakeEE, self.Image(), "WKT",
+                               from_origin(0, 0, 30, 30), 4, 4,
+                               os.devnull, retries=2)
+            except RuntimeError as e:
+                return str(e), get.call_count
+        return None, get.call_count
+
+    def test_400_raised_once_with_body(self):
+        msg, n = self.call(400, '{"error": {"message": "Bad CRS"}}')
+        self.assertEqual(n, 1)
+        self.assertIn("Bad CRS", msg)
+
+    def test_500_retried_with_body(self):
+        msg, n = self.call(503, "backend busy")
+        self.assertEqual(n, 3)
+        self.assertIn("backend busy", msg)
+
+
 class T5Gate(unittest.TestCase):
     """check_canopy_structure.compare: passes agreement, fails each named
     failure mode (PA-0021: the gate is shown to fail)."""

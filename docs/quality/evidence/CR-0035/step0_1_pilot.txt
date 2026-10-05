@@ -1,0 +1,20 @@
+# CR-0035 steps 0-1 on EC2 (user, 2026-10-05), code at b8f5687 (EC2 worktree HEAD for the before arm: 472ba5e)
+## step 0 (step0_snapshot.py)
+0.1 snapshot data_before_bug0094 (cp -al); snapshot.sha256: 3620 files
+0.2 git worktree ~/grouse2_before (detached 472ba5e); data -> data_before_bug0094
+0.3 inventory_before (ME, NH, VT identical):
+    nlcd 2016-2025; tcc 2016-2023; balive/tpa_live/qmd/carbon_dwn 2016-2025; tsd 2016-2025
+0.4 --clear: snapshot.sha256 verify OK; deleted 201 in-scope files
+## step 1 pilot
+1a download_tcc_nlcd --regions NH --features nlcd --years 2025: projects/sat-io/open-datasets/USGS/ANNUAL_NLCD/LANDCOVER (years 1985-2025);
+   wrote NH_2025_nlcd.tif (5504x10364 px, 88.7% valid, on template grid NH_2024_evt.tif); real 45.4 s
+1b check_layer_registration --regions NH --skip-treemap:
+   NH nlcd 2025 equal 100.00% of 400 PASS; at BUG-0094 offset 82%   -> Gate PASS (1 of 1)
+1c diagnose_fetch_tile_offset --region NH --native nlcd: native origin (-2415585, 3314805), CRS "AEA WGS84" WKT;
+   tile (1925445, 2582325, 1931445, 2588325) 200x200: max |EE - file centre| 0.0000 m -> PASS
+1d collections and native grids (NH bounds):
+   nlcd 2025 projects/sat-io/open-datasets/USGS/ANNUAL_NLCD/LANDCOVER origin (-2415585, 3314805)
+   tcc 2023 projects/gtac-data-publish/assets/TCC/Product_Version/2025-6 origin (-2361705, 3177525)
+   PROJ pipeline description: "unavailable until proj_trans is called" (not recorded; 1b's exact equality shows no datum offset)
+1e download_treemap --regions NH --vintages 2022 --out-dir /tmp/cr0035_pilot_treemap: USFS/GTAC/TreeMap/v2022 (deprecated asset),
+   native origin (-2361585, 3177435.0000000037); BALIVE/TPA_LIVE/CARBON_DWN 7989x11545 px, 65.9% forested; real 61.3 s

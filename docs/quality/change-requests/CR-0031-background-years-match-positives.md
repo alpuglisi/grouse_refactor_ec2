@@ -240,7 +240,14 @@ experiment this CR unblocks, not its acceptance).
       — Done: `docs/quality/evidence/CR-0031/reviewA/wrong_impl_runs.txt`
       (re-runnable with `mutate.py`), at `e18944d`: control 15/15; every
       variant detected; mapping of (i) and (v) corrected (review log I1).
-- [ ] 4. EC2 smoke run log committed as evidence.
+- [x] 4. EC2 smoke run log committed as evidence.
+      — Done: `docs/quality/evidence/CR-0031/cr0031_smoke.log` (transcribed
+      from the user's terminal). Per-year background counts equal each
+      region's training positives' (CR-0021 `acceptance_prefix.txt`
+      DETAIL 1, train P): ME 469/588/648/282/304, NH 97/118/137/118/164,
+      VT 163/147/170/174/268 (2020–2024); totals 2,291 / 634 / 922 = the
+      training positives; train samples 30,776 + 4 × 3,847 = 46,164; no
+      `RuntimeError`; the epoch ran. PASS.
 - [ ] 5. Bookkeeping: BUG-0074 → FIXED (corrective action, recurrence
       re-check); `BUG_LOG.md`; Swept? cells of PA-0020, PA-0029 and
       PA-0033 note that the run-time background producer is now matched

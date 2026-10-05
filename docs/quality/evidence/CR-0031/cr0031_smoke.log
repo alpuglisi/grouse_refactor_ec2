@@ -1,0 +1,20 @@
+# CR-0031 deliverable 4: EC2 smoke run, transcribed from the user's terminal output (2026-10-05).
+# Host: ~/grouse2 on main 652889c with train.py/pretrain.py checked out from claude/nice-cori-creqpb d118b96.
+# Command:
+#   python train.py --epochs 1 --an-background 1.0 --batch-size 128 \
+#     --cache-dir '' --save-path /tmp/cr0031_smoke.pth 2>&1 | tee cr0031_smoke.log
+Model features (discovered): ['evt', 'evh', 'evc', 'sclass', 'fdist', 'ch', 'cc', 'tcc', 'nlcd', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn']
+   ME: +2,291 random background assumed-negatives (x1 per positive; in-state, training blocks only - validation unchanged); years 2020: 469, 2021: 588, 2022: 648, 2023: 282, 2024: 304.
+   NH: +634 random background assumed-negatives (x1 per positive; in-state, training blocks only - validation unchanged); years 2020: 97, 2021: 118, 2022: 137, 2023: 118, 2024: 164.
+   VT: +922 random background assumed-negatives (x1 per positive; in-state, training blocks only - validation unchanged); years 2020: 163, 2021: 147, 2022: 170, 2023: 174, 2024: 268.
+Train samples: 46,164 | Val samples: 7,696
+LR scaling (sqrt): batch 128 is 4x the reference 32, so lr 3.00e-04 -> 6.00e-04. Use --lr-scaling none to disable, or --batch-size 32 to reproduce the tuned recipe exactly.
+   Dual-branch head active: Branch B = dilated (32 ch, full-resolution multi-scale via dilation), pooled with 'attn', +77,474 params, zero-init head (identity at start).
+GrouseModelHandler: device=cuda, categorical=['evt', 'evh', 'evc', 'sclass', 'fdist', 'nlcd'], continuous=['ch', 'cc', 'tcc', 'road_dist', 'tsd', 'balive', 'tpa_live', 'qmd', 'carbon_dwn'], stem input channels=136 (derived, not hardcoded)
+   Alternating stratified batches: 32pos/96neg <-> 96pos/32neg per batch of 128 (net 50/50 per cycle; 482 batches/epoch).
+   Init sanity (train-mode forward, 32 spread samples): logit std = 0.1143 - input-dependent. Watch the per-epoch 'logit std' in the status line: it should GROW as training progresses.
+   Differential LR: backbone 6.0e-05 (11,167,104 params) | fresh layers 6.0e-04 (1,071,853 params)
+   Weight EMA active (decay=0.999); validation and checkpoints use the averaged weights.
+   Warmup: alpha-weighted BCE (gamma=0) for the first 3 epoch(s), then FocalLoss(gamma=2.0).
+   Epoch 1/1 | Focal Loss: 0.0821 | Val Accuracy: 60.95% | AUC: 0.6869 | TTA AUC: 0.6870 | AP: 0.6433 | rank: 0.6656 | tuned acc: 60.60% | strict: 0.00% (hedged 100.0%) | train acc: 64.5% | logit std: 0.179 (Saved)
+Training finished. Best Focal Loss: 0.0821 | Best TTA AUC: 0.6870 | Best rank: 0.6656 | Best strict acc: 0.00% (selection metric: rank, min delta 0.001 -> saved checkpoint is epoch 1)

@@ -105,7 +105,8 @@ def _features(ee, pts, radius=None):
     return ee.FeatureCollection(feats)
 
 
-def reduce_batches(ee, image, pts, reducer, radius, batch, label):
+def reduce_batches(ee, image, pts, reducer, radius, batch, label,
+                   scale=30):
     """reduceRegions over points (radius None) or buffers; on a timeout the
     batch is split in half and retried, down to single points (then the
     error propagates). Returns {idx: properties}."""
@@ -117,7 +118,7 @@ def reduce_batches(ee, image, pts, reducer, radius, batch, label):
         chunk = todo.pop(0)
         try:
             res = image.reduceRegions(collection=_features(ee, chunk, radius),
-                                      reducer=reducer, scale=30,
+                                      reducer=reducer, scale=scale,
                                       tileScale=4).getInfo()
         except EEException as e:
             if "timed out" not in str(e).lower() or len(chunk) == 1:

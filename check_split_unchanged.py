@@ -8,7 +8,7 @@ disk, over acceptance_split.digested_paths (the 20 digested artifacts).
 Exit 1 on any difference, missing artifact or missing digest. Read-only.
 
 Usage (repository root):
-    python check_split_unchanged.py --old data_before_bug0094/split_manifest.json
+    python check_split_unchanged.py --old data_before_bug0094/pipeline/split_manifest.json
 """
 import argparse
 import json

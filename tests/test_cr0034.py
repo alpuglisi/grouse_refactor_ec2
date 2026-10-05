@@ -375,7 +375,9 @@ class G9NativeGridFromEE(unittest.TestCase):
                                lambda ee_, sub: sub.infos):
             g = dtn.year_native_grid(ee, "cid", 2025, (-72, 43, -71, 44))
         self.assertEqual(g["x0"], 15.0)
-        self.assertEqual(log[0][1], (-72, 43, -71, 44))
+        w, so, e, n = log[0][1]      # padded around the region (A34-2-1)
+        self.assertTrue(w < -72 and so < 43 and e > -71 and n > 44)
+        self.assertTrue(w > -72.2 and n < 44.1)
 
     def test_year_grid_refuses_mixed(self):
         infos = [{"crs": "EPSG:5070", "transform": [30, 0, 15, 0, -30, 615]},
@@ -437,6 +439,62 @@ class G7TreeMap(Base):
         r0 = int(round((self.src.sy0 - t.f) / 30))
         want = self.src.a[r0:r0 + a.shape[0], c0:c0 + a.shape[1]]
         self.assertTrue((a == want.astype(a.dtype)).all())
+
+
+class G10ExactWarp(unittest.TestCase):
+    """realign_rasters.warp_to_grid takes, for every template cell, the
+    source pixel containing the cell centre - on a 60 km rotated grid,
+    where GDAL's default approximate transformer (0.125 px) misses ~7 %
+    (BUG-0095)."""
+    def test_large_rotated_grid(self):
+        from pyproj import Transformer
+        from realign_rasters import warp_to_grid
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp)
+        n, half = 2000, 30000.0
+        tpl = os.path.join(tmp, "tpl.tif")
+        with rasterio.open(tpl, "w", driver="GTiff", height=n, width=n,
+                           count=1, dtype="int16", crs=LOCAL_ALBERS,
+                           transform=from_origin(-half, half, 30, 30),
+                           nodata=NODATA) as d:
+            d.write(np.zeros((n, n), np.int16), 1)
+        src = source_around(tpl, margin=3000)
+        sp = os.path.join(tmp, "src.tif")
+        src.write(sp)
+        out = os.path.join(tmp, "out.tif")
+        warp_to_grid(sp, tpl, out)
+        rng = np.random.default_rng(0)
+        r, c = rng.integers(0, n, 3000), rng.integers(0, n, 3000)
+        X, Y = Transformer.from_crs(LOCAL_ALBERS, "EPSG:5070",
+                                    always_xy=True).transform(
+            -half + (c + 0.5) * 30, half - (r + 0.5) * 30)
+        truth = src.sample(np.asarray(X), np.asarray(Y))
+        with rasterio.open(out) as o:
+            got = o.read(1)[r, c]
+        self.assertEqual(float((got == truth).mean()), 1.0)
+
+
+class G11RepairPathWarpsExact(unittest.TestCase):
+    """Every WarpedVRT on the repair path passes the exact tolerance
+    realign_rasters.WARP_TOLERANCE_PX (<= 1e-6 px) (BUG-0095);
+    generate_treemap_features' warp sits inside write_vintage, so it is
+    pinned in the source."""
+    def test_tolerance_exact(self):
+        import ast
+        import realign_rasters
+        self.assertLessEqual(realign_rasters.WARP_TOLERANCE_PX, 1e-6)
+        for name in ("realign_rasters.py", "generate_treemap_features.py"):
+            tree = ast.parse(open(os.path.join(REPO, name)).read())
+            calls = [n for n in ast.walk(tree) if isinstance(n, ast.Call)
+                     and getattr(n.func, "id", getattr(n.func, "attr", ""))
+                     == "WarpedVRT"]
+            self.assertTrue(calls, name)
+            for call in calls:
+                with self.subTest(file=name, line=call.lineno):
+                    kw = {k.arg: k.value for k in call.keywords}
+                    self.assertIn("tolerance", kw)
+                    self.assertEqual(getattr(kw["tolerance"], "id", None),
+                                     "WARP_TOLERANCE_PX")
 
 
 class G7TreeMapCustomCrs(G7TreeMap):

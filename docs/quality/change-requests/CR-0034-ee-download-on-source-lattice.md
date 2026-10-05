@@ -1,7 +1,8 @@
 # CR-0034: Earth Engine downloads requested on each source's own grid
 
-**Status: DRAFT v2, 2026-10-05** — revised after round 1; awaiting
-bounded re-review. Verdicts and dispositions: `CR-0034-review-log.md`. This document states only current intent.
+**Status: DRAFT v3, 2026-10-05** — round 2 approved v2 with follow-ups;
+v3 applies them and adds §5 (BUG-0095, found in round 2); awaiting a
+bounded re-review of §5. Verdicts and dispositions: `CR-0034-review-log.md`. This document states only current intent.
 
 ## Scope
 `download_tcc_nlcd.py` and `download_treemap.py` request every tile on the
@@ -10,7 +11,8 @@ instead of resampling them; the single resampling step stays the local
 nearest warp onto the region's template grid.
 
 ## Fixes
-BUG-0094 (root cause confirmed: `evidence/CR-0032/source_lattice_NH.txt`).
+BUG-0094 (root cause confirmed: `evidence/CR-0032/source_lattice_NH.txt`)
+and, on the same files, BUG-0095 (approximate warp transformer, §5).
 The data repair that uses this code is CR-0035.
 
 ## Why now
@@ -35,7 +37,8 @@ affected; CR-0032's canopy layers also wait on a registered NLCD.
   image a request touches; refuses an empty list, or images whose CRSs
   differ (compared semantically) or whose origins differ modulo 30 m.
 - `year_native_grid(ee, cid, year, bounds_lonlat)`: the subset
-  `year_image` mosaics, **filtered to the region's bounds**; the
+  `year_image` mosaics, **filtered to the region's bounds padded by twice
+  `region_grid`'s pad** (so every image a tile touches is included); the
   projections of **all** its images (`subset_projections`) go through
   `common_native_grid`. (A collection can hold images for several areas,
   e.g. TCC's study areas; the first image may be one that never touches
@@ -96,13 +99,32 @@ affected; CR-0032's canopy layers also wait on a registered NLCD.
   diagnostics, `test_cr0018_candidates`). `generate_canopy_structure.py` uses `year_image`,
   `mask_to_valid`, `PRODUCTS`, `template_raster`, `_fetch_all` only:
   unchanged.
-- **Output files:** same names, CRS (template), dtype, nodata and tags as
-  today; only the content moves ~half a cell.
+- **Template-grid files** (`data/landfire/*_{nlcd,tcc,...}.tif`): same
+  names, CRS (template), dtype and nodata as today, two new tags
+  (`GROUSE_GRID`, `GROUSE_SOURCE`); the content moves ~half a cell
+  (BUG-0094) and up to one cell where the approximate warp had swapped a
+  pixel (BUG-0095).
+- **Raw TreeMap files** (`data/treemap_raw/`): written in the source's
+  native CRS and lattice (EPSG:5070 or the 2016 vintage's NAD83 Albers
+  WKT), with the two tags; `generate_treemap_features` warps them as
+  before.
 - **Tile sizes:** unchanged defaults (`--tile-m` 96000 / 48000); the
   source lattice has the same pixel size.
 
+### 5. Exact local warp (BUG-0095)
+`realign_rasters.WARP_TOLERANCE_PX = 1e-6`, passed as `tolerance=` by
+`warp_to_grid` and by `generate_treemap_features`' `WarpedVRT` (imported).
+GDAL's default approximate transformer (0.125 px) sends ~7 % of nearest
+picks to a neighbouring pixel on a 60 km rotated grid (BUG-0095 §3);
+1e-6 px is exact in practice (`tolerance=0` with an explicit transform
+fails in rasterio 1.5's `WarpedVRT`). `warp_to_grid` is also used by
+`realign_rasters.py` for other files; exactness only removes error there.
+The other warps in the repository are swept in BUG-0095 §8 (tracked).
+
 ## One change per CR (CR-0011 A5)
-Code only (two downloaders and their diagnostics). Data repair,
+Code only (two downloaders, the shared warp, their diagnostics). §5 is in
+this CR because it changes the same files CR-0035 re-creates: landing it
+separately would force a second re-download. Data repair,
 re-acceptance and the evaluation retrain are CR-0035.
 
 ## Risk: MEDIUM
@@ -139,10 +161,15 @@ with the source in EPSG:5070 and in a custom Albers WKT.
   different CRS refused.
 - G9 `year_native_grid` filters by the region's bounds and refuses mixed
   grids; `vintage_native_grid` handles collection and Image.
+- G10 `warp_to_grid` on a 60 km rotated grid: every sampled cell takes the
+  source pixel containing its centre (the default transformer: ~95 %).
+- G11 both repair-path `WarpedVRT` calls pass `WARP_TOLERANCE_PX`
+  (<= 1e-6).
 - Author's trial implementation (not committed): all pass; mutants fail -
   0-origin snap, hard-coded request `crs`, no lattice check, TreeMap's own
   `region_grid`, merged file labelled EPSG:5070, raw TreeMap labelled
-  EPSG:5070, no `filterBounds`, first image only, wrap-around lattice test.
+  EPSG:5070, no `filterBounds`, first image only, wrap-around lattice
+  test, default warp tolerance (G10 and G11 fail).
 - Existing suites pass, `test_cr0018_candidates` included (updated with
   the code).
 

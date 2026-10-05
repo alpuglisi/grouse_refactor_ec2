@@ -10,7 +10,8 @@ it samples them at the ~9,600 training/validation points through Earth
 Engine and re-fits the same trees with and without them.
 
 Candidate sources (both on Earth Engine, 30 m):
-  * USFS LCMS (default USFS/GTAC/LCMS/v2024-10, CONUS): annual Change
+  * USFS LCMS (default projects/gtac-data-publish/assets/LCMS/Product_Version/2025-11,
+    CONUS; USFS/GTAC/LCMS/v2024-10 via --lcms-asset): annual Change
     band 1985+ with cause attribution - 9 = Tree Removal (harvest),
     14 = Vegetation Successional Growth, 1-2 and 6-13 = other vegetation
     loss (3-5 are hydrologic/snow transitions, ignored).
@@ -49,6 +50,7 @@ Usage (repository root, same environment as train.py):
     python diagnose_disturbance_features.py --project <gcp-project>
 """
 import argparse
+import json
 import os
 import time
 
@@ -57,14 +59,16 @@ import pandas as pd
 
 import diagnose_gbm_baseline as gbm
 
-LCMS_ASSET = "USFS/GTAC/LCMS/v2024-10"
+LCMS_ASSET = "projects/gtac-data-publish/assets/LCMS/Product_Version/2025-11"
 GFC_ASSET = "UMD/hansen/global_forest_change_2024_v1_12"
 LCMS_FIRST_YEAR = 1985
 TREE_REMOVAL = 9
 SUCCESSIONAL_GROWTH = 14
 VEG_LOSS = (1, 2, 6, 7, 8, 9, 10, 11, 12, 13)   # 3-5: snow/ice, desiccation, inundation
 NONE_YEARS = 40                                  # "no event on record" cap
-BATCH = 800                                      # points per Earth Engine request
+BATCH_POINTS = 500                               # points per Earth Engine request
+BATCH_BUFFERS = 150                              # buffered points per request
+RADII_M = (250, 1000)
 
 FEATURES_LCMS = ["lcms_ys_removal", "lcms_ys_loss", "lcms_growth10",
                  "lcms_rm20_r250", "lcms_rm20_r1000"]
@@ -78,127 +82,146 @@ def point_frame(concat):
                       for part in concat.datasets], ignore_index=True)
 
 
-def lcms_image(ee, asset, year):
-    """Per-pixel features from LCMS Change up to and including `year`."""
-    col = (ee.ImageCollection(asset)
-           .filter(ee.Filter.eq("study_area", "CONUS"))
-           .filter(ee.Filter.rangeContains("year", LCMS_FIRST_YEAR, year)))
-    proj = ee.Image(col.first()).select("Change").projection()
-
-    def year_where(img, cond):
-        y = ee.Number(img.get("year"))
-        return ee.Image.constant(y).toInt16().updateMask(cond)
-
-    def removal(img):
-        return year_where(img, img.select("Change").eq(TREE_REMOVAL))
-
-    def loss(img):
-        chg = img.select("Change")
-        return year_where(img, chg.remap(list(VEG_LOSS), [1] * len(VEG_LOSS), 0))
-
-    def growth_recent(img):
-        y = ee.Number(img.get("year"))
-        recent = y.gt(year - 10)
-        return (img.select("Change").eq(SUCCESSIONAL_GROWTH)
-                .And(ee.Image.constant(recent)).toInt16())
-
-    def removal_recent(img):
-        y = ee.Number(img.get("year"))
-        recent = y.gt(year - 20)
-        return (img.select("Change").eq(TREE_REMOVAL)
-                .And(ee.Image.constant(recent)).toInt16())
-
-    last_rm = col.map(removal).max().unmask(0).rename("last_removal")
-    last_ls = col.map(loss).max().unmask(0).rename("last_loss")
-    growth = col.map(growth_recent).sum().rename("growth10")
-    rm20 = col.map(removal_recent).max().unmask(0).reproject(proj)
-    r250 = rm20.reduceNeighborhood(ee.Reducer.mean(),
-                                   ee.Kernel.circle(250, "meters"))
-    r1000 = rm20.reduceNeighborhood(ee.Reducer.mean(),
-                                    ee.Kernel.circle(1000, "meters"))
-    return (ee.Image.cat([last_rm, last_ls, growth]).reproject(proj)
-            .addBands(r250.rename("rm20_r250"))
-            .addBands(r1000.rename("rm20_r1000")))
+def lcms_stack(ee, asset, years):
+    """One image, one band per year: c{year} = LCMS Change (CONUS)."""
+    col = ee.ImageCollection(asset).filter(ee.Filter.eq("study_area", "CONUS"))
+    have = set(int(v) for v in col.aggregate_array("year").getInfo())
+    missing = [y for y in years if y not in have]
+    if missing:
+        raise SystemExit(f"{asset} has no CONUS image for years {missing}")
+    return ee.Image.cat([
+        col.filter(ee.Filter.eq("year", y)).first().select("Change")
+        .rename(f"c{y}") for y in years])
 
 
-def gfc_image(ee, asset, year):
-    """Hansen loss up to and including `year`, and 2000 tree cover."""
-    g = ee.Image(asset)
-    ly = g.select("lossyear")                        # 0 none, k = 2000 + k
-    cal = ly.add(2000)
-    valid = ly.gt(0).And(cal.lte(year))
-    last = cal.updateMask(valid).unmask(0).rename("gfc_last_loss")
-    recent = valid.And(cal.gt(year - 20)).toInt16()
-    r250 = recent.reduceNeighborhood(ee.Reducer.mean(),
-                                     ee.Kernel.circle(250, "meters"))
-    return (last.addBands(r250.rename("gfc_loss20_r250"))
-            .addBands(g.select("treecover2000").rename("gfc_treecover2000")))
+def _features(ee, pts, radius=None):
+    feats = []
+    for r in pts.itertuples():
+        g = ee.Geometry.Point([float(r.longitude), float(r.latitude)])
+        if radius:
+            g = g.buffer(radius)
+        feats.append(ee.Feature(g, {"idx": int(r.idx)}))
+    return ee.FeatureCollection(feats)
 
 
-def sample(ee, image, pts):
-    """reduceRegions(first) at 30 m for a frame with columns idx,
-    longitude, latitude; returns {idx: {band: value}}."""
+def reduce_batches(ee, image, pts, reducer, radius, batch, label):
+    """reduceRegions over points (radius None) or buffers; on a timeout the
+    batch is split in half and retried, down to single points (then the
+    error propagates). Returns {idx: properties}."""
+    from ee.ee_exception import EEException
     out = {}
-    for start in range(0, len(pts), BATCH):
-        chunk = pts.iloc[start:start + BATCH]
-        fc = ee.FeatureCollection([
-            ee.Feature(ee.Geometry.Point([float(r.longitude), float(r.latitude)]),
-                       {"idx": int(r.idx)}) for r in chunk.itertuples()])
-        res = image.reduceRegions(collection=fc, reducer=ee.Reducer.first(),
-                                  scale=30).getInfo()
+    todo = [pts.iloc[i:i + batch] for i in range(0, len(pts), batch)]
+    done = 0
+    while todo:
+        chunk = todo.pop(0)
+        try:
+            res = image.reduceRegions(collection=_features(ee, chunk, radius),
+                                      reducer=reducer, scale=30,
+                                      tileScale=4).getInfo()
+        except EEException as e:
+            if "timed out" not in str(e).lower() or len(chunk) == 1:
+                raise
+            half = len(chunk) // 2
+            todo[:0] = [chunk.iloc[:half], chunk.iloc[half:]]
+            print(f"   [{label}] timeout on {len(chunk)} points - "
+                  f"retrying as {half} + {len(chunk) - half}")
+            continue
         for f in res["features"]:
-            p = f["properties"]
-            out[int(p["idx"])] = p
+            out[int(f["properties"]["idx"])] = f["properties"]
+        done += len(chunk)
+        print(f"   [{label}] {done:,}/{len(pts):,}", flush=True)
     return out
 
 
-def years_since(year, last):
-    last = np.asarray(last, dtype=float)
-    ys = np.where(last > 0, year - last, NONE_YEARS)
-    return np.clip(ys, 0, NONE_YEARS)
-
-
 def fetch(ee, pts, lcms_asset, gfc_asset):
-    rows = []
-    for y in sorted(pts["year"].unique()):
-        sub = pts[pts["year"] == y]
-        t = time.time()
-        lc = sample(ee, lcms_image(ee, lcms_asset, int(y)), sub)
-        gf = sample(ee, gfc_image(ee, gfc_asset, int(y)), sub)
-        for r in sub.itertuples():
-            a, b = lc.get(int(r.idx), {}), gf.get(int(r.idx), {})
-            rows.append({"idx": int(r.idx), "year": int(y),
-                         "last_removal": a.get("last_removal"),
-                         "last_loss": a.get("last_loss"),
-                         "growth10": a.get("growth10"),
-                         "rm20_r250": a.get("rm20_r250"),
-                         "rm20_r1000": a.get("rm20_r1000"),
-                         "gfc_last_loss": b.get("gfc_last_loss"),
-                         "gfc_loss20_r250": b.get("gfc_loss20_r250"),
-                         "gfc_treecover2000": b.get("gfc_treecover2000")})
-        print(f"   year {int(y)}: {len(sub):,} points sampled "
-              f"({time.time() - t:.0f} s)")
-    return pd.DataFrame(rows).sort_values("idx").reset_index(drop=True)
+    """Raw per-point samples (no per-year logic here; see derive):
+    c{year} LCMS Change at the point, s{r}_{year} share of Tree Removal
+    within r metres in that year, Hansen lossyear/treecover2000 at the
+    point and the lossyear histogram within 250 m."""
+    years = list(range(LCMS_FIRST_YEAR, int(pts["year"].max()) + 1))
+    stack = lcms_stack(ee, lcms_asset, years)
+    raw = pd.DataFrame({"idx": pts["idx"].to_numpy(),
+                        "year": pts["year"].to_numpy()})
+    first = ee.Reducer.first()
+    at = reduce_batches(ee, stack, pts, first, None, BATCH_POINTS, "LCMS at points")
+    for y in years:
+        raw[f"c{y}"] = [at.get(i, {}).get(f"c{y}") for i in raw["idx"]]
+    removal = stack.eq(TREE_REMOVAL)
+    for r in RADII_M:
+        sh = reduce_batches(ee, removal, pts, ee.Reducer.mean(), r,
+                            BATCH_BUFFERS if r > 300 else BATCH_POINTS,
+                            f"LCMS removal share {r} m")
+        for y in years:
+            raw[f"s{r}_{y}"] = [sh.get(i, {}).get(f"c{y}") for i in raw["idx"]]
+    g = ee.Image(gfc_asset).select(["lossyear", "treecover2000"])
+    gp = reduce_batches(ee, g, pts, first, None, BATCH_POINTS, "Hansen at points")
+    raw["gfc_lossyear"] = [gp.get(i, {}).get("lossyear") for i in raw["idx"]]
+    raw["gfc_treecover2000"] = [gp.get(i, {}).get("treecover2000") for i in raw["idx"]]
+    gh = reduce_batches(ee, g.select("lossyear"), pts,
+                        ee.Reducer.frequencyHistogram(), 250, BATCH_POINTS,
+                        "Hansen loss histogram 250 m")
+    raw["gfc_hist250"] = [json.dumps(gh.get(i, {}).get("histogram"))
+                          for i in raw["idx"]]
+    return raw
+
+
+def _num(raw, col):
+    return pd.to_numeric(raw[col], errors="coerce").to_numpy(float)
 
 
 def derive(raw):
+    """Per-point features from the raw samples, using only years <= the
+    point's own year Y (no future)."""
+    Y = raw["year"].to_numpy(int)
+    years = sorted(int(c[1:]) for c in raw.columns
+                   if c.startswith("c") and c[1:].isdigit())
+    yr = np.array(years)
+    C = np.stack([_num(raw, f"c{y}") for y in years], axis=1)   # (N, T)
+    upto = yr[None, :] <= Y[:, None]
+    have = ~np.isnan(C).all(axis=1)
+
+    def last_year(mask):
+        m = mask & upto
+        last = np.where(m, yr[None, :], 0).max(axis=1).astype(float)
+        ys = np.where(last > 0, Y - last, NONE_YEARS)
+        ys = np.clip(ys, 0, NONE_YEARS).astype(float)
+        ys[~have] = np.nan
+        return ys
+
     f = pd.DataFrame({"idx": raw["idx"]})
-    y = raw["year"].to_numpy(float)
-    num = lambda c: pd.to_numeric(raw[c], errors="coerce").to_numpy(float)
-    f["lcms_ys_removal"] = years_since(y, num("last_removal"))
-    f["lcms_ys_loss"] = years_since(y, num("last_loss"))
-    f["lcms_growth10"] = num("growth10")
-    f["lcms_rm20_r250"] = num("rm20_r250")
-    f["lcms_rm20_r1000"] = num("rm20_r1000")
-    f["gfc_ys_loss"] = years_since(y, num("gfc_last_loss"))
-    f["gfc_loss20_r250"] = num("gfc_loss20_r250")
-    f["gfc_treecover2000"] = num("gfc_treecover2000")
-    # A point the sample did not return (outside coverage) stays NaN; the
-    # years-since columns must then be NaN too, not NONE_YEARS.
-    for src, dst in (("last_removal", "lcms_ys_removal"),
-                     ("last_loss", "lcms_ys_loss"),
-                     ("gfc_last_loss", "gfc_ys_loss")):
-        f.loc[np.isnan(num(src)), dst] = np.nan
+    f["lcms_ys_removal"] = last_year(C == TREE_REMOVAL)
+    f["lcms_ys_loss"] = last_year(np.isin(C, VEG_LOSS))
+    recent10 = upto & (yr[None, :] > (Y[:, None] - 10))
+    g = ((C == SUCCESSIONAL_GROWTH) & recent10).sum(axis=1).astype(float)
+    g[~have] = np.nan
+    f["lcms_growth10"] = g
+    recent20 = upto & (yr[None, :] > (Y[:, None] - 20))
+    for r in RADII_M:
+        S = np.stack([_num(raw, f"s{r}_{y}") for y in years], axis=1)
+        # area-years harvested in the window / window length 1: the sum of
+        # annual removal shares (a pixel cut twice counts twice; rare)
+        share = np.where(recent20, np.nan_to_num(S), 0.0).sum(axis=1)
+        share[np.isnan(S).all(axis=1)] = np.nan
+        f[f"lcms_rm20_r{r}"] = np.clip(share, 0, 1)
+
+    ly = _num(raw, "gfc_lossyear")                   # 0 none, k -> 2000 + k
+    cal = np.where(ly > 0, 2000 + ly, 0)
+    cal = np.where(cal <= Y, cal, 0)                 # a later loss is the future
+    ys = np.where(cal > 0, Y - cal, NONE_YEARS).astype(float)
+    ys[np.isnan(ly)] = np.nan
+    f["gfc_ys_loss"] = np.clip(ys, 0, NONE_YEARS)
+    shares = []
+    for h, y0 in zip(raw["gfc_hist250"], Y):
+        hist = json.loads(h) if isinstance(h, str) and h != "null" else None
+        if not hist:
+            shares.append(np.nan)
+            continue
+        tot = sum(hist.values())
+        win = sum(v for k, v in hist.items()
+                  if 0 < float(k) and y0 - 20 < 2000 + float(k) <= y0)
+        shares.append(win / tot if tot else np.nan)
+    f["gfc_loss20_r250"] = shares
+    f["gfc_treecover2000"] = _num(raw, "gfc_treecover2000")
     return f
 
 

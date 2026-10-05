@@ -1,0 +1,29 @@
+# diagnose_layer_registration.py at f59cfeb (EC2, user, 2026-10-05); BUG-0094 sweep
+# 8 seeded road-rich 256 px windows per region; best offset of road contrast; (0,0) as % of best
+region feature    kind best   (0,0)%  verdict
+ME  evt/evh/evc/sclass/fdist/ch/cc  (0,0) 100%  aligned (LANDFIRE control)
+ME  tcc        cont (1,0)   99%   OFF
+ME  nlcd       cate (1,0)   93%   OFF
+ME  tsd        cont (0,0)  100%   aligned
+ME  balive     cont (1,0)   98%   OFF
+ME  tpa_live   cont (1,0)   96%   OFF
+ME  qmd        cont (1,0)   96%   OFF
+ME  carbon_dwn cont (1,0)   98%   OFF
+NH  evt/evh/evc/sclass/ch/cc  (0,0) 100%  aligned (LANDFIRE control)
+NH  fdist      cate (2,0)   81%   noise (road contrast 0.04)
+NH  tcc        cont (1,0)   97%   OFF
+NH  nlcd       cate (1,0)   92%   OFF
+NH  tsd        cont (0,0)  100%   aligned
+NH  balive     cont (1,0)   94%   OFF
+NH  tpa_live   cont (1,0)   93%   OFF
+NH  qmd        cont (1,0)   92%   OFF
+NH  carbon_dwn cont (1,0)   94%   OFF
+VT  evt/evh/evc/sclass/fdist/ch/cc  (0,0) 100%  aligned (LANDFIRE control)
+VT  tcc        cont (0,0)  100%   aligned (smooth layer, weak signal)
+VT  nlcd       cate (1,0)   96%   OFF
+VT  tsd        cont (0,1)  100%   tie (noise)
+VT  balive     cont (1,0)   99%   OFF
+VT  tpa_live   cont (1,0)   99%   OFF
+VT  qmd        cont (1,0)   99%   OFF
+VT  carbon_dwn cont (1,0)   99%   OFF
+# Conclusion: every Earth Engine download (nlcd; TreeMap x4; tcc in ME/NH) one row off, content ~30 m north; LANDFIRE-derived layers aligned.

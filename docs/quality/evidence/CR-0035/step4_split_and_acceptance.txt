@@ -1,0 +1,22 @@
+# CR-0035 step 4: split manifests and acceptance (user, EC2, 2026-10-05, code at 3c3f7e4)
+4.1 prepare_training_data.py (no flags): exit 0
+    ME: 7,924 loaded, 2,909 habitat, 2,909 window in bounds, 2,854 kept after pooled thinning
+    NH: 2,303 loaded,   856 habitat,   856 window in bounds,   827 kept
+    VT: 3,725 loaded, 1,174 habitat, 1,174 window in bounds, 1,128 kept
+    Wrote 10 files + manifest positives section (4,809 positives)
+    generate_negatives.py (no flags): exit 0
+    Pool 24,853 candidates; 6 partition exceptions dropped; 10,501 within 300 m of a grouse location (a);
+    95 more within 300 m of the acquisition-domain edge (b only); 20 in both
+    ME train 2,291 (1,604 habitat + 687 NonVeg), val 563 (394 + 169)
+    NH train   634 (445 + 189), val 193 (135 + 58)
+    VT train   922 (646 + 276), val 206 (144 + 62)
+    Wrote 10 files + manifest negatives section
+4.2 check_split_unchanged.py --old data_before_bug0094/pipeline/split_manifest.json: exit 0
+    20 digested split artifacts compared; Gate (split byte-identical): PASS
+4.3 acceptance_split.py: exit 0
+    config docs/quality/acceptance_split.json sha256 63b33da951d8cd00c8437362d97e350f6d10dc21f45cd1982ec4a75354422587
+    commit 3c3f7e41 (dirty tracked .py: False)
+    GATES E0, E1, E1p, E2-E15, R1-R4: 21/21 PASS
+    OBS references: "references stale (footing changed)"; flags |z| > 4: 0   (expected per step 4.3; OBS never block)
+    ACCEPTED. data/pipeline/acceptance_record.json sha256 a81c213efbb8836f4ea7f25b050dd86f8cecdbf7177d9943d7de7bbedabcd7fe
+    runtime 41.7 s

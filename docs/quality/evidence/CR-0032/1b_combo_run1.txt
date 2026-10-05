@@ -1,0 +1,14 @@
+# CR-0032 deliverable 1b, run 1 (EC2, user, 2026-10-05), diagnose_structure_combo.py at fa8bbc7
+# Bar (CR-0032 v3 Why now): "+ CR-0032 four (r30)" >= +0.006 AUC -> FAILED (+0.0033)
+Points: train 7,694, val 1,924; patches read in 154 s
+TREES (centre + neighbourhood, val; 5 seeds)
+  today's features            75 features  AUC 0.7693 +/- 0.0013  AP 0.7291  (vs today +0.0000)
+  + CR-0032 four (r30)        79 features  AUC 0.7726 +/- 0.0035  AP 0.7343  (vs today +0.0033)
+  + CR-0032 four + sd         80 features  AUC 0.7720 +/- 0.0029  AP 0.7335  (vs today +0.0027)
+  + Meta r30 (all 6)          81 features  AUC 0.7733 +/- 0.0007  AP 0.7331  (vs today +0.0040)
+  + Meta                      87 features  AUC 0.7782 +/- 0.0052  AP 0.7420  (vs today +0.0089)
+  + LCMS                      80 features  AUC 0.7703 +/- 0.0026  AP 0.7290  (vs today +0.0010)
+  + Meta + LCMS               92 features  AUC 0.7781 +/- 0.0046  AP 0.7422  (vs today +0.0088)
+  + Meta + LCMS + Hansen      95 features  AUC 0.7760 +/- 0.0042  AP 0.7403  (vs today +0.0067)
+  + everything (with GEDI)   101 features  AUC 0.7746 +/- 0.0036  AP 0.7373  (vs today +0.0053)
+Done in 174 s.

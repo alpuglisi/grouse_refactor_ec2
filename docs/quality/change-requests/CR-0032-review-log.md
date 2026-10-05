@@ -11,9 +11,14 @@ rounds, verdicts and every concern's disposition.
 | 2 | v2 (`fa8bbc7`), bounded (CR-0011 A2) | A (same agent) | APPROVE WITH FOLLOW-UPS | 0 (1 MAJOR, 1 MEDIUM, 2 LOW) |
 | 2 | v2 (`fa8bbc7`), bounded | B (same agent; ran five existing suites, 214 tests: 1 failure = B2-1) | APPROVE WITH FOLLOW-UPS | 0 (2 MAJOR, 2 MEDIUM, 4 LOW) |
 
-Quorum (CLAUDE.md §1.4): both reviewers and the author sign off after
-round 2; v3 applies every round-2 follow-up (none left open except as
-noted). Approval is conditional on deliverable 1b (B2-8).
+| 3 | v4 (`c2329bc`), bounded, after 1b | A (same agent) | APPROVE WITH FOLLOW-UPS | 0 (1 MEDIUM, 2 LOW) |
+| 3 | v4 (`c2329bc`), bounded, after 1b | B (same agent) | APPROVE WITH FOLLOW-UPS once B3-1 fixed | 0 (1 MAJOR, 2 MEDIUM, 2 LOW) |
+
+Round 2: both reviewers and the author signed off on v3, conditional on
+deliverable 1b (B2-8). **That approval lapsed** when 1b run 1 failed
+(`a005e58`; § Deliverable 1b). Round 3: both reviewers and the author sign
+off on v4; v5 applies every round-3 follow-up, B3-1 included. Approved
+2026-10-05.
 
 Author checks of the reviewers' code claims (against `5dd7e70`):
 `download_tcc_nlcd.year_image` ends `.toInt16().unmask(-1)` because EE
@@ -113,3 +118,15 @@ comment, commit below): **"+ CR-0032 four (r30 + r100)" >= +0.006 AUC, mean
 of 5 seeds**. If it fails, the layer set is redesigned; if it passes, CR-0032
 is revised (Why now restated) and goes to a bounded re-review before any
 implementation. The CNN 3 + 3 evaluation remains the decider.
+
+## Round 3: concerns and dispositions (v5)
+| id | sev | concern (short) | disposition | where |
+|---|---|---|---|---|
+| A3-1 | MEDIUM | the post-run-1 bar guards little: run 1 already showed the r100 gain; run 2 is a re-analysis, not independent | accepted: Why now says the bar was chosen after run 1 and 1b is supporting evidence, not confirmation; § Evaluation criteria declared frozen (any later change is a new CR) | Why now; § Evaluation |
+| A3-2 | LOW | "area-weighted means" exact only with validity weights and whole cells | accepted: "approximately (to validity weighting and cell discretisation)" | Why now |
+| A3-3 | LOW | the CNN can rebuild the neighbourhood, but may not | accepted, already covered: § Evaluation decides; stored 100 m layers are the named follow-up (Out of scope), the natural next test because r100 only (+0.0083) ≈ r30 + r100 (+0.0086) | this log; Out of scope |
+| B3-1 | MAJOR | 1b evidence files untracked (`.gitignore` `*`) | accepted: tracked in the v5 commit; mechanism fixed by `.gitignore` rule 12 (every evidence subdirectory at any depth, text types), since per-CR rules (10, 11) were twice added after the fact | `.gitignore`; evidence |
+| B3-2 | MEDIUM | CR overstates the bar's control (= A3-1) | accepted: see A3-1 | Why now |
+| B3-3 | MEDIUM | CHANGELOG entry stale (says approved, old bar) and wrong about water ("tall forest") | accepted: entry rewritten (lapse, r30 + r100 bar, v5 approval); water as 0 reads as 0 m (open ground), not tall forest - the author's earlier wording, which also appears in round-1 A1's scenario, was wrong | `CHANGELOG.md` |
+| B3-4 | LOW | Rounds/Quorum section did not show the lapse | accepted: rows for round 3 and the lapse stated in the Quorum paragraph | this log |
+| B3-5 | LOW | tracker hides that the bar changed | accepted: tracker line says so | tracker |

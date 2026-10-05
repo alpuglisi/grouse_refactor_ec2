@@ -295,8 +295,8 @@ Background assumed-negatives take the training positives' years (BUG-0074). `--a
 Split window mask reads pinned `SPLIT_WINDOW_FEATURES` (BUG-0093, PA-0048).
 - [ ] LOW (review A33-2): move `SPLIT_WINDOW_FEATURES` to `regions.py` and map it in `acceptance_split.json` `regions_py` so acceptance checks it at run time, not only by unit test (pinned-section change; own CR). Owner: lead
 
-## CR-0032 (v4 in round-3 re-review after deliverable 1b, 2026-10-05) — follow-ups, owner: lead
-- [x] Deliverable 1b: run 1 FAILED (+0.0033, approval lapsed); pre-stated re-measure "+ CR-0032 four (r30 + r100)" PASSED (+0.0086). v4 in bounded re-review. Owner: lead
+## CR-0032 (APPROVED WITH FOLLOW-UPS, v5, round 3, 2026-10-05) — follow-ups, owner: lead
+- [x] Deliverable 1b: run 1 FAILED (+0.0033, approval lapsed); bar changed after run 1 to "+ CR-0032 four (r30 + r100)" (post hoc; see review log § Deliverable 1b), PASSED (+0.0086). Supporting evidence only; § Evaluation (frozen) decides. Owner: lead
 - [ ] LOW (BUG-0093 sweep note): once `mch_*` is registered, the static generators' year unions (`generate_road_distance.py:311`, `generate_time_since_disturbance.py:252`, `generate_treemap_features.py:373`) include `mch_*` years; harmless while `mch_*` copies the same union, but a stale `mch_*` file would propagate its year there. Consider excluding a shared `STATIC_FEATURES` in each. Owner: lead
 - [ ] LOW (review A10): `--copy-only` mode to add a vintage without Earth Engine. In CR-0032 §3.4; tracked until implemented. Owner: lead
 - [ ] Out of scope, revisit if the pilot estimate exceeds 24 h for all regions: batch `Export.image` to Cloud Storage (review B4). Owner: lead

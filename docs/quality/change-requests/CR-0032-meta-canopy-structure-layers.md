@@ -1,7 +1,8 @@
 # CR-0032: Meta 1 m canopy-structure layers as model features
 
-**Status: DRAFT v4, 2026-10-05** — revised after deliverable 1b; awaiting
-bounded re-review (round 3). Verdicts and dispositions:
+**Status: APPROVED WITH FOLLOW-UPS (v5), 2026-10-05** — round 3 (bounded,
+after deliverable 1b): both reviewers APPROVE WITH FOLLOW-UPS; v5 applies
+them. Verdicts and dispositions:
 `CR-0032-review-log.md`. This document states only current intent.
 
 ## Scope
@@ -32,10 +33,13 @@ were measured on their own (deliverable 1b, `diagnose_structure_combo.py`,
 (30 m radius) they add +0.0033 AUC; with their 100 m-radius versions,
 +0.0086 AUC and +0.0117 AP, matching all 12 Meta columns (+0.0089). The
 CNN sees each 30 m layer across its 64 x 64 window, and the 100 m mean and
-shares are area-weighted means of the 30 m cells, so the r30 + r100 row is
-the like-for-like proxy for four 30 m layers (the bar for that row was
-pre-stated before it was run; review log § Deliverable 1b). The CNN
-evaluation (§ Evaluation) decides whether the network realises the gain.
+shares are approximately (to validity weighting and cell discretisation)
+area-weighted means of the 30 m cells, so the r30 + r100 row is the
+like-for-like proxy for four 30 m layers. That bar was chosen **after**
+run 1, whose all-Meta row already contained a superset of it, and run 2
+re-analyses the same split and seeds: 1b is supporting evidence, **not**
+confirmation (review log § Deliverable 1b). The confirmatory test is
+§ Evaluation, pre-stated and unchanged.
 
 ## The change
 
@@ -194,6 +198,9 @@ tests. The split-pipeline coupling found in review is CR-0033.
 | The CNN does not reproduce the trees' gain | § Evaluation decides; removal is a follow-up CR |
 
 ## Evaluation (deliverable 5)
+These criteria are frozen. Changing them after any evaluation result is a
+new CR, never a revision of this one.
+
 Two arms, same recipe (`--sched warm_restarts`, wd 3e-3, the
 `grouse_cr0031_wd3e3_wr` command), seeds 0, 1, 2 each: **base** with
 `--features` set to the 15 current names, **mch** with the 19. Each run
@@ -234,10 +241,10 @@ directory `docs/quality/evidence/CR-0032/`):**
 3. Evaluation (above).
 
 ## Deliverables
-- [ ] 1. This CR, the review log, `tests/test_cr0032.py`,
+- [x] 1. This CR, the review log, `tests/test_cr0032.py`,
       `check_canopy_structure.py`; two independent reviews; approval
-      (round 2 approved v3; approval lapsed at 1b run 1; v4 awaits a
-      bounded round-3 re-review of the changed text).
+      (round 2 approved v3; lapsed at 1b run 1; round 3 approved v4, v5
+      applies its follow-ups).
 - [x] 1b. Four-column measurement on EC2: r30 alone failed its bar
       (+0.0033); the pre-stated r30 + r100 bar passed (+0.0086); both
       runs in the evidence directory.

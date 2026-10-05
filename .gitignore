@@ -69,3 +69,14 @@
 !/docs/quality/evidence/CR-0031/reviewA/
 !/docs/quality/evidence/CR-0031/reviewA/*.txt
 !/docs/quality/evidence/CR-0031/reviewA/*.py
+
+# 12. Every CR's evidence directory, at any depth (text evidence only), so a
+#     new CR-XXXX/ is tracked without a per-CR rule (rules 10-11 had to be
+#     added after the fact; CR-0032 round-3 review B3-1 found the 1b runs
+#     untracked the same way).
+!/docs/quality/evidence/**/
+!/docs/quality/evidence/**/*.txt
+!/docs/quality/evidence/**/*.log
+!/docs/quality/evidence/**/*.py
+!/docs/quality/evidence/**/*.json
+!/docs/quality/evidence/**/*.tsv

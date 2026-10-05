@@ -1,0 +1,9 @@
+# diagnose_fetch_tile_offset.py --region NH at a22c484 (EC2, user, 2026-10-05); BUG-0094 root cause step 1
+# ee.Image.pixelCoordinates fetched through each route; EE coordinate minus the file's pixel centre
+T1 fetch_tile lower (1925460, 2582310, 1931460, 2588310): transform (30, 0, 1925460, 0, -30, 2588310), 200x200; x +0.00, y +0.00 m
+T1 fetch_tile upper (1925460, 2588310, 1931460, 2594310): transform (30, 0, 1925460, 0, -30, 2594310), 200x200; x +0.00, y +0.00 m
+T2 two tiles merged (rio_merge) 400x200: x +0.00, y +0.00 m
+T3 dimensions, no region 200x200: x +0.00, y +0.00 m
+T4 merged + warp_to_grid onto template, 75,194 cells: x +0.02, y -0.10 m (5070 frame)
+W  fetch_window on template grid 64x64: x +0.00, y +0.00 m
+# Conclusion: the route's geometry is exact; the shift is not in fetch_tile, rio_merge or warp_to_grid.

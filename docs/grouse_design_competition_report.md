@@ -162,10 +162,17 @@ Each phase is its own change request under CLAUDE.md §1. Acceptance and test sc
 **Day 0–1: freeze evidence before fitting**
 1. **Owner scorecard (D).** Blind-rate at least 30 past coverts. Commit before seeing any map.
 2. **Zero-fit covert layer (A/B/E's "H250").** Share of 5–20-year cuts within 250 m, plus access classes from PAD-US and state lands. Ship it for the rest of the 2026 season with one randomised covert in five, so hunts become held-out labels.
-3. **Checklist years.** Every habitat feature must come from a raster whose year matches the checklist year, within the pipeline's `YEAR_MATCH_TOLERANCE`. On-disk rasters cover 2016–2025, and the current pipeline floor is `YEAR_MIN = 2020` (`regions.py:73`). So the habitat model trains and is scored on checklists from **2016 onward**, and the decision sets use the same years as the legacy baseline. Checklists from 2010–2015 are used only where no year-matched habitat raster is needed:
-   - the panel event study, which needs only harvest timing from Hansen/LCMS (back to 2000/1985) plus location fixed effects;
-   - pre-trend placebo leads;
-   - out-of-fold observer-skill indices.
+3. **Checklist years** (corrected after the vote review; R1, R6 and R7 independently found this). The binding limit is LANDFIRE. The structure layers (`evt`, `evh`, `evc`, `sclass`, `fdist`, `ch`, `cc`) have **no vintage before 2022** (`grouse_data.py:373-375`), and `YEAR_MATCH_TOLERANCE` is 2 (`grouse_data.py:174`). That is why the pipeline floor is `YEAR_MIN = 2020` (`regions.py:73`). `train.filter_by_year_gap` refuses, rather than drops, rows outside the tolerance. Other coverage limits:
+   - TCC ends in 2023, so the 2026 prediction year is 3 years past it;
+   - TreeMap vintages are 2016, 2020 and 2022;
+   - `mch_*` is one static epoch.
+
+   Consequences:
+   - **The habitat model trains and is scored on 2020+ checklists only**, the same years as the legacy baseline.
+   - **Panel test pre-cut windows before 2020 have no legacy-layer features.** Panel checks therefore test the **clock (disturbance-age) component only**. Its inputs are Hansen and LCMS (back to 2000 and 1985) plus location fixed effects. This is what A's T5 within-site age curve does.
+   - **Checklists from 2010–2019 are used only for** clock-only panel checks, pre-trend placebo leads, and out-of-fold observer-skill indices.
+   - **Using pre-2020 checklists in the full habitat model** would need older LANDFIRE vintages back-filled under a separate CR.
+   - **The ingest CR's acceptance check** asserts that every row entering the habitat model has every feature within tolerance, and fails the run otherwise.
 4. **EBD ingest.** One row per complete checklist, filtered to best practice. Record counts by state, season, protocol and detection mode, and check the column header.
 
 **Days 2–6: decisive tests, pre-registered, multiplicity-corrected, on fall checklists in HH**
@@ -211,7 +218,7 @@ Each phase is its own change request under CLAUDE.md §1. Acceptance and test sc
 ## 8. Open items
 - **Off-support extrapolation:** whether A's offset helps can only be judged by the field and the scorecard if fewer than 200 HH detections fall off-support.
 - **Seasonal assumptions:** spring/fall density and habitat-use differences (about 2× in fall, plus dispersal). The fall-only model is the arbiter until resolved.
-- **Pre-2016 checklists:** no habitat rasters exist before 2016, so these checklists enter only the panel test and the observer-skill indices (§7 step 3). Extending the habitat model earlier would need a separate change to back-fill rasters, for example LANDFIRE 2001–2014 vintages, LCMS or Hansen.
+- **Pre-2020 checklists:** LANDFIRE has nothing before 2022 and the tolerance is 2 years, so these checklists enter only the clock-only panel checks and the observer-skill indices (§7 step 3). Extending the habitat model earlier needs back-filled LANDFIRE vintages under a separate CR.
 - **Panel test power:** unknown until treated eBird locations near harvests are counted.
 - **AlphaEarth filters:** the GBIF year range and filter details are unverified by the compiler.
 - **Agency data:** NH flush tables (403 to automated fetch), ME/VT programmes, GMNF coordinates.

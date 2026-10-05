@@ -20,11 +20,17 @@ suspect, not the layer.
 
 Read-only: reads data/landfire, writes nothing.
 
+Gate mode (CR-0035): --require-aligned FEAT ... exits 1 unless each named
+feature peaks at (0, 0) in every region scanned (a feature with too few
+usable windows fails too).
+
 Usage (repository root):
     python diagnose_layer_registration.py
     python diagnose_layer_registration.py --regions NH --windows 12
+    python diagnose_layer_registration.py --require-aligned nlcd tcc balive tpa_live qmd carbon_dwn
 """
 import argparse
+import sys
 
 import numpy as np
 import rasterio
@@ -85,6 +91,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--regions", nargs="+", default=list(REGIONS))
     ap.add_argument("--windows", type=int, default=N_WINDOWS)
+    ap.add_argument("--require-aligned", nargs="+", default=[],
+                    metavar="FEAT", help="gate: exit 1 unless each peaks "
+                    "at (0, 0) in every region")
     args = ap.parse_args()
     data = GrouseData()
     summary = []
@@ -147,6 +156,15 @@ def main():
         print(f"   {R} {f:11s} best {b}, (0,0) at {r:.0%} of best")
     if not off:
         print("   none")
+    if args.require_aligned:
+        seen = {(R, f): b for R, f, b, _ in summary}
+        bad = [(R, f, seen.get((R, f))) for R in args.regions
+               for f in args.require_aligned if seen.get((R, f)) != (0, 0)]
+        print(f"\nGate (--require-aligned {' '.join(args.require_aligned)}):"
+              f" {'PASS' if not bad else 'FAIL'}")
+        for R, f, b in bad:
+            print(f"   {R} {f}: {'not measured' if b is None else f'best {b}'}")
+        sys.exit(1 if bad else 0)
 
 
 if __name__ == "__main__":

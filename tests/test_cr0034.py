@@ -1,0 +1,318 @@
+"""CR-0034: Earth Engine downloads requested on each source's own grid
+(BUG-0094). Synthetic rasters and a fake Earth Engine only; no network,
+no data/ access.
+
+The fake serves a categorical source on an EPSG:5070 lattice whose pixel
+edges sit at odd multiples of 15 m (as NLCD/TCC/TreeMap do) and answers
+getDownloadURL by nearest-neighbour with ties broken to the south-east -
+the behaviour measured on the real service
+(docs/quality/evidence/CR-0032/source_lattice_NH.txt).
+
+Written before approval (CR-0011 A3). Run with
+    python -m unittest tests.test_cr0034
+"""
+import io
+import math
+import os
+import shutil
+import sys
+import tempfile
+import unittest
+from unittest import mock
+
+import numpy as np
+import rasterio
+from rasterio.io import MemoryFile
+from rasterio.transform import from_origin
+from rasterio.warp import transform_bounds
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, REPO)
+import download_tcc_nlcd as dtn  # noqa: E402
+
+LOCAL_ALBERS = ("+proj=aea +lat_0=44 +lon_0=-71.5 +lat_1=43 +lat_2=45 "
+                "+x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs")
+NODATA = -9999
+CLASSES = np.array([11, 21, 22, 41, 42, 43, 52, 71, 81, 90, 95], np.int16)
+MASKED = -1          # year_image's unmask marker
+
+
+class FakeEE:
+    class EEException(Exception):
+        pass
+
+    @staticmethod
+    def Projection(crs):
+        return ("proj", crs)
+
+    class Geometry:
+        @staticmethod
+        def Rectangle(coords, proj=None, geodesic=True):
+            return ("rect", tuple(coords), proj, geodesic)
+
+
+class Source:
+    """A synthetic source on an EPSG:5070 lattice (origin sx0, sy0)."""
+    def __init__(self, sx0, sy0, w, h, seed=0):
+        self.sx0, self.sy0, self.w, self.h = sx0, sy0, w, h
+        rng = np.random.default_rng(seed)
+        self.a = CLASSES[rng.integers(0, len(CLASSES), (h, w))]
+
+    def sample(self, X, Y):
+        """Nearest pixel; a centre exactly on an edge takes the pixel to
+        the east / south (floor) - BUG-0094's tie rule."""
+        col = np.floor((X - self.sx0) / 30.0).astype(int)
+        row = np.floor((self.sy0 - Y) / 30.0).astype(int)
+        ok = (col >= 0) & (col < self.w) & (row >= 0) & (row < self.h)
+        out = np.full(X.shape, MASKED, np.int16)
+        out[ok] = self.a[row[ok], col[ok]]
+        return out
+
+    def write(self, path):
+        with rasterio.open(path, "w", driver="GTiff", height=self.h,
+                           width=self.w, count=1, dtype="int16",
+                           crs="EPSG:5070",
+                           transform=from_origin(self.sx0, self.sy0, 30, 30),
+                           nodata=NODATA) as dst:
+            dst.write(self.a, 1)
+
+
+class FakeImage:
+    """getDownloadURL -> token; fake_get renders the GeoTIFF."""
+    def __init__(self, source, store, x_skew=0.0):
+        self.source, self.store, self.x_skew = source, store, x_skew
+
+    def select(self, *a, **k):
+        return self
+
+    def unmask(self, *a, **k):
+        return self
+
+    def toFloat(self):
+        return self
+
+    def getDownloadURL(self, params):
+        token = f"https://fake.invalid/{len(self.store)}"
+        self.store[token] = (self, params)
+        return token
+
+
+def make_fake_get(store, calls=None):
+    def fake_get(url, timeout=None):
+        img, p = store[url]
+        if calls is not None:
+            calls.append(p)
+        from rasterio.crs import CRS
+        assert CRS.from_user_input(p["crs"]) == CRS.from_epsg(5070), p["crs"]
+        a, _, c, _, e, f = p["crs_transform"]
+        _, (x0, y0, x1, y1), _, _ = p["region"]
+        w, h = int(round((x1 - x0) / a)), int(round((y1 - y0) / -e))
+        cols, rows = np.meshgrid(np.arange(w) + 0.5, np.arange(h) + 0.5)
+        X, Y = c + cols * a, f + rows * e
+        arr = img.source.sample(X, Y)
+        buf = MemoryFile()
+        with buf.open(driver="GTiff", height=h, width=w, count=1,
+                      dtype="int16", crs=p["crs"],
+                      transform=from_origin(c + img.x_skew, f, a, -e)) as d:
+            d.write(arr, 1)
+        resp = mock.Mock(status_code=200, content=buf.read())
+        resp.raise_for_status = lambda: None
+        return resp
+    return fake_get
+
+
+def write_template(path, n=100):
+    with rasterio.open(path, "w", driver="GTiff", height=n, width=n,
+                       count=1, dtype="int16", crs=LOCAL_ALBERS,
+                       transform=from_origin(-1500.0, 1500.0, 30, 30),
+                       nodata=NODATA) as dst:
+        dst.write(np.full((n, n), 7, np.int16), 1)
+
+
+def source_around(template, margin=4000):
+    """A source on a 15-m-offset lattice covering the template + margin."""
+    with rasterio.open(template) as t:
+        l, b, r, top = transform_bounds(t.crs, "EPSG:5070", *t.bounds,
+                                        densify_pts=21)
+    sx0 = math.floor((l - margin) / 30) * 30 + 15
+    sy0 = math.ceil((top + margin) / 30) * 30 + 15
+    w = int((r - l + 2 * margin) / 30) + 4
+    h = int((top - b + 2 * margin) / 30) + 4
+    return Source(sx0, sy0, w, h)
+
+
+class Base(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp)
+        self.template = os.path.join(self.tmp, "tpl.tif")
+        write_template(self.template)
+        self.src = source_around(self.template)
+        self.grid = {"crs": "EPSG:5070", "x0": float(self.src.sx0),
+                     "y0": float(self.src.sy0)}
+        with rasterio.open(self.template) as t:
+            self.bounds = transform_bounds(t.crs, "EPSG:4326", *t.bounds,
+                                           densify_pts=21)
+
+    def expected(self):
+        """The source warped straight onto the template (one nearest
+        step), masked as build_raster masks it."""
+        from realign_rasters import warp_to_grid
+        p = os.path.join(self.tmp, "src.tif")
+        self.src.write(p)
+        out = os.path.join(self.tmp, "expected.tif")
+        warp_to_grid(p, self.template, out)
+        with rasterio.open(out) as s:
+            return s.read(1)
+
+    def build(self, grid, x_skew=0.0):
+        store = {}
+        img = FakeImage(self.src, store, x_skew)
+        out = os.path.join(self.tmp, "NH_2025_nlcd.tif")
+        spec = dtn.PRODUCTS["nlcd"]
+        with mock.patch.object(dtn, "year_image",
+                               return_value=(img, "b1")), \
+             mock.patch.object(dtn, "year_native_grid",
+                               return_value=grid), \
+             mock.patch.object(dtn.requests, "get", make_fake_get(store)), \
+             mock.patch("builtins.print"):
+            dtn.build_raster(FakeEE, "nlcd", spec, "cid", 2025,
+                             self.bounds, out, 96000, workers=1,
+                             template=self.template, coverage_path=None)
+        with rasterio.open(out) as s:
+            return s.read(1)
+
+
+def agreement(a, b):
+    v = (a != NODATA) & (b != NODATA)
+    return float((a[v] == b[v]).mean()) if v.any() else 0.0
+
+
+class G1ParseNativeGrid(unittest.TestCase):
+    def test_accepts_north_up_30m(self):
+        g = dtn.parse_native_grid({"crs": "EPSG:5070",
+                                   "transform": [30, 0, -2361585, 0, -30,
+                                                 3177435.0000000037]})
+        self.assertEqual(g["crs"], "EPSG:5070")
+        self.assertAlmostEqual(g["x0"] % 30, 15.0, places=4)
+        self.assertAlmostEqual(g["y0"] % 30, 15.0, places=4)
+
+    def test_wkt_when_no_epsg(self):
+        g = dtn.parse_native_grid({"wkt": 'PROJCS["AEA WGS84"]',
+                                   "transform": [30, 0, -2415585, 0, -30,
+                                                 3314805]})
+        self.assertEqual(g["crs"], 'PROJCS["AEA WGS84"]')
+
+    def test_refusals(self):
+        for info in ({"crs": "EPSG:5070", "transform": [30, 1, 0, 0, -30, 0]},
+                     {"crs": "EPSG:5070", "transform": [10, 0, 0, 0, -10, 0]},
+                     {"crs": "EPSG:5070"},
+                     {"transform": [30, 0, 0, 0, -30, 0]}):
+            with self.subTest(info=info), self.assertRaises(ValueError):
+                dtn.parse_native_grid(info)
+
+
+class G2RegionGrid(unittest.TestCase):
+    def test_snaps_to_lattice_and_covers(self):
+        grid = {"crs": "EPSG:5070", "x0": -2415585.0, "y0": 3314805.0}
+        b = (-71.8, 44.0, -71.2, 44.4)
+        x0, y0, x1, y1 = dtn.region_grid(b, grid=grid)
+        for v in (x0, y0, x1, y1):
+            self.assertAlmostEqual(v % 30, 15.0, places=6)
+        from pyproj import Transformer
+        xs, ys = Transformer.from_crs("EPSG:4326", "EPSG:5070",
+                                      always_xy=True).transform(
+            [b[0], b[0], b[2], b[2]], [b[1], b[3], b[1], b[3]])
+        self.assertTrue(x0 <= min(xs) and x1 >= max(xs))
+        self.assertTrue(y0 <= min(ys) and y1 >= max(ys))
+
+    def test_grid_required(self):
+        with self.assertRaises(TypeError):
+            dtn.region_grid((-71.8, 44.0, -71.2, 44.4))
+
+
+class G3FetchTile(unittest.TestCase):
+    def test_params_carry_source_crs(self):
+        store, calls = {}, []
+        src = Source(15, 615, 40, 40)
+        img = FakeImage(src, store)
+        rect = (15.0, 15.0, 615.0, 615.0)
+        with mock.patch.object(dtn.requests, "get",
+                               make_fake_get(store, calls)):
+            dest = os.path.join(tempfile.mkdtemp(), "t.tif")
+            dtn.fetch_tile(FakeEE, img, rect, dest, crs="EPSG:5070")
+        p = calls[0]
+        self.assertEqual(p["crs"], "EPSG:5070")
+        self.assertEqual(list(p["crs_transform"]), [30, 0, 15.0, 0, -30, 615.0])
+        self.assertEqual(p["region"][1], rect)
+        self.assertEqual(p["region"][2], ("proj", "EPSG:5070"))
+        with rasterio.open(dest) as s:      # an exact copy of the source
+            self.assertTrue((s.read(1) == src.a[:20, :20]).all())
+
+    def test_wkt_crs_passed_verbatim(self):
+        """NLCD's native CRS is a WKT, not an EPSG code: fetch_tile must
+        send the source's own CRS, not a hard-coded one."""
+        from rasterio.crs import CRS
+        wkt = CRS.from_epsg(5070).to_wkt()
+        store, calls = {}, []
+        img = FakeImage(Source(15, 615, 40, 40), store)
+        with mock.patch.object(dtn.requests, "get",
+                               make_fake_get(store, calls)):
+            dtn.fetch_tile(FakeEE, img, (15.0, 15.0, 615.0, 615.0),
+                           os.path.join(tempfile.mkdtemp(), "t.tif"),
+                           crs=wkt)
+        self.assertEqual(calls[0]["crs"], wkt)
+        self.assertEqual(calls[0]["region"][2], ("proj", wkt))
+
+    def test_crs_required(self):
+        with self.assertRaises(TypeError):
+            dtn.fetch_tile(FakeEE, None, (0, 0, 30, 30), "x")
+
+
+class G4EndToEnd(Base):
+    def test_registered_with_source(self):
+        got = self.build(self.grid)
+        self.assertGreaterEqual(agreement(got, self.expected()), 0.99)
+
+
+class G5Control(Base):
+    """The simulation detects BUG-0094: the 0-origin lattice shifts."""
+    def test_zero_origin_grid_is_shifted(self):
+        zero = {"crs": "EPSG:5070", "x0": 0.0, "y0": 0.0}
+        got = self.build(zero)
+        self.assertLess(agreement(got, self.expected()), 0.6)
+
+
+class G6LatticeCheck(Base):
+    def test_off_lattice_mosaic_refused(self):
+        with self.assertRaises(RuntimeError):
+            self.build(self.grid, x_skew=15.0)
+
+
+class G7TreeMap(Base):
+    def test_shares_the_fixed_functions(self):
+        import download_treemap as dtm
+        self.assertIs(dtm.region_grid, dtn.region_grid)
+        self.assertIs(dtm.tiles, dtn.tiles)
+        self.assertIs(dtm.fetch_tile, dtn.fetch_tile)
+
+    def test_raw_download_is_an_exact_copy(self):
+        import download_treemap as dtm
+        store = {}
+        img = FakeImage(self.src, store)
+        out = os.path.join(self.tmp, "TreeMap2022_NH_BALIVE.tif")
+        with mock.patch.object(dtn.requests, "get", make_fake_get(store)), \
+             mock.patch("builtins.print"):
+            dtm.build_raster(FakeEE, img, "BALIVE", self.bounds, out, 48000,
+                             workers=1, grid=self.grid)
+        with rasterio.open(out) as s:
+            a, t = s.read(1), s.transform
+        self.assertAlmostEqual((t.c - self.src.sx0) % 30, 0.0, places=6)
+        c0 = int(round((t.c - self.src.sx0) / 30))
+        r0 = int(round((self.src.sy0 - t.f) / 30))
+        want = self.src.a[r0:r0 + a.shape[0], c0:c0 + a.shape[1]]
+        self.assertTrue((a == want.astype(a.dtype)).all())
+
+
+if __name__ == "__main__":
+    unittest.main()

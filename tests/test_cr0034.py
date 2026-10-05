@@ -34,6 +34,11 @@ LOCAL_ALBERS = ("+proj=aea +lat_0=44 +lon_0=-71.5 +lat_1=43 +lat_2=45 "
                 "+x_0=0 +y_0=0 +datum=WGS84 +units=m +no_defs")
 NODATA = -9999
 CLASSES = np.array([11, 21, 22, 41, 42, 43, 52, 71, 81, 90, 95], np.int16)
+# A source CRS that is NOT EPSG:5070 (NLCD's native CRS is a custom Albers
+# WKT): a hard-coded "EPSG:5070" anywhere on the path misplaces its pixels
+# by kilometres (CR-0034 reviews B34-2/A34-2).
+CUSTOM_ALBERS = ("+proj=aea +lat_0=23 +lon_0=-96 +lat_1=29.5 +lat_2=45.5 "
+                 "+x_0=1000 +y_0=-500 +datum=WGS84 +units=m +no_defs")
 MASKED = -1          # year_image's unmask marker
 
 
@@ -52,9 +57,10 @@ class FakeEE:
 
 
 class Source:
-    """A synthetic source on an EPSG:5070 lattice (origin sx0, sy0)."""
-    def __init__(self, sx0, sy0, w, h, seed=0):
+    """A synthetic source on a lattice (origin sx0, sy0) in `crs`."""
+    def __init__(self, sx0, sy0, w, h, seed=0, crs="EPSG:5070"):
         self.sx0, self.sy0, self.w, self.h = sx0, sy0, w, h
+        self.crs = crs
         rng = np.random.default_rng(seed)
         self.a = CLASSES[rng.integers(0, len(CLASSES), (h, w))]
 
@@ -71,7 +77,7 @@ class Source:
     def write(self, path):
         with rasterio.open(path, "w", driver="GTiff", height=self.h,
                            width=self.w, count=1, dtype="int16",
-                           crs="EPSG:5070",
+                           crs=self.crs,
                            transform=from_origin(self.sx0, self.sy0, 30, 30),
                            nodata=NODATA) as dst:
             dst.write(self.a, 1)
@@ -103,7 +109,10 @@ def make_fake_get(store, calls=None):
         if calls is not None:
             calls.append(p)
         from rasterio.crs import CRS
-        assert CRS.from_user_input(p["crs"]) == CRS.from_epsg(5070), p["crs"]
+        # the fake serves only the source's own CRS (a copy, never a
+        # reprojection): a request in any other CRS is a test failure
+        assert CRS.from_user_input(p["crs"]) == \
+            CRS.from_user_input(img.source.crs), p["crs"]
         a, _, c, _, e, f = p["crs_transform"]
         _, (x0, y0, x1, y1), _, _ = p["region"]
         w, h = int(round((x1 - x0) / a)), int(round((y1 - y0) / -e))
@@ -129,26 +138,28 @@ def write_template(path, n=100):
         dst.write(np.full((n, n), 7, np.int16), 1)
 
 
-def source_around(template, margin=4000):
+def source_around(template, margin=4000, crs="EPSG:5070"):
     """A source on a 15-m-offset lattice covering the template + margin."""
     with rasterio.open(template) as t:
-        l, b, r, top = transform_bounds(t.crs, "EPSG:5070", *t.bounds,
+        l, b, r, top = transform_bounds(t.crs, crs, *t.bounds,
                                         densify_pts=21)
     sx0 = math.floor((l - margin) / 30) * 30 + 15
     sy0 = math.ceil((top + margin) / 30) * 30 + 15
     w = int((r - l + 2 * margin) / 30) + 4
     h = int((top - b + 2 * margin) / 30) + 4
-    return Source(sx0, sy0, w, h)
+    return Source(sx0, sy0, w, h, crs=crs)
 
 
 class Base(unittest.TestCase):
+    SRC_CRS = "EPSG:5070"
+
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tmp)
         self.template = os.path.join(self.tmp, "tpl.tif")
         write_template(self.template)
-        self.src = source_around(self.template)
-        self.grid = {"crs": "EPSG:5070", "x0": float(self.src.sx0),
+        self.src = source_around(self.template, crs=self.SRC_CRS)
+        self.grid = {"crs": self.SRC_CRS, "x0": float(self.src.sx0),
                      "y0": float(self.src.sy0)}
         with rasterio.open(self.template) as t:
             self.bounds = transform_bounds(t.crs, "EPSG:4326", *t.bounds,
@@ -180,6 +191,7 @@ class Base(unittest.TestCase):
                              self.bounds, out, 96000, workers=1,
                              template=self.template, coverage_path=None)
         with rasterio.open(out) as s:
+            self.tags = s.tags()
             return s.read(1)
 
 
@@ -273,6 +285,12 @@ class G4EndToEnd(Base):
     def test_registered_with_source(self):
         got = self.build(self.grid)
         self.assertGreaterEqual(agreement(got, self.expected()), 0.99)
+        self.assertEqual(self.tags.get("GROUSE_GRID"), "native-lattice")
+        self.assertEqual(self.tags.get("GROUSE_SOURCE"), "cid 2025")
+
+
+class G4EndToEndCustomCrs(G4EndToEnd):
+    SRC_CRS = CUSTOM_ALBERS
 
 
 class G5Control(Base):
@@ -288,6 +306,99 @@ class G6LatticeCheck(Base):
         with self.assertRaises(RuntimeError):
             self.build(self.grid, x_skew=15.0)
 
+    def test_float_noise_below_lattice_accepted(self):
+        """A lattice value a hair below a multiple of 30 is on the lattice
+        (review A34-5)."""
+        from rasterio.transform import Affine
+        g = {"crs": "EPSG:5070", "x0": 15.0, "y0": 3177435.0000000037}
+        dtn.check_on_lattice(Affine(30, 0, 45.0 - 1e-9, 0, -30,
+                                    3177435.0), g, "t")
+
+
+class G8CommonGrid(unittest.TestCase):
+    def info(self, x0, y0, crs="EPSG:5070"):
+        return {"crs": crs, "transform": [30, 0, x0, 0, -30, y0]}
+
+    def test_same_lattice_accepted(self):
+        g = dtn.common_native_grid([self.info(15, 615), self.info(9015, 315)],
+                                   "t")
+        self.assertEqual((g["x0"], g["y0"]), (15.0, 615.0))
+
+    def test_refusals(self):
+        cases = ([],
+                 [self.info(15, 615), self.info(0, 615)],
+                 [self.info(15, 615), self.info(15, 615, CUSTOM_ALBERS)])
+        for infos in cases:
+            with self.subTest(n=len(infos)), self.assertRaises(ValueError):
+                dtn.common_native_grid(infos, "t")
+
+
+class FakeCollection:
+    """ImageCollection stand-in recording filterBounds; images carry
+    projection infos."""
+    def __init__(self, infos, log):
+        self.infos, self.log = infos, log
+
+    def filter(self, *a):
+        return self
+
+    def filterBounds(self, geom):
+        self.log.append(geom)
+        return self
+
+    def size(self):
+        return mock.Mock(getInfo=lambda: len(self.infos))
+
+
+class G9NativeGridFromEE(unittest.TestCase):
+    """year_native_grid / vintage_native_grid read every image that
+    intersects the region (reviews B34-1, A34-1, B34-4)."""
+    def fake_ee(self, infos, log, as_image=False):
+        ee = mock.Mock()
+        ee.EEException = FakeEE.EEException
+        ee.Geometry = FakeEE.Geometry
+        col = FakeCollection(infos, log)
+        if as_image:
+            col.size = lambda: mock.Mock(getInfo=mock.Mock(
+                side_effect=FakeEE.EEException("not a collection")))
+        ee.ImageCollection.return_value = col
+        ee.Image.return_value.projection.return_value.getInfo.return_value = \
+            infos[0] if infos else {}
+        ee.Filter = mock.Mock()
+        return ee
+
+    def test_year_grid_filters_bounds_and_checks_all(self):
+        log = []
+        infos = [{"crs": "EPSG:5070", "transform": [30, 0, 15, 0, -30, 615]}]
+        ee = self.fake_ee(infos, log)
+        with mock.patch.object(dtn, "subset_projections",
+                               lambda ee_, sub: sub.infos):
+            g = dtn.year_native_grid(ee, "cid", 2025, (-72, 43, -71, 44))
+        self.assertEqual(g["x0"], 15.0)
+        self.assertEqual(log[0][1], (-72, 43, -71, 44))
+
+    def test_year_grid_refuses_mixed(self):
+        infos = [{"crs": "EPSG:5070", "transform": [30, 0, 15, 0, -30, 615]},
+                 {"crs": "EPSG:5070", "transform": [30, 0, 0, 0, -30, 600]}]
+        ee = self.fake_ee(infos, [])
+        with mock.patch.object(dtn, "subset_projections",
+                               lambda ee_, sub: sub.infos), \
+             self.assertRaises(ValueError):
+            dtn.year_native_grid(ee, "cid", 2025, (-72, 43, -71, 44))
+
+    def test_vintage_grid_collection_and_image(self):
+        import download_treemap as dtm
+        infos = [{"crs": "EPSG:5070", "transform": [30, 0, 15, 0, -30, 615]}]
+        for as_image in (False, True):
+            with self.subTest(as_image=as_image):
+                log = []
+                ee = self.fake_ee(infos, log, as_image)
+                with mock.patch.object(dtm, "subset_projections",
+                                       lambda ee_, sub: sub.infos):
+                    g = dtm.vintage_native_grid(ee, 2022, (-72, 43, -71, 44))
+                self.assertEqual((g["x0"], g["y0"]), (15.0, 615.0))
+                self.assertEqual(bool(log), not as_image)
+
 
 class G7TreeMap(Base):
     def test_shares_the_fixed_functions(self):
@@ -295,6 +406,17 @@ class G7TreeMap(Base):
         self.assertIs(dtm.region_grid, dtn.region_grid)
         self.assertIs(dtm.tiles, dtn.tiles)
         self.assertIs(dtm.fetch_tile, dtn.fetch_tile)
+
+    def test_off_lattice_refused(self):
+        import download_treemap as dtm
+        store = {}
+        img = FakeImage(self.src, store, x_skew=15.0)
+        out = os.path.join(self.tmp, "TreeMap2022_NH_BALIVE.tif")
+        with mock.patch.object(dtn.requests, "get", make_fake_get(store)), \
+             mock.patch("builtins.print"), self.assertRaises(RuntimeError):
+            dtm.build_raster(FakeEE, img, "BALIVE", self.bounds, out, 48000,
+                             workers=1, grid=self.grid)
+        self.assertFalse(os.path.exists(out))
 
     def test_raw_download_is_an_exact_copy(self):
         import download_treemap as dtm
@@ -307,11 +429,18 @@ class G7TreeMap(Base):
                              workers=1, grid=self.grid)
         with rasterio.open(out) as s:
             a, t = s.read(1), s.transform
+            from rasterio.crs import CRS
+            self.assertEqual(s.crs, CRS.from_user_input(self.SRC_CRS))
+            self.assertEqual(s.tags().get("GROUSE_GRID"), "native-lattice")
         self.assertAlmostEqual((t.c - self.src.sx0) % 30, 0.0, places=6)
         c0 = int(round((t.c - self.src.sx0) / 30))
         r0 = int(round((self.src.sy0 - t.f) / 30))
         want = self.src.a[r0:r0 + a.shape[0], c0:c0 + a.shape[1]]
         self.assertTrue((a == want.astype(a.dtype)).all())
+
+
+class G7TreeMapCustomCrs(G7TreeMap):
+    SRC_CRS = CUSTOM_ALBERS
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@ feature raster on disk, in every region, against the same reference -
 road_dist, rasterised locally from TIGER road vectors onto the template
 grid (no Earth Engine) - without any Earth Engine call.
 
-Per region it picks N_WINDOWS seeded windows of WINDOW_PX cells holding at
+Per region it picks N_WINDOWS seeded windows of SWEEP_WINDOW_PX cells holding at
 least MIN_ROAD_CELLS road cells (road_dist <= ROAD_M), and for each
 feature's latest raster scores how distinct the road cells are at every
 offset (dy, dx) up to K cells, averaged over the windows:
@@ -42,7 +42,7 @@ from regions import REGIONS
 
 K = 2
 ROAD_M = 15.0
-WINDOW_PX = 256
+SWEEP_WINDOW_PX = 256
 MIN_ROAD_CELLS = 500
 N_WINDOWS = 8
 SEED = 0
@@ -77,9 +77,9 @@ def pick_windows(road_full, n, seed):
     edge by K so every shift stays inside the raster."""
     H, W = road_full.shape
     cand = []
-    for r in range(K, H - WINDOW_PX - K, WINDOW_PX):
-        for c in range(K, W - WINDOW_PX - K, WINDOW_PX):
-            if road_full[r:r + WINDOW_PX, c:c + WINDOW_PX].sum() \
+    for r in range(K, H - SWEEP_WINDOW_PX - K, SWEEP_WINDOW_PX):
+        for c in range(K, W - SWEEP_WINDOW_PX - K, SWEEP_WINDOW_PX):
+            if road_full[r:r + SWEEP_WINDOW_PX, c:c + SWEEP_WINDOW_PX].sum() \
                     >= MIN_ROAD_CELLS:
                 cand.append((r, c))
     rng = np.random.default_rng(seed)
@@ -104,7 +104,7 @@ def main():
             road_full = (road_dist_decode(raw) <= ROAD_M) & \
                 ~np.isin(raw, NODATA_SENTINELS)
             wins, n_cand = pick_windows(road_full, args.windows, SEED)
-        print(f"\n{R}: {len(wins)} windows of {WINDOW_PX} px with >= "
+        print(f"\n{R}: {len(wins)} windows of {SWEEP_WINDOW_PX} px with >= "
               f"{MIN_ROAD_CELLS} road cells (of {n_cand} eligible)")
         if not wins:
             continue
@@ -125,17 +125,17 @@ def main():
                 tab = {(dy, dx): [] for dy in range(-K, K + 1)
                        for dx in range(-K, K + 1)}
                 for r, c in wins:
-                    x = src.read(1, window=Window(c, r, WINDOW_PX,
-                                                  WINDOW_PX))
+                    x = src.read(1, window=Window(c, r, SWEEP_WINDOW_PX,
+                                                  SWEEP_WINDOW_PX))
                     valid = ~np.isin(x, NODATA_SENTINELS)
                     if src.nodata is not None:
                         valid &= x != src.nodata
-                    rpad = road_full[r - K:r + WINDOW_PX + K,
-                                     c - K:c + WINDOW_PX + K]
+                    rpad = road_full[r - K:r + SWEEP_WINDOW_PX + K,
+                                     c - K:c + SWEEP_WINDOW_PX + K]
                     for (dy, dx) in tab:
                         tab[(dy, dx)].append(score(
-                            x, valid, shifted(rpad, dy, dx, WINDOW_PX,
-                                              WINDOW_PX)))
+                            x, valid, shifted(rpad, dy, dx, SWEEP_WINDOW_PX,
+                                              SWEEP_WINDOW_PX)))
             mean = {o: float(np.nanmean(v)) if np.isfinite(v).any()
                     else np.nan for o, v in tab.items()}
             if not np.isfinite(mean[(0, 0)]):

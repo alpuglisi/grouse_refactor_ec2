@@ -1,6 +1,6 @@
 # CR-0022: Background assumed-negatives take the positives' years (BUG-0074)
 
-**Status: DRAFT v2, 2026-10-05** — in review (round 2).
+**Status: APPROVED, 2026-10-05** (v2; reviewers A and B, round 2).
 Verdicts and dispositions: `CR-0022-review-log.md`. This document states
 only current intent.
 
@@ -69,7 +69,7 @@ style of CR-0015's required `region` / `train_blocks_only`:
 
 **B. New helper `background_for_positives(rd, features, pos_years, ratio,
 *, seed, region_i, region, assignments, in_state=None)`** in `train.py`:
-- `pos_years`: the region's training positives' years. Each must be
+- `pos_years`: the region's training positives' years (array-like). Each must be
   non-null and integral (a float such as `2020.0` from a column that held
   a null is accepted and cast; `2020.5` or a null raises `ValueError`,
   PA-0034).
@@ -218,8 +218,10 @@ evidence.
 experiment this CR unblocks, not its acceptance).
 
 ## Deliverables
-- [ ] 1. This CR and `tests/test_cr0022.py` (pre-approval, CR-0011 A3);
+- [x] 1. This CR and `tests/test_cr0022.py` (pre-approval, CR-0011 A3);
       two independent reviews, dispositions in the review log; approval.
+      — Done: round 1 `9bb1636`, v2 and tests `069f50c`, round 2 APPROVE
+      (A) and APPROVE WITH FOLLOW-UPS (B); review log.
 - [ ] 2. Code: §2 A–D; callers and CR-0015 test fixtures updated; all
       suites pass.
 - [ ] 3. Reviewer's wrong-implementation runs (i)–(v) recorded.

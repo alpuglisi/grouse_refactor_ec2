@@ -284,3 +284,6 @@ Year-matched negative draw (BUG-0073). Review log: `docs/quality/change-requests
 - [ ] LOW (code review note): O11w's criterion is one-sided ("exceeds p99"); a merged stratum with negatives later than positives would not trigger it. n/a under S1; revisit if S2/S3 is ever adopted. Owner: lead
 - [ ] PA-0035 lint: turn `docs/quality/evidence/CR-0021/sweep_main_last.py` into a lint test (needs a CR; with the PA-0031 lint item). Owner: lead
 - [ ] PA-0034 sweep beyond `year`: coerced codes/ids (`int(...)` on raster codes, `gbif_id`, block ids) not yet swept; with the next CR touching them. Owner: lead
+
+## CR-0022 (APPROVED, 2026-10-05) — follow-ups, owner: lead
+- [ ] LOW (review A7 = B12): `tests/test_cr0022.py` U4 pins `year="latest"` with a validation share of 0, so the training-block filter is a no-op there; add one fixture with a non-zero validation share (the filter itself is covered by `test_cr0015_sampler`). Owner: lead

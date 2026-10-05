@@ -39,3 +39,29 @@ To check the tests before review, the author implemented §2 A–C in a
 throwaway worktree: all 15 tests pass; wrong implementation (iv) fails
 U2, U5, U7, W1 and W3. The worktree was deleted; the production change
 waits for approval.
+
+## Round 2 (bounded, CR-0011 A2), text v2 `069f50c`
+| reviewer | verdict | prior concerns | new concerns |
+|---|---|---|---|
+| A | APPROVE | A1–A6 resolved (U4 digests independently reproduced) | A7 LOW |
+| B | APPROVE WITH FOLLOW-UPS | B1–B11 resolved; B8 justification accepted (`train.py:189-202` filters read only coordinates) | B12–B14 LOW |
+
+Both reviewers built a correct §2 A–C independently: 15/15 tests pass.
+Reviewer-built wrong implementations, each caught by the test the CR
+names (reviewer A, `scratchpad/reviewA22/impl.py`): (i) U1, U2, U5, U6,
+W1, W3; (ii) U2; (iii) U3; (iv) U2, U5, U7, W1, W3; (v) W1; extra
+variants (validity without content check; exact-year path) U2. Reviewer
+B's independent set agrees. These are the deliverable-3 runs in substance;
+deliverable 3 re-runs them against the committed code.
+
+| id | sev | concern (short) | disposition | where |
+|---|---|---|---|---|
+| A7 = B12 | LOW | `ASSIGN` has validation share 0, so U4's `train_blocks_only=True` digests pin only a no-op filter | accepted: comment in the test naming `test_cr0015_sampler` as the filter's owner; tracker entry to add a non-zero-share fixture | `tests/test_cr0022.py` `ASSIGN`; tracker |
+| B13 | LOW | U6b passes if the column stays float; `pos_years` type unstated | fixed: U6b asserts an integer dtype; §2 B says array-like | U6; §2 B |
+| B14 | LOW | test docstring names the wrong passing test | fixed | `tests/test_cr0022.py:4-7` |
+
+## Approval (2026-10-05)
+Quorum (CLAUDE.md §1.4): author and both reviewers who commented. A:
+APPROVE (round 2). B: APPROVE WITH FOLLOW-UPS (round 2). No BLOCKING
+concern in either round; every MAJOR resolved in the text. **CR-0022
+APPROVED.** Deliverable 2 (code) may start.

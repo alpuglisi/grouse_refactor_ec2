@@ -2,9 +2,9 @@
 (BUG-0074). Synthetic rasters only; no data/ access.
 
 Written before approval (CR-0011 A3) and reviewed with the CR. Every test
-except the pinned pre-CR digests' fixture fails until CR-0022 deliverable 2
-lands (`sample_background_points(year=...)`, `background_for_positives`,
-the build_datasets check).
+except BuildDatasetsWiring.test_off_by_default fails until CR-0022
+deliverable 2 lands (`sample_background_points(year=...)`,
+`background_for_positives`, the build_datasets check).
 
 Run with
     python -m unittest tests.test_cr0022
@@ -39,7 +39,10 @@ PRE_CR_DIGESTS = {
     (True, 0, 40): "c8f84c95e6e08f860faf4229cfd003024006ede339b6fcd1f76f3f0d7bf574c6",
     (True, 7, 25): "32a74c5c1d5c93984cd02d8549324f849b7e3bcb645565f4ed1620d2994720dd",
 }
-ASSIGN = pd.DataFrame({"block_id": ["none"], "split": ["train"]})  # vf 0: all train
+# vf 0: every block is a training block, so U4's train_blocks_only=True
+# fixtures pin only "the block filter keeps everything"; the filter itself
+# is owned by tests/test_cr0015_sampler.py (CR-0022 review A7/B12).
+ASSIGN = pd.DataFrame({"block_id": ["none"], "split": ["train"]})
 
 
 def everywhere(lon, lat, region):
@@ -204,6 +207,7 @@ class U6PositiveYearsRefused(Base):
     def test_integral_float_accepted(self):
         bg = self.helper([2020.0, 2020.0])        # a CSV column with a null upstream
         self.assertEqual(bg["year"].tolist(), [2020, 2020])
+        self.assertTrue(pd.api.types.is_integer_dtype(bg["year"]))   # cast, B13
 
 
 class U7HelperCheck(Base):

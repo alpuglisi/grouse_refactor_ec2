@@ -54,6 +54,16 @@ ALLOWLIST = {
         "CR-0015 PA-0021(a): todays_sampler is a deliberate verbatim copy of "
         "the pre-CR sampler (BUG-0032 included), used only to show the "
         "CR-0015 checks fail on it; never called by production code.",
+    ("check_canopy_structure.py", "(shares > 0) & (shares < 1000)"):
+        "CR-0032 review B2-1: interior-share test (a share strictly inside "
+        "(0, 1000) per mille), not a validity mask; NODATA cells are "
+        "excluded by the separate `valid` mask it is indexed with, and 0 is "
+        "a real reading (PA-0028) that the test deliberately counts as a "
+        "boundary value.",
+    ("tests/test_cr0032.py", "[123, 0, NODATA, NODATA, NODATA]"):
+        "CR-0032 review B2-1: expected encoder output in a test, where 0 is "
+        "the encoded reading of a 0 m cell (PA-0028: 0 is a valid reading) "
+        "and NODATA the encoded invalid cells; no mask is built from it.",
 }
 
 # Unclassified matches. Empty since CR-0015 deliverables 4 (the three

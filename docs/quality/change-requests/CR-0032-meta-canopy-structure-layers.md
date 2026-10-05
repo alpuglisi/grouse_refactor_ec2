@@ -1,6 +1,8 @@
 # CR-0032: Meta 1 m canopy-structure layers as model features
 
-**Status: DRAFT v2, 2026-10-05** — awaiting round-2 review.
+**Status: APPROVED WITH FOLLOW-UPS (v3), 2026-10-05**, conditional on
+deliverable 1b meeting the Why-now bar. Round 2: both reviewers APPROVE
+WITH FOLLOW-UPS; follow-ups applied in v3.
 Verdicts and dispositions: `CR-0032-review-log.md`. This document states
 only current intent.
 
@@ -49,9 +51,10 @@ mostly 2018-2020; MAE 2.8 m). Per region, in `mch_image(ee, bounds)`:
    aggregated by `reduceResolution(ee.Reducer.mean(), maxPixels=MCH_MAX_PIXELS)`
    (`MCH_MAX_PIXELS` = 4096): the mean height and the three shares of the
    **valid** 1 m pixels in each output cell.
-4. Band `valid = ee.Image(1).updateMask(h.mask()).unmask(0)`, same
-   projection, same reducer: the valid fraction of each cell, never
-   masked.
+4. Band `valid = ee.Image(1).updateMask(h.mask()).unmask(0)
+   .setDefaultProjection(proj)` (a constant image has no native
+   projection of its own), same reducer: the valid fraction of each
+   cell, never masked.
 5. `.toFloat().unmask(-1)`: any masked output cell is the marker -1
    (Earth Engine would otherwise export it as 0).
 
@@ -66,8 +69,11 @@ fetched by `fetch_window(ee, image, crs_wkt, transform, width, height,
 dest, retries=4)`: one `getDownloadURL` with the template's WKT as `crs`,
 the window's affine as `crs_transform` and the window rectangle as
 `region`, retrying the same transient types as
-`download_tcc_nlcd.fetch_tile` (BUG-0066 clause). No warp, no mosaic: a
-tile's cells are the template's cells. Windows where the template is
+`download_tcc_nlcd.fetch_tile` (BUG-0066 clause), into `dest + ".part"`,
+then `os.replace`. A fetched or cached tile is used only if its CRS equals
+the template's and its transform equals the requested window's to 1e-3
+px; otherwise the run is refused (fetched) or the tile re-fetched
+(cached). No warp, no mosaic: a tile's cells are the template's cells. Windows where the template is
 entirely nodata are not fetched (written as `NODATA`). The asset filter
 uses the template footprint in lon/lat (`template_bounds_lonlat`,
 `transform_bounds(..., densify_pts=21)`).
@@ -79,9 +85,11 @@ Per cell, from the five floats:
 - **`NODATA`, counted** where `h > MCH_HEIGHT_MAX_M` (60 m): a source
   artefact, not clipped (PA-0034). The region is refused if these exceed
   `MCH_MAX_OVER_FRAC` = 0.001 of the valid cells;
-- otherwise `mch_height_encode(h)` and `mch_share_encode(f)`, which refuse
-  NaN/inf and out-of-range input (PA-0006 encoder clause). 0 is a valid
-  reading (PA-0028).
+- otherwise `mch_height_encode(h)` and `mch_share_encode(f)`. Each refuses
+  NaN/inf (PA-0006 encoder clause), rounds to stored units, then refuses
+  a stored value outside 0-600 dm / 0-1000 per mille (so float32 means a
+  hair outside [0, 1] are kept, real out-of-range values refused; no
+  clipping, PA-0034). 0 is a valid reading (PA-0028).
 
 | feature | value | stored | `FEATURE_SPEC` scale |
 |---|---|---|---|
@@ -101,8 +109,10 @@ tile_dir=None, pilot_lonlat=None)`:
   `mch_*`), so a stale static file cannot perpetuate its year.
 - **Tiles**: fetched concurrently (`download_tcc_nlcd._fetch_all`) into a
   persistent cache (`--tile-dir`, default `~/.cache/grouse_mch/{REGION}`,
-  outside `data/`); a cached tile that parses with the expected shape is
-  reused, so a failed run resumes.
+  outside `data/`) under a subdirectory keyed by a hash of (template WKT,
+  transform, shape, `tile_px`, `MCH_ASSET`, `RECIPE_VERSION`); a cached
+  tile passing the §3.2 identity check is reused, so a failed run
+  resumes and a changed template or recipe re-fetches.
 - **Write**: each tile is encoded and written into its window of four
   staged `.tmp` files (template profile, int16, nodata -9999, deflate,
   block = `tile_px`; tags `GROUSE_COVERAGE=ee-mask`,
@@ -115,10 +125,18 @@ tile_dir=None, pilot_lonlat=None)`:
   region's positives, template centre if none; `--pilot-lonlat`
   overrides) into a temporary directory, prints the native CRS and
   nominal scale, the per-band counts of -1, low-validity, > 60 m and
-  encoded cells, value ranges, and the measured fetch time; writes the
+  encoded cells, the fraction of `valid` strictly inside (0, 1) (0 means
+  the band was not aggregated), value ranges, and the measured fetch time;
+  runs `grid_check(ee, nlcd_image, rd, "nlcd", window)` - the region's
+  latest NLCD year fetched through `fetch_window` over the pilot window,
+  compared with the on-disk `nlcd` file, refused below `MIN_GRID_AGREE`
+  (0.99) of cells equal (catches an EE misreading of the template WKT,
+  which the gate shares); writes the
   encoded window as one 4-band int16 file (bands in `MCH_FEATURES` order)
   to `--pilot-out` (default `/tmp/mch_pilot_{REGION}.tif`) and nothing
-  under `data/`. Refuses if `ceil(30 / scale + 1)^2 > MCH_MAX_PIXELS`.
+  under `data/`. Refuses if `ceil(30 / g + 1)^2 > MCH_MAX_PIXELS`, with
+  `g` the native pixel's ground size (nominal scale x cos(latitude) for a
+  Mercator source).
 - **`--copy-only`**: writes missing vintage years from the existing
   latest `mch_*` files, no Earth Engine.
 - Returns `{"years", "written", "valid_frac", "n_tiles", "skipped",
@@ -128,8 +146,9 @@ tile_dir=None, pilot_lonlat=None)`:
   block last (PA-0035).
 
 ### 3.5 Acceptance gate `check_canopy_structure.py` (committed with v2)
-Read-only. Per region, a seeded sample of valid cells from the generated
-latest-vintage files is recomputed in Earth Engine with `reduceRegions`
+Read-only. Per region, two seeded samples from the generated
+latest-vintage files - valid cells, and any cells inside the template's
+valid area (so over-masking shows) - are recomputed in Earth Engine with `reduceRegions`
 over each cell's exact polygon (template CRS) at the source's native
 scale, plus a sample of the four bands' interior-share fraction. The
 script's constants and `compare()` decide pass/fail; the CR does not
@@ -184,11 +203,12 @@ more than 0.002. Otherwise a follow-up CR removes them from
 
 ## Test plan
 **Synthetic, `tests/test_cr0032.py` (pre-approval, CR-0011 A3):**
-- T1 encoders: values, int16, refusal of NaN/inf/out-of-range; no code
-  equals a nodata sentinel.
+- T1 encoders: values, int16, round-then-check (1.0004 → 1000), refusal
+  of NaN/inf/out-of-range; encoded boundary values are not sentinels.
 - T2 registration: the four names in `RASTER_FEATURES` and
   `FEATURE_SPEC` with §3.3 kinds and scales; `MCH_FEATURES` order; the
-  generator's and the gate's `MCH_ASSET` are equal.
+  generator's and the gate's `MCH_ASSET` and valid-fraction rule are
+  equal.
 - T3 `encode_tile` and local build, with `fetch_window` monkeypatched to
   write raw 5-band float tiles on the requested window: values encoded;
   -1, low-validity and > 60 m cells → `NODATA`; too many > 60 m cells →
@@ -196,10 +216,13 @@ more than 0.002. Otherwise a follow-up CR removes them from
   byte-identical copies per year; dry run writes only the pilot file,
   nothing under `data/`; < 1 % valid →
   refusal with existing files untouched; a second run with the tile cache
-  fetches nothing.
+  fetches nothing; an off-grid fetched tile is refused; a changed
+  template re-fetches every tile; `grid_check` passes the same grid and
+  fails a one-cell shift.
 - T4 years: union excluding `STATIC_FEATURES` (stale `mch` year ignored).
 - T5 gate: `check_canopy_structure.compare` passes matching values and
-  fails a dm/m scale error, bimodal (sampled) shares, and 0-for-nodata.
+  fails a dm/m scale error, bimodal (sampled) shares, 0-for-nodata, and
+  over-masking.
 - Existing suites pass.
 
 **On the EC2 host (user runs; results recorded in the CR's evidence
@@ -210,11 +233,12 @@ directory `docs/quality/evidence/CR-0032/`):**
 3. Evaluation (above).
 
 ## Deliverables
-- [ ] 1. This CR, the review log, `tests/test_cr0032.py`,
-      `check_canopy_structure.py`; two independent reviews; approval.
+- [x] 1. This CR, the review log, `tests/test_cr0032.py`,
+      `check_canopy_structure.py`; two independent reviews; approval
+      (round 2, both APPROVE WITH FOLLOW-UPS; v3 applies them).
 - [ ] 1b. `diagnose_structure_combo.py` "+ CR-0032 four (r30)" result on
       EC2 (user runs; output in the evidence directory) meets the Why-now
-      bar.
+      bar; approval lapses if it does not (the CR is then revised).
 - [ ] 2. After CR-0033 lands: `generate_canopy_structure.py`, `models.py`
       constants/encoders/`FEATURE_SPEC`, `RASTER_FEATURES`; all suites pass.
 - [ ] 3. EC2 pilot, runtime estimate, full generation, gate passes (user

@@ -1,6 +1,8 @@
 """check_canopy_structure.py - CR-0032 acceptance gate for the mch_* layers.
 
-Recomputes a seeded sample of generated 30 m cells independently in Earth
+Recomputes two seeded samples of generated 30 m cells - one of valid
+cells, one of any cells (NODATA included, so over-masking shows) -
+independently in Earth
 Engine - reduceRegions over each cell's exact polygon (template CRS) at
 the source's native scale, no reduceResolution - and compares them with
 the stored values. Also checks that the height shares are fractions, not
@@ -10,7 +12,7 @@ Read-only: reads the generated files (or a dry-run pilot file), writes
 nothing. This script owns the pass/fail constants; CR-0032 cites it.
 
 Usage (repository root):
-    python check_canopy_structure.py --pilot /tmp/mch_pilot_NH.tif
+    python check_canopy_structure.py --pilot /tmp/mch_pilot_NH.tif --pilot-region NH
     python check_canopy_structure.py --regions ME NH VT
 """
 import argparse
@@ -26,6 +28,7 @@ FEATURES = ("mch_mean", "mch_f01", "mch_f15", "mch_f512")
 NODATA = -9999
 SEED = 0
 N_CELLS = 200            # valid cells recomputed per region (or pilot)
+N_ANY_CELLS = 200        # cells drawn regardless of validity
 # Agreement of a stored value with the independent recomputation. The two
 # reducers weight edge pixels differently (area-weighted reduceResolution
 # vs pixel-centre reduceRegions), so small differences are expected; a
@@ -78,13 +81,17 @@ def compare(gen, ref):
     return ok, lines
 
 
-def sample_cells(paths, n, seed=SEED, tries=50):
-    """Up to n random cells valid in every band. paths: four single-band
+def sample_cells(paths, n, seed=SEED, tries=50, valid_only=True,
+                 mask_path=None):
+    """Up to n random cells (valid in every band when valid_only; inside
+    the template's own valid area when mask_path is given - the generator
+    writes nothing outside the region's clip, by design). paths: four single-band
     files in FEATURES order, or one 4-band file. Returns (rows, cols,
     {feature: values}, transform, crs_wkt)."""
     import rasterio
     from rasterio.windows import Window
     srcs = [rasterio.open(p) for p in paths]
+    mask = rasterio.open(mask_path) if mask_path else None
     try:
         bands = ([(srcs[0], b) for b in range(1, 5)] if len(srcs) == 1
                  else [(s, 1) for s in srcs])
@@ -97,8 +104,15 @@ def sample_cells(paths, n, seed=SEED, tries=50):
             r, c = int(rng.integers(ref.height)), int(rng.integers(ref.width))
             v = [int(s.read(b, window=Window(c, r, 1, 1))[0, 0])
                  for s, b in bands]
-            if NODATA in v:
+            if valid_only and NODATA in v:
                 continue
+            if mask is not None:
+                x, y = ref.xy(r, c)
+                mr, mc = mask.index(x, y)
+                if not (0 <= mr < mask.height and 0 <= mc < mask.width) or \
+                        mask.read(1, window=Window(mc, mr, 1, 1))[0, 0] \
+                        == mask.nodata:
+                    continue
             rows.append(r)
             cols.append(c)
             for f, x in zip(FEATURES, v):
@@ -109,6 +123,8 @@ def sample_cells(paths, n, seed=SEED, tries=50):
     finally:
         for s in srcs:
             s.close()
+        if mask is not None:
+            mask.close()
 
 
 def recompute(ee, rows, cols, transform, crs_wkt):
@@ -154,30 +170,37 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--pilot", help="4-band pilot file from "
                     "generate_canopy_structure.py --dry-run")
+    ap.add_argument("--pilot-region", default="NH",
+                    help="region whose template the pilot file lies in")
     ap.add_argument("--regions", nargs="+", default=None)
     ap.add_argument("--project", default=os.environ.get("EARTHENGINE_PROJECT"))
     ap.add_argument("--n", type=int, default=N_CELLS)
     args = ap.parse_args()
     from download_tcc_nlcd import ee_init
     ee = ee_init(args.project)
+    from grouse_data import GrouseData
+    data = GrouseData()
     targets = []
     if args.pilot:
-        targets.append(("pilot", [args.pilot]))
-    if args.regions:
-        from grouse_data import GrouseData
-        data = GrouseData()
-        for R in args.regions:
-            rd = data[R]
-            targets.append((R, [rd.latest_raster_path(f) for f in FEATURES]))
+        targets.append(("pilot", [args.pilot],
+                        data[args.pilot_region].latest_raster_path("evt")))
+    for R in args.regions or []:
+        rd = data[R]
+        targets.append((R, [rd.latest_raster_path(f) for f in FEATURES],
+                        rd.latest_raster_path("evt")))
     if not targets:
         raise SystemExit("Give --pilot and/or --regions.")
     all_ok = True
-    for name, paths in targets:
+    for name, paths, template in targets:
         rows, cols, gen, tr, wkt = sample_cells(paths, args.n)
         if len(rows) == 0:
             print(f"{name}: no valid cell found  FAIL")
             all_ok = False
             continue
+        r2, c2, g2, _, _ = sample_cells(paths, N_ANY_CELLS, seed=SEED + 1,
+                                        valid_only=False, mask_path=template)
+        rows, cols = np.concatenate([rows, r2]), np.concatenate([cols, c2])
+        gen = {f: np.concatenate([gen[f], g2[f]]) for f in FEATURES}
         ref = recompute(ee, rows, cols, tr, wkt)
         ok, lines = compare(gen, ref)
         print(f"{name}: {len(rows)} cells  {'PASS' if ok else 'FAIL'}")

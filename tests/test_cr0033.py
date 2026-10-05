@@ -26,6 +26,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, REPO)
 import models  # noqa: E402
 import prepare_training_data as ptd  # noqa: E402
+import grouse_data  # noqa: E402
 from grouse_data import DataConfig, RegionData  # noqa: E402
 
 LOCAL_ALBERS = ("+proj=aea +lat_0=44 +lon_0=-71.5 +lat_1=43 +lat_2=45 "
@@ -40,8 +41,6 @@ class T1Pinned(unittest.TestCase):
             keys = json.load(f)["feature_spec_keys"]
         self.assertEqual(list(ptd.SPLIT_WINDOW_FEATURES), keys)
 
-    def test_subset_of_feature_spec(self):
-        self.assertTrue(set(ptd.SPLIT_WINDOW_FEATURES) <= set(models.FEATURE_SPEC))
 
 
 class T2ExtraFeatureIgnored(unittest.TestCase):
@@ -68,7 +67,10 @@ class T2ExtraFeatureIgnored(unittest.TestCase):
         self.df = pd.DataFrame({"longitude": lon, "latitude": lat,
                                 "year": [2022, 2022]})
 
-    def test_mask_unchanged_and_extra_never_opened(self):
+    def check_extra_ignored(self):
+        """window_mask with the extra feature registered: same mask, its
+        raster never opened and never recorded in rasters_touched (the
+        manifest's input list)."""
         base = ptd.window_mask(self.df, self.rd)
         self.assertEqual(base.tolist(), [True, False])
         opened = []
@@ -80,10 +82,30 @@ class T2ExtraFeatureIgnored(unittest.TestCase):
 
         extra = {EXTRA: {"kind": "continuous", "scale": 1.0}}
         with mock.patch.dict(models.FEATURE_SPEC, extra), \
+             mock.patch.object(grouse_data, "RASTER_FEATURES",
+                               grouse_data.RASTER_FEATURES + [EXTRA]), \
              mock.patch.object(rasterio, "open", spy):
             got = ptd.window_mask(self.df, self.rd)
         self.assertEqual(got.tolist(), base.tolist())
         self.assertFalse([p for p in opened if EXTRA in p])
+        self.assertFalse([p for p in self.rd.rasters_touched
+                          if EXTRA in str(p)])
+
+    def test_extra_without_raster(self):
+        self.check_extra_ignored()
+
+    def test_extra_with_raster_on_disk(self):
+        """CR-0033 review B33-1: the extra raster exists (as mch_* will
+        after CR-0032) but covers only a corner, so reading it would turn
+        the centre point's window False: a fix that iterates
+        available_features() or FEATURE_SPEC & available fails here."""
+        p = os.path.join(self.tmp, "data", "landfire", f"NH_2022_{EXTRA}.tif")
+        with rasterio.open(p, "w", driver="GTiff", height=20, width=20,
+                           count=1, dtype="int16", crs=LOCAL_ALBERS,
+                           transform=from_origin(-3000, 3000, 30, 30),
+                           nodata=-9999) as dst:
+            dst.write(np.ones((20, 20), np.int16), 1)
+        self.check_extra_ignored()
 
 
 if __name__ == "__main__":

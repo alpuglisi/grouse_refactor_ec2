@@ -8,6 +8,12 @@ rounds, verdicts and every concern's disposition.
 |---|---|---|---|---|
 | 1 | v1 (`5dd7e70`) | A: correctness of design and data semantics (fresh agent; read-only) | REVISE | 2 (A1, A2; 4 MAJOR, 4 MEDIUM, 3 LOW) |
 | 1 | v1 (`5dd7e70`) | B: implementability, composition, test plan, operations (fresh agent; read-only; ran `test_shared_constants`, `test_pa0027_lint`, `test_nodata_zero_lint`: 33 OK) | REVISE | 1 (B1; 4 MAJOR, 4 MEDIUM, 2 LOW) |
+| 2 | v2 (`fa8bbc7`), bounded (CR-0011 A2) | A (same agent) | APPROVE WITH FOLLOW-UPS | 0 (1 MAJOR, 1 MEDIUM, 2 LOW) |
+| 2 | v2 (`fa8bbc7`), bounded | B (same agent; ran five existing suites, 214 tests: 1 failure = B2-1) | APPROVE WITH FOLLOW-UPS | 0 (2 MAJOR, 2 MEDIUM, 4 LOW) |
+
+Quorum (CLAUDE.md §1.4): both reviewers and the author sign off after
+round 2; v3 applies every round-2 follow-up (none left open except as
+noted). Approval is conditional on deliverable 1b (B2-8).
 
 Author checks of the reviewers' code claims (against `5dd7e70`):
 `download_tcc_nlcd.year_image` ends `.toInt16().unmask(-1)` because EE
@@ -70,3 +76,22 @@ of the tree: all 20 tests pass. Wrong implementations, each must fail:
 CR-0033 trial: `SPLIT_WINDOW_FEATURES` + loop change makes
 `tests/test_cr0033.py` pass (3/3); today's code fails T2 with
 `MissingDataError` on the extra feature.
+
+## Round 2: concerns and dispositions (v3)
+| id | sev | concern (short) | disposition | where |
+|---|---|---|---|---|
+| A2-1 | MAJOR | constant validity band lacks `setDefaultProjection`; would not aggregate | accepted: §3.1 step 4 adds `.setDefaultProjection(proj)`; pilot reports the fraction of `valid` strictly inside (0, 1) | §3.1, §3.4 |
+| A2-2 | MEDIUM | tile identity not checked (transform/CRS); cache reused on shape only | accepted with B2-2: identity check on fetched and cached tiles (fetched mismatch refuses, cached re-fetches); cache keyed on grid + asset + recipe; `.part` + `os.replace`. Tests: off-grid tile refused, template change re-fetches. Mutants M8 (no fetched-tile check) and M9+ (no key and no cached check) fail; M9 alone (no key) passes because the cached-tile identity check still re-fetches - defence in depth, behaviour pinned | §3.2, §3.4; T3TileIdentity |
+| A2-3 | LOW | float32 shares at 1+ε abort a region | accepted: encoders round to stored units, then range-check the integer (no clipping); T1 adds 1.0004 → 1000 | §3.3; T1 |
+| A2-4 | LOW | max-pixels check uses projection units | accepted with B2-7: ground size = nominal scale x cos(lat) | §3.4 |
+| B2-1 | MAJOR | branch fails PA-0028 L1 lint on two new statements | accepted: both reviewed as not-a-defect (interior-share bounds over cells already filtered by `valid`; expected encoder output in a test) and added to `test_nodata_zero_lint.ALLOWLIST` with justifications; lint passes | `tests/test_nodata_zero_lint.py` |
+| B2-2 | MAJOR | cache not keyed on template/recipe | accepted: see A2-2 | – |
+| B2-3 | MEDIUM | generator and gate share any EE misreading of the template WKT | accepted: pilot `grid_check` fetches NLCD over the pilot window via `fetch_window` and requires >= `MIN_GRID_AGREE` = 0.99 equality with the on-disk file; tests: same grid passes, one-cell shift fails | §3.4; T3GridCheck |
+| B2-4 | MEDIUM | gate samples only valid cells; over-masking invisible | accepted: second sample of any cells inside the template's valid area (outside the clip the generator writes nothing by design); T5 adds an over-masking case | §3.5; T5 |
+| B2-5 | LOW | gate's `MIN_VALID_FRAC` not tied to models | accepted: T2 asserts equality | T2 |
+| B2-6 | LOW | sentinel test vacuous | accepted: encodes the boundary values | T1 |
+| B2-7 | LOW | = A2-4 | accepted | – |
+| B2-8 | LOW | approval depends on an unseen EC2 result | accepted: approval explicitly conditional on 1b; its output is recorded in the evidence directory and this log | Status; Deliverable 1b |
+
+Trial implementation re-run against v3 tests: 25/25 pass; mutants M1-M8
+fail (M2 now 14 errors, others as before).

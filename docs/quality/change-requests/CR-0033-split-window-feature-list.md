@@ -1,8 +1,8 @@
 # CR-0033: split window mask reads a pinned feature list
 
-**Status: DRAFT, 2026-10-05** — awaiting independent review.
-Verdicts and dispositions: `CR-0033-review-log.md` (created at the first
-review). This document states only current intent.
+**Status: APPROVED WITH FOLLOW-UPS (v2), 2026-10-05.** Verdicts and
+dispositions: `CR-0033-review-log.md`. This document states only current
+intent.
 
 ## Scope
 `prepare_training_data.window_mask` checks the window against a pinned
@@ -66,26 +66,33 @@ One function and its constant; pipeline code only.
 | risk | mitigation |
 |---|---|
 | The constant drifts from the acceptance config | T1 asserts equality with `acceptance_split.json["feature_spec_keys"]` |
-| A split feature removed from `FEATURE_SPEC` | T1 asserts the constant is a subset of `FEATURE_SPEC` |
 
 ## Test plan (`tests/test_cr0033.py`, pre-approval)
 - T1: `SPLIT_WINDOW_FEATURES` equals `feature_spec_keys` (order
-  included) and is a subset of `FEATURE_SPEC`.
-- T2: with `models.FEATURE_SPEC` patched to add a feature that has no
-  raster, `window_mask` on a synthetic region returns the same mask as
-  without it and opens no path for the extra feature.
-- T3 (wrong implementation): the pre-CR body fails T2.
+  included). Deliberately not tied to `FEATURE_SPEC`: the split must not
+  change when a model feature does.
+- T2: with an extra feature added to `models.FEATURE_SPEC` and
+  `grouse_data.RASTER_FEATURES`, `window_mask` on a synthetic region
+  returns the same mask, never opens the extra raster and never records
+  it in `rd.rasters_touched` (the manifest's input list); two variants:
+  no extra raster on disk, and an extra raster on disk that covers only a
+  corner (reading it would change the mask).
+- Wrong implementations: today's body fails both T2 variants; a body
+  iterating `FEATURE_SPEC` ∩ `available_features()` fails the on-disk
+  variant.
 - Existing suites pass (`test_acceptance_split`, `test_shared_constants`,
   lints).
 
 ## Deliverables
-- [ ] 1. This CR and `tests/test_cr0033.py`; independent review(s);
+- [x] 1. This CR and `tests/test_cr0033.py`; two independent reviews;
       approval.
 - [ ] 2. The change; all suites pass.
 - [ ] 3. BUG-0093, BUG_LOG, PREVENTIVE_ACTIONS (PA-0048, with recurrence
       review and sweep), CHANGELOG; close-out.
 
 ## Out of scope
+- Moving the constant to `regions.py` so acceptance cross-checks it at
+  run time (review A33-2): tracked follow-up.
 - Having `acceptance_split.py` read the constant (it deliberately reads
   only its own config and `regions.py`).
 - Any change to the split's raster set.

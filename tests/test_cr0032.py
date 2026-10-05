@@ -80,7 +80,8 @@ def build_region_dir(base, evt_years=(2022, 2024), tcc_years=(2020,),
         return RegionData("NH", DataConfig(base_dir=base))
 
 
-def fake_fetch_factory(calls, all_over=False, all_masked=False):
+def fake_fetch_factory(calls, all_over=False, all_masked=False,
+                       shift_px=0):
     """fetch_window replacement: a 5-band float32 tile on exactly the
     requested window, raw values per RAW and the special cells."""
     def fake(ee, image, crs_wkt, transform, width, height, dest, retries=4):
@@ -103,6 +104,8 @@ def fake_fetch_factory(calls, all_over=False, all_masked=False):
             arr[0, :10, :] = 75.0
         if all_masked:
             arr[:] = -1
+        if shift_px:          # EE returned a tile off the requested grid
+            transform = transform * transform.translation(shift_px, 0)
         with rasterio.open(dest, "w", driver="GTiff", height=height,
                            width=width, count=5, dtype="float32",
                            crs=crs_wkt, transform=transform) as dst:
@@ -128,12 +131,16 @@ class T1Encoders(unittest.TestCase):
         v = models.mch_share_encode(np.array([0.0, 0.2504, 1.0]))
         self.assertEqual(v.dtype, np.int16)
         self.assertEqual(v.tolist(), [0, 250, 1000])
+        # float32 means a hair outside [0, 1] round into range (A2-3)
+        self.assertEqual(models.mch_share_encode(
+            np.array([1.0004, -0.0004])).tolist(), [1000, 0])
         for bad in (np.nan, -np.inf, -0.01, 1.01):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 models.mch_share_encode(np.array([bad]))
 
     def test_no_code_is_a_sentinel(self):
-        codes = set(range(0, 1001))
+        codes = set(models.mch_height_encode(np.array([0.0, 60.0])).tolist())
+        codes |= set(models.mch_share_encode(np.array([0.0, 1.0])).tolist())
         self.assertFalse(codes & set(grouse_data.NODATA_SENTINELS))
 
 
@@ -157,6 +164,7 @@ class T2Registration(unittest.TestCase):
         self.assertEqual(g.MCH_MAX_PIXELS, 4096)
         self.assertEqual(g.MCH_MAX_OVER_FRAC, 0.001)
         self.assertEqual(g.MCH_ASSET, chk.MCH_ASSET)
+        self.assertEqual(chk.MIN_VALID_FRAC, models.MCH_MIN_VALID_FRAC)
 
 
 class T3EncodeTile(unittest.TestCase):
@@ -287,6 +295,78 @@ class T3Build(Base):
         self.assertEqual(leftovers, [])
 
 
+class T3TileIdentity(Base):
+    """CR-0032 round-2 A2-2/B2-2: tiles are checked against the requested
+    window, and the cache is keyed on the template grid."""
+    def test_off_grid_tile_refused(self):
+        with self.assertRaises(RuntimeError):
+            self.run_build(fake_fetch_factory([], shift_px=1),
+                           tile_dir=os.path.join(self.tmp, "tiles"))
+        self.assertFalse(os.path.exists(self.path("mch_mean", 2024)))
+
+    def test_template_change_refetches(self):
+        tiles = os.path.join(self.tmp, "tiles")
+        self.run_build(fake_fetch_factory([]), tile_dir=tiles)
+        # new latest evt vintage on a grid shifted by one cell
+        d = os.path.join(self.tmp, "data", "landfire")
+        with rasterio.open(os.path.join(d, "NH_2025_evt.tif"), "w",
+                           driver="GTiff", height=N, width=N, count=1,
+                           dtype="int16", crs=LOCAL_ALBERS,
+                           transform=from_origin(-1890.0, 1920.0, 30, 30),
+                           nodata=NODATA) as dst:
+            dst.write(np.full((N, N), 7, np.int16), 1)
+        calls = []
+        self.run_build(fake_fetch_factory(calls), tile_dir=tiles)
+        self.assertEqual(len(calls), 4)        # nothing reused
+        with rasterio.open(self.path("mch_mean", 2025)) as src, \
+             rasterio.open(os.path.join(d, "NH_2025_evt.tif")) as ref:
+            self.assertIsNone(grid_mismatch(src, ref))
+
+
+class T3GridCheck(Base):
+    """CR-0032 round-2 B2-3: the pilot fetches an existing product over
+    the pilot window through fetch_window and compares it with the file on
+    disk, so an EE misreading of the template WKT is caught."""
+    def fake_tcc(self, shift_px=0):
+        def fake(ee, image, crs_wkt, transform, width, height, dest,
+                 retries=4):
+            with rasterio.open(self.rd.latest_raster_path("tcc")) as src:
+                from rasterio.windows import from_bounds
+                w = from_bounds(*rasterio.transform.array_bounds(
+                    height, width, transform), transform=src.transform)
+                a = src.read(1, window=w, boundless=True,
+                             fill_value=NODATA)
+            a = np.roll(a, shift_px, axis=1)
+            with rasterio.open(dest, "w", driver="GTiff", height=height,
+                               width=width, count=1, dtype="int16",
+                               crs=crs_wkt, transform=transform,
+                               nodata=NODATA) as dst:
+                dst.write(a, 1)
+        return fake
+
+    def setUp(self):
+        super().setUp()
+        # give tcc structure so a shift is visible
+        p = self.rd.latest_raster_path("tcc")
+        with rasterio.open(p, "r+") as dst:
+            dst.write((np.arange(N * N) % 97).astype(np.int16)
+                      .reshape(N, N), 1)
+
+    def grid_check(self, fake):
+        from rasterio.windows import Window
+        with mock.patch.object(self.g, "fetch_window", fake):
+            return self.g.grid_check(None, None, self.rd, "tcc",
+                                     Window(0, TILE, TILE, TILE))
+
+    def test_same_grid_agrees(self):
+        self.assertGreaterEqual(self.grid_check(self.fake_tcc()),
+                                self.g.MIN_GRID_AGREE)
+
+    def test_shifted_grid_detected(self):
+        self.assertLess(self.grid_check(self.fake_tcc(shift_px=1)),
+                        self.g.MIN_GRID_AGREE)
+
+
 class T5Gate(unittest.TestCase):
     """check_canopy_structure.compare: passes agreement, fails each named
     failure mode (PA-0021: the gate is shown to fail)."""
@@ -310,6 +390,11 @@ class T5Gate(unittest.TestCase):
     def test_sampled_not_aggregated_fails(self):
         gen = {f: (np.where(v >= 500, 1000, 0).astype(np.int16)
                    if f != "mch_mean" else v) for f, v in self.gen.items()}
+        self.assertFalse(chk.compare(gen, self.ref)[0])
+
+    def test_over_masking_fails(self):
+        gen = {f: np.where(np.arange(200) < 100, NODATA, v).astype(np.int16)
+               for f, v in self.gen.items()}
         self.assertFalse(chk.compare(gen, self.ref)[0])
 
     def test_zero_for_nodata_fails(self):

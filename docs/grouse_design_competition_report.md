@@ -1,44 +1,67 @@
 # Grouse model design competition: final report
 
-*Compiled 2026-10-05. Five independent designer agents each received `docs/grouse_model_report.md`, the repository and the owner's goal: **locate productive grouse-hunting areas in ME/NH/VT, with as much precision and accuracy as possible.** Each wrote a round-1 design using a different brainstorming technique. All five then read each other's designs, attacked them, borrowed from them and filed a round-2 final proposal. This report compiles and compares those finals and ends with a recommended merged plan. It is a design study: it changes no code or data, and any implementation goes through change control (CLAUDE.md §1).*
+*Compiled 2026-10-05 and updated after round 3.*
 
-The full documents are in `docs/design_competition/`:
+Five independent designer agents each received `docs/grouse_model_report.md`, the repository, and the owner's goal: **locate productive grouse-hunting areas in ME/NH/VT, with as much precision and accuracy as possible.** The competition ran in three rounds:
 
-| | |
+1. **Round 1.** Each designer wrote an initial design using a different brainstorming technique.
+2. **Round 2.** All five read each other's designs, attacked them and borrowed from them, then filed revisions.
+3. **Round 3.** All five read every revision and every critique, answered each critique aimed at them, and filed a final proposal.
+
+This report compiles the three rounds and ends with a recommended merged plan. It is a design study: it changes no code or data. Any implementation goes through change control (CLAUDE.md §1).
+
+All files are in `docs/design_competition/`:
+
+| File | Contents |
 |---|---|
-| Briefs | `BRIEF.md`, `ROUND2.md` |
-| Round 1 | `round1/A.md` … `round1/E.md` |
-| Round 2 finals | `round2/A.md` … `round2/E.md` |
+| `BRIEF.md`, `ROUND2.md`, `ROUND3.md` | the briefs for each round |
+| `CRITIQUES_ROUND2.md` | every round-2 critique, compiled |
+| `round1/` | the five initial designs |
+| `round2/` | the five revisions |
+| `round3/` | **the five final proposals** |
 
 ---
 
 ## 1. Executive summary
 
-1. **All five designs independently reached the same core.** Replace today's grouse-record vs other-species-record contrast with eBird complete checklists, which carry real non-detections and measured effort. Fit them as a detection-given-effort hazard over each checklist's walking footprint. Use an effort term that is dropped at prediction time. Rank covert polygons by expected October encounters or flushes per hour, judged by top-k lift. Five different methods converging on this is the strongest signal in the exercise. It also matches `grouse_model_report.md` §5.4: the 0.77 AUC ceiling is in the labels, and new labels are the one lever not yet pulled.
-2. **The owner already has eBird Basic Dataset (EBD) access, so the decisive test can run in week 1.** The designs differ mainly on which tests can actually falsify the idea. They agree the model should be a **LightGBM cloglog** encounter model run mostly on CPU. A neural model is optional, and every designer gives it about a 25% prior chance of paying off.
-3. **The competition surfaced several verified facts that change the plan** (§4):
-   - **Wrong season.** About 61% of eBird grouse records are April–June drumming. Only about 15% fall in September–November, the hunting season.
-   - **In-sample leak.** Today's CNN was trained on GBIF eBird detections, so scoring it on EBD checklists is partly in-sample.
-   - **Unusable without a request.** The Vermont Green Mountain NF recorder data has no site coordinates.
-   - **GBIF can't substitute for the EBD.** GBIF eBird records have no checklist ID or effort fields.
-4. **No single design wins outright. The best plan is a merge** (§6). It keeps the shared core and the strongest *unique* test from each designer:
+1. **One shared core.** All five final proposals now share an identical core:
+   - **Labels:** eBird complete checklists, with real non-detections.
+   - **Likelihood:** a cloglog detection-given-effort likelihood over each checklist's walking footprint.
+   - **Model:** LightGBM, fitted mostly on CPU in hours. No design needs a neural trunk.
+   - **Effort term:** built only from covariates measured on the checklist, and dropped at prediction.
+   - **Unit:** covert polygons ranked by expected October encounters or flushes per hour.
+   - **Main metric:** observed/expected top-k lift on **fall** checklists, scored in the leak-free arena **HH**, the checklists inside the current CNN's own validation blocks.
+2. **Convergence on tests, not just the model.** In round 3 the designs also converged on most of the falsification battery:
 
-   | From | Contribution |
+   | Test | Proposed by |
    |---|---|
-   | C | Leak-free arena and before/after-harvest panel test |
-   | B | Label-swap cross-play |
-   | D | Same-observer case-crossover, label-permutation control, heard-vs-seen detection modes, and the owner's blind scorecard |
-   | E | Season-contrast term and a fall-only gate |
-   | A | A frozen expert prior map you can field-test this October |
+   | Same-observer, same-day, first-visit case-crossover | D |
+   | Label-permutation null | D |
+   | Before/after-harvest panel test, as an event study | C |
+   | Label-swap cross-play | B |
+   | Season-aware detectability, with an injection test that can fail | E, C, D |
+   | Owner's frozen blind scorecard | D |
+   | Zero-fit covert map for this season | A |
 
-5. **Honest expectations.** No designer claims to beat 0.77 on the legacy AUC metric; they argue that metric is the wrong target. Each designer gave prior probabilities that its own core gates pass:
-   - the label thesis passes: about 0.6;
-   - the succession clock helps: about 0.45;
-   - AlphaEarth embeddings help: about 0.35–0.40;
-   - a measurable field gain in season 1: about 0.35;
-   - a neural model beats the GBM: about 0.25.
+   The designs now differ mainly in **which tests decide** and **how the map behaves where birders never walk**.
+3. **The biggest round-3 move was A's.** CYM-H turns A's ecological model into an offset and fallback under a LightGBM residual. The residual has full authority where checklists exist and fades out where they don't. This is A's answer to a problem it says the others leave open: tree models extend the edge value into dense off-trail regeneration, which is exactly where hunters go. Its other three outstanding MAJOR issues were fixed, as detailed in §4.2.
+4. **Verified facts that shape the plan** (§5):
+   - About 61% of grouse records are spring drumming; only about 15% fall in September–November.
+   - The CNN's positives are the same eBird detections, so it must be scored only on HH.
+   - GBIF has no checklist or effort fields.
+   - The Vermont recorder data has no coordinates.
+   - AlphaEarth used GBIF occurrences as a training target. This is now partly verified, and every design treats it as manageable.
+5. **Recommendation.** Adopt the shared core and the shared test battery (§7). Take **A's support-weighted ecological offset** as the off-support safeguard, and **E's failable injection test** to choose the detectability model. The decision rule is pre-registered: the checklist programme proceeds only if it beats the CNN on fall HH lift *and* on the case-crossover, outside the permutation band.
+6. **Honest expectations.** No design claims to beat the legacy 0.77 AUC; all argue it is the wrong target. The designers' own probabilities:
 
-   A field gain of 1.2× over today's map needs about 120 hunting hours per arm to detect. That means several seasons, or several hunters.
+   | Outcome | Probability |
+   |---|---|
+   | Label thesis passes | 0.55–0.65 |
+   | Succession clock adds signal | about 0.45 |
+   | AlphaEarth gate passes | 0.30–0.35 |
+   | Measurable field gain in season 1 | about 0.35 |
+
+   A single season can detect only differences of about 2× or more. A 1.2× gain over the CNN needs about 120 hours per arm.
 
 ---
 
@@ -46,136 +69,145 @@ The full documents are in `docs/design_competition/`:
 
 | | Technique | Design | Distinctive round-1 idea |
 |---|---|---|---|
-| A | First principles + Five Whys | **CYM**, Covert Yield Model | flushes/h = 2·W·v·D. Uses a shape-constrained model of about 40 parameters with literature priors, e.g. a stand-age hump peaking near 10 years. Includes a loop planner. |
-| B | Analogical transfer from 11 fields | **CEM**, Checklist Encounter Model | Borrows ad-click position bias, the test-negative design, fisheries CPUE and injection–recovery. A ResNet run fully convolutionally at 120 m. |
-| C | Morphological analysis (Zwicky box) | **FLUSH-C** | AlphaEarth 10 m embeddings averaged over multi-radius discs, with features sampled in Earth Engine at point coordinates. LightGBM plus a small neural net. |
-| D | Reverse brainstorm + pre-mortem | **COVERT** | 18 ways to fail hunters while keeping a high AUC, turned into 12 requirements. Access classes, a Thompson-sampling recommender with a randomised arm, and a freshness audit. |
-| E | SCAMPER + TRIZ | **FLUSH-E** | A 40-year succession clock from LCMS, Hansen and LandTrendr, aged forward to forecast future seasons. A per-pixel MLP. |
+| A | First principles + Five Whys | **CYM**, Covert Yield Model | flushes/h = 2·W·v·D. A shape-constrained model of about 40 parameters with literature priors (stand-age hump near 10 yr), plus a loop planner. |
+| B | Analogical transfer from 11 fields | **CEM**, Checklist Encounter Model | Borrowed ad-click position bias, test-negative design, fisheries CPUE and injection–recovery. The ResNet runs fully convolutionally at 120 m. |
+| C | Morphological analysis (Zwicky box) | **FLUSH-C** | AlphaEarth 10 m embeddings over multi-radius discs. Features sampled in Earth Engine at points. |
+| D | Reverse brainstorm + pre-mortem | **COVERT** | 18 ways to fail hunters with a high AUC. Access classes, a Thompson-sampling recommender with a randomised arm, and a freshness audit. |
+| E | SCAMPER + TRIZ | **FLUSH-E** | A 40-year succession clock (LCMS/Hansen/LandTrendr), aged forward to future seasons. |
 
-The designers did not coordinate, yet four of the five arrived independently at complete checklists plus a separate effort term. The fifth, A, included them as one label stream among three.
+Four of the five reached complete checklists plus a separate effort term without coordinating. A included them as one label stream among three.
+
+## 3. Round 2: what changed
+
+- **Effort covariates.** Every design dropped location-derived effort covariates. D also dropped its gradient-reversal adversary: all four critics showed it would erase real remoteness signal.
+- **Production model.** Every design moved to a LightGBM production model, with the neural part optional.
+- **Distinctive contributions that emerged:**
+  - C: the leak-free arena HH and the before/after-harvest panel test.
+  - B: label-swap cross-play.
+  - D: case-crossover, the permutation null, heard/seen detection modes and the owner's scorecard.
+  - E: the season-contrast term.
+  - A: the frozen zero-fit prior map.
+- The round-2 critiques are in `CRITIQUES_ROUND2.md`.
 
 ---
 
-## 3. Round 2: the final proposals
+## 4. Round 3: the final proposals
 
-### 3.1 What all five now share
-- **Labels:** EBD complete checklists, filtered to eBird best practice, with Sampling Event Data supplying the non-detections.
-- **Likelihood:** cloglog, P(detect) = 1 − exp(−e^{g(effort)} · Σ_footprint e^{f(habitat)}).
-- **Effort term:** may use only covariates measured on the checklist itself (B's rule, now adopted by all). That means duration, distance, observers, time, date and an out-of-fold observer-skill index. Nothing location-derived is allowed.
-- **Prediction:** a fixed standard walk (about 1 h, 2 km, mid-October morning).
-- **Production model:** LightGBM, with the neural model optional and gated.
-- **Product:** a covert card per covert, carrying:
-  - expected encounters or flushes per hour, with an interval;
-  - access class from PAD-US and state lands;
-  - freshness and peak window;
-  - a daily pick of 4 Thompson-sampled coverts plus 1 randomised covert, which gives an unbiased estimate of lift.
-- **Primary metric:** observed/expected top-k lift, with an effort-only expectation as the denominator (D). Legacy AUC is reported but never optimised.
+### 4.1 Final designs at a glance
 
-### 3.2 What each final proposal adds
-
-| Design | Unique contribution (what only this design has) | First decisive test | Self-assessed gate priors |
-|---|---|---|---|
-| **A: CYM** | A **frozen zero-fit prior map** built from literature mechanisms, committed before any label is seen. It enables a blinded field test *this* season: prior map vs CNN vs random accessible forest. A hunt-log "transfer" term models how hunters and birders differ in detecting grouse. | T1, week 1: on real held-out checklists, the prior map vs the CNN vs a one-variable "share of 5–20-yr cuts within 250 m" heuristic. CYM's core dies if the prior map beats neither. | Expects to lose slightly in-sample to the GBM. The bet is the extrapolation subset (+0.02–0.05 AUC). Field lift 1.3–2.5× over random. |
-| **B: CEM-X** | **Label-swap cross-play.** The same features and the same GBM are trained once on legacy labels and once on checklist labels. Each is scored on its own test set, on the other's and on an independent field, which cancels home advantage. Also: within-observer AUC, a drop-targeters refit, positive and negative control species, and an achieved-vs-achievable AUC ratio. | T0 (days 2–3): injection–recovery on real checklist geometry. T1 (days 3–5): cross-play. | G1 label thesis 0.6, G2 within-observer 0.6, G3 clock 0.45, G4 AlphaEarth 0.35, G5 neural 0.25, G6 season-1 field 0.35. |
-| **C: FLUSH-C** | (1) The **leak-free arena "H"**: checklists inside the current CNN's own validation blocks with a 2.5 km buffer. (2) The **disturbance panel test**: eBird locations birded before *and* after a harvest within 300 m, with a location fixed effect, where the model must predict the within-site change as the cut ages. It is the only within-site, causal-style test. (3) AlphaEarth embeddings with roads, paths, parking and buildings masked out, behind an infrastructure-probe gate, aged forward coherently. | Days 1–2: an injection simulation for the minimum detectable effect. Days 3–5: cross-play on H, with a kill rule. Week 2: the panel test and a v0 covert product (about 20 October). | Cross-play passes 0.65, fall top-5% lift gap ≥ 0.3× 0.60, panel test 0.55, embedding gate 0.40. |
-| **D: COVERT-X** | (1) **Same-observer, same-day, first-visit case-crossover** as the primary metric. It cancels observer skill, date, weather, the year's level and seasonal detectability, and drops returns to known grouse spots. (2) A **label-permutation negative control** within observer × month × duration strata, measuring how much "habitat" effort alone can manufacture and gating every feature block. (3) **Detection modes** from eBird breeding/behaviour codes and comments: heard (drumming) vs seen (flushed). If the two rankings diverge, the product ranks by flush mode. (4) The **owner's blind scorecard** of at least 30 past coverts, frozen before any map is seen. | Day 1: counts and the scorecard freeze. Days 2–4: head-to-head on H, with kill rules for both the checklist programme and the current map. | 0.3–0.6 across gates. It does not claim to beat 0.77 legacy AUC. |
-| **E: FLUSH-E** | A **season-contrast term**. Detection depends on canopy cover, conifer share and leaf-on status; it is free in spring and summer and fixed at zero in fall, so same-footprint spring/fall contrasts separate audibility from fall density. A fall-only fallback applies if its covert ranking disagrees with the full model (Spearman < 0.7). Also a naive-visit test, and a feature stencil per checklist-year (about 5 GB). | Days 2–5: a fall-only gate. Checklist GBM vs the *recalibrated* CNN on fall checklists in H, within observers. Kill unless fall top-5% lift is ≥ 0.2 higher and within-observer AUC is ≥ 0.015 higher. | Clock about 0.45, neural about 0.25. A 1.2× field gain needs about 120 h per arm. |
-
-### 3.3 Cross-critique matrix (strongest flaw raised against each design)
-
-| Target | Raised by | Flaw | Severity | Status in target's final |
+| Design | Final positioning | Unique contribution kept | Decisive test and kill rule | Critiques received → answered |
 |---|---|---|---|---|
-| A | B | Precision is capped by a small model centred on stand age, and stand age added only +0.001 AUC in the tree-model tests (CR-0032 record) | MAJOR | Partly answered: a flexible residual is allowed behind a gate. A concedes it may lose in-sample. |
-| A | C | The footprint disc grows with distance walked while the distance term cannot go negative: 29× the area for a 4 km walk against 0.5 km, vs 8× the path length. The fit then down-weights remote big woods. | MAJOR | Open. Raised in round 2 after A's final. |
-| A | D | Injection–recovery compares models on different synthetic truths. T1 scores the CNN on its own training positives. | MAJOR | Open (the leak issue in §4) |
-| A | E | Rigid priors miss spruce–fir regeneration and wetland cover | MAJOR | Open |
-| B | D, C | Negative-control species (chickadee, jay) cannot fail because their maps are nearly flat. All of B's tests are between-site. | MAJOR / MEDIUM | Open |
-| B | E | Cannot separate detectability from abundance, so a gain may be spring drumming | MAJOR | Partly answered: B has a fall head |
-| C | B | 10 m embeddings can see trails and parking | MAJOR | **Accepted and fixed**: infrastructure mask, a probe gate (AUC > 0.70 fails) and gated status |
-| C | A | Its 5-year trajectory holds an embedding that ends in 2024 fixed | MAJOR | **Accepted and fixed**: coherent ageing and a 2019→2024 back-test requiring Kendall τ ≥ 0.80 |
-| C | E | AlphaEarth may have been pretrained on GBIF occurrences, which include eBird, so evaluation may leak | MAJOR, possibly BLOCKING | **Unverified.** Must be checked before the embedding gate. |
-| D | A, B, C, E | Location-derived effort covariates plus the gradient-reversal adversary erase real remoteness signal and flatten the north woods | MAJOR (all four) | **Accepted and fixed**: both removed |
-| E | A, B | Using the species count as the effort proxy carries habitat and counts the grouse itself | MAJOR | **Moot or fixed**: the pseudo-checklist step was dropped once the owner's EBD access was known |
-| E | D, C | Its day-1 comparison is not leak-free (CNN in-sample) | MAJOR | Partly answered: E uses the recalibrated CNN on H |
+| **A: CYM-H** | Ecology where birders never walk, a learner where they do | A ~35-parameter ecological offset (stand-age hump, regeneration guild, understory under canopy, home-range kernels, physics-scaled flushes/h). A LightGBM residual is weighted by checklist support and fades out off-support. The age curve is estimated *within sites* from C's panel, then imposed. A support badge ("data-driven" vs "ecology-driven") and an exact additive "why" appear on each card. | Days 2–6 on HH: prior map vs stand-age heuristic vs CNN vs GBM. A full 2×2 injection cross scored on unvisited cells. A tie with the GBM on HH is the expected outcome. The off-support bet (+0.02–0.05 AUC) is untestable on checklists if fewer than 200 detections fall there; the scorecard and the field decide it instead. | All accepted and fixed: footprint normalised to a mean with a free-sign distance slope; CNN scored only on HH; injection made a 2×2; priors weakened with shrub wetland/old field added; blinding claim dropped. |
+| **B: CEM-X** | Ship only what survives a cheater battery | Pre-registered battery B1–B6 with multiple-testing correction. Every gate is decided on **fall** checklists. HH membership is by checklist start point and training exclusion accounts for footprint size, so no footprint is lost. A pipelines × truths injection test on real EBD geometry, scored on unvisited cells. `road_dist` removed from the habitat model. 2025–26 cuts added (OPERA DIST, HF437). | G1, the label thesis on fall HH, decided by day 6. If it fails, the programme stops and H250 plus the access layer and field ledger remain. | 11 accepted. The control-species gate was replaced by D's permutation null. |
+| **C: FLUSH-C** | A map that must predict what happens after a cut | Panel test upgraded to a **stacked event study**: pre-trend placebo leads, not-yet-treated controls, region × year effects, and the model refit without the panel sites plus a 2.5 km buffer. Gated AlphaEarth with infrastructure masking, evaluated only on 2024–25 checklists. Gains must not concentrate within 1 km of past GBIF grouse records. Three detectability models compete in an injection test. An **assumption ledger** pairs 7 identifying assumptions each with a test and a decision. | Days 3–5: cross-play plus HH plus case-crossover, with a kill rule. Week 2: panel test and fitted v1 (about 20 Oct). Week 3: embedding gate (P = 0.30). | 9 accepted, 1 partly. AlphaEarth leak accepted as MAJOR but rebutted as BLOCKING: the decisive test uses no embedding. |
+| **D: COVERT-X** | Every gain confirmed by two independent routes | **Triangulation table:** each threat (preferential sampling, effort leakage, detectability) needs at least two tests that difference out different things. Kept: case-crossover as the primary metric; permutation null, now honestly scoped to the matched-pair score; heard/seen modes; owner scorecard. Training excludes everything within 2.5 km of the CNN's validation blocks. | Days 2–4: the programme is killed unless the matched-pair score beats both the CNN and the permutation band by more than 1 bootstrap SE. The status-quo map gets its own verdict from the same test. | 6 accepted, all against round-1 text. The grouped objective became optional stage 2 behind a gradient unit test. |
+| **E: FLUSH-E** | The map reflects where grouse are in fall, not where drumming is audible | A **detectability triad**: season-contrast term, D's modes, and an unshrunk, separately fitted fall-only model. An **injection test that can fail** (planted spring tilt vs none) proves the agreement rule fires. Clock-only forecast mode with a 2020→2024 back-test. | Days 3–5 on HH: case-crossover concordance, fall TkL₅ and effort-stratified AUC must all beat the CNN and the permutation band. | 10 accepted, 0 rebutted. |
+
+### 4.2 Status of the main critiques after round 3
+
+| Critique | Raised by | Status |
+|---|---|---|
+| A's footprint sum grows with disc area, penalising remote big woods | C, then B, D, E | **Fixed** (A): normalised mean, free-sign distance slope |
+| A's T1 scores the CNN in-sample | D, then B, C, E | **Fixed** (A): all comparisons on HH |
+| A's injection test compares different truths | D, B, C | **Fixed** (A): 2×2 cross on unvisited cells |
+| A's small structural model caps precision | B, D, E | **Fixed by architecture change** (CYM-H residual) |
+| B's control-species gate cannot fail | D, C, A | **Fixed** (B): replaced by permutation null. A still lists it as open, since A's critique targeted the round-2 text. |
+| Agreement tests compare a model with a heavily shrunk version of itself, so agreement is near-certain (breaks PA-0021(a)) | **E (new MAJOR, against B, C, D)** | **Open.** E's unshrunk fall model plus injection test is the only answer offered. Adopted in §7. |
+| None of the designs changes *prediction* off the birders' map; trees extend the edge value | **A (new MAJOR, against all four)** | **Open** for B, C, D and E. Answered only by CYM-H's support-weighted offset. Adopted in §7. |
+| C's panel test is fitted on the treated sites | B, A | **Fixed** (C): refit without panel sites plus buffer |
+| C's panel test needs a forest→forest filter, or development near hotspots reads as young stands | E (new) | **Open.** Cheap to add; adopted in §7. |
+| C's panel can be confounded by birders changing routes after a cut | D (new MEDIUM) | **Open.** Mitigated by first-visit and footprint-change checks. |
+| C's AlphaEarth pretraining leak | E | **Accepted as MAJOR, not BLOCKING** (C, B). Gate evaluates only 2024–25 checklists. |
+| D's permutation null cannot see infrastructure leakage within a stratum | C (new MAJOR) | **Open.** Covered in §7 by C's infrastructure probe. |
+| D's mode labels are missing not at random, so the split may just restate season | B (new MEDIUM) | **Open.** B requires at least 500 coded detections per mode. |
+| D's kill margin of 1 bootstrap SE (about 16% false pass per test) | B (new MEDIUM) | **Open.** §7 uses a multiplicity-corrected margin. |
+| D's same-day pairs are mostly spring roadside contrasts | C (new MEDIUM) | **Open.** §7 decides on fall pairs only. |
+| E's season contrast assumes the same habitat use and density in spring and fall, but fall density is about 2× and dispersal shifts it | B (MAJOR), A and C (MEDIUM) | **Open.** This is why §7 keeps the unshrunk fall-only model as the arbiter rather than trusting the contrast term alone. |
+| E's fall-only kill gate may be underpowered and kill a working programme | A (new MEDIUM) | **Open.** §7 requires a pre-run power check (injection minimum detectable effect) before the gate is binding. |
 
 ---
 
-## 4. Facts verified or corrected during the competition
+## 5. Facts verified during the competition
 
 | Fact | Verified by | Consequence |
 |---|---|---|
-| GBIF eBird records have **no checklist ID, start time or effort fields**. They do carry observer ID, date and coordinates. | C, then A, B and D via the GBIF API | Only the EBD with Sampling Event Data supports a checklist model. The owner has it. |
-| The **current CNN's positives are GBIF eBird detections** (`sightings.py:20`, `EBIRD_DATASET_KEY`) | D; confirmed in the repository | Any CNN score on EBD checklists outside its validation blocks is partly in-sample. All CNN comparisons must use C's leak-free H set. |
-| About **61% of grouse records are April–June and about 15% September–November** (about 43k records, 2016–24). There are 5,774 fall records for 2020–24. | E, B (GBIF API counts) | A model trained on all seasons mostly learns where drumming is audible. Fall-specific handling is required: E's season-contrast term and/or D's detection modes. |
-| The **Vermont Green Mountain NF drumming-recorder release (doi:10.5066/P13EFLXX) has no site IDs or coordinates** | D and C (file list downloaded) | Not usable as an independent scorer without a data request to USGS/USFS |
-| The **NH flush-rate pages return 403** to automated fetch. ME and VT sub-state flush data are unconfirmed. | A, B, C, D, E | Flush aggregates are a scale and year check only (C's ecological-fallacy point), pending agency requests |
-| Whether AlphaEarth was pretrained on eBird/GBIF occurrences | Raised by E; **unverified** | Check before using the embeddings |
-| eBird `SPECIES COMMENTS` and behaviour-code columns are present | Assumed from EBD documentation; **unverified** against the owner's file header | Needed for D's heard/seen split. If absent, behaviour codes only. |
+| GBIF eBird records have **no checklist ID, start time or effort**. They do have observer ID, date and coordinates. | C, A, B, D (GBIF API) | Only the EBD with Sampling Event Data supports the model. The owner has it. |
+| **The CNN's positives are GBIF eBird detections** (`sightings.py:20`, `EBIRD_DATASET_KEY`) | D; confirmed in the repository | The CNN may be scored only on HH (inside its validation blocks, 2.5 km buffer). `regions.py:55,58`: `VAL_FRACTION` 0.2, `SPLIT_SEED` 42 (A). |
+| **About 61% of grouse records are April–June, about 15% September–November** (about 43k, 2016–24). There are 5,774 fall records for 2020–24. | E, B, D (GBIF counts) | Every decision is made on fall checklists, and detectability must be season-aware. |
+| The **Vermont GMNF recorder release has no site coordinates** (doi:10.5066/P13EFLXX) | D, C | Usable only after a data request. |
+| **AlphaEarth Foundations (arXiv:2507.22291) uses GBIF species occurrence records as a training target** (text alignment), not as an input | B, C; compiler confirmed against the paper's HTML | The leak risk is real but indirect. Evaluate embeddings only on post-training-period checklists. B and C report 2017–2023, ≤240 m uncertainty and ≤1,000 per taxon; the compiler **could not verify** those filter details. |
+| NH flush-rate pages return 403 to automated fetch; ME and VT sub-state flush data are unconfirmed | all | Flush data are used for absolute scale and year checks only, pending agency requests. |
+| eBird species-comments and breeding/behaviour-code columns | **Unverified** against the owner's file | Needed for D's mode split. If absent, use behaviour codes only. |
 
 ---
 
-## 5. Assessment
+## 6. Assessment
 
-The final proposals hardly differ in the model; they differ in **evidence design**. Judged on what each adds that survived attack:
+By round 3 the designs differ less in *what to fit* than in *what each one alone protects against*. Ranked on contributions that survived three rounds of attack:
 
-1. **C (FLUSH-C)** contributes the two things every other design adopted or has no substitute for. First, the leak-free H arena, which A, B, D and E all adopted. Second, the before/after-harvest panel test, the only test that compares a site with itself and so cancels why birders choose sites. Its embedding block is the only input that is genuinely new information, and it is gated sensibly. One leakage question is open.
-2. **D (COVERT-X)** has the strongest robustness tests:
-   - the case-crossover cancels most confounds exactly;
-   - the permutation control fixes B's controls that cannot fail;
-   - the heard/seen split addresses the seasonal problem directly;
-   - the owner's scorecard is the only independent check available *today*.
-
-   D lost its round-1 adversary, but every designer agreed it should go.
-3. **E (FLUSH-E)** found the most consequential new fact, the 61%/15% seasonal split, and its season-contrast term is the principled response.
-4. **B (CEM-X)** supplied the general evaluation machinery that most finals reuse: cross-play, within-observer AUC and drop-targeters. Its own differentiators are weaker now that the others have adopted them.
-5. **A (CYM)** is the only design that can put a falsifiable map in the field *this season*. Its main core is the weakest bet, given the +0.001 prior result for stand age, and C's footprint-area critique is unanswered. A is candid about this.
+1. **C (FLUSH-C)** supplied the two pieces every design now depends on: the leak-free HH arena, and the only within-site test, now a proper event study refit out-of-sample. Its assumption ledger is the clearest map of what could still go wrong. Its embedding block is new information, gated, with leakage handled.
+2. **D (COVERT-X)** supplied most of the shared falsification battery (case-crossover, permutation null, modes, scorecard). Its triangulation rule, that each threat needs two independent tests, is the right governing principle. It has three open MEDIUM issues and one open MAJOR.
+3. **A (CYM-H)** made the largest final-round improvement. It fixed all three outstanding MAJOR issues and raised the one critique nobody else answers: off-support extrapolation. Hunters care about off-trail young cover, so this matters directly for the product. Its main claim, a +0.02–0.05 off-support gain, may be untestable on checklists and rests on the field and the scorecard.
+4. **E (FLUSH-E)** contributed the seasonal fact and the only agreement test designed to be able to fail, a direct application of the repository's own PA-0021(a). Its season-contrast term rests on an assumption three critics dispute, so in the merged plan the fall-only model, not the contrast term, is the arbiter.
+5. **B (CEM-X)** has the most disciplined decision procedure: fall-only gates, multiple-testing correction, and fold geometry that keeps every footprint. Most of its unique machinery has now been adopted by the others, so it differentiates least.
 
 This ranking is the compiler's judgement, not a vote by the designers.
 
 ---
 
-## 6. Recommended merged plan
+## 7. Recommended merged plan
 
-Each phase below is its own change request under CLAUDE.md §1. Acceptance scripts are committed first (CR-0011 A3). Nothing writes to `data/` before approval. CR-0035, the registration repair, finishes first: its evaluation is the legacy baseline every comparison below uses.
+Each phase is its own change request under CLAUDE.md §1. Acceptance and test scripts are committed first (CR-0011 A3), and nothing writes to `data/` before approval. **CR-0035 finishes first**; its evaluation is the legacy baseline.
 
-**Week 0–1: freeze the evidence before fitting**
-1. **The owner's blind scorecard (D).** Rate at least 30 past coverts and commit the file before seeing any map.
-2. **Frozen prior map (A).** Build the literature-mechanism map, commit it, and start the randomised blinded field arms for the rest of the 2026 season: prior map / current CNN / random accessible forest. Use one randomised covert in five.
-3. **EBD ingest.** One row per complete checklist, filtered to best practice. Record counts by state, season, protocol and detection mode. Verify the column header, including species comments.
+**Day 0–1: freeze evidence before fitting**
+1. **Owner scorecard (D).** Blind-rate at least 30 past coverts. Commit before seeing any map.
+2. **Zero-fit covert layer (A/B/E's "H250").** Share of 5–20-year cuts within 250 m, plus access classes from PAD-US and state lands. Ship it for the rest of the 2026 season with one randomised covert in five, so hunts become held-out labels.
+3. **EBD ingest.** One row per complete checklist, filtered to best practice. Record counts by state, season, protocol and detection mode, and check the column header.
 
-**Week 1: the decisive tests, all pre-registered and run on the leak-free H set (C)**
+**Days 2–6: decisive tests, pre-registered, multiplicity-corrected, on fall checklists in HH**
+4. **Injection–recovery.** Pipelines × truths on real EBD geometry, scored on unvisited cells (B). Include a planted spring tilt and a null (E). This sets the minimum detectable effect, so a gate is binding only if it is powered (A's concern). It also chooses among the three detectability models (C's radius, D's modes, E's contrast). The arbiter is the unshrunk fall-only model.
+5. **Cross-play (B).** The same GBM trained on legacy vs checklist labels, scored at home, away and on independent data. The CNN is recalibrated on the same checklists.
+6. **Kill rule.** The checklist programme continues only if all of these hold:
+   - fall TkL₅ beats the recalibrated CNN by the pre-registered margin;
+   - **and** the fall same-observer, first-visit case-crossover is positive (D);
+   - **and** both clear the within-stratum label-permutation band (D);
+   - **and** the infrastructure probe passes (C).
 
-4. **Injection–recovery (B, C)** on real checklist geometry. This sets the minimum detectable effect and tests the season-contrast term (E).
-5. **Cross-play (B).** Train the same GBM on legacy labels vs checklist labels and score home, away and independent. The current CNN is recalibrated on the same checklists (E).
-6. **Kill rules,** combining E's and D's:
-   - the checklist programme stops unless fall top-5% observed/expected lift is ≥ 0.2 higher than the recalibrated CNN;
-   - **and** same-observer case-crossover (D) shows a positive gain;
-   - **and** the label-permutation control (D) shows the gain is not manufactured by effort.
+   The current map gets its own verdict from the same tests.
 
-**Weeks 2–3: build the model if it survives**
+**Weeks 2–3: build what survived**
 
-7. **Production model.** LightGBM cloglog with footprint features and the checklist-only effort term. Add a **season-contrast** detection term (E) and a **heard/seen detection-mode** split (D). The product ranks by the fall, flush-mode model.
-8. **Disturbance panel test (C).** Run it as the causal check on the habitat function and the succession clock.
-9. **Feature gates.** Each block (the succession clock; AlphaEarth with infrastructure masking, after the pretraining-leak check) is kept only if it passes the permutation control and improves fall lift on H.
-10. **v0 covert product** for the late 2026 season. Each covert card carries:
-    - expected flushes per hour with an interval;
-    - access class;
-    - freshness and peak window;
-    - an evidence badge.
+7. **Production model.** A LightGBM cloglog footprint model:
+   - footprint as a normalised mean with a free-sign distance slope (A, fixed after C's critique);
+   - event-only effort GAM (B);
+   - the winning detectability model from step 4.
 
-    The daily pick is 4 Thompson-sampled coverts plus 1 randomised covert. Every logged hunt becomes a held-out label.
+   Add **A's support-weighted ecological offset**: the stand-age curve estimated within sites from the panel, with the residual fading off-support. Each covert card carries a "data-driven / ecology-driven" badge.
+8. **Panel event study (C).** Use a forest→forest land-use filter (E) and first-visit plus footprint-change checks (D). This validates the habitat function and supplies A's age curve.
+9. **Feature gates.** Each block is kept only if it passes the permutation null and improves fall TkL on HH:
+   - succession clock;
+   - AlphaEarth with infrastructure masking, evaluated only on 2024–25 checklists from a model trained on data up to 2023, with no gain concentrated near past GBIF grouse records (C).
+10. **v1 covert product (about 19–20 October).** Each card shows:
+    - flushes/h with interval;
+    - support badge;
+    - access class and walk-in distance;
+    - peak window and freshness;
+    - artefact badges (near-hotspot, season/mode disagreement, extrapolation).
+
+    The daily list has 4 Thompson-sampled coverts plus 1 randomised. The owner's hunts enter the likelihood as hunt-protocol checklists.
 
 **Later:**
-- agency requests for ME/VT flush data and for the GMNF recorder coordinates;
+- agency requests: ME/VT flush data, NH tables, GMNF recorder coordinates;
 - leaf-off lidar understory metrics;
-- a neural model only if it beats the GBM by at least 0.01 on H;
+- a neural model only if it beats the GBM by at least 0.01 on HH;
 - a multi-season field comparison sized for 1.2× (about 120 h per arm).
 
 ---
 
-## 7. Open items
-- AlphaEarth pretraining data: does it include eBird/GBIF occurrences? This must be settled before the embedding gate (E, unverified).
-- A's footprint-area bias raised by C: the disc area grows quadratically with distance walked. Any footprint kernel in the merged model should scale with path length, not with disc area.
-- How many sites qualify for the panel test (eBird locations with checklists before and after a harvest). Its statistical power is unknown until counted (C).
-- Agency data: NH flush-rate tables (the pages return 403 to automated fetch), ME and VT flush programmes, and the GMNF recorder coordinates.
-- References in the designs marked **unverified** by their authors: several DOIs written from memory, and PDFs seen only through search summaries.
+## 8. Open items
+- **Off-support extrapolation:** whether A's offset helps can only be judged by the field and the scorecard if fewer than 200 HH detections fall off-support.
+- **Seasonal assumptions:** spring/fall density and habitat-use differences (about 2× in fall, plus dispersal). The fall-only model is the arbiter until resolved.
+- **Panel test power:** unknown until treated eBird locations near harvests are counted.
+- **AlphaEarth filters:** the GBIF year range and filter details are unverified by the compiler.
+- **Agency data:** NH flush tables (403 to automated fetch), ME/VT programmes, GMNF coordinates.
+- **Citations:** references marked **unverified** by their authors (DOIs from memory, PDFs seen only via search summaries).

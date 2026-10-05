@@ -316,3 +316,6 @@ Split window mask reads pinned `SPLIT_WINDOW_FEATURES` (BUG-0093, PA-0048).
 - [ ] TreeMap assets `USFS/GTAC/TreeMap/v20xx` deprecated; migrate to `projects/gtac-data-publish/assets/TreeMap/Product_Version/2023-1` (own CR). Owner: lead
 - [ ] PA-0049(b) follow-up: make the registration gate a standing check before training (CR candidate). Owner: lead
 - [ ] TCC asset `USGS/NLCD_RELEASES/2023_REL/TCC/v2023-5` deprecated (CR-0035 pins it, I35-1); migrate to `projects/gtac-data-publish/assets/TCC/Product_Version/2025-6` (adds 2024-2025) under its own CR, with a before/after evaluation. Owner: lead
+- [ ] CR-0036 follow-up (B36-2-1): add C9 steep-terrain leave-one-out ground-Z gate, with a nearest-1 control, to `check_lidar_structure.py` before the NH pilot. Owner: lead
+- [ ] CR-0036 follow-up (A36-2-10): independent agent review of the built `lidar_sources.csv` and NNE footprint layer before the NH pilot. Owner: lead
+- [ ] CR-0037 binding (A36-5/B36-3/B36-4): evaluate lidar layers within each work unit and within |Y - A| <= 2 as well as overall; decide `LIDAR_ASSIGN_POLICY`; snow QA (B36-18). Owner: lead

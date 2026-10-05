@@ -39,3 +39,35 @@ All concerns below were checked against the code or sources before being accepte
 | B36-17 | MEDIUM | conflicts with HYBRID_REPORT numbering and v1 scope; CR-0038 source-year gate | accepted: stated in Impact | §Impact |
 | B36-18 | LOW | snow on early-spring flights | accepted as a tracked item for CR-0037 QA | §Risk |
 | B36-20 | LOW | figure inconsistencies | accepted: volume and cost now quoted once, from the pilot | §6 |
+
+## Round 2 (v2, bounded re-review per CR-0011 A2)
+| Reviewer | Verdict |
+|---|---|
+| A | APPROVE WITH FOLLOW-UPS. All round-1 BLOCKING concerns resolved; no new BLOCKING. A36-2-1 and A36-2-2 must be fixed in the text before code. Full review: `evidence/CR-0036/REVIEW_A_r2.md` |
+| B | APPROVE WITH FOLLOW-UPS. Both round-1 BLOCKING concerns resolved; no new BLOCKING. B36-2-1 tracked to before deliverable 3. Full review: `evidence/CR-0036/REVIEW_B_r2.md` |
+| Author | APPROVE (v3 applies the required text fixes and the follow-ups below) |
+
+**Quorum met (CLAUDE.md §1.4): both reviewers and the author signed off. Status: APPROVED WITH FOLLOW-UPS (v3).**
+
+| id | sev | concern (short) | disposition | where (v3) |
+|---|---|---|---|---|
+| A36-2-1 = B36-2-7 | MAJOR / MEDIUM | withheld is `ClassFlags & 0x04` (bit 3 is overlap); blacklist kept classes 19–22 | accepted (required before code): class whitelist {0,1,2,3,4,5,9}; withheld = `Withheld` or `ClassFlags & 0x04`; point-filter test | §1.3; `test_point_filter` |
+| A36-2-2 = B36-2-13 | MAJOR / LOW | C6 control "maxdist > pad" can be accepted on dense data; C6 compared `lid_p95` only | accepted (required before code): control = the same blocks computed with pad 0, which must differ; all seven features and the count bands compared | §5 C6; `check_seam`, `_read_set` |
+| A36-2-3 = B36-2-11 | MAJOR / MEDIUM | C3 and C5 fail on slivers and footprint overreach | accepted: units with fewer than `MIN_CELLS` forest cells are OBS; fallback to the next covering unit when the assigned unit delivers no return | §1.1, §5; `gated_units`, test |
+| A36-2-4 = B36-2-4 | MAJOR / MEDIUM | the units/CRS test could pass with no assertions; no XY or header-refusal test | accepted: synthetic rows; feet Z, EPT Z, a pinned UTM→Albers pipeline checked against `from_pipeline`, header-mismatch refusals | tests |
+| A36-2-5 | MEDIUM | pilot used `lid_p95` validity for every feature | accepted: per-feature validity | `pilot()` |
+| A36-2-6 | MAJOR (follow-up) | controls uncalibrated; single draw | accepted: C4 now needs the real contrast to beat the p99 of a 100-draw permutation null. C3 and C5 controls are deterministic transformations, not random draws, so PA-0021(c) draw counts do not apply | §5 C4; `regen_null` |
+| A36-2-7 = B36-2-5 | MEDIUM | Mask B needs `tsd_2015`; nodata, boundary and 1999 start unstated | accepted: years at A < 2016 derived from `tsd_2016`; inclusive bounds; nodata masks; pre-1999 reads as the cap; test | §2; `test_mask_b_before_tsd_record` |
+| A36-2-8 | MEDIUM | oracle and CR misaligned (noise drop, ground HAG 0, zero distance, water, first return) | accepted: all stated in the CR and tested | §1.3, §1.5; tests |
+| A36-2-9 | MEDIUM | EPT Z already metres; WESM `vert_crs` ftUS would apply feet twice | accepted: Z factor 1 for every EPT row | §1.4; `test_z_units` |
+| A36-2-10 | MEDIUM | source table delivered after approval with no review step | accepted: independent agent review of the built table before the pilot | deliverable 2 |
+| A36-2-11 = B36-2-12 | LOW | GPS time type; acquisition date vs WESM window | accepted: decode as adjusted standard regardless of the flag; cells outside the window ± 7 days are NODATA and counted | §2 |
+| A36-2-12 = B36-2-8 | LOW | prose restates thresholds; C3 effective band; `ch`/`cc` 2022 fallback | accepted: §5 states rules and points to the script's constants; effective band and 2022 fallback stated; the log prints the year used | §5 |
+| A36-2-13 | LOW | when masks apply; tsd not in cache key | accepted: blocks cached unmasked, masks applied at assembly, so tsd is not part of the block key | §1.8 |
+| B36-2-1 | MAJOR (follow-up) | W3 cannot detect steep-terrain HAG error | accepted as a tracked follow-up: C9, a leave-one-out ground-Z RMSE by slope class with a nearest-1 control, added to the gate script before deliverable 3 | §5 C9; deliverable 2 |
+| B36-2-2 | MEDIUM | ties on `collect_end` | accepted: tie-break QL, then EPT, then name; test | §1.1; `test_assign_order_tie_break` |
+| B36-2-3 | MEDIUM | footprints from unpinned `WESM.gpkg` | accepted: NNE footprint layer committed with sha256 alongside the table | §1.1; deliverable 2 |
+| B36-2-6 | MEDIUM | leaf-risk flag unused in assignment | accepted: `LIDAR_ASSIGN_POLICY` pinned (`newest` here; `newest_leaf_off` for CR-0037 to decide) | §1.1 |
+| B36-2-9 | LOW | narrow the regrowth range | accepted: 3–10 years | `REGEN_YEARS` |
+| B36-2-10 | MEDIUM | C2 never runs on a rockyweb source | accepted: pilot window W4 (~12 km, one rockyweb unit) runs C2, C3 and C5 | §6 |
+| B36-2-14 | LOW | independent party for controls | accepted: both reviewers recorded as the independent party | §5 |

@@ -15,15 +15,18 @@ that cannot fail can never report PASS.
     C3 height scale   median(lid_p95 / LANDFIRE ch) on forest cells within
                       [RATIO_LO, RATIO_HI], per work unit
                       control: lid_p95 x 3.2808 (feet read as metres)
-    C4 understory     median lid_u1_3 (regenerating forest, tsd 3-15 y)
+    C4 understory     median lid_u1_3 (regenerating forest, tsd 3-10 y)
                       minus median (mature forest: tsd cap, cc >= 60 %)
-                      >= MIN_REGEN_CONTRAST per mille
+                      >= MIN_REGEN_CONTRAST per mille and > the p99 of a
+                      100-draw permutation null
                       control: lid_u1_3 permuted across cells
     C5 coverage       per work unit, valid share of its assigned forest
                       cells >= MIN_COVERAGE
                       control: one work unit's cells set to NODATA
-    C6 seam           blocks of 64 assembled == one 128 block, bit for bit
-                      control: a single perturbed cell
+    C6 seam           blocks of 64 assembled == one 128 block, bit for bit,
+                      in every feature and the count bands
+                      control (pilot): the same blocks computed with pad 0,
+                      which must differ; (self-test): one perturbed cell
     C7, C8            OBS only (project offsets, throughput) - reported by
                       the generator's pilot log, never gating here.
 
@@ -35,7 +38,10 @@ Pilot directory layout (written by generate_lidar_structure.py --pilot):
     {W}_{feature}.tif       W in W1, W2, W3; features LIDAR_FEATURES
     {W}_lidar_meta.tif      bands: year, doy, n_returns, n_ground,
                             n_nohag, work-unit index
-    W2seam_{feature}.tif    W2 recomputed as one 128-cell block (C6)
+    W2seam_{feature}.tif, W2seam_lidar_meta.tif
+                            W2 recomputed as one 128-cell block (C6)
+    W2pad0_{feature}.tif, W2pad0_lidar_meta.tif
+                            W2 in 64-cell blocks with pad 0 (C6 control)
 """
 import argparse
 import os
@@ -52,9 +58,12 @@ SEED = 0
 RATIO_LO, RATIO_HI = 0.5, 2.0  # C3 band for median lid_p95 / ch
 FEET = 3.2808                 # C3 control factor
 LANDFIRE_CH_PER_M = 10.0      # LANDFIRE CH is coded in decimetres
-REGEN_YEARS = (3.0, 15.0)     # C4 regenerating stand age (tsd), years
+REGEN_YEARS = (3.0, 10.0)     # C4 regenerating stand age (tsd), years (B36-2-9)
 MATURE_CC_PCT = 60            # C4 mature forest: LANDFIRE cc >= this
 MIN_REGEN_CONTRAST = 50       # C4, per mille
+N_PERM = 100                  # C4 permutation-null draws (PA-0021(c))
+PERM_Q = 99.0                 # C4: real contrast must exceed this
+                              # percentile of the null
 MIN_CELLS = 200               # C3/C4 minimum cells per group, else FAIL
 MIN_COVERAGE = 0.99           # C5
 FOREST_NLCD = (41, 42, 43)
@@ -141,32 +150,63 @@ def regen_contrast(u13, tsd_years, cc_pct, forest, valid, tsd_cap):
             int(regen.sum()), int(mature.sum()))
 
 
+def regen_null(u13, tsd_years, cc_pct, forest, valid, tsd_cap,
+               n=N_PERM, seed=SEED):
+    """Contrast under N_PERM permutations of u13 across valid cells."""
+    rng = np.random.default_rng(seed)
+    idx = np.flatnonzero(valid.ravel())
+    out = []
+    for _ in range(n):
+        p = u13.copy()
+        p.ravel()[idx] = rng.permutation(u13.ravel()[idx])
+        out.append(regen_contrast(p, tsd_years, cc_pct, forest, valid,
+                                  tsd_cap)[0])
+    return np.asarray(out, dtype=np.float64)
+
+
 def check_regen(u13, tsd_years, cc_pct, forest, valid, tsd_cap):
     d, nr, nm = regen_contrast(u13, tsd_years, cc_pct, forest, valid, tsd_cap)
-    ok = np.isfinite(d) and d >= MIN_REGEN_CONTRAST
+    if not np.isfinite(d):
+        return False, f"too few cells (regen {nr}, mature {nm}; need {MIN_CELLS})"
+    null = regen_null(u13, tsd_years, cc_pct, forest, valid, tsd_cap)
+    q = float(np.nanpercentile(null, PERM_Q))
+    ok = d >= MIN_REGEN_CONTRAST and d > q
     return ok, (f"contrast {d:.1f} per mille (regen {nr}, mature {nm}; "
-                f"need >= {MIN_REGEN_CONTRAST})")
+                f"need >= {MIN_REGEN_CONTRAST} and > null p{PERM_Q:g} "
+                f"{q:.1f} over {N_PERM} permutations)")
+
+
+def gated_units(forest, wu_index):
+    """Work units with >= MIN_CELLS assigned forest cells. Smaller units
+    (slivers at a project edge) are reported, never gated (A36-2-3)."""
+    u, n = np.unique(wu_index[(wu_index >= 0) & forest], return_counts=True)
+    return [int(a) for a, b in zip(u, n) if b >= MIN_CELLS], \
+        [int(a) for a, b in zip(u, n) if b < MIN_CELLS]
 
 
 def coverage(valid, forest, wu_index):
-    """Valid share of assigned forest cells, per work-unit index (>= 0)."""
-    out = {}
-    for w in np.unique(wu_index[(wu_index >= 0) & forest]):
-        m = forest & (wu_index == w)
-        out[int(w)] = float(valid[m].mean())
-    return out
+    """Valid share of assigned forest cells, per gated work unit."""
+    gated, _ = gated_units(forest, wu_index)
+    return {w: float(valid[forest & (wu_index == w)].mean()) for w in gated}
 
 
 def check_coverage(valid, forest, wu_index):
     cov = coverage(valid, forest, wu_index)
+    _, slivers = gated_units(forest, wu_index)
     ok = bool(cov) and min(cov.values()) >= MIN_COVERAGE
     txt = ", ".join(f"wu{w}={v:.4f}" for w, v in sorted(cov.items()))
-    return ok, f"{txt or 'no work units'} (need >= {MIN_COVERAGE})"
+    sl = f"; slivers (OBS) {slivers}" if slivers else ""
+    return ok, f"{txt or 'no gated work units'} (need >= {MIN_COVERAGE}){sl}"
 
 
 def check_seam(a, b):
-    ok = a.shape == b.shape and np.array_equal(a, b)
-    return ok, "bit-identical" if ok else "differs"
+    """a, b: dict name -> array (all features and the meta count bands),
+    or two arrays. Bit-identical in every entry."""
+    if not isinstance(a, dict):
+        a, b = {"x": a}, {"x": b}
+    bad = [k for k in a if k not in b or a[k].shape != b[k].shape
+           or not np.array_equal(a[k], b[k])]
+    return not bad, "bit-identical" if not bad else f"differs: {bad}"
 
 
 def gate(name, real, control):
@@ -260,31 +300,34 @@ def synthetic_world(n=520, seed=1):
     valid = np.ones((n, n), bool)
     wu = np.where(np.arange(n)[None, :] < n // 2, 0, 1) * np.ones((n, 1), int)
     return dict(road=road, forest=forest, tsd=tsd, tsd_cap=tsd_cap, cc=cc,
-                ch=ch, p95=p95, wcov=wcov, u13=u13, valid=valid, wu=wu)
+                ch=ch, p95=p95, wcov=wcov, u13=u13, valid=valid, wu=wu,
+                v_p95=valid, v_wcov=valid, v_u13=valid)
 
 
 def run_checks(w, seam=None):
     """All array checks with their controls; True if every gate PASSes."""
     ok = True
-    for f, layer in (("lid_wcov5", w["wcov"]), ("lid_p95", w["p95"])):
+    for f, layer, v in (("lid_wcov5", w["wcov"], w["v_wcov"]),
+                        ("lid_p95", w["p95"], w["v_p95"])):
         ok &= gate(f"C2 {f}",
-                   check_registration(layer, w["valid"], w["road"]),
+                   check_registration(layer, v, w["road"]),
                    check_registration(shift_one(layer, 0),
-                                      shift_one(w["valid"], False), w["road"]))
-    for u in np.unique(w["wu"][w["wu"] >= 0]):
+                                      shift_one(v, False), w["road"]))
+    for u in gated_units(w["forest"], w["wu"])[0]:
         m = w["wu"] == u
         ok &= gate(f"C3 wu{u}",
-                   check_height(w["p95"], w["ch"], w["forest"] & m, w["valid"]),
+                   check_height(w["p95"], w["ch"], w["forest"] & m,
+                                w["v_p95"]),
                    check_height(as_feet(w["p95"]), w["ch"], w["forest"] & m,
-                                w["valid"]))
+                                w["v_p95"]))
     ok &= gate("C4 understory",
                check_regen(w["u13"], w["tsd"], w["cc"], w["forest"],
-                           w["valid"], w["tsd_cap"]),
-               check_regen(permute(w["u13"], w["valid"]), w["tsd"], w["cc"],
-                           w["forest"], w["valid"], w["tsd_cap"]))
+                           w["v_u13"], w["tsd_cap"]),
+               check_regen(permute(w["u13"], w["v_u13"]), w["tsd"], w["cc"],
+                           w["forest"], w["v_u13"], w["tsd_cap"]))
     ok &= gate("C5 coverage",
-               check_coverage(w["valid"], w["forest"], w["wu"]),
-               check_coverage(drop_unit(w["valid"], w["wu"], w["forest"]),
+               check_coverage(w["v_p95"], w["forest"], w["wu"]),
+               check_coverage(drop_unit(w["v_p95"], w["wu"], w["forest"]),
                               w["forest"], w["wu"]))
     if seam is not None:
         a, b = seam
@@ -328,6 +371,26 @@ def _read_ref_window(rd, feature, year, out_src):
                         fill_value=NODATA)
 
 
+def _read_set(directory, prefix):
+    """Every feature plus the meta count bands (returns, ground, no-HAG)
+    of one pilot output set; raises FileNotFoundError if any is missing."""
+    import rasterio
+    out = {}
+    for f in LIDAR_FEATURES:
+        p = os.path.join(directory, f"{prefix}_{f}.tif")
+        if not os.path.exists(p):
+            raise FileNotFoundError(2, "missing", p)
+        with rasterio.open(p) as s:
+            out[f] = s.read(1)
+    p = os.path.join(directory, f"{prefix}_lidar_meta.tif")
+    if not os.path.exists(p):
+        raise FileNotFoundError(2, "missing", p)
+    with rasterio.open(p) as s:
+        for b, name in ((3, "n_returns"), (4, "n_ground"), (5, "n_nohag")):
+            out[name] = s.read(b)
+    return out
+
+
 def pilot(directory, region):
     import rasterio
     from grouse_data import GrouseData
@@ -353,7 +416,7 @@ def pilot(directory, region):
                 src.width, src.height = s.width, s.height
                 ok &= gate(f"C1 {f}", check_grid(s, tmpl),
                            check_grid(half_cell_off(s), tmpl))
-        valid = lay["lid_p95"] != NODATA
+        vf = {f: lay[f] != NODATA for f in LIDAR_FEATURES}   # per feature
         nlcd = _read_ref_window(rd, "nlcd", yr, src)
         forest = np.isin(nlcd, FOREST_NLCD)
         ch = _read_ref_window(rd, "ch", yr, src).astype(np.float64)
@@ -363,32 +426,31 @@ def pilot(directory, region):
         road = (road_dist_decode(rraw) <= ROAD_M) & (rraw != NODATA)
         w = dict(road=road, forest=forest, tsd=tsd, tsd_cap=TSD_MAX_YEARS,
                  cc=cc, ch=ch, p95=lay["lid_p95"], wcov=lay["lid_wcov5"],
-                 u13=lay["lid_u1_3"], valid=valid, wu=wu)
+                 u13=lay["lid_u1_3"], wu=wu, v_p95=vf["lid_p95"],
+                 v_wcov=vf["lid_wcov5"], v_u13=vf["lid_u1_3"])
         # C2 (>= MIN_WINDOWS sweep windows) and C4 (enough regenerating and
-        # mature cells) need W1's 20 km extent; W2/W3 run C3, C5 and C6.
-        seam = None
+        # mature cells) need W1's 20 km extent; W2/W3 run C3, C5 (and C6).
+        if W == "W1":
+            ok &= run_checks(w)
+            continue
+        v = vf["lid_p95"]
+        for u in gated_units(forest, wu)[0]:
+            m = wu == u
+            ok &= gate(f"C3 wu{u}", check_height(w["p95"], ch, forest & m, v),
+                       check_height(as_feet(w["p95"]), ch, forest & m, v))
+        ok &= gate("C5 coverage", check_coverage(v, forest, wu),
+                   check_coverage(drop_unit(v, wu, forest), forest, wu))
         if W == "W2":
-            sp = os.path.join(directory, "W2seam_lid_p95.tif")
-            if not os.path.exists(sp):
-                print(f"   C6 seam: missing {sp} - FAIL")
+            try:
+                blocks = _read_set(directory, "W2")
+                whole = _read_set(directory, "W2seam")
+                pad0 = _read_set(directory, "W2pad0")
+            except FileNotFoundError as e:
+                print(f"   C6 seam: missing {e.filename} - FAIL")
                 ok = False
             else:
-                with rasterio.open(sp) as s:
-                    seam = (lay["lid_p95"], s.read(1).astype(np.float64))
-        if W != "W1":
-            for u in np.unique(wu[wu >= 0]):
-                m = wu == u
-                ok &= gate(f"C3 wu{u}",
-                           check_height(w["p95"], ch, forest & m, valid),
-                           check_height(as_feet(w["p95"]), ch, forest & m,
-                                        valid))
-            ok &= gate("C5 coverage", check_coverage(valid, forest, wu),
-                       check_coverage(drop_unit(valid, wu, forest), forest, wu))
-            if seam is not None:
-                ok &= gate("C6 seam", check_seam(*seam),
-                           check_seam(seam[0], perturb_one(seam[1])))
-        else:
-            ok &= run_checks(w)
+                ok &= gate("C6 seam", check_seam(blocks, whole),
+                           check_seam(pad0, whole))
     print(f"\nPilot gate: {'PASS' if ok else 'FAIL'}")
     return ok
 

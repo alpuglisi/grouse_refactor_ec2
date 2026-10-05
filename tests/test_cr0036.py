@@ -18,9 +18,17 @@ Generator API these tests pin (CR-0036 section 1):
   mask_a(Y, A, tsd_years_at_max)              -> bool, True = NODATA
   mask_b(Y, A, tsd_years_at_A)                -> bool, True = NODATA
   lidar_share_encode / lidar_height_encode    -> int16, raise on bad input
-  load_sources()                              -> rows of lidar_sources.csv
-                                                 (dicts; z_to_m, xy_to_m, ...)
+  keep_points(classification, class_flags=None, withheld=None)
+                                              -> bool keep mask (section 1.3)
+  is_first(return_number)                     -> bool, ReturnNumber == 1
+  assign_order(rows)                          -> rows sorted newest-first with
+                                                 the pinned tie-break
   to_metres_z(z, row)                         -> z * row['z_to_m']
+  transform_xy(x, y, row)                     -> template-CRS metres via the
+                                                 row's pinned 'pipeline'
+  check_source(row, header)                   -> raises ValueError when the
+                                                 header CRS or units differ
+                                                 from the row
 """
 import importlib.util
 import os
@@ -99,6 +107,34 @@ class GateTests(unittest.TestCase):
             w["forest"], w["wu"])[0])
         self.assertFalse(chk.check_coverage(
             w["valid"], np.zeros_like(w["forest"]), w["wu"])[0])
+
+    def test_regen_needs_beating_null(self):
+        w = self.w
+        args = (w["tsd"], w["cc"], w["forest"], w["valid"], w["tsd_cap"])
+        null = chk.regen_null(w["u13"], *args)
+        self.assertEqual(null.size, chk.N_PERM)
+        self.assertLess(np.nanpercentile(null, chk.PERM_Q),
+                        chk.MIN_REGEN_CONTRAST)
+
+    def test_coverage_slivers_are_obs(self):
+        w = self.w
+        wu = w["wu"].copy()
+        idx = np.flatnonzero(w["forest"].ravel())[:chk.MIN_CELLS - 1]
+        wu.ravel()[idx] = 7                    # a sliver work unit
+        v = w["valid"].copy()
+        v.ravel()[idx] = False                 # with no data at all
+        ok, msg = chk.check_coverage(v, w["forest"], wu)
+        self.assertTrue(ok, msg)
+        self.assertIn("slivers (OBS) [7]", msg)
+
+    def test_seam_compares_every_band(self):
+        a = {f: np.arange(16).reshape(4, 4) for f in ("p", "q", "n_returns")}
+        b = {k: v.copy() for k, v in a.items()}
+        self.assertTrue(chk.check_seam(a, b)[0])
+        b["n_returns"] = chk.perturb_one(b["n_returns"])
+        ok, msg = chk.check_seam(a, b)
+        self.assertFalse(ok)
+        self.assertIn("n_returns", msg)
 
     def test_seam_rejects_one_cell(self):
         a = self.w["p95"]
@@ -316,13 +352,101 @@ class GeneratorTests(unittest.TestCase):
                 with self.assertRaises(ValueError, msg=(enc.__name__, b)):
                     enc(np.array([b]))
 
-    def test_units_and_crs(self):
-        # A US-survey-feet source must come out in metres on the template.
-        rows = self.gen.load_sources()
-        feet = [r for r in rows if abs(r["z_to_m"] - 1200 / 3937) < 1e-9]
-        for r in feet[:1]:
-            z = self.gen.to_metres_z(np.array([3937.0]), r)
-            np.testing.assert_allclose(z, [1200.0])
+    def test_point_filter(self):
+        cls = np.array([0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 17, 18,
+                        19, 20, 21, 22, 2, 2])
+        flags = np.zeros(cls.size, np.uint8)
+        flags[-2] = 0x04          # withheld (LAS ClassFlags bit 2)
+        flags[-1] = 0x08          # overlap (bit 3): KEPT
+        keep = self.gen.keep_points(cls, class_flags=flags)
+        exp = np.isin(cls, (0, 1, 2, 3, 4, 5, 9)) & \
+            ((flags & 0x04) == 0)
+        np.testing.assert_array_equal(keep, exp)
+        w = np.zeros(cls.size, bool)
+        w[0] = True               # LAS 1.4 Withheld dimension
+        self.assertFalse(self.gen.keep_points(cls, withheld=w)[0])
+
+    def test_assign_order_tie_break(self):
+        rows = [dict(work_unit="B", collect_end="2019/12/01", ql="QL2",
+                     reader="ept"),
+                dict(work_unit="A", collect_end="2019/12/01", ql="QL1",
+                     reader="las"),
+                dict(work_unit="C", collect_end="2019/12/01", ql="QL1",
+                     reader="ept"),
+                dict(work_unit="D", collect_end="2020/01/01", ql="QL2",
+                     reader="las"),
+                dict(work_unit="E", collect_end="2019/12/01", ql="QL1",
+                     reader="ept")]
+        got = [r["work_unit"] for r in self.gen.assign_order(rows)]
+        self.assertEqual(got, ["D", "C", "E", "A", "B"])
+
+    def test_first_return(self):
+        np.testing.assert_array_equal(self.gen.is_first(np.array([1, 2, 1, 3])),
+                                      [True, False, True, False])
+
+    def _row(self, **kw):
+        row = dict(work_unit="TEST", reader="las", horiz_epsg=6348,
+                   xy_to_m=1.0, z_to_m=1.0,
+                   pipeline="+proj=noop")
+        row.update(kw)
+        return row
+
+    def test_z_units(self):
+        feet = self._row(z_to_m=1200 / 3937)
+        np.testing.assert_allclose(self.gen.to_metres_z(np.array([3937.0]),
+                                                        feet), [1200.0])
+        ept = self._row(reader="ept", z_to_m=1.0)
+        np.testing.assert_allclose(self.gen.to_metres_z(np.array([5.0]),
+                                                        ept), [5.0])
+
+    def test_xy_pipeline_used_exactly(self):
+        # UTM 19N (NAD83(2011), EPSG:6348) -> CONUS Albers (EPSG:5070) via
+        # an explicit pinned pipeline; must equal pyproj's from_pipeline.
+        from pyproj import Transformer
+        pipe = ("+proj=pipeline +step +inv +proj=utm +zone=19 +ellps=GRS80 "
+                "+step +proj=aea +lat_0=23 +lon_0=-96 +lat_1=29.5 "
+                "+lat_2=45.5 +x_0=0 +y_0=0 +ellps=GRS80")
+        row = self._row(pipeline=pipe)
+        x, y = np.array([300000.0, 310000.0]), np.array([4800000.0, 4810000.0])
+        gx, gy = self.gen.transform_xy(x, y, row)
+        ex, ey = Transformer.from_pipeline(pipe).transform(x, y)
+        np.testing.assert_allclose(gx, ex, atol=1e-6)
+        np.testing.assert_allclose(gy, ey, atol=1e-6)
+
+    def test_source_header_mismatch_refused(self):
+        row = self._row(horiz_epsg=6348, xy_to_m=1.0, z_to_m=1.0)
+        self.gen.check_source(row, dict(horiz_epsg=6348, xy_to_m=1.0,
+                                        z_to_m=1.0))
+        for bad in (dict(horiz_epsg=6589, xy_to_m=1.0, z_to_m=1.0),
+                    dict(horiz_epsg=6348, xy_to_m=1200 / 3937, z_to_m=1.0),
+                    dict(horiz_epsg=6348, xy_to_m=1.0, z_to_m=1200 / 3937)):
+            with self.assertRaises(ValueError, msg=bad):
+                self.gen.check_source(row, bad)
+
+    def test_hag_ground_zero_noise_and_water(self):
+        # ground points get HAG 0; HAG < -2 or > LIDAR_HAG_MAX_M -> NaN
+        # (dropped as noise); water (class 9) points at the surface get ~0
+        x = np.array([0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+        y = np.zeros(6)
+        z = np.array([100.0, 100.0, 105.0, 95.0, 100.0 + 200.0, 100.1])
+        g = np.array([True, True, False, False, False, False])
+        h = self.gen.compute_hag(x, y, z, g)
+        self.assertEqual(h[0], 0.0)
+        self.assertAlmostEqual(h[2], 5.0, places=9)
+        self.assertTrue(np.isnan(h[3]))      # -5 m: noise
+        self.assertTrue(np.isnan(h[4]))      # +200 m: noise
+        self.assertAlmostEqual(h[5], 0.1, places=9)
+
+    def test_mask_b_before_tsd_record(self):
+        # A = 2015 precedes the first tsd vintage (2016): years since
+        # disturbance at A come from tsd_2016 minus (2016 - A).
+        got = self.gen.mask_b(np.array([2025]), np.array([2015]),
+                              np.array([5.0]))      # tsd_A, already shifted
+        self.assertTrue(bool(got[0]))
+        self.assertEqual(self.gen.tsd_years_at(
+            2015, {2016: np.array([6.0])})[0], 5.0)
+        self.assertTrue(np.isnan(self.gen.tsd_years_at(
+            2015, {2016: np.array([0.0])})[0]))      # cut in 2016: after A
 
 
 class LintTests(unittest.TestCase):

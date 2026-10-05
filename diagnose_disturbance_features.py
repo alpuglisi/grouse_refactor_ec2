@@ -69,6 +69,7 @@ NONE_YEARS = 40                                  # "no event on record" cap
 BATCH_POINTS = 500                               # points per Earth Engine request
 BATCH_BUFFERS = 150                              # buffered points per request
 RADII_M = (250, 1000)
+BUFFER250_PIXELS = np.pi * 250.0 ** 2 / 30.0 ** 2   # ~218 pixels
 
 FEATURES_LCMS = ["lcms_ys_removal", "lcms_ys_loss", "lcms_growth10",
                  "lcms_rm20_r250", "lcms_rm20_r1000"]
@@ -223,10 +224,11 @@ def derive(raw):
             # covers the point, unknown otherwise
             shares.append(0.0 if cov else np.nan)
             continue
-        tot = sum(hist.values())
+        # Only lost pixels are unmasked, so the histogram total is NOT the
+        # buffer: divide by the buffer's area in 30 m pixels instead.
         win = sum(v for k, v in hist.items()
                   if 0 < float(k) and y0 - 20 < 2000 + float(k) <= y0)
-        shares.append(win / tot if tot else np.nan)
+        shares.append(min(win / BUFFER250_PIXELS, 1.0))
     f["gfc_loss20_r250"] = shares
     f["gfc_treecover2000"] = tc
     return f

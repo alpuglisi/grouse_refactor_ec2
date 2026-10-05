@@ -1,6 +1,6 @@
 # CR-0033: split window mask reads a pinned feature list
 
-**Status: APPROVED WITH FOLLOW-UPS (v2), 2026-10-05.** Verdicts and
+**Status: IMPLEMENTED, 2026-10-05** (approved with follow-ups, v2). Verdicts and
 dispositions: `CR-0033-review-log.md`. This document states only current
 intent.
 
@@ -86,9 +86,9 @@ One function and its constant; pipeline code only.
 ## Deliverables
 - [x] 1. This CR and `tests/test_cr0033.py`; two independent reviews;
       approval.
-- [ ] 2. The change; all suites pass.
-- [ ] 3. BUG-0093, BUG_LOG, PREVENTIVE_ACTIONS (PA-0048, with recurrence
-      review and sweep), CHANGELOG; close-out.
+- [x] 2. The change; all suites pass.
+- [x] 3. BUG-0093, BUG_LOG, PREVENTIVE_ACTIONS (PA-0048, with recurrence
+      review and sweep), CHANGELOG, tracker (A33-2); close-out.
 
 ## Out of scope
 - Moving the constant to `regions.py` so acceptance cross-checks it at

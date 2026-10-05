@@ -15,9 +15,10 @@ acceptance_split.py (CR-0013) can replay it exactly.
    pre-floor point cannot win the thin order over a kept neighbour.
    evaluated_sightings_* themselves keep every year (the negatives'
    buffer and the envelope metrics use them all).
-3. Drop rows whose WINDOW_PX window is not inside every FEATURE_SPEC
-   raster (regions.window_in_bounds; nodata inside the window is not
-   considered).
+3. Drop rows whose WINDOW_PX window is not inside every
+   SPLIT_WINDOW_FEATURES raster (regions.window_in_bounds; nodata inside
+   the window is not considered). A pinned list, not FEATURE_SPEC
+   (CR-0033).
 4. THINNING, pooled over all regions: visit rows by ascending
    order_key(coord), ties by lon then lat; keep a row iff its squared
    EPSG:5070 distance to every kept row is >= MIN_SPACING_M**2. Two
@@ -158,20 +159,28 @@ def year_filled(df, rd):
     return df["year"].fillna(df["year"].max()).astype(int)
 
 
+# CR-0033: the rasters every split record's window must lie inside.
+# Pinned, not FEATURE_SPEC: adding a model feature must not change the
+# split (BUG-0093). Equal to acceptance_split.json "feature_spec_keys",
+# order included (tests/test_cr0033.py); change both together.
+SPLIT_WINDOW_FEATURES = ("evt", "evh", "evc", "sclass", "fdist", "ch",
+                         "cc", "tcc", "nlcd", "road_dist", "tsd",
+                         "balive", "tpa_live", "qmd", "carbon_dwn")
+
+
 def window_mask(df, rd):
-    """True where regions.window_in_bounds holds on every FEATURE_SPEC
-    raster at rd.raster_path(feat, year), year filled over `df` (CR-0012
-    positives step 3 / pool step 8). lon/lat go into each raster's own
-    CRS, as dataset.py does."""
+    """True where regions.window_in_bounds holds on every
+    SPLIT_WINDOW_FEATURES raster at rd.raster_path(feat, year), year
+    filled over `df` (CR-0012 positives step 3 / pool step 8; CR-0033).
+    lon/lat go into each raster's own CRS, as dataset.py does."""
     import rasterio
-    from models import FEATURE_SPEC
     ok = np.ones(len(df), dtype=bool)
     if len(df) == 0:
         return ok
     years = year_filled(df, rd).to_numpy()
     lon = df["longitude"].to_numpy(dtype=np.float64)
     lat = df["latitude"].to_numpy(dtype=np.float64)
-    for feat in FEATURE_SPEC:
+    for feat in SPLIT_WINDOW_FEATURES:
         for yr in sorted(set(years.tolist())):
             sel = years == yr
             path = rd.raster_path(feat, int(yr))

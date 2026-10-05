@@ -16,6 +16,31 @@ the diff.
 
 ---
 
+## Split window mask pinned to the acceptance list; CR-0032 canopy layers approved (CR-0033, CR-0032, 2026-10-05)
+
+**Defect (BUG-0093, latent).** `prepare_training_data.window_mask` checked
+each record's window against every `models.FEATURE_SPEC` raster, while the
+acceptance replay checks a frozen list of 15. Adding a model feature would
+have made split regeneration raise (`MissingDataError`) or fail acceptance
+(unexpected manifest inputs). Found in CR-0032 review before any feature
+was added.
+
+**Change (CR-0033).** `SPLIT_WINDOW_FEATURES` (the 15 names, acceptance
+order) is the only list the split's window mask reads;
+`tests/test_cr0033.py` ties it to `acceptance_split.json` and shows an
+extra registered feature is never opened or recorded. Split outputs are
+unchanged (the list equals today's `FEATURE_SPEC` keys). PA-0048.
+
+**CR-0032 (approved, not yet implemented).** Four Meta 1 m canopy-structure
+layers (`mch_mean`, `mch_f01`, `mch_f15`, `mch_f512`). Round 1 found two
+silent-failure modes in the first design, now designed out: Earth Engine
+exports masked cells as 0 (so water would read as tall forest) and
+`mosaic()` drops the native projection (so `reduceResolution` would sample
+one 1 m pixel per cell). Approval is conditional on the four columns alone
+clearing +0.006 AUC in `diagnose_structure_combo.py` (deliverable 1b).
+
+---
+
 ## Background assumed-negatives take the positives' years; `--an-background` usable again (CR-0031, 2026-10-05)
 
 **Defect (BUG-0074, latent).** With `--an-background R > 0`, every random

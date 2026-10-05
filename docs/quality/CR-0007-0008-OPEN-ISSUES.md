@@ -290,3 +290,13 @@ Year-matched negative draw (BUG-0073). Review log: `docs/quality/change-requests
 ## CR-0031 (IMPLEMENTED, 2026-10-05) — follow-ups, owner: lead
 Background assumed-negatives take the training positives' years (BUG-0074). `--an-background > 0` is allowed again.
 - [ ] LOW (review A7 = B12): `tests/test_cr0031.py` U4 pins `year="latest"` with a validation share of 0, so the training-block filter is a no-op there; add one fixture with a non-zero validation share (the filter itself is covered by `test_cr0015_sampler`). Owner: lead
+
+## CR-0033 (IMPLEMENTED, 2026-10-05) — follow-ups, owner: lead
+Split window mask reads pinned `SPLIT_WINDOW_FEATURES` (BUG-0093, PA-0048).
+- [ ] LOW (review A33-2): move `SPLIT_WINDOW_FEATURES` to `regions.py` and map it in `acceptance_split.json` `regions_py` so acceptance checks it at run time, not only by unit test (pinned-section change; own CR). Owner: lead
+
+## CR-0032 (APPROVED WITH FOLLOW-UPS, conditional on deliverable 1b, 2026-10-05) — follow-ups, owner: lead
+- [ ] Deliverable 1b: `diagnose_structure_combo.py` row "+ CR-0032 four (r30)" >= +0.006 AUC on EC2 (user runs). Owner: user / lead
+- [ ] LOW (BUG-0093 sweep note): once `mch_*` is registered, the static generators' year unions (`generate_road_distance.py:311`, `generate_time_since_disturbance.py:252`, `generate_treemap_features.py:373`) include `mch_*` years; harmless while `mch_*` copies the same union, but a stale `mch_*` file would propagate its year there. Consider excluding a shared `STATIC_FEATURES` in each. Owner: lead
+- [ ] LOW (review A10): `--copy-only` mode to add a vintage without Earth Engine. In CR-0032 §3.4; tracked until implemented. Owner: lead
+- [ ] Out of scope, revisit if the pilot estimate exceeds 24 h for all regions: batch `Export.image` to Cloud Storage (review B4). Owner: lead

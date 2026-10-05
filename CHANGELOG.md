@@ -16,6 +16,47 @@ the diff.
 
 ---
 
+## Background assumed-negatives take the positives' years; `--an-background` usable again (CR-0031, 2026-10-05)
+
+**Defect (BUG-0074, latent).** With `--an-background R > 0`, every random
+background assumed-negative got one year — the latest of `features[0]`
+(2024, or 2025 for some feature orders) — so at R = 1 about 3,800 label-0
+rows sat at one vintage, the one `predict.py` maps with. After CR-0021 had
+removed the year→label signal from the split files, this would have put it
+back in reverse. Since CR-0019 the tracker forbade any run with the flag.
+
+**Change.** `sample_background_points` takes a required `year` (an integer
+validates on the raster the row is read from; `"latest"` only for
+`pretrain.py`'s unlabelled tiles). `background_for_positives` draws one
+batch per training-positive year, `round(c_y × R)` points each, seeded
+per (run seed, region, year); `build_datasets` re-derives the expected
+counts from the training positives and refuses any difference. Code
+`e18944d`; tests `tests/test_cr0031.py`.
+
+**Verified.** Two independent reviews (round 2 approved); reviewer-built
+wrong implementations each caught (`docs/quality/evidence/CR-0031/reviewA/`);
+EC2 smoke run with `--an-background 1.0`: per-year background counts equal
+the training positives' in ME, NH and VT (`evidence/CR-0031/cr0031_smoke.log`).
+
+**Consequences.**
+- `--an-background R > 0` is allowed again. With `--an-background 0` (the
+  default and every run since CR-0009) nothing changes; validation is
+  never touched, so metrics stay comparable with and without the flag on
+  the same split.
+- Background rows (years and locations) differ from any pre-CR draw; no
+  pre-CR `--an-background` result is a baseline.
+- `pretrain.py` output is byte-identical (pinned digests).
+
+**Numbering.** Drafted as CR-0022; renumbered CR-0031 because the unmerged
+branch `claude/wonderful-gauss-ghz53i` had already allocated CR-0020..0030,
+BUG-0076..0092 and PA-0033..0047 (user decision: `main`'s IDs stay; new IDs
+from CR-0032, BUG-0093, PA-0048). That branch's fate is an open tracker
+item.
+
+**Bugs introduced during this work.** None reached a run. The CR's Test
+plan named the wrong test for two of the wrong implementations (review log
+I1); corrected.
+
 ## Negatives drawn year-matched to the positives; year alone no longer predicts the label (CR-0021, 2026-10-03)
 
 **Defect (BUG-0073).** After CR-0019 both classes spanned 2020–2024, but
@@ -79,7 +120,7 @@ standing checks pass on `main` (`fbc6c10`).
   2020–2022 and 2023–2024 (`wetland_mix.txt`; follow-up CR for a
   wetland-balanced draw within each year).
 - `train.sample_background_points` (BUG-0074) is unaffected: still no
-  run with `--an-background > 0`.
+  run with `--an-background > 0`. (Fixed by CR-0031, below.)
 
 **Bugs introduced during this work.** None reached a run. Found in
 review or implementation: a hard-linked scratch copy would have let the

@@ -1,6 +1,6 @@
 # CR-0031: Background assumed-negatives take the positives' years (BUG-0074)
 
-**Status: APPROVED, 2026-10-05** (v2; reviewers A and B, round 2).
+**Status: IMPLEMENTED, 2026-10-05** (approved v2; reviewers A and B, round 2).
 Numbered CR-0031, not CR-0022: CR-0020..CR-0030 were already allocated on
 the unmerged branch `claude/wonderful-gauss-ghz53i` (user decision
 2026-10-05, tracker § Shared / decisions needed). Commits and evidence
@@ -248,12 +248,16 @@ experiment this CR unblocks, not its acceptance).
       VT 163/147/170/174/268 (2020–2024); totals 2,291 / 634 / 922 = the
       training positives; train samples 30,776 + 4 × 3,847 = 46,164; no
       `RuntimeError`; the epoch ran. PASS.
-- [ ] 5. Bookkeeping: BUG-0074 → FIXED (corrective action, recurrence
+- [x] 5. Bookkeeping: BUG-0074 → FIXED (corrective action, recurrence
       re-check); `BUG_LOG.md`; Swept? cells of PA-0020, PA-0029 and
       PA-0033 note that the run-time background producer is now matched
       and checked; tracker: the "no `--an-background > 0`" rule lifted,
       MEDIUM/LOW review follow-ups entered with an owner; `CHANGELOG.md`.
-- [ ] 6. Close-out.
+      — Done: BUG-0074 FIXED (§6, §7 re-check, §8); `BUG_LOG.md`; Swept?
+      cells of PA-0020, PA-0029, PA-0033; tracker (BUG-0074 item closed,
+      rule lifted, § CR-0031); `CHANGELOG.md`.
+- [x] 6. Close-out.
+      — All deliverables done; status IMPLEMENTED; merged to `main`.
 
 ## Out of scope
 - Validity on every feature rather than `features[0]` (a background row

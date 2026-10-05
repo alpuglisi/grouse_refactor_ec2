@@ -2,7 +2,9 @@
 
 > Found by the PA-0020 sweep in CR-0019 deliverable 8, 2026-09-30, at
 > `00b0b84` (CR-0019 § Out of scope named it for this sweep).
-> **Status: OPEN (latent: opt-in flag, off by default); owner: lead.**
+> **Status: FIXED by CR-0031, 2026-10-05** (code `e18944d`; smoke run
+> `docs/quality/evidence/CR-0031/cr0031_smoke.log`). Original status: OPEN
+> (latent: opt-in flag, off by default); owner: lead.
 
 ## 1. Description
 With `train.py --an-background R > 0` (the L_AN-full "assumed negative"
@@ -76,7 +78,31 @@ distribution of the class it is trained against, and no build-time check
 compares the classes on that axis for rows produced at run time.
 
 ## 6. Corrective action
-**None yet.** Candidate fix: draw each background point's year from the
+**CR-0031** (approved 2026-10-05 by two independent reviewers; code
+`e18944d`):
+- `sample_background_points` takes a **required** keyword `year`: an
+  integer validates draws on `rd.raster_path(features[0], year)` — the
+  raster `GrousePatchDataset` reads a row of that year from, nearest-year
+  and empty-placeholder fallbacks included — and stamps every row with
+  that year; `"latest"` keeps the old single vintage for `pretrain.py`
+  only (its SSL tiles carry no label); anything else raises.
+- New `background_for_positives` draws, per distinct training-positive
+  year `y`, `round(c_y × R)` points (seed `(seed, region_i, y)`), and
+  checks the result's year histogram.
+- `build_datasets` recomputes the expected counts from the training
+  positives itself and raises on any difference (a run-time gate for this
+  run-time producer, PA-0029).
+- Tests: `tests/test_cr0031.py` (15, synthetic rasters with a missing year
+  and an empty placeholder vintage); reviewer-built wrong implementations
+  each caught (`docs/quality/evidence/CR-0031/reviewA/wrong_impl_runs.txt`).
+- On real data (EC2, `--an-background 1.0`): every region's background
+  year counts equal its training positives' (ME 469/588/648/282/304,
+  NH 97/118/137/118/164, VT 163/147/170/174/268 for 2020–2024).
+This addresses the root cause: the producer no longer assigns the time
+attribute by its own rule, and a run-time check compares the classes on
+that axis.
+
+Candidate fix as first written (kept for the record): Candidate fix: draw each background point's year from the
 region's training positives' year distribution (or from the negatives'
 after BUG-0073's fix), with a test that the background year histogram
 matches it; and judge validity on that year's raster. That changes
@@ -112,13 +138,23 @@ Status: **OPEN** (latent). Owner: lead.
   Category: sweep scope too narrow (by producer type), not a gap in the
   rule text.
 
+**Re-checked at the fix (CR-0031, 2026-10-05):** `BUG_LOG.md` rows since
+filing (BUG-0076, BUG-0077) and `PREVENTIVE_ACTIONS.md` PA-0033..PA-0035:
+PA-0033 (BUG-0073, extends PA-0020) now names this instance in its Swept?
+cell; no new prior instance of this mechanism. Analysis above stands.
+
 ## 8. Preventive action
-**No new rule; PA-0020 covers it.** The PA-0020 Swept? cell now names
+**No new rule.** PA-0020 covers it, and PA-0033 (written after this BUG,
+for BUG-0073) now requires the per-cell distribution comparison it lacked;
+CR-0031 implements that comparison for this producer. The Swept? cells of
+PA-0020, PA-0029 and PA-0033 record the fix.
+
+As first written: **No new rule; PA-0020 covers it.** The PA-0020 Swept? cell now names
 training-time producers of labelled rows (`sample_background_points`) as
 part of the sweep scope and this BUG as the owner of the finding. If
 BUG-0073's fix CR extends PA-0020 to per-class attribute-assignment rules,
 this instance is cited there.
 
 ## Cross-references
-CR-0019 deliverable 8 and § Out of scope; BUG-0034; BUG-0073; PA-0020;
-PA-0029.
+CR-0019 deliverable 8 and § Out of scope; CR-0031 (fix); BUG-0034;
+BUG-0073; PA-0020; PA-0029; PA-0033.

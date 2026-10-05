@@ -162,12 +162,16 @@ Each phase is its own change request under CLAUDE.md §1. Acceptance and test sc
 **Day 0–1: freeze evidence before fitting**
 1. **Owner scorecard (D).** Blind-rate at least 30 past coverts. Commit before seeing any map.
 2. **Zero-fit covert layer (A/B/E's "H250").** Share of 5–20-year cuts within 250 m, plus access classes from PAD-US and state lands. Ship it for the rest of the 2026 season with one randomised covert in five, so hunts become held-out labels.
-3. **EBD ingest.** One row per complete checklist, filtered to best practice. Record counts by state, season, protocol and detection mode, and check the column header.
+3. **Checklist years.** Every habitat feature must come from a raster whose year matches the checklist year, within the pipeline's `YEAR_MATCH_TOLERANCE`. On-disk rasters cover 2016–2025, and the current pipeline floor is `YEAR_MIN = 2020` (`regions.py:73`). So the habitat model trains and is scored on checklists from **2016 onward**, and the decision sets use the same years as the legacy baseline. Checklists from 2010–2015 are used only where no year-matched habitat raster is needed:
+   - the panel event study, which needs only harvest timing from Hansen/LCMS (back to 2000/1985) plus location fixed effects;
+   - pre-trend placebo leads;
+   - out-of-fold observer-skill indices.
+4. **EBD ingest.** One row per complete checklist, filtered to best practice. Record counts by state, season, protocol and detection mode, and check the column header.
 
 **Days 2–6: decisive tests, pre-registered, multiplicity-corrected, on fall checklists in HH**
-4. **Injection–recovery.** Pipelines × truths on real EBD geometry, scored on unvisited cells (B). Include a planted spring tilt and a null (E). This sets the minimum detectable effect, so a gate is binding only if it is powered (A's concern). It also chooses among the three detectability models (C's radius, D's modes, E's contrast). The arbiter is the unshrunk fall-only model.
-5. **Cross-play (B).** The same GBM trained on legacy vs checklist labels, scored at home, away and on independent data. The CNN is recalibrated on the same checklists.
-6. **Kill rule.** The checklist programme continues only if all of these hold:
+5. **Injection–recovery.** Pipelines × truths on real EBD geometry, scored on unvisited cells (B). Include a planted spring tilt and a null (E). This sets the minimum detectable effect, so a gate is binding only if it is powered (A's concern). It also chooses among the three detectability models (C's radius, D's modes, E's contrast). The arbiter is the unshrunk fall-only model.
+6. **Cross-play (B).** The same GBM trained on legacy vs checklist labels, scored at home, away and on independent data. The CNN is recalibrated on the same checklists.
+7. **Kill rule.** The checklist programme continues only if all of these hold:
    - fall TkL₅ beats the recalibrated CNN by the pre-registered margin;
    - **and** the fall same-observer, first-visit case-crossover is positive (D);
    - **and** both clear the within-stratum label-permutation band (D);
@@ -177,17 +181,17 @@ Each phase is its own change request under CLAUDE.md §1. Acceptance and test sc
 
 **Weeks 2–3: build what survived**
 
-7. **Production model.** A LightGBM cloglog footprint model:
+8. **Production model.** A LightGBM cloglog footprint model:
    - footprint as a normalised mean with a free-sign distance slope (A, fixed after C's critique);
    - event-only effort GAM (B);
-   - the winning detectability model from step 4.
+   - the winning detectability model from step 5.
 
    Add **A's support-weighted ecological offset**: the stand-age curve estimated within sites from the panel, with the residual fading off-support. Each covert card carries a "data-driven / ecology-driven" badge.
-8. **Panel event study (C).** Use a forest→forest land-use filter (E) and first-visit plus footprint-change checks (D). This validates the habitat function and supplies A's age curve.
-9. **Feature gates.** Each block is kept only if it passes the permutation null and improves fall TkL on HH:
+9. **Panel event study (C).** Use a forest→forest land-use filter (E) and first-visit plus footprint-change checks (D). This validates the habitat function and supplies A's age curve.
+10. **Feature gates.** Each block is kept only if it passes the permutation null and improves fall TkL on HH:
    - succession clock;
    - AlphaEarth with infrastructure masking, evaluated only on 2024–25 checklists from a model trained on data up to 2023, with no gain concentrated near past GBIF grouse records (C).
-10. **v1 covert product (about 19–20 October).** Each card shows:
+11. **v1 covert product (about 19–20 October).** Each card shows:
     - flushes/h with interval;
     - support badge;
     - access class and walk-in distance;
@@ -207,6 +211,7 @@ Each phase is its own change request under CLAUDE.md §1. Acceptance and test sc
 ## 8. Open items
 - **Off-support extrapolation:** whether A's offset helps can only be judged by the field and the scorecard if fewer than 200 HH detections fall off-support.
 - **Seasonal assumptions:** spring/fall density and habitat-use differences (about 2× in fall, plus dispersal). The fall-only model is the arbiter until resolved.
+- **Pre-2016 checklists:** no habitat rasters exist before 2016, so these checklists enter only the panel test and the observer-skill indices (§7 step 3). Extending the habitat model earlier would need a separate change to back-fill rasters, for example LANDFIRE 2001–2014 vintages, LCMS or Hansen.
 - **Panel test power:** unknown until treated eBird locations near harvests are counted.
 - **AlphaEarth filters:** the GBIF year range and filter details are unverified by the compiler.
 - **Agency data:** NH flush tables (403 to automated fetch), ME/VT programmes, GMNF coordinates.

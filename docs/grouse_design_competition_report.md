@@ -2,6 +2,8 @@
 
 *Compiled 2026-10-05 and updated after round 3.*
 
+> **Vote result:** seven independent reviewers chose **E (FLUSH-E)** (Borda 31; Condorcet winner), followed by B 25, D 19, C 18 and A 12. They also found 13 flaws that all three design rounds missed. These include the LANDFIRE 2022 year floor and training buffers that discard about 70% of the data. See `docs/design_competition/VOTE_REPORT.md`; those fixes take precedence over §7 below.
+
 Five independent designer agents each received `docs/grouse_model_report.md`, the repository, and the owner's goal: **locate productive grouse-hunting areas in ME/NH/VT, with as much precision and accuracy as possible.** The competition ran in three rounds:
 
 1. **Round 1.** Each designer wrote an initial design using a different brainstorming technique.

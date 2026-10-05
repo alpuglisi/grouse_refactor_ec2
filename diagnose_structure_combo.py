@@ -104,7 +104,15 @@ def main():
 
     print(f"\nTREES (centre + neighbourhood, val; {len(args.seeds)} seeds)")
     base = None
+    # CR-0032 review A7: the four columns CR-0032 actually builds (30 m
+    # radius ~ one cell: mean, <1 m, 1-5 m, 5-12 m shares), alone and with
+    # sd added, against all 12 Meta columns.
+    mch4 = ["meta_mean_r30", "meta_f0_1_r30", "meta_f1_5_r30",
+            "meta_f5_12_r30"]
     combos = (("today's features", []),
+              ("+ CR-0032 four (r30)", mch4),
+              ("+ CR-0032 four + sd", mch4 + ["meta_sd_r30"]),
+              ("+ Meta r30 (all 6)", [c for c in meta if c.endswith("_r30")]),
               ("+ Meta", meta),
               ("+ LCMS", lcms),
               ("+ Meta + LCMS", meta + lcms),

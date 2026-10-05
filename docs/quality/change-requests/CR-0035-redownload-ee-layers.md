@@ -172,7 +172,7 @@ scripts); the code fix is CR-0034. The evaluation measures this repair.
 - [x] 1. This CR, `check_layer_registration.py`, `check_split_unchanged.py`,
       `tests/test_cr0035.py`; two independent reviews; approval (round 3).
 - [x] 2. Steps 0-2 on EC2 (after CR-0034 lands), inventories equal (evidence `step0_1_pilot.txt`, `step2_1_nlcd_and_tcc_version.txt`, `step2_redownload_and_inventory.txt`).
-- [ ] 3. Gate 3 passes on the repaired data and fails on the snapshot.
+- [x] 3. Gate 3 passes on the repaired data and fails on the snapshot (evidence `step3_registration_gate.txt`).
 - [ ] 4. Gates 4.2 and 4.3 pass.
 - [ ] 5. Evaluation recorded.
 - [ ] 6. Bookkeeping: BUG-0094/0095/0096 FIXED, PA-0049, BUG_LOG, CHANGELOG,

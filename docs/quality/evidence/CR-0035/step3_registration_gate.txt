@@ -1,0 +1,42 @@
+# CR-0035 step 3: registration gate (user, EC2, 2026-10-05, code at 3c3f7e4)
+# C_nlcd = projects/sat-io/open-datasets/USGS/ANNUAL_NLCD/LANDCOVER ; C_tcc = USGS/NLCD_RELEASES/2023_REL/TCC/v2023-5
+# Logs on EC2: ~/cr0035_gate3_after.log, ~/cr0035_gate3_before.log. The gate exits 1 iff it prints FAIL
+# (check_layer_registration.py:339-343).
+
+## repaired data (~/grouse2): exit 0
+Gate (every file >= 99% equal): PASS - 201 of 201 files pass
+  nlcd ME/NH/VT 2016-2025 (30):     equal 100.00% each; at BUG-0094 offset 80-83%
+  tcc  ME/NH/VT 2016-2023 (24):     equal 100.00% each; at BUG-0094 offset 34-45%
+  raw TreeMap 2016/2020/2022 x BALIVE/TPA_LIVE/CARBON_DWN x ME/NH/VT (27):
+                                    equal 100.00% each; at offset ME 71-77%, NH 44-47%, VT 38-44%
+  derived balive/tpa_live/qmd/carbon_dwn x 2016-2025 x ME/NH/VT (120): equal 100.00% each
+
+## snapshot.sha256 --verify: OK
+
+## snapshot (~/grouse2_before -> data_before_bug0094): exit 1, 201 files reported (>= inventory)
+Gate (every file >= 99% equal): FAIL - 16 of 201 files pass
+  nlcd (30): equal 80.50-85.25%, FAIL; mismatches near edge 44-53%; at BUG-0094 offset 99-100%
+  tcc  (24): equal 33.00-44.75%, FAIL; near edge 45-55%; at offset 96-98%
+  raw TreeMap (27): equal ME 68.50-69.00%, NH 32.00-32.50%, VT 30.50-32.75%, FAIL; at offset 100% (all)
+  derived (120): equal 97.75-99.00%; 104 FAIL; 16 PASS (VT balive/tpa_live/qmd/carbon_dwn 2022-2025, 99.00%)
+
+## reading against the CR's step-3 criteria
+1. Repaired: every in-scope file, every year >= MIN_EQUAL (0.99): MET (201/201 at 100.00%).
+2. Snapshot exits 1 and reports >= inventory: MET (201 reported, 185 fail).
+3. "at BUG-0094 offset" high on the snapshot, low on the repaired files: MET as a crossover.
+   - Snapshot: 96-100% at the offset vs 31-85% at the centre.
+   - Repaired: 100% at the centre vs 34-83% at the offset.
+   The repaired-file offset values are not near zero. They are the spatial-autocorrelation baseline of
+   each product at a 21 m (15 m, 15 m) displacement:
+   - categorical NLCD ~81% (the same 82% as the step-1 pilot);
+   - large imputed TreeMap plots, e.g. ME 71-77%;
+   - continuous TCC ~40%.
+   Every file therefore matches the source exactly where it was sampled from: the snapshot at the
+   offset, the repair at the centre. This attributes the snapshot failure to the BUG-0094 shift, not to
+   a product-version change. (TCC: the snapshot is 96-98% at the offset against the pinned v2023-5,
+   per I35-1.)
+4. The 16 snapshot derived files that pass are not a registration result. The derived check compares
+   each derived layer with a rebuild from the SAME tree's raw files. In the snapshot those raw files are
+   shifted too, so the check measures only derived-vs-raw consistency, i.e. the old approximate warp
+   (BUG-0095: 97.75-99.00%). The shift is caught by the 27 raw files, all of which fail at 100% at the
+   offset. On the repaired tree the derived check is 100.00% (exact warp, CR-0034).

@@ -193,12 +193,14 @@ All 15 tests fail at `9bb1636` (no `year` keyword, no helper) except W2
 (R = 0), and pass against a trial implementation of §2 (not committed).
 
 **Wrong-implementation runs (PA-0021(a)), by a reviewer, not the
-author:** (i) helper ignores years (one `"latest"` call) → U1/U2/U7 fail;
-(ii) per-year `year` on the rows but validity on the latest raster → U2
-fails; (iii) `year="latest"` as the default → U3 fails; (iv) one
-`"latest"` draw for `Σ n_y` points with the `year` column overwritten to
-match the histogram → U2 fails; (v) `build_datasets` passing another
-frame's years → W3 fails. Recorded as evidence.
+author:** (i) helper ignores years (one `"latest"` call) → U1 and U2
+fail (via the helper's year check); (ii) per-year `year` on the rows but
+validity on the latest raster → U2 fails; (iii) `year="latest"` as the
+default → U3 fails; (iv) one `"latest"` draw for `Σ n_y` points with the
+`year` column overwritten to match the histogram → U2 fails; (v)
+`build_datasets` passing another frame's years → W1 fails (via the
+independent `build_datasets` check that W3 exercises). Recorded as
+evidence.
 
 **Existing suites** still pass: `test_cr0015_sampler` (calls updated),
 `test_cr0015_real` (skips without data), `test_pa0027_lint`,
@@ -230,7 +232,10 @@ experiment this CR unblocks, not its acceptance).
       `tests/cr0015_background_check.py`, `tests/cr0015_wrong_samplers.py`.
       All 19 test modules pass (`test_cr0022` 15/15; `test_cr0015_real`
       skips without data).
-- [ ] 3. Reviewer's wrong-implementation runs (i)–(v) recorded.
+- [x] 3. Reviewer's wrong-implementation runs (i)–(v) recorded.
+      — Done: `docs/quality/evidence/CR-0022/reviewA/wrong_impl_runs.txt`
+      (re-runnable with `mutate.py`), at `e18944d`: control 15/15; every
+      variant detected; mapping of (i) and (v) corrected (review log I1).
 - [ ] 4. EC2 smoke run log committed as evidence.
 - [ ] 5. Bookkeeping: BUG-0074 → FIXED (corrective action, recurrence
       re-check); `BUG_LOG.md`; Swept? cells of PA-0020, PA-0029 and

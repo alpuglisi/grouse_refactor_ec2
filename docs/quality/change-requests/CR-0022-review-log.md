@@ -65,3 +65,22 @@ Quorum (CLAUDE.md §1.4): author and both reviewers who commented. A:
 APPROVE (round 2). B: APPROVE WITH FOLLOW-UPS (round 2). No BLOCKING
 concern in either round; every MAJOR resolved in the text. **CR-0022
 APPROVED.** Deliverable 2 (code) may start.
+
+## Deliverable 3: wrong-implementation runs (reviewer A, at `e18944d`)
+Record: `docs/quality/evidence/CR-0022/reviewA/wrong_impl_runs.txt`
+(variants re-runnable with `mutate.py`). Control: `test_cr0022` 15/15,
+`test_cr0015_sampler` 12/12. Every variant, (i)–(v) and the reviewer's two
+extras, is detected (each run FAILED). The record's verdict line reads
+**FAIL** by the literal rule the author set ("each variant fails the test
+the CR names for it"), because the CR's Test plan named the wrong test for
+two variants. The record is kept unedited.
+
+- **I1 (LOW, Test-plan transcription; found by reviewer A).** (i) was
+  mapped to U1/U2/U7, but U7 asserts the helper's `RuntimeError`, which (i)
+  still raises, so U7 passes; U1 and U2 fail. (v) was mapped to W3, but W3
+  asserts the `build_datasets` `RuntimeError`, which (v) triggers, so W3
+  passes; W1 fails. Resolution: the Test plan now names U1/U2 for (i) and
+  W1 for (v). No code or test change. On the corrected mapping every
+  variant fails its named test — reviewer A's statement in the record
+  ("correct the CR's test mapping for (i) and (v) and re-state the
+  verdict"), with no re-run needed since the outcomes are unchanged.

@@ -302,3 +302,9 @@ Split window mask reads pinned `SPLIT_WINDOW_FEATURES` (BUG-0093, PA-0048).
 - [x] LOW (review A10, done in deliverable 2): `--copy-only` mode to add a vintage without Earth Engine. In CR-0032 §3.4; tracked until implemented. Owner: lead
 - [ ] Out of scope, revisit if the pilot estimate exceeds 24 h for all regions: batch `Export.image` to Cloud Storage (review B4). Owner: lead
 - [ ] Pilot 1 (EC2, 2026-10-05): `fetch_window` got HTTP 400 from Earth Engine, discarded the response body and retried a deterministic 4xx four times. Fixed in `fetch_window` (body reported, 4xx other than 429 not retried; T6). To log as a BUG at close-out with a sweep of sibling fetchers (`download_tcc_nlcd.fetch_tile` has the same shape). Owner: lead
+- [ ] CR-0032 pilot grid check used the on-disk NLCD as reference, which is itself misregistered (BUG-0094): re-design to register the generator-route NLCD against `road_dist` (TIGER, no EE). Needs a CR-0032 revision + re-review. Owner: lead
+- [ ] CR-0032: `mch_*` registration itself unproven (diagnostic row M flat, peak (2, 1)); needs a stronger test (e.g. against the registered NLCD forest/non-forest edges over a larger window) before the full build. Owner: lead
+
+## BUG-0094 (OPEN, 2026-10-05) — on-disk nlcd about one cell off the template grid, owner: lead
+- [ ] Full investigation (BUG-0094 doc): confirm on `tcc` and in ME/VT; sweep every layer downloaded by Earth Engine (`download_tcc_nlcd.py`, `download_treemap.py`, others) against `road_dist`.
+- [ ] CR: re-download affected layers straight onto the template grid; measure the training effect.

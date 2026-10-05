@@ -74,7 +74,13 @@ STATIC_FEATURES = ("road_dist",) + MCH_FEATURES
 MCH_MAX_PIXELS = 4096          # reduceResolution input pixels per cell
 MCH_MAX_OVER_FRAC = 0.001      # of valid cells; more -> region refused
 MIN_VALID_REGION_FRAC = 0.01   # of template-valid cells; less -> refused
-MIN_GRID_AGREE = 0.99          # pilot grid check against the NLCD file
+# Pilot grid check (CR-0032 code review C1): the on-disk NLCD came through
+# two nearest-neighbour steps (native -> 5070 lattice -> template), the
+# fetched copy through one, so exact equality is not expected. Registration
+# is tested instead: agreement at offset (0, 0) must beat every shift up to
+# GRID_MAX_SHIFT cells by at least GRID_MARGIN.
+GRID_MAX_SHIFT = 2
+GRID_MARGIN = 0.02
 # Bump when mch_image's expression changes: it keys the tile cache.
 RECIPE_VERSION = 1
 EE_MASKED = -1.0
@@ -229,11 +235,13 @@ def _pilot_window(rd, tpl, wins, pilot_lonlat):
 
 
 def grid_check(ee, image, rd, feature, window, valid_range=None):
-    """Fetch `image` over a template window through fetch_window and
-    return the share of cells (valid in both) equal to the region's
-    on-disk `feature` file there. Catches an Earth Engine misreading of
-    the template's CRS, which the acceptance gate would share (CR-0032
-    review B2-3)."""
+    """Fetch `image` over a template window through fetch_window and test
+    that it is registered with the region's on-disk `feature` file: the
+    share of equal cells (valid in both) at every offset up to
+    GRID_MAX_SHIFT cells. Returns {"agree": {(dy, dx): share}, "best",
+    "margin", "ok"}; ok when (0, 0) is the best offset by >= GRID_MARGIN.
+    Catches an Earth Engine misreading of the template's CRS, which the
+    acceptance gate would share (CR-0032 review B2-3, code review C1)."""
     template = dtn.template_raster(rd)
     with rasterio.open(template) as tpl:
         wkt, tr = tpl.crs.to_wkt(), tpl.window_transform(window)
@@ -244,10 +252,25 @@ def grid_check(ee, image, rd, feature, window, valid_range=None):
             got = s.read(1)
     if valid_range is not None:
         got = dtn.mask_to_valid(got, *valid_range)
+    k = GRID_MAX_SHIFT
+    padded = Window(window.col_off - k, window.row_off - k,
+                    window.width + 2 * k, window.height + 2 * k)
     with rasterio.open(rd.latest_raster_path(feature)) as src:
-        disk = src.read(1, window=window)
-    both = (got != NODATA) & (got != EE_MASKED) & (disk != NODATA)
-    return float((got[both] == disk[both]).mean()) if both.any() else 0.0
+        disk = src.read(1, window=padded, boundless=True, fill_value=NODATA)
+    got_ok = (got != NODATA) & (got != EE_MASKED)
+    agree = {}
+    for dy in range(-k, k + 1):
+        for dx in range(-k, k + 1):
+            d = disk[k + dy:k + dy + window.height,
+                     k + dx:k + dx + window.width]
+            both = got_ok & (d != NODATA)
+            agree[(dy, dx)] = (float((got[both] == d[both]).mean())
+                               if both.any() else 0.0)
+    best = max(agree, key=agree.get)
+    runner_up = max(v for o, v in agree.items() if o != (0, 0))
+    margin = agree[(0, 0)] - runner_up
+    return {"agree": agree, "best": best, "margin": margin,
+            "ok": best == (0, 0) and margin >= GRID_MARGIN}
 
 
 def _report_pilot(raw, enc, n_over, seconds):
@@ -262,6 +285,13 @@ def _report_pilot(raw, enc, n_over, seconds):
           f"> {MCH_HEIGHT_MAX_M:g} m: {n_over:,}")
     print(f"   valid fraction strictly inside (0, 1): {vin:.2%} of cells "
           f"(0 means the validity band was not aggregated)")
+    if vin == 0 and (valid >= MCH_MIN_VALID_FRAC).any() and \
+            (valid < MCH_MIN_VALID_FRAC).any():
+        # a coverage edge with no partial cell: the band was sampled, not
+        # averaged (CR-0032 code review C7)
+        raise RuntimeError("pilot: the validity band holds only 0/1 across "
+                           "a coverage edge - not aggregated. Do not run "
+                           "the full build.")
     for f in MCH_FEATURES:
         a = enc[f][enc[f] != NODATA]
         rng = f"{int(a.min())}..{int(a.max())}" if a.size else "none"
@@ -367,14 +397,19 @@ def build_region(ee, image, rd, tile_px=256, workers=8, dry_run=False,
             print(f"   pilot written to {pilot_out} (nothing under data/)")
             if grid_image is not None:
                 gimg, gfeat, grange = grid_image
-                agree = grid_check(ee, gimg, rd, gfeat, w, grange)
-                print(f"   grid check vs on-disk {gfeat}: {agree:.2%} of "
-                      f"cells equal (need {MIN_GRID_AGREE:.0%})")
-                if agree < MIN_GRID_AGREE:
+                g = grid_check(ee, gimg, rd, gfeat, w, grange)
+                print(f"   grid check vs on-disk {gfeat}: {g['agree'][(0, 0)]:.2%}"
+                      f" equal at offset (0, 0); best offset {g['best']}, "
+                      f"margin over the best shift {g['margin']:+.2%} "
+                      f"(need (0, 0) and >= {GRID_MARGIN:.0%})")
+                if not g["ok"]:
                     raise RuntimeError(
                         f"{rd.region}: Earth Engine's reading of the "
-                        f"template grid disagrees with {gfeat} on disk "
-                        f"({agree:.2%}) - do not run the full build")
+                        f"template grid is not registered with {gfeat} on "
+                        f"disk (best offset {g['best']}, margin "
+                        f"{g['margin']:+.2%}) - do not run the full build; "
+                        f"if the window is too uniform to tell, retry "
+                        f"with another --pilot-lonlat")
             return {"years": years, "written": [], "valid_frac": None,
                     "n_tiles": 1, "skipped": skipped, "over_max": n_over}
 
@@ -423,15 +458,21 @@ def build_region(ee, image, rd, tile_px=256, workers=8, dry_run=False,
                         mm = grid_mismatch(s, ref)
                     if mm is not None:
                         raise RuntimeError(f"{p}: {mm}. Not written.")
-            written = []
-            for f, p in staged.items():
+            # every copy staged before any replace, so a failure leaves
+            # either all years new or all untouched (code review C6)
+            outs = [os.path.join(d, f"{rd.region}_{y}_{f}.tif")
+                    for f in MCH_FEATURES for y in years]
+            for f in MCH_FEATURES:
                 for y in years:
-                    out = os.path.join(d, f"{rd.region}_{y}_{f}.tif")
-                    shutil.copyfile(p, out + ".tmp")
-                    os.replace(out + ".tmp", out)
-                    written.append(out)
+                    shutil.copyfile(staged[f], os.path.join(
+                        d, f"{rd.region}_{y}_{f}.tif") + ".tmp")
+            for out in outs:
+                os.replace(out + ".tmp", out)
+            written = outs
         finally:
-            for p in staged.values():
+            for p in list(staged.values()) + [
+                    os.path.join(d, f"{rd.region}_{y}_{f}.tif.tmp")
+                    for f in MCH_FEATURES for y in years]:
                 if os.path.exists(p):
                     os.remove(p)
         print(f"   {rd.region}: wrote {len(written)} files; valid "
@@ -449,12 +490,21 @@ def copy_only(rd):
     """Write missing vintage years from the existing latest mch_* files
     (no Earth Engine)."""
     years = vintage_years(rd)
+    template = dtn.template_raster(rd)
     written = []
     for f in MCH_FEATURES:
         if not rd.raster_years(f):
             raise SystemExit(f"{rd.region}: no {f} file to copy from - "
                              f"run the full build first")
         src = rd.latest_raster_path(f)
+        # only a file this generator wrote, on today's template grid
+        # (code review C4)
+        with rasterio.open(src) as s, rasterio.open(template) as ref:
+            mm = grid_mismatch(s, ref)
+            tag = s.tags().get("GROUSE_SOURCE")
+        if mm is not None or tag != MCH_ASSET:
+            raise SystemExit(f"{src}: {mm or f'GROUSE_SOURCE={tag!r}'} - "
+                             f"rebuild instead of copying")
         for y in years:
             out = os.path.join(os.path.dirname(src),
                                f"{rd.region}_{y}_{f}.tif")
@@ -472,8 +522,10 @@ def native_pixel_check(ee, proj, lat):
     pixels (CR-0032 §3.4). Returns the native pixel's ground size (m)."""
     scale = proj.nominalScale().getInfo()
     crs = proj.crs().getInfo()
-    ground = scale * (math.cos(math.radians(lat))
-                      if crs in ("EPSG:3857", "EPSG:900913") else 1.0)
+    wkt = proj.wkt().getInfo() if not crs.startswith("EPSG:") else ""
+    mercator = (crs in ("EPSG:3857", "EPSG:900913") or
+                "mercator" in wkt.lower())      # code review C5
+    ground = scale * (math.cos(math.radians(lat)) if mercator else 1.0)
     need = math.ceil(30.0 / ground + 1) ** 2
     print(f"   source projection {crs}, nominal scale {scale:.3f}, ground "
           f"pixel {ground:.3f} m -> up to {need} pixels per cell "

@@ -298,5 +298,6 @@ Split window mask reads pinned `SPLIT_WINDOW_FEATURES` (BUG-0093, PA-0048).
 ## CR-0032 (APPROVED WITH FOLLOW-UPS, v5, round 3, 2026-10-05) — follow-ups, owner: lead
 - [x] Deliverable 1b: run 1 FAILED (+0.0033, approval lapsed); bar changed after run 1 to "+ CR-0032 four (r30 + r100)" (post hoc; see review log § Deliverable 1b), PASSED (+0.0086). Supporting evidence only; § Evaluation (frozen) decides. Owner: lead
 - [ ] LOW (BUG-0093 sweep note): once `mch_*` is registered, the static generators' year unions (`generate_road_distance.py:311`, `generate_time_since_disturbance.py:252`, `generate_treemap_features.py:373`) include `mch_*` years; harmless while `mch_*` copies the same union, but a stale `mch_*` file would propagate its year there. Consider excluding a shared `STATIC_FEATURES` in each. Owner: lead
-- [ ] LOW (review A10): `--copy-only` mode to add a vintage without Earth Engine. In CR-0032 §3.4; tracked until implemented. Owner: lead
+- [ ] LOW (code review C2, C3): EE tile CRS equality and shape without `dimensions` - confirm on the EC2 pilot; both fail closed. Owner: lead
+- [x] LOW (review A10, done in deliverable 2): `--copy-only` mode to add a vintage without Earth Engine. In CR-0032 §3.4; tracked until implemented. Owner: lead
 - [ ] Out of scope, revisit if the pilot estimate exceeds 24 h for all regions: batch `Export.image` to Cloud Storage (review B4). Owner: lead

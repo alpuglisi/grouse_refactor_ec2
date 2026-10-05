@@ -130,3 +130,23 @@ implementation. The CNN 3 + 3 evaluation remains the decider.
 | B3-3 | MEDIUM | CHANGELOG entry stale (says approved, old bar) and wrong about water ("tall forest") | accepted: entry rewritten (lapse, r30 + r100 bar, v5 approval); water as 0 reads as 0 m (open ground), not tall forest - the author's earlier wording, which also appears in round-1 A1's scenario, was wrong | `CHANGELOG.md` |
 | B3-4 | LOW | Rounds/Quorum section did not show the lapse | accepted: rows for round 3 and the lapse stated in the Quorum paragraph | this log |
 | B3-5 | LOW | tracker hides that the bar changed | accepted: tracker line says so | tracker |
+
+## Implementation code review (deliverable 2, `d81aff8`)
+Reviewer A (same agent; read-only): **APPROVE WITH FOLLOW-UPS**, 0
+BLOCKING (1 MAJOR, 6 LOW). Verified from code and EE documentation:
+§3.1 expression, `crs_transform` order, tile identity checks and cache
+key, PA-0027 retry clause, encoders, staged writes and refusals,
+registration order (appended; existing checkpoints keep channel order),
+the allowlist entry. Pilot-only items: EE accepts the template WKT; the
+returned shape without `dimensions`; CRS equality of returned tiles;
+fetch time.
+
+| id | sev | concern (short) | disposition | where |
+|---|---|---|---|---|
+| C1 | MAJOR | 99 % NLCD equality expects one-step resampling to match the on-disk two-step route; a correct grid would fail (reviewer's simulation: 55-92 %) | accepted: `grid_check` is a registration test - agreement at offsets up to 2 cells, (0, 0) must be best by >= 0.02; tests: exact grid, 15 % resampling noise (passes), 1-cell shift (fails), uniform window (fails, retry elsewhere) | §3.4; `grid_check`; T3GridCheck |
+| C2 | LOW | EE's returned CRS may be equivalent but not `==` | open, pilot-confirmable; fails closed (every tile refused). If seen: semantic comparison, recorded in evidence | tracker |
+| C3 | LOW | without `dimensions`, a row/column could be added | open, pilot-confirmable; fails closed. Fallback: pass `dimensions` | tracker |
+| C4 | LOW | `--copy-only` copies without grid/tag check | accepted: requires `grid_mismatch` None and `GROUSE_SOURCE=MCH_ASSET`; tests T3CopyOnly | §3.4; `copy_only` |
+| C5 | LOW | Mercator detected only from an EPSG string | accepted: also from the projection WKT | `native_pixel_check` |
+| C6 | LOW | per-year copies not all-or-nothing | accepted: every copy staged before any `os.replace`; leftovers removed | §3.4 |
+| C7 | LOW | unaggregated validity band only printed | accepted: pilot refuses when the band is only 0/1 across a coverage edge | §3.4; `_report_pilot` |

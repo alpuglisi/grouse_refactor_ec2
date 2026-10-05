@@ -358,13 +358,60 @@ class T3GridCheck(Base):
             return self.g.grid_check(None, None, self.rd, "tcc",
                                      Window(0, TILE, TILE, TILE))
 
-    def test_same_grid_agrees(self):
-        self.assertGreaterEqual(self.grid_check(self.fake_tcc()),
-                                self.g.MIN_GRID_AGREE)
+    def test_same_grid_registered(self):
+        g = self.grid_check(self.fake_tcc())
+        self.assertTrue(g["ok"])
+        self.assertEqual(g["best"], (0, 0))
+        self.assertEqual(g["agree"][(0, 0)], 1.0)
+
+    def test_registered_despite_resampling_noise(self):
+        """Code review C1: the disk file went through two nearest steps,
+        so ~15 % of cells differ even on a correct grid; registration,
+        not equality, is the test."""
+        base = self.fake_tcc()
+
+        def noisy(ee, image, crs_wkt, transform, width, height, dest,
+                  retries=4):
+            base(ee, image, crs_wkt, transform, width, height, dest)
+            with rasterio.open(dest, "r+") as dst:
+                a = dst.read(1)
+                rng = np.random.default_rng(1)
+                flip = rng.random(a.shape) < 0.15
+                a[flip] = (a[flip] + 1) % 97
+                dst.write(a, 1)
+        g = self.grid_check(noisy)
+        self.assertTrue(g["ok"])
+        self.assertLess(g["agree"][(0, 0)], 0.9)
 
     def test_shifted_grid_detected(self):
-        self.assertLess(self.grid_check(self.fake_tcc(shift_px=1)),
-                        self.g.MIN_GRID_AGREE)
+        g = self.grid_check(self.fake_tcc(shift_px=1))
+        self.assertFalse(g["ok"])
+        self.assertNotEqual(g["best"], (0, 0))
+
+    def test_uniform_window_is_not_evidence(self):
+        with rasterio.open(self.rd.latest_raster_path("tcc"), "r+") as dst:
+            dst.write(np.full((N, N), 40, np.int16), 1)
+        self.assertFalse(self.grid_check(self.fake_tcc())["ok"])
+
+
+class T3CopyOnly(Base):
+    """Code review C4: --copy-only copies only generator output on
+    today's template grid."""
+    def test_copies_missing_year(self):
+        self.run_build(fake_fetch_factory([]),
+                       tile_dir=os.path.join(self.tmp, "tiles"))
+        os.remove(self.path("mch_f15", 2020))
+        with mock.patch("builtins.print"):
+            out = self.g.copy_only(self.rd)
+        self.assertEqual(out, [self.path("mch_f15", 2020)])
+        self.assertEqual(open(self.path("mch_f15", 2020), "rb").read(),
+                         open(self.path("mch_f15", 2024), "rb").read())
+
+    def test_refuses_untagged_file(self):
+        for f in FEATS:
+            write_template(self.path(f, 2024))
+        with mock.patch("builtins.print"), self.assertRaises(SystemExit):
+            self.g.copy_only(self.rd)
 
 
 class T5Gate(unittest.TestCase):

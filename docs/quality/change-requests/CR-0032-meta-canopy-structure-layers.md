@@ -124,8 +124,9 @@ tile_dir=None, pilot_lonlat=None)`:
   `GROUSE_SOURCE=MCH_ASSET`). After the last tile: refuse (staged files
   deleted, existing files untouched) if valid cells < 1 % of template-
   valid cells or the > 60 m share exceeds its limit; check
-  `grid_mismatch(staged, template) is None`; then copy to every vintage
-  year and `os.replace` (identical bytes per year).
+  `grid_mismatch(staged, template) is None`; then stage a copy for every
+  vintage year and only then `os.replace` them all (identical bytes per
+  year, all years or none).
 - **Dry run / pilot**: fetches one window (the one holding most of the
   region's positives, template centre if none; `--pilot-lonlat`
   overrides) into a temporary directory, prints the native CRS and
@@ -133,17 +134,22 @@ tile_dir=None, pilot_lonlat=None)`:
   encoded cells, the fraction of `valid` strictly inside (0, 1) (0 means
   the band was not aggregated), value ranges, and the measured fetch time;
   runs `grid_check(ee, nlcd_image, rd, "nlcd", window)` - the region's
-  latest NLCD year fetched through `fetch_window` over the pilot window,
-  compared with the on-disk `nlcd` file, refused below `MIN_GRID_AGREE`
-  (0.99) of cells equal (catches an EE misreading of the template WKT,
-  which the gate shares); writes the
+  latest NLCD year fetched through `fetch_window` over the pilot window
+  and compared with the on-disk `nlcd` file at every offset up to
+  `GRID_MAX_SHIFT` (2) cells; refused unless offset (0, 0) is the best by
+  at least `GRID_MARGIN` (0.02). A registration test, not equality: the
+  on-disk file came through two nearest-neighbour steps, the fetched copy
+  through one (catches an EE misreading of the template WKT, which the
+  gate shares); refuses when the validity band holds only 0/1 across a
+  coverage edge (not aggregated); writes the
   encoded window as one 4-band int16 file (bands in `MCH_FEATURES` order)
   to `--pilot-out` (default `/tmp/mch_pilot_{REGION}.tif`) and nothing
   under `data/`. Refuses if `ceil(30 / g + 1)^2 > MCH_MAX_PIXELS`, with
   `g` the native pixel's ground size (nominal scale x cos(latitude) for a
   Mercator source).
 - **`--copy-only`**: writes missing vintage years from the existing
-  latest `mch_*` files, no Earth Engine.
+  latest `mch_*` files, no Earth Engine; only from a file tagged
+  `GROUSE_SOURCE=MCH_ASSET` on today's template grid.
 - Returns `{"years", "written", "valid_frac", "n_tiles", "skipped",
   "over_max"}`. CLI: `--regions`, `--project`, `--tile-px`, `--workers`,
   `--tile-dir`, `--dry-run`, `--pilot-lonlat`, `--pilot-out`,

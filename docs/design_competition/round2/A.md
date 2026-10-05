@@ -288,26 +288,37 @@ $$\mathcal L=\ell_{O1}+\ell_{O2}^{\text{(level only)}}+\ell_{O3}^{\text{(from 20
 - **T3. Freshness audit** (from D). The share of the current CNN's top-5% pixels that were cut in 2023–2026 (LCMS/Hansen/DIST), or that are older than 30 years in 2026.
   - *Reading:* below 3% means freshness is not a material argument against the CNN.
 
-**Tier 1, week 1, no EBD.**
+**Tier 1, week 1: real complete checklists, no fitting of CYM.**
 
-**T1. Pseudo-checklist falsification (E's idea, made stricter).**
-1. Download GBIF eBird records for all Aves in ME/NH/VT, 2017–2024. VT 2023 alone has about 0.98 M rows, so expect roughly 30–40 M in total. Use a `pygbif` download with a free account.
-2. Group rows by `recordedBy` × `eventDate` × 4-decimal coordinates. Keep groups with ≥ 15 species as "likely complete". The outcome is grouse present or absent.
-3. Species count depends on habitat, so it is **not** used as a regressor. Instead, AUC is computed **within strata** of (species-count decile × month × state), with an observer random intercept in a sensitivity run.
-4. Compare, all with zero tuning on these data:
-   - (a) the CNN score;
+**T1. Zero-tuning falsification on real EBD checklists** (E's comparison, made stricter).
+1. Ingest EBD + SED for ME/NH/VT 2016–2025 with `ebird_checklists.py`:
+   - apply the Johnston et al. 2021 filters;
+   - zero-fill grouse;
+   - deduplicate shared checklists by group;
+   - attach footprints $B_i$ and 25 km-block folds.
+   In the same pass, measure the counts of detections and non-detections, overall and for fall only.
+2. Fit an **effort-only** detection model on the training folds: $g(e)$ from §3.4, with no habitat term and no location-derived variable (rule R-b).
+3. Add one map score at a time as a single offset-plus-slope covariate, evaluated on held-out blocks. Every score is computed before it sees any checklist:
+   - (a) the current CNN score, footprint-averaged;
    - (b) H250;
-   - (c) $D_0$ footprint-averaged over 300 m;
-   - (d) a GBM on the legacy features, fitted on 25 km-block folds.
+   - (c) the frozen prior-mean $D_0$, footprint-averaged.
+
+   For reference only, also run (d) the GBM twin fitted on the training folds.
+4. Report three metrics:
+   - effort-adjusted held-out deviance gain;
+   - effort-stratified AUC (protocol × duration tercile × month × year);
+   - TkL₅.
+
+   Report each on the full set, the fall-only subset and the H subset (from C).
 
 **CYM's premise is falsified if** both:
-- the stratified AUC of (c) is no better than (a) by more than one block-bootstrap SE; and
+- the deviance gain and the stratified AUC of (c) are no better than (a) by more than one block-bootstrap SE; and
 - (c) is no better than (b), meaning the structure adds nothing over a one-variable heuristic.
 
 *Consequence:* drop the structural core and adopt the shared-core GBM with CYM's product, evaluation and field-test layers.
 
 **T2. Preferential-sampling injection–recovery (B's method, re-aimed).**
-1. Take real birder geometry: the existing target-group pool on EC2, or the T1 pseudo-checklist locations.
+1. Take real birder geometry: the EBD checklist start points, footprints and effort vectors from T1.
 2. Simulate two synthetic truths:
    - (i) CYM-shaped;
    - (ii) a CNN-like truth: GBM-learned on random features, so it is not CYM-shaped.
@@ -320,7 +331,7 @@ $$\mathcal L=\ell_{O1}+\ell_{O2}^{\text{(level only)}}+\ell_{O3}^{\text{(from 20
 
 **T4. Coverage audit.** The density ratio between visited and available area by age class × understory class × distance to road. Its outputs are the extrapolation subset of H and the per-covert extrapolation flag.
 
-**Tier 2, after EBD arrives: the H-set head-to-head.**
+**Tier 2, weeks 2–3: fitted CYM, the H-set head-to-head.**
 - Fitted CYM vs the GBM twin vs the CNN on TkL and effort-stratified AUC (full, fall-only and extrapolation subsets).
 - **Kill rule for the residual $r$:** it is admitted only if it improves held-out TkL and deviance on H *and* does not degrade the T2 unvisited-cell recovery.
 
@@ -336,7 +347,7 @@ $$\mathcal L=\ell_{O1}+\ell_{O2}^{\text{(level only)}}+\ell_{O3}^{\text{(from 20
 | Partial harvests are missed (Maine shelterwood) | Severity term, lidar understory, HF437, DIST |
 | Grouse rarely reported in fall checklists | Season enters $g$; the transfer term fixes fall detection; fall-only reporting |
 | The prior is wrong | Soft priors; fitted parameters audited against ecology; T2 bounds the cost |
-| The pseudo-checklist test is biased (incomplete lists, merged same-day lists) | Strata on species count; a ≥ 15-species threshold sensitivity (10/15/25); T1 is a gate, not the final answer |
+| Grouse-targeted visits in EBD (preferential sampling beyond $x$) | Observer random effect; a sensitivity run dropping the top-1% grouse-reporting observers (from B); T1 is a gate, not the final answer |
 | Access errors | Class A4 is never shown as open; product is for personal use |
 | Registration bugs in new exports | Template `crsTransform` plus existing probes; kernel smoothing at 150–600 m dampens sub-pixel shifts |
 | The hunt-log sample is small | Power stated; logs accumulate across seasons; only 2–3 transfer parameters |
@@ -348,7 +359,6 @@ $$\mathcal L=\ell_{O1}+\ell_{O2}^{\text{(level only)}}+\ell_{O3}^{\text{(from 20
 Each phase is one CR (CR-0011 A5). Acceptance scripts land before approval (A3). New modules:
 - `habitat_cube.py`
 - `cym_prior.py`
-- `gbif_pseudochecklists.py`
 - `sim_prefsampling.py`
 - `ebird_checklists.py`
 - `cym_fit.py`
@@ -358,14 +368,14 @@ Each phase is one CR (CR-0011 A5). Acceptance scripts land before approval (A3).
 
 | Phase | Work | Effort | Gate |
 |---|---|---|---|
-| **Day 0** | Submit the EBD + SED request. Email NH F&G, ME IF&W and VT FWD (flush/hour tables by unit and year; drumming stops) and USGS VT Coop (GMNF ARU sites). Create a GBIF account. Commit the acceptance script (H set, folds, metrics, thresholds) | 0.5 d | — |
+| **Day 0** | Start the EBD + SED download (access already held). Email NH F&G, ME IF&W and VT FWD (flush/hour tables by unit and year; drumming stops) and USGS VT Coop (GMNF ARU sites). Commit the acceptance script (H set, folds, metrics, thresholds) | 0.5 d | — |
 | **Days 1–3** | `habitat_cube.py` for 2026 (`age`, `sev`, `regen`, `conif`, `dev`, NLCD, `snow`; Meta-CHM `under` fallback). `cym_prior.py` → frozen $D_0$ and covert layer with access. T3 freshness audit | 2–3 d | Registration probes pass. **The owner starts hunting the blinded three-arm test** |
-| Week 1 | T1 (GBIF pseudo-checklists), T2 (injection–recovery), T4 (coverage) | 4–5 d | T1 falsification rule |
-| Weeks 2–3 (EBD arrives) | `ebird_checklists.py`, `cym_fit.py` (O1 + O2 level), GBM twin, `eval_h.py` | 1.5 wk | Kill rules for the core and the residual |
+| Days 2–7 (in parallel with T0) | `ebird_checklists.py` ingest; T1 on real checklists; T2 (injection–recovery on EBD geometry); T4 (coverage) | 4–5 d | T1 falsification rule |
+| Weeks 2–3 | `cym_fit.py` (O1 + O2 level), GBM twin, `eval_h.py` | 1.5 wk | Kill rules for the core and the residual |
 | Weeks 3–5 | Lidar `under` from LAZ (PDAL, per region); AlphaEarth residual test; NumPyro posterior; recommender and loop planner | 2 wk | — |
 | Season end | Analyse the field test; fit $\delta$ and $\xi$; publish season-2027 coverts | 1 wk | Pre-registered field endpoints |
 
-**First experiment the owner can run on EC2 today:** T0 plus T3. The disturbance fusion and NLCD exports go through Earth Engine on the template grid. Kernel convolutions run in PyTorch. With prior-mean parameters, the result is a covert GeoPackage ready for tomorrow's hunt. The freshness audit uses the same exports.
+**First experiments the owner can run on EC2 today:** T0 plus T3, with the EBD download and `ebird_checklists.py` ingest running in parallel so T1 runs on real complete checklists within the week. The disturbance fusion and NLCD exports go through Earth Engine on the template grid. Kernel convolutions run in PyTorch. With prior-mean parameters, the result is a covert GeoPackage ready for tomorrow's hunt. The freshness audit uses the same exports.
 
 ---
 
@@ -410,7 +420,7 @@ Each row gives the strongest flaw I could find.
 | **D (COVERT)** | **Location-derived effort variables remove real habitat signal.** Distance to hotspot, distance to trail and 1 km checklist density go into $g$ and are set to "median non-hotspot forest" at prediction. A gradient-reversal adversary also stops $f$ from predicting checklist density. Grouse are plausibly denser in remote, low-effort industrial forest (NH reports the highest densities in the North Country, where effort is lowest). These covariates are then collinear with true density. $g$ absorbs the remoteness effect, which is deleted at prediction, and the adversary penalises $f$ for learning it. The map is flattened exactly in the north woods | MAJOR (close to BLOCKING for northern Maine/NH ranking) | D §3.2.1 "Effort and birder-ness nuisance", "gradient-reversal adversary"; NH F&G 2025 ("most abundant in the northern part of the state") |
 | D | The E1 probe ($R^2$ of the CNN logit on effort layers) is confounded for the same reason. A high $R^2$ may mean grouse habitat correlates with remoteness, not that the map is an effort map, so it cannot falsify | MEDIUM | D §6 E1 |
 | D | The LightGBM custom objective with a 7-row disk stencil aggregated by log-sum-exp is feasible through the chain rule, but non-standard and easy to get wrong | LOW | D §3.4(a) |
-| **E (FLUSH-E)** | **The day-1 test regresses on an effort proxy that depends on habitat.** It uses species count as the effort proxy in both arms. Richness rises at edges and in young or mixed cover, which is grouse habitat, so `n_species` carries habitat signal into both models. That shrinks the habitat-feature advantage and can produce a false "(a) ≈ (b)" reading, which would wrongly kill the design | MAJOR | E §7 step 5 ("n_species (effort proxy)"). CYM T1 uses within-stratum AUC instead |
+| **E (FLUSH-E)** | **The day-1 test regresses on an effort proxy that depends on habitat.** (This is moot now that EBD is in hand, but it still applies to any GBIF stop-gap.) It uses species count as the effort proxy in both arms. Richness rises at edges and in young or mixed cover, which is grouse habitat, so `n_species` carries habitat signal into both models. That shrinks the habitat-feature advantage and can produce a false "(a) ≈ (b)" reading, which would wrongly kill the design | MAJOR | E §7 step 5 ("n_species (effort proxy)"). CYM T1 uses EBD effort fields and within-stratum AUC instead |
 | E | The ARU criterion uses naive occupancy (top quintile ≥ 2× bottom). With 28-day detection near 61% of sites (Lapp et al.), occupancy saturates: if the bottom quintile is at 40%, a 2× ratio is nearly unreachable. Use drum rate per day | MEDIUM | E §3.7 M4; Lapp et al. 2023 |
 | E | Feasibility: the feature cube is about 36 GB/yr, while training wants each checklist's own year for 2010–2025 (about 0.5 TB) yet stores only 3–4 key years. These contradict each other | MEDIUM | E §3.5 and §7 Phase 2 |
 | **All, including round-1 A** | Detectability depends on habitat (drumming audibility, visual cover) and none can identify it from eBird. The others accept it as a risk; CYM v2 adds the hunt-log transfer term and the drum-rate check | — | B R3, C R1, D K1, E pre-mortem |

@@ -26,7 +26,7 @@ All five designs now share this core, so this document competes on what they do 
 
 | Adopted | From | Why it is better than what I had |
 |---|---|---|
-| **Pseudo-checklists from GBIF before EBD access arrives.** I verified the fields myself (§3.1): GBIF eBird records carry `recordedBy` (the obsr ID), `eventDate` and coordinates, but no `eventID`, time or effort. | E (idea); C (field claim) | Lets the decisive label test run in week 1 instead of after the 7-day EBD wait. My round-1 day-1 test (F0) used only the target-group pool as a stand-in geometry. |
+| **Verified that the existing GBIF route cannot produce checklists** (no `eventID`, time or effort fields; checked via the GBIF API, §3.1) | C (claim) | Confirms that EBD + Sampling Event Data, which the owner already has, is the only label source. The pseudo-checklist workaround (E) is unnecessary and is not used. |
 | **Effort-expected denominator in top-k lift** (TkL = observed / effort-only-expected detections) | D | My round-1 M3 divided by a raw mean, so hotspot effort could inflate it. D's form cannot be gamed by effort. |
 | **Zero-parameter heuristic baseline H** (share of a 250 m radius in 5–20-year post-cut forest), reported everywhere | A | If a learned model cannot beat H, the learning added nothing. This is the cheapest guard against self-deception. |
 | **Succession clock** (LCMS / Hansen year-of-loss, aged to the target season) and a "peak window" per covert | A, D, E | The hunter needs this season's map, and the clock is deterministic. I had kept the stale LANDFIRE `tsd` only. |
@@ -42,21 +42,22 @@ All five designs now share this core, so this document competes on what they do 
 | Dropped | Why |
 |---|---|
 | A fully convolutional ResNet as the main habitat model | The report shows GBM ≈ CNN. One owner with one GPU should not spend weeks on a trunk whose prior chance of beating a tuned GBM by ≥ 0.01 I put at about 25%. It survives only as an optional last phase. |
-| Round-1 F0 run on the target-group pool geometry | Superseded: the injection–recovery test now runs on real pseudo-checklist geometry. |
+| Round-1 F0 run on the target-group pool geometry | Superseded: the injection–recovery test now runs on real EBD complete-checklist geometry. |
+| Any step that existed only to wait for EBD access | The owner already has EBD + SED access, so every first experiment uses real complete checklists from day 1. |
 | Using the hotspot flag as anything but an effort covariate | See the critique of D in §9. Nothing derived from *location* enters the effort tower. |
 
 ---
 
 ## 1. Title and pitch
 
-**CEM-X: the checklist encounter model, made to prove itself. It predicts grouse encounters per standard October hunting hour per covert, and it is built around one test that can kill it in week 1.**
+**CEM-X: the checklist encounter model, made to prove itself. It predicts grouse encounters per standard October hunting hour per covert, and it is built around one test that can kill it in week 1, on real complete checklists.**
 
 Five designers independently reached the same core, and that agreement is evidence the core is right. The remaining open question is the one the owner actually faces: *will a map trained on effort-explicit checklists send me to more grouse than today's map, and how would I know before I have spent a season finding out?*
 
 CEM-X answers it with three things the other designs lack.
 
-1. **A label-swap cross-play test that runs before EBD access arrives.**
-   - Train the *same* features and the *same* GBM twice: once on today's target-group labels and once on GBIF-derived pseudo-checklist labels.
+1. **A label-swap cross-play test that runs in week 1 on real EBD complete checklists.**
+   - Train the *same* features and the *same* GBM twice: once on today's target-group labels and once on EBD complete-checklist labels (detection/non-detection, with the effort tower).
    - Score both at home, away and on an independent field.
    - Training labels are the only difference, and home advantage is cancelled by design (§5.1).
    - If checklist labels do not win, the core thesis dies in week 1, for all five designs, at the cost of one CPU day.
@@ -102,8 +103,8 @@ CEM-X answers it with three things the other designs lack.
 
 | Source | Status | Role |
 |---|---|---|
-| **GBIF eBird Observation Dataset** (`datasetKey 4fa7b334-…`, the project's existing `sightings.py` route) | **Verified via the GBIF API, 2026-10-05.** Records carry `recordedBy` (e.g. `obsr934582`), `eventDate` (date only), coordinates, `locality` and `individualCount`. `eventID`, `eventTime`, `samplingProtocol` and `samplingEffort` are all **absent**, so C's claim holds. 2020–24 bird records: VT 5.08 M, NH 4.73 M, ME 8.49 M. 2020–24 grouse records: VT 10,524, NH 5,941, ME 13,108 (29.6 k in total, before the pipeline collapses them to 6,232 positives). Grouse records by season: Apr–May 13,822; Jun–Aug 6,850; **Sep–Dec 5,774**; Jan–Mar 3,127. | **Pseudo-checklists for weeks 1–2** (below). |
-| **eBird EBD + Sampling Event Data**, ME/NH/VT, 2016–present | Free, on request; "typically approved within 7 days" (science.ebird.org) | Production labels: true checklists with duration, distance, protocol, observers, time and the `ALL SPECIES REPORTED` flag. |
+| **GBIF eBird Observation Dataset** (`datasetKey 4fa7b334-…`, the project's existing `sightings.py` route) | **Verified via the GBIF API, 2026-10-05.** Records carry `recordedBy` (e.g. `obsr934582`), `eventDate` (date only), coordinates, `locality` and `individualCount`. `eventID`, `eventTime`, `samplingProtocol` and `samplingEffort` are all **absent**, so C's claim holds. 2020–24 bird records: VT 5.08 M, NH 4.73 M, ME 8.49 M. 2020–24 grouse records: VT 10,524, NH 5,941, ME 13,108 (29.6 k in total, before the pipeline collapses them to 6,232 positives). Grouse records by season: Apr–May 13,822; Jun–Aug 6,850; **Sep–Dec 5,774**; Jan–Mar 3,127. | Context only: confirms the existing pipeline cannot build checklists; seasonal counts size the fall head. |
+| **eBird EBD + Sampling Event Data**, ME/NH/VT, 2016–present | **The owner already has access**; download now | Labels from day 1: true checklists with duration, distance, protocol, observers, time and the `ALL SPECIES REPORTED` flag. |
 | Existing 15 layers + `mch_*`, **after the CR-0035 registration repair** | On EC2 | Habitat features (GBM design of `diagnose_gbm_baseline.py`, footprint-averaged). |
 | LCMS v2024-10 fast/slow loss, Hansen GFC v1.12 `lossyear` | Earth Engine (catalog pages verified by A, C and D) | Succession clock: age since last loss, capped at 40 years, aged to the season. Exported on the template lattice with an explicit `crsTransform`; registration gate as in BUG-0094. |
 | AlphaEarth Satellite Embedding V1 (2017–2024, 10 m, 64-d) | Earth Engine (verified by C) | **Optional, gated** input (§3.3). |
@@ -112,20 +113,15 @@ CEM-X answers it with three things the other designs lack.
 | The owner's GPS hunt logs (GPX + flush waypoints) | Collected in season | Independent scorer S3 (the hunter's own estimand), then training data from season 2. |
 | PAD-US 4.x and state lands | Public | Access classes (adopted from D's A1–A4/X scheme). |
 
-**Pseudo-checklists (pre-EBD; E's idea, my verification and filters).**
+**Checklist filtering** (Johnston et al. 2021):
 
-1. Download all Aves records for ME/NH/VT, 2020–2024, through the existing GBIF download path. This is about 18 M rows.
-2. Group by (`recordedBy`, `eventDate`, latitude/longitude rounded to 4 decimals). Each group is a *location-day bag*.
-3. Keep bags with ≥ 8 species, as a proxy for complete checklists.
-4. Set $y=1$ if Ruffed Grouse is in the bag.
+- complete checklists only;
+- Stationary or Traveling protocol;
+- duration 5–300 min; distance ≤ 5 km; ≤ 10 observers;
+- one checklist per `GROUP IDENTIFIER`;
+- $y=1$ if Ruffed Grouse is reported (including "X").
 
-The expected yield is about 0.8–1.2 M bags (**estimate**: 18 M records at about 15–20 species per checklist). These bags have three known defects, and each has a mitigation.
-
-- **No duration or distance.**
-  - The only effort proxies are observer identity, day of year and the observer's out-of-bag average species count.
-  - I deliberately **do not** use the bag's own species count, as E's day-1 plan does. It is habitat-dependent: wetland edges yield more species than closed forest. It also counts the grouse itself. Using it would bias the habitat function (see §9).
-- **Incomplete checklists remain in the sample.** The ≥ 8-species filter reduces but does not remove them. The resulting label noise is one-directional (missed grouse), so it biases *against* the checklist arm of the cross-play test. A pass is therefore conservative.
-- **Footprint unknown.** Use a fixed Gaussian with σ = 400 m. The EBD stage restores per-checklist kernels.
+The checklist's own species count is **not** used as an effort covariate. It depends on the habitat being scored and it counts the grouse itself (see §9, E).
 
 ### 3.2 Estimand
 
@@ -255,7 +251,7 @@ It also adds a time-correct succession clock and a hunter-scale estimand. This i
 
 Each could make a checklist-trained map *look* better on checklist metrics while sending a hunter to trailside woods. CEM-X is the only design that:
 
-1. tests the *label* effect with features and model held fixed, home and away, before EBD access;
+1. tests the *label* effect with features and model held fixed, home and away, in week 1;
 2. measures effort contamination of *today's* map and the new map with pre-registered control species;
 3. evaluates within observers;
 4. keeps location-derived effort out of the effort tower by rule;
@@ -272,7 +268,7 @@ It is also deliberately the cheapest: a GBM in production, CPU-only falsificatio
 | | Scored on T_TG: existing target-group validation set (TG's home) | Scored on HH: checklists in the same validation blocks (CEM's home) | Scored on S1–S3: independent (nobody's home) |
 |---|---|---|---|
 | **M_TG**: same GBM features, target-group labels (`diagnose_gbm_baseline.py`), plus the CNN logit as a second entry | home: AUC ≈ 0.770 (known) | away | neutral |
-| **M_CL**: same features, footprint-averaged, checklist labels (pseudo-checklists, then EBD) | away | home | neutral |
+| **M_CL**: same features, footprint-averaged, EBD complete-checklist labels | away | home | neutral |
 
 **The label effect.** If labels do not matter, M_CL's away deficit on T_TG should be about as large as M_TG's away deficit on HH. If checklist labels carry more grouse information, M_CL loses *less* away than M_TG does.
 
@@ -300,7 +296,7 @@ These are priors and will be replaced by measurements.
 
 | Quantity | Expected | Confidence |
 |---|---|---|
-| Label-swap gap $\Delta_{\text{away}}^{TG}-\Delta_{\text{away}}^{CL}$ with pseudo-checklists | +0.01 to +0.04 | Low |
+| Label-swap gap $\Delta_{\text{away}}^{TG}-\Delta_{\text{away}}^{CL}$ on EBD checklists | +0.01 to +0.05 | Low |
 | Effort-stratified AUC on HH: M_TG / CNN → M_CL-EBD + clock | 0.62–0.70 → 0.68–0.76 | Low–medium. The direction is supported by Johnston et al. (2021); the magnitude is a guess. |
 | Within-observer AUC gain (CL − TG) | about 60% of the stratified-AUC gain survives | Low. If < 30% survives, preferential sampling is a large share of the gain, and I will say so. |
 | TkL₅ on HH (effort-expected denominator) | TG 1.3–1.7×; CEM-X 1.6–2.4× | Low |
@@ -311,8 +307,8 @@ These are priors and will be replaced by measurements.
 
 | Gate | Prior probability of passing |
 |---|---|
-| G1: label thesis passes on pseudo-checklists (week 1) | 0.55 |
-| G2: EBD effort covariates beat pseudo-checklists by ≥ 0.01 on HH | 0.6 |
+| G1: label thesis passes on EBD checklists (week 1) | 0.6 |
+| G2: at least 30% of the HH gain survives within observers (R-PS) | 0.6 |
 | G3: succession clock adds ≥ 0.01 on HH | 0.45. It added +0.001 under TG labels (CR-0032, verified in the repository); under checklist labels it could matter, but that is unproven. |
 | G4: AlphaEarth passes the ablation and the negative-control test | 0.35 |
 | G5: neural tower beats the GBM by ≥ 0.01 | 0.25 |
@@ -324,15 +320,15 @@ The expected value of the project rests on G1 and G2. Everything else is optiona
 
 ## 6. Risks and the falsification ladder
 
-Every step before EBD access runs on CPU on EC2 with data already present, or downloadable via the existing GBIF path. Every step is read-only with respect to `data/` and writes to scratch.
+All first steps run on CPU on EC2, using the EBD/SED download plus data already present. Every step is read-only with respect to `data/` and writes to scratch.
 
 | Step | When | Test | Kills or changes |
 |---|---|---|---|
-| **T0: injection–recovery on real pseudo-checklist geometry** | Day 1–2 | Plant two synthetic species into real location-day bags: (i) a CEM-shaped hazard truth; (ii) a pure thinned-IPP truth, which is where the target-group pipeline is correctly specified. Run both pipelines and the cross-play matrix. | If the target-group pipeline recovers truth (i) within 0.02 Spearman of CEM, the estimand argument is weak and the gain must come from volume. This also **calibrates the home-advantage symmetry assumption** of §5.1. |
-| **T1: label-swap cross-play** (the decisive one) | Day 2–4 | The §5.1 matrix with pseudo-checklists | **Fails → stop the checklist programme for all designs.** The remaining value is field validation and the product layer on today's map. |
-| T2: effort-contamination audit of today's map | Day 2–4 (parallel) | Control species (R-EL) + D's effort probe + share of the top 5% near hotspots | No kill. It quantifies how much of today's map is birding; a high index strengthens G1's motivation. |
+| **T0: injection–recovery on real checklist geometry** | Day 2–3 | Plant two synthetic species into real EBD checklists (real locations, effort and observers): (i) a CEM-shaped hazard truth; (ii) a pure thinned-IPP truth, which is where the target-group pipeline is correctly specified. Run both pipelines and the cross-play matrix. | If the target-group pipeline recovers truth (i) within 0.02 Spearman of CEM, the estimand argument is weak and the gain must come from volume. This also **calibrates the home-advantage symmetry assumption** of §5.1. |
+| **T1: label-swap cross-play** (the decisive one) | Day 3–5 | The §5.1 matrix with EBD checklists, plus R-PS within-observer AUC | **Fails → stop the checklist programme for all designs.** The remaining value is field validation and the product layer on today's map. |
+| T2: effort-contamination audit of today's map | Day 3–5 (parallel) | Control species (R-EL) + D's effort probe + share of the top 5% near hotspots | No kill. It quantifies how much of today's map is birding; a high index strengthens G1's motivation. |
 | T3: freshness audit (D's E2) | Day 3 | Share of today's top 5% cut in 2023–24 or older than 30 years by 2026 | No kill. It sizes the value of the clock. |
-| T4: EBD stage-1 | Week 2–3 | M_CL-EBD vs M_CL-pseudo vs M_TG on HH, plus R-PS and R-EL | Gate G2. If within-observer AUC shows no gain, the product ships with all coverts badged "unverified". |
+| T4: full stage-1 | Week 2–3 | GBM-cloglog with per-checklist footprints and observer effects vs M_TG and the CNN on HH, plus R-PS and R-EL | Gate G2. If within-observer AUC shows no gain, the product ships with all coverts badged "unverified". |
 | T5: independent scorers | When obtained | S1 GMNF acoustic site detection rates (Spearman vs covert $\Lambda^\star$); S2 NH regions (leave-one-region-out) | Decisive for any public claim. |
 | T6: field season | Oct–Nov | Randomised fifth-covert arm | Product-level truth |
 
@@ -341,7 +337,7 @@ Every step before EBD access runs on CPU on EC2 with data already present, or do
 | Risk | Severity | Mitigation |
 |---|---|---|
 | Home-advantage symmetry fails | MAJOR | Checked by T0; independent scorers S1–S3 decide |
-| Pseudo-checklist noise (incomplete lists, no effort) masks a real label effect | MEDIUM | The bias is conservative (§3.1); T4 repeats the test with EBD |
+| EBD schema differs from expectations (column or protocol names change between releases) | LOW | Schema assertions in the ingest acceptance script |
 | Preferential sampling | MAJOR | R-PS: within-observer AUC, drop-targeters, repeat-visit check |
 | Detectability depends on habitat | MAJOR | Fall head; spring/fall badge; hunter $W(s)$ from the owner's logs |
 | Embedding or infrastructure leakage | MEDIUM | AlphaEarth admitted only if it passes R-EL |
@@ -357,17 +353,16 @@ Each item is its own CR under `CLAUDE.md` §1, following A5 (one independently l
 
 | When | Work | Compute |
 |---|---|---|
-| **Day 0** | Request EBD + SED. Email the USGS VT Coop Unit (GMNF coordinates), NH F&G (regional tables) and ME IF&W / VT F&W. Commit `eval_crossplay.py` with HH, metrics and gates (acceptance CR). | none |
-| **Day 1** | GBIF download of all Aves in ME/NH/VT 2020–24 (reusing the `sightings.py` request code with a class filter instead of the species filter). Build `pseudo_checklists.parquet`. | CPU, about 2 h |
-| **Day 1–2** | T0 injection–recovery (`inv_cem_injection.py`) | CPU |
-| **Day 2–4** | Footprint-averaged features through the existing patch reader (`diagnose_gbm_baseline.py` design, 7-point stencil). Run **T1 cross-play**, **T2** and **T3**. | CPU, with the patch cache on EC2 |
-| **Week 2–3** | EBD ingest (`ebird_checklists.py`, pandas chunked); GBM-cloglog with the effort tower; R-PS, R-EL; **T4** | CPU/GPU, hours |
+| **Day 1** | Download the EBD (Ruffed Grouse, ME/NH/VT) and the SED. Build `checklists.parquet` with `ebird_checklists.py` (pandas, chunked): filter, zero-fill, dedupe groups, attach blocks and HH flags, and report volumes and the grouse rate. Commit `eval_crossplay.py` with HH, metrics and gates (acceptance CR). Email the USGS VT Coop Unit (GMNF coordinates), NH F&G (regional tables), and ME IF&W / VT F&W. | CPU, a few hours |
+| **Day 2–3** | Footprint-averaged features through the existing patch reader (`diagnose_gbm_baseline.py` design, 7- or 13-point stencil). T0 injection–recovery (`inv_cem_injection.py`). | CPU |
+| **Day 3–5** | **T1 cross-play** (simple effort GAM + GBM habitat), with **T2** and **T3** in parallel | CPU |
+| **Week 2–3** | Full GBM-cloglog custom objective with observer effects; R-PS, R-EL; **T4** | CPU/GPU, hours |
 | **Week 3–4** | Succession-clock export (GEE, registration-gated); fall head; gate G3; optional AlphaEarth (G4) | GEE + CPU |
 | **Week 5** | Covert generation, access classes, cards, recommender, ledger (`covert_cards.py`) | CPU |
 | **Season** | Field use with the randomised arm; log ingestion | — |
 | **Optional** | Per-pixel MLP (E), then the FCN ResNet (round-1 B) on the single GPU; G5 | GPU, days |
 
-**First experiment within a day:** the Day-1 GBIF pull and T0. The cross-play result (T1) follows by day 4, and it needs nothing from eBird's approval queue.
+**First experiment within a day:** the Day-1 EBD/SED ingest, with checklist volume and grouse-rate counts. T0 follows on days 2–3, and the decisive cross-play result (T1) by day 5.
 
 ---
 
@@ -409,6 +404,6 @@ Each entry names the strongest flaw I could substantiate. I have tried not to at
 | C (second) | The kill test "FLUSH-LF ≤ CNN + 0.01 on H" is scored only on checklists, so it has home advantage | MEDIUM | M_CL is trained on the label process it is scored on, while the CNN is scored away. That favours FLUSH by an unknown amount. CEM-X's cross-play matrix fixes this. | — |
 | **D: COVERT** | **Location-derived "birder-ness" covariates are placed in the effort/detection term $g$:** distance to hotspot, distance to marked trail, checklist density within 1 km. They are set to "median non-hotspot forest" at prediction. A gradient-reversal adversary also pushes $f$ to be uninformative about log checklist density. | MAJOR (D sweeps $\lambda_{adv}$ including 0, and selects using independent data, so it is not BLOCKING) | Checklist density and hotspot distance are habitat-correlated. Big, remote forest has low checklist density, and NH F&G and the report (§1.7) say grouse densities are highest in the north, where eBird effort is lowest. Scenario: $g$ learns "low checklist density → higher detection" (it is really habitat). $f$ loses that signal, and fixing $w^\star$ at a single median puts it back only as a constant. The adversary actively removes a true habitat–effort correlation and down-ranks remote north-woods coverts. PAL works precisely because its bias tower sees *only* position. | Effort-expected TkL; GMNF acoustic scorer; randomised 5th covert; access classes A1–A4/X; fall head; custom LightGBM cloglog objective; E1/E2 audits |
 | D (second) | A Royle–Nichols disk average with radius $\max(150, \ell/2)$ and spatial subsampling to 1 checklist per 3 km × week | LOW | The subsampling throws away most non-detections. That is defensible for variance but costly at the 3-state scale; C and E use a cap of k > 1. | — |
-| **E: FLUSH-E** | **The day-1 pre-EBD experiment uses the pseudo-checklist's own species count as the effort proxy.** | MAJOR (for its first test only; the production design is sound) | Species count is post-treatment: it depends on the very habitat being scored (edges and wetlands yield more species than closed forest) and it counts the grouse itself. Scenario: conditioning on it makes footprint habitat features look *more* predictive in closed forest, where low species counts co-occur with grouse. That inflates arm (b) and can produce a false "supported" result on day 1. Its comparison of (a) a CNN score with one coefficient against (b) a GBM fitted on checklists also has home advantage. I verified that GBIF lacks `eventID` and time, so E's grouping fallback is the only route, and it works. | Pseudo-checklists (my verification); placebo species, recast as positive and negative controls; succession-clock bins; per-pixel MLP option; importance-weighted evaluation; 25 km hexagons |
+| **E: FLUSH-E** | **Its day-1 experiment uses the checklist's own species count as the effort proxy.** EBD access makes its pseudo-checklist route unnecessary, but the proxy problem carries over if species count is kept as an effort covariate. | MEDIUM (first test only; the production design is sound) | Species count is post-treatment: it depends on the very habitat being scored (edges and wetlands yield more species than closed forest) and it counts the grouse itself. Scenario: conditioning on it makes footprint habitat features look *more* predictive in closed forest, where low species counts co-occur with grouse. That inflates arm (b) and can produce a false "supported" result on day 1. Its comparison of (a) a CNN score with one coefficient against (b) a GBM fitted on checklists also has home advantage. I verified that GBIF lacks `eventID` and time. | Placebo species, recast as positive and negative controls; succession-clock bins; per-pixel MLP option; importance-weighted evaluation; 25 km hexagons |
 | E (second) | The claim that within-location repeat visits identify ρ separately from λ needs closure across visits | LOW | It is irrelevant to ranking, which E itself says, but it overstates what the checklist data can identify. | — |
-| **B round 1 (self-critique)** | The main model was a fully convolutional ResNet on tiles, which costs weeks of GPU work for a prior gain I now put at about 25%. Day-1 F0 ran on target-group geometry. The M3 lift denominator could be gamed by effort. | MAJOR (self) | Fixed in §0: GBM main model, F0 replaced by T0/T1 on pseudo-checklists, D's TkL adopted. | — |
+| **B round 1 (self-critique)** | The main model was a fully convolutional ResNet on tiles, which costs weeks of GPU work for a prior gain I now put at about 25%. Day-1 F0 ran on target-group geometry. The M3 lift denominator could be gamed by effort. | MAJOR (self) | Fixed in §0: GBM main model, F0 replaced by T0/T1 on real EBD checklists, D's TkL adopted. | — |

@@ -27,6 +27,10 @@ that cannot fail can never report PASS.
                       in every feature and the count bands
                       control (pilot): the same blocks computed with pad 0,
                       which must differ; (self-test): one perturbed cell
+    C9 steep ground   (W3) leave-one-out ground-Z RMSE of the pinned IDW on
+                      steep ground (slope >= 0.30) <= LOO_MAX_M, from the
+                      generator's W3_hag_loo.json
+                      control: the nearest-1 predictor (no distance limit)
     C7, C8            OBS only (project offsets, throughput) - reported by
                       the generator's pilot log, never gating here.
 
@@ -35,7 +39,8 @@ Usage (repository root):
     python check_lidar_structure.py --pilot /tmp/lidar_pilot --region NH
 
 Pilot directory layout (written by generate_lidar_structure.py --pilot):
-    {W}_{feature}.tif       W in W1, W2, W3; features LIDAR_FEATURES
+    {W}_{feature}.tif       W in W1..W4; features LIDAR_FEATURES
+    W3_hag_loo.json         C9 evidence (generate_lidar_structure.hag_loo)
     {W}_lidar_meta.tif      bands: year, doy, n_returns, n_ground,
                             n_nohag, work-unit index
     W2seam_{feature}.tif, W2seam_lidar_meta.tif
@@ -67,6 +72,8 @@ PERM_Q = 99.0                 # C4: real contrast must exceed this
 MIN_CELLS = 200               # C3/C4 minimum cells per group, else FAIL
 MIN_COVERAGE = 0.99           # C5
 FOREST_NLCD = (41, 42, 43)
+LOO_MAX_M = 0.5               # C9 steep-ground RMSE limit, metres
+LOO_MIN_N = 500               # C9 minimum steep ground points
 NODATA = -9999
 
 LIDAR_FEATURES = ("lid_u05_2", "lid_u1_3", "lid_u3_5", "lid_u5_10",
@@ -207,6 +214,15 @@ def check_seam(a, b):
     bad = [k for k in a if k not in b or a[k].shape != b[k].shape
            or not np.array_equal(a[k], b[k])]
     return not bad, "bit-identical" if not bad else f"differs: {bad}"
+
+
+def check_loo(loo, key):
+    """C9: RMSE of predictor `key` on steep ground <= LOO_MAX_M."""
+    st = loo.get("steep") or {}
+    n, v = int(st.get("n") or 0), st.get(key)
+    ok = n >= LOO_MIN_N and v is not None and v <= LOO_MAX_M
+    return ok, (f"steep RMSE {v} m over {n} ground points "
+                f"(need <= {LOO_MAX_M} and n >= {LOO_MIN_N})")
 
 
 def gate(name, real, control):
@@ -397,7 +413,7 @@ def pilot(directory, region):
     from models import TSD_MAX_YEARS, road_dist_decode, tsd_decode
     rd = GrouseData()[region]
     ok = True
-    for W in ("W1", "W2", "W3"):
+    for W in ("W1", "W2", "W3", "W4"):
         meta_p = os.path.join(directory, f"{W}_lidar_meta.tif")
         if not os.path.exists(meta_p):
             print(f"{W}: missing {meta_p} - FAIL")
@@ -422,6 +438,9 @@ def pilot(directory, region):
         ch = _read_ref_window(rd, "ch", yr, src).astype(np.float64)
         cc = _read_ref_window(rd, "cc", yr, src).astype(np.float64)
         tsd = tsd_decode(_read_ref_window(rd, "tsd", yr, src))
+        used = {f: rd.raster_path(f, yr) for f in ("ch", "cc", "tsd", "nlcd")}
+        print("   reference rasters used: " + ", ".join(
+            f"{k}={os.path.basename(v)}" for k, v in used.items()))
         rraw = _read_ref_window(rd, "road_dist", yr, src)
         road = (road_dist_decode(rraw) <= ROAD_M) & (rraw != NODATA)
         w = dict(road=road, forest=forest, tsd=tsd, tsd_cap=TSD_MAX_YEARS,
@@ -433,6 +452,12 @@ def pilot(directory, region):
         if W == "W1":
             ok &= run_checks(w)
             continue
+        if W == "W4":       # C2 on a rockyweb (native-CRS) source
+            for f, layer, vv in (("lid_wcov5", w["wcov"], w["v_wcov"]),
+                                 ("lid_p95", w["p95"], w["v_p95"])):
+                ok &= gate(f"C2 {f}", check_registration(layer, vv, road),
+                           check_registration(shift_one(layer, 0),
+                                              shift_one(vv, False), road))
         v = vf["lid_p95"]
         for u in gated_units(forest, wu)[0]:
             m = wu == u
@@ -440,6 +465,17 @@ def pilot(directory, region):
                        check_height(as_feet(w["p95"]), ch, forest & m, v))
         ok &= gate("C5 coverage", check_coverage(v, forest, wu),
                    check_coverage(drop_unit(v, wu, forest), forest, wu))
+        if W == "W3":
+            lp = os.path.join(directory, "W3_hag_loo.json")
+            if not os.path.exists(lp):
+                print(f"   C9 steep ground: missing {lp} - FAIL")
+                ok = False
+            else:
+                import json
+                with open(lp) as fh:
+                    loo = json.load(fh)
+                ok &= gate("C9 steep ground", check_loo(loo, "rmse_idw"),
+                           check_loo(loo, "rmse_nn1"))
         if W == "W2":
             try:
                 blocks = _read_set(directory, "W2")

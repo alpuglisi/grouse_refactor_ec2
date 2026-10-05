@@ -42,11 +42,13 @@ sys.path.insert(0, _root)
 
 import check_lidar_structure as chk  # noqa: E402
 
-GENERATOR_REQUIRED = False   # deliverable 2 flips this to True
+GENERATOR_REQUIRED = True    # deliverable 2: the generator must import
 _HAVE_GEN = importlib.util.find_spec("generate_lidar_structure") is not None
 _skip_gen = unittest.skipUnless(
     _HAVE_GEN or GENERATOR_REQUIRED,
     "generate_lidar_structure.py lands in CR-0036 deliverable 2")
+# With GENERATOR_REQUIRED the decorator never skips: a missing module is an
+# ImportError in setUpClass, i.e. a failure, never a silent pass.
 
 
 # ----------------------------------------------------------------------
@@ -136,6 +138,14 @@ class GateTests(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("n_returns", msg)
 
+    def test_c9_steep_loo(self):
+        good = {"steep": {"n": 5000, "rmse_idw": 0.25, "rmse_nn1": 0.9},
+                "flat": {"n": 9000, "rmse_idw": 0.08, "rmse_nn1": 0.2}}
+        self.assertTrue(chk.check_loo(good, "rmse_idw")[0])
+        self.assertFalse(chk.check_loo(good, "rmse_nn1")[0])
+        few = {"steep": {"n": 10, "rmse_idw": 0.1, "rmse_nn1": 0.1}}
+        self.assertFalse(chk.check_loo(few, "rmse_idw")[0])
+
     def test_seam_rejects_one_cell(self):
         a = self.w["p95"]
         self.assertTrue(chk.check_seam(a, a.copy())[0])
@@ -165,7 +175,7 @@ def oracle_bin(x, y, transform, shape):
     return out
 
 
-def oracle_hag(x, y, z, is_ground, k, maxdist):
+def oracle_hag(x, y, z, is_ground, k, maxdist, hag_min=-2.0, hag_max=80.0):
     gx, gy, gz = x[is_ground], y[is_ground], z[is_ground]
     hag = np.full(len(x), np.nan)
     for i in range(len(x)):
@@ -184,6 +194,8 @@ def oracle_hag(x, y, z, is_ground, k, maxdist):
             wgt = 1.0 / dd ** 2
             g = (wgt * zz).sum() / wgt.sum()
         hag[i] = z[i] - g
+    noise = ~is_ground & ((hag < hag_min) | (hag > hag_max))
+    hag[noise] = np.nan
     return hag
 
 
@@ -257,7 +269,8 @@ class GeneratorTests(unittest.TestCase):
             x, y, z, g = self._cloud(slope=slope)
             got = self.gen.compute_hag(x, y, z, g)
             exp = oracle_hag(x, y, z, g, self.gen.LIDAR_HAG_K,
-                             self.gen.LIDAR_HAG_MAXDIST_M)
+                             self.gen.LIDAR_HAG_MAXDIST_M,
+                             self.gen.LIDAR_HAG_MIN_M, self.gen.LIDAR_HAG_MAX_M)
             np.testing.assert_allclose(got, exp, rtol=0, atol=1e-9,
                                        equal_nan=True)
 

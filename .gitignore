@@ -80,3 +80,15 @@
 !/docs/quality/evidence/**/*.py
 !/docs/quality/evidence/**/*.json
 !/docs/quality/evidence/**/*.tsv
+
+# 11. CR-0036: the pinned lidar source table, footprints and the conda
+#     environment the lidar generator runs in.
+!/envs/
+!/envs/*.yml
+!/docs/quality/lidar/
+!/docs/quality/lidar/*.csv
+!/docs/quality/lidar/*.geojson
+!/docs/quality/lidar/*.txt
+!/docs/quality/evidence/CR-0036/
+!/docs/quality/evidence/CR-0036/*.csv
+!/docs/quality/evidence/CR-0036/*.json

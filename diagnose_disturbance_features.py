@@ -205,23 +205,30 @@ def derive(raw):
         f[f"lcms_rm20_r{r}"] = np.clip(share, 0, 1)
 
     ly = _num(raw, "gfc_lossyear")                   # 0 none, k -> 2000 + k
+    tc = _num(raw, "gfc_treecover2000")
+    covered = ~np.isnan(tc)
+    # Hansen leaves no-loss pixels MASKED (null), not 0: where the point
+    # has tree-cover data, a null lossyear means "no loss on record".
+    ly = np.where(np.isnan(ly) & covered, 0.0, ly)
     cal = np.where(ly > 0, 2000 + ly, 0)
     cal = np.where(cal <= Y, cal, 0)                 # a later loss is the future
     ys = np.where(cal > 0, Y - cal, NONE_YEARS).astype(float)
     ys[np.isnan(ly)] = np.nan
     f["gfc_ys_loss"] = np.clip(ys, 0, NONE_YEARS)
     shares = []
-    for h, y0 in zip(raw["gfc_hist250"], Y):
+    for h, y0, cov in zip(raw["gfc_hist250"], Y, covered):
         hist = json.loads(h) if isinstance(h, str) and h != "null" else None
         if not hist:
-            shares.append(np.nan)
+            # no unmasked (= lost) pixel within 250 m: share 0 where Hansen
+            # covers the point, unknown otherwise
+            shares.append(0.0 if cov else np.nan)
             continue
         tot = sum(hist.values())
         win = sum(v for k, v in hist.items()
                   if 0 < float(k) and y0 - 20 < 2000 + float(k) <= y0)
         shares.append(win / tot if tot else np.nan)
     f["gfc_loss20_r250"] = shares
-    f["gfc_treecover2000"] = _num(raw, "gfc_treecover2000")
+    f["gfc_treecover2000"] = tc
     return f
 
 

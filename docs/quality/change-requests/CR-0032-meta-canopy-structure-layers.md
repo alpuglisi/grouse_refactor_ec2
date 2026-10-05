@@ -1,9 +1,7 @@
 # CR-0032: Meta 1 m canopy-structure layers as model features
 
-**Status: APPROVAL LAPSED, 2026-10-05** — deliverable 1b failed its bar
-(`docs/quality/evidence/CR-0032/1b_combo_run1.txt`: the four columns at
-30 m radius +0.0033 AUC, bar +0.006). Revision pending the pre-stated
-r30 + r100 measurement (review log § 1b). Verdicts and dispositions:
+**Status: DRAFT v4, 2026-10-05** — revised after deliverable 1b; awaiting
+bounded re-review (round 3). Verdicts and dispositions:
 `CR-0032-review-log.md`. This document states only current intent.
 
 ## Scope
@@ -28,10 +26,16 @@ AUC:
   5 seeds). The share of canopy 5-12 m tall ranked 4th of 92 by
   permutation importance.
 
-The four columns this CR builds (30 m mean and the < 1, 1-5, 5-12 m
-shares) are measured on their own by `diagnose_structure_combo.py` row
-"+ CR-0032 four (r30)" (deliverable 1b). Approval requires that row's
-mean gain to be at least +0.006 AUC; otherwise the layer set is revised.
+The four columns this CR builds (mean and the < 1, 1-5, 5-12 m shares)
+were measured on their own (deliverable 1b, `diagnose_structure_combo.py`,
+5 seeds, evidence in `docs/quality/evidence/CR-0032/`). At the point only
+(30 m radius) they add +0.0033 AUC; with their 100 m-radius versions,
++0.0086 AUC and +0.0117 AP, matching all 12 Meta columns (+0.0089). The
+CNN sees each 30 m layer across its 64 x 64 window, and the 100 m mean and
+shares are area-weighted means of the 30 m cells, so the r30 + r100 row is
+the like-for-like proxy for four 30 m layers (the bar for that row was
+pre-stated before it was run; review log § Deliverable 1b). The CNN
+evaluation (§ Evaluation) decides whether the network realises the gain.
 
 ## The change
 
@@ -230,13 +234,14 @@ directory `docs/quality/evidence/CR-0032/`):**
 3. Evaluation (above).
 
 ## Deliverables
-- [x] 1. This CR, the review log, `tests/test_cr0032.py`,
+- [ ] 1. This CR, the review log, `tests/test_cr0032.py`,
       `check_canopy_structure.py`; two independent reviews; approval
-      (round 2, both APPROVE WITH FOLLOW-UPS; v3 applies them).
-- [ ] 1b. `diagnose_structure_combo.py` "+ CR-0032 four (r30)" result on
-      EC2 (user runs; output in the evidence directory) meets the Why-now
-      bar; approval lapses if it does not (the CR is then revised).
-- [ ] 2. After CR-0033 lands: `generate_canopy_structure.py`, `models.py`
+      (round 2 approved v3; approval lapsed at 1b run 1; v4 awaits a
+      bounded round-3 re-review of the changed text).
+- [x] 1b. Four-column measurement on EC2: r30 alone failed its bar
+      (+0.0033); the pre-stated r30 + r100 bar passed (+0.0086); both
+      runs in the evidence directory.
+- [ ] 2. (CR-0033 landed, `714b325`.) `generate_canopy_structure.py`, `models.py`
       constants/encoders/`FEATURE_SPEC`, `RASTER_FEATURES`; all suites pass.
 - [ ] 3. EC2 pilot, runtime estimate, full generation, gate passes (user
       runs; outputs committed to the evidence directory).
@@ -246,8 +251,9 @@ directory `docs/quality/evidence/CR-0032/`):**
 
 ## Out of scope
 - Airborne lidar (USGS 3DEP); LCMS/Hansen disturbance layers.
-- Neighbourhood (100 m) versions and a height-sd layer (unless 1b says
-  otherwise).
+- Stored neighbourhood (100 m) versions: the CNN derives them from the
+  30 m layers over its window (if § Evaluation fails, a follow-up may test
+  stored 100 m layers). A height-sd layer: no gain in 1b.
 - Batch `Export.image` to Cloud Storage (revisit if the pilot estimate
   exceeds 24 h for all regions).
 - Re-running the `diagnose_*` scripts after registration.

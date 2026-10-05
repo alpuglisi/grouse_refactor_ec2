@@ -100,6 +100,7 @@ fail (M2 now 14 errors, others as before).
 | run | commit | bar | result | outcome |
 |---|---|---|---|---|
 | 1 | `fa8bbc7` | "+ CR-0032 four (r30)" >= +0.006 AUC (5 seeds) | +0.0033 (AUC 0.7726 +/- 0.0035 vs 0.7693); all 12 Meta columns +0.0089, all six r30 +0.0040 | **FAILED: approval lapsed** (`evidence/CR-0032/1b_combo_run1.txt`) |
+| 2 | `a005e58` | "+ CR-0032 four (r30 + r100)" >= +0.006 AUC (5 seeds), pre-stated in code before the run | +0.0086 (AUC 0.7779 +/- 0.0027), AP +0.0117; r100 only +0.0083 | **PASSED** (`evidence/CR-0032/1b_combo_run2.txt`); v4 restates Why now; bounded re-review (round 3) before implementation |
 
 Author's analysis after run 1, recorded as post-hoc: the gain sits in the
 100 m-radius columns. The trees see the new columns only at the point; the

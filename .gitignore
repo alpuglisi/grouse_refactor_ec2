@@ -66,3 +66,6 @@
 !/docs/quality/evidence/CR-0022/*.txt
 !/docs/quality/evidence/CR-0022/*.log
 !/docs/quality/evidence/CR-0022/*.py
+!/docs/quality/evidence/CR-0022/reviewA/
+!/docs/quality/evidence/CR-0022/reviewA/*.txt
+!/docs/quality/evidence/CR-0022/reviewA/*.py

@@ -1,0 +1,195 @@
+CR-0022 deliverable 3: PA-0021(a) wrong-implementation runs (reviewer A)
+commit: e18944d3b80c3707596e31c8dc4fc5ad82d8d092
+python: 3.12.11  numpy: 2.5.2
+date: 2026-10-05T01:21Z
+method: throwaway worktree at e18944d; each variant a minimal edit to the committed train.py (mutate.py), train.py restored with git checkout between variants; suite: python -m unittest tests.test_cr0022
+
+=== CONTROL (unmodified e18944d): tests.test_cr0022
+Ran 15 tests in 0.428s
+OK
+
+=== CONTROL (unmodified e18944d): tests.test_cr0015_sampler
+Ran 12 tests in 35.194s
+OK
+
+=== VARIANT (i) helper ignores years: one year="latest" draw of sum(n_y) points (CR names U1/U2/U7)
+--- diff:
+diff --git a/train.py b/train.py
+index e0ac5ee..d5c67f5 100644
+--- a/train.py
++++ b/train.py
+@@ -266,10 +266,10 @@ def background_for_positives(rd, features, pos_years, ratio, *, seed,
+     want = {int(y): int(round(int(c) * ratio)) for y, c in counts.items()}
+     want = {y: n for y, n in want.items() if n > 0}
+     parts, acc = [], []
+-    for y, n in want.items():
++    if want:
+         df = sample_background_points(
+-            rd, features, n, seed=(int(seed), int(region_i), y),
+-            region=region, train_blocks_only=True, year=y,
++            rd, features, sum(want.values()), seed=(int(seed), int(region_i)),
++            region=region, train_blocks_only=True, year="latest",
+             assignments=assignments, in_state=in_state)
+         acc.append(df.attrs.get("acceptance"))
+         parts.append(df)
+--- result:
+ERROR: test_background_follows_training_positives (tests.test_cr0022.BuildDatasetsWiring.test_background_follows_training_positives)
+ERROR: test_wrong_frame_wired_into_helper_is_caught (tests.test_cr0022.BuildDatasetsWiring.test_wrong_frame_wired_into_helper_is_caught)
+ERROR: test_ratio_one_and_a_half_rounds_per_year (tests.test_cr0022.U1Histogram.test_ratio_one_and_a_half_rounds_per_year)
+ERROR: test_ratio_one_matches_positives_exactly (tests.test_cr0022.U1Histogram.test_ratio_one_matches_positives_exactly)
+ERROR: test_each_row_valid_on_its_years_resolved_raster (tests.test_cr0022.U2ValidatedOnReadRaster.test_each_row_valid_on_its_years_resolved_raster)
+ERROR: test_acceptance_attrs_one_entry_per_year (tests.test_cr0022.U5Determinism.test_acceptance_attrs_one_entry_per_year)
+ERROR: test_same_inputs_same_frame_other_seed_or_region_differs (tests.test_cr0022.U5Determinism.test_same_inputs_same_frame_other_seed_or_region_differs)
+ERROR: test_integral_float_accepted (tests.test_cr0022.U6PositiveYearsRefused.test_integral_float_accepted)
+Ran 15 tests in 0.260s
+FAILED (errors=8)
+
+=== VARIANT (ii) per-year year on rows, validity on the latest raster (CR names U2)
+--- diff:
+diff --git a/train.py b/train.py
+index e0ac5ee..ed7c5c7 100644
+--- a/train.py
++++ b/train.py
+@@ -185,7 +185,7 @@ def sample_background_points(rd, features, n, seed=0, *, region,
+         path = rd.latest_raster_path(feat)
+         year = max(rd.raster_years(feat))
+     else:
+-        path = rd.raster_path(feat, year)   # = dataset.py's per-row resolver
++        path = rd.latest_raster_path(feat)
+     rng = np.random.default_rng(seed)
+     sentinels = np.asarray(NODATA_SENTINELS, dtype=np.float64)
+     lons, lats = [], []
+--- result:
+FAIL: test_each_row_valid_on_its_years_resolved_raster (tests.test_cr0022.U2ValidatedOnReadRaster.test_each_row_valid_on_its_years_resolved_raster)
+Ran 15 tests in 0.303s
+FAILED (failures=1)
+
+=== VARIANT (iii) year="latest" restored as the default (CR names U3)
+--- diff:
+diff --git a/train.py b/train.py
+index e0ac5ee..c0ef090 100644
+--- a/train.py
++++ b/train.py
+@@ -119,7 +119,7 @@ def discover_features(data, regions):
+ 
+ 
+ def sample_background_points(rd, features, n, seed=0, *, region,
+-                             train_blocks_only, year, assignments=None,
++                             train_blocks_only, year="latest", assignments=None,
+                              in_state=None):
+     """n uniformly random locations inside the region's reference
+     raster, kept only where they are valid, in the region's own state
+--- result:
+FAIL: test_missing_year_is_a_type_error (tests.test_cr0022.U3YearKeyword.test_missing_year_is_a_type_error)
+Ran 15 tests in 0.332s
+FAILED (failures=1)
+
+=== VARIANT (iv) one "latest" draw, year column overwritten to match the histogram (CR names U2)
+--- diff:
+diff --git a/train.py b/train.py
+index e0ac5ee..0c187c4 100644
+--- a/train.py
++++ b/train.py
+@@ -266,11 +266,12 @@ def background_for_positives(rd, features, pos_years, ratio, *, seed,
+     want = {int(y): int(round(int(c) * ratio)) for y, c in counts.items()}
+     want = {y: n for y, n in want.items() if n > 0}
+     parts, acc = [], []
+-    for y, n in want.items():
++    if want:
+         df = sample_background_points(
+-            rd, features, n, seed=(int(seed), int(region_i), y),
+-            region=region, train_blocks_only=True, year=y,
++            rd, features, sum(want.values()), seed=(int(seed), int(region_i)),
++            region=region, train_blocks_only=True, year="latest",
+             assignments=assignments, in_state=in_state)
++        df["year"] = [y for y, n in want.items() for _ in range(n)]
+         acc.append(df.attrs.get("acceptance"))
+         parts.append(df)
+     out = (pd.concat(parts, ignore_index=True) if parts else
+--- result:
+ERROR: test_background_follows_training_positives (tests.test_cr0022.BuildDatasetsWiring.test_background_follows_training_positives)
+ERROR: test_wrong_frame_wired_into_helper_is_caught (tests.test_cr0022.BuildDatasetsWiring.test_wrong_frame_wired_into_helper_is_caught)
+FAIL: test_each_row_valid_on_its_years_resolved_raster (tests.test_cr0022.U2ValidatedOnReadRaster.test_each_row_valid_on_its_years_resolved_raster)
+FAIL: test_acceptance_attrs_one_entry_per_year (tests.test_cr0022.U5Determinism.test_acceptance_attrs_one_entry_per_year)
+FAIL: test_sampler_ignoring_year_makes_helper_raise (tests.test_cr0022.U7HelperCheck.test_sampler_ignoring_year_makes_helper_raise)
+Ran 15 tests in 0.246s
+FAILED (failures=3, errors=2)
+
+=== VARIANT (v) build_datasets passes the training negatives' years to the helper (CR names W3)
+--- diff:
+diff --git a/train.py b/train.py
+index e0ac5ee..236cd77 100644
+--- a/train.py
++++ b/train.py
+@@ -429,7 +429,7 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
+             # counts are re-derived here from pos_df itself - independent
+             # of the helper - so a wrong frame wired in cannot pass.
+             bg_df = background_for_positives(
+-                rd, features, pos_df["year"], background_per_pos,
++                rd, features, neg_df["year"], background_per_pos,
+                 seed=seed, region_i=region_i, region=region,
+                 assignments=data.block_assignments)
+             expected = {int(y): int(round(int(c) * background_per_pos))
+--- result:
+ERROR: test_background_follows_training_positives (tests.test_cr0022.BuildDatasetsWiring.test_background_follows_training_positives)
+Ran 15 tests in 0.316s
+FAILED (errors=1)
+
+=== VARIANT (x1, reviewer extra) validity on raster_path(..., validate=False): no empty-placeholder fallback (expected U2)
+--- diff:
+diff --git a/train.py b/train.py
+index e0ac5ee..2ec7847 100644
+--- a/train.py
++++ b/train.py
+@@ -185,7 +185,7 @@ def sample_background_points(rd, features, n, seed=0, *, region,
+         path = rd.latest_raster_path(feat)
+         year = max(rd.raster_years(feat))
+     else:
+-        path = rd.raster_path(feat, year)   # = dataset.py's per-row resolver
++        path = rd.raster_path(feat, year, validate=False)   # = dataset.py's per-row resolver
+     rng = np.random.default_rng(seed)
+     sentinels = np.asarray(NODATA_SENTINELS, dtype=np.float64)
+     lons, lats = [], []
+--- result:
+ERROR: test_each_row_valid_on_its_years_resolved_raster (tests.test_cr0022.U2ValidatedOnReadRaster.test_each_row_valid_on_its_years_resolved_raster)
+Ran 15 tests in 0.336s
+FAILED (errors=1)
+
+=== VARIANT (x2, reviewer extra) validity on the exact-year file path, no nearest-year resolution (expected U2)
+--- diff:
+diff --git a/train.py b/train.py
+index e0ac5ee..49f19f9 100644
+--- a/train.py
++++ b/train.py
+@@ -185,7 +185,7 @@ def sample_background_points(rd, features, n, seed=0, *, region,
+         path = rd.latest_raster_path(feat)
+         year = max(rd.raster_years(feat))
+     else:
+-        path = rd.raster_path(feat, year)   # = dataset.py's per-row resolver
++        path = rd.path("raster", feature=feat, year=year)   # = dataset.py's per-row resolver
+     rng = np.random.default_rng(seed)
+     sentinels = np.asarray(NODATA_SENTINELS, dtype=np.float64)
+     lons, lats = [], []
+--- result:
+ERROR: test_each_row_valid_on_its_years_resolved_raster (tests.test_cr0022.U2ValidatedOnReadRaster.test_each_row_valid_on_its_years_resolved_raster)
+Ran 15 tests in 0.260s
+FAILED (errors=1)
+
+=== ASSESSMENT
+Control: tests.test_cr0022 15/15 OK; tests.test_cr0015_sampler 12/12 OK.
+Every variant fails or errors at least one test (none passes the suite).
+Against the tests the CR Test plan NAMES:
+  (i)   names U1/U2/U7: U1 x2 and U2 error (the helper's RuntimeError); U7 PASSES - U7 asserts that
+        RuntimeError, and the helper's own check (left intact) raises it. CR text overstates U7.
+  (ii)  names U2: U2 fails. Match.
+  (iii) names U3: U3 missing-year fails. Match.
+  (iv)  names U2: U2 fails (also U5, U7, W1, W3). Match.
+  (v)   names W3: W3 PASSES; W1 errors instead. W3 asserts that build_datasets raises RuntimeError
+        when a wrong frame is wired in, and under (v) the independent build_datasets check raises
+        exactly that - so the gate fires, but the test that detects the mutant is W1, not W3.
+  x1, x2 (reviewer extras): U2 errors (2023 empty-placeholder undersupply / missing 2021 file).
+Detection is sound for every mutant; the CR Test plan's mapping is wrong for (v) and partly for (i).
+Correct text: (i) -> U1, U2 (+U5, U6, W1, W3 errors via the helper check); (v) -> W1 (via the
+build_datasets RuntimeError, the check W3 exercises).
+
+WRONG-IMPL RUNS: FAIL (literal rule: variant (v) does not fail its CR-named test W3; every variant is nevertheless detected - correct the CR's test mapping for (i) and (v) and re-state the verdict)

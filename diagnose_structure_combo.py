@@ -109,7 +109,15 @@ def main():
     # sd added, against all 12 Meta columns.
     mch4 = ["meta_mean_r30", "meta_f0_1_r30", "meta_f1_5_r30",
             "meta_f5_12_r30"]
+    # The CNN sees a 30 m layer over its whole 64 x 64 window, so it can
+    # rebuild the 100 m-radius mean and shares (area-weighted means of the
+    # 30 m cells); the trees cannot. Pre-stated bar for CR-0032 (1b v2,
+    # 2026-10-05, set before this row was run): "+ CR-0032 four (r30 +
+    # r100)" >= +0.006 AUC, mean of 5 seeds.
+    mch4_100 = [c.replace("_r30", "_r100") for c in mch4]
     combos = (("today's features", []),
+              ("+ CR-0032 four (r30 + r100)", mch4 + mch4_100),
+              ("+ CR-0032 four (r100 only)", mch4_100),
               ("+ CR-0032 four (r30)", mch4),
               ("+ CR-0032 four + sd", mch4 + ["meta_sd_r30"]),
               ("+ Meta r30 (all 6)", [c for c in meta if c.endswith("_r30")]),
@@ -121,7 +129,7 @@ def main():
     for label, cs in combos:
         m, sd, p = dlf.trees(Xtr, Xva, is_cat, F, idx(cs), ytr, yva, args.seeds)
         base = m if base is None else base
-        print(f"  {label:26s} {Xtr.shape[1] + len(cs):3d} features  AUC "
+        print(f"  {label:29s} {Xtr.shape[1] + len(cs):3d} features  AUC "
               f"{m:.4f} +/- {sd:.4f}  AP {p:.4f}  (vs today {m - base:+.4f})")
 
     if args.importance:

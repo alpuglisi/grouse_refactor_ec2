@@ -1,13 +1,10 @@
 # CR-0032: Meta 1 m canopy-structure layers as model features
 
-**Status: APPROVED WITH FOLLOW-UPS (v3), 2026-10-05**, conditional on
-deliverable 1b meeting the Why-now bar. Round 2: both reviewers APPROVE
-WITH FOLLOW-UPS; follow-ups applied in v3.
-Verdicts and dispositions: `CR-0032-review-log.md`. This document states
-only current intent.
-
-**Depends on CR-0033** (split window mask pinned to the acceptance
-feature list). Deliverable 2 does not land before CR-0033 does.
+**Status: APPROVAL LAPSED, 2026-10-05** — deliverable 1b failed its bar
+(`docs/quality/evidence/CR-0032/1b_combo_run1.txt`: the four columns at
+30 m radius +0.0033 AUC, bar +0.006). Revision pending the pre-stated
+r30 + r100 measurement (review log § 1b). Verdicts and dispositions:
+`CR-0032-review-log.md`. This document states only current intent.
 
 ## Scope
 Add four static 30 m raster features, aggregated from the Meta/WRI 1 m

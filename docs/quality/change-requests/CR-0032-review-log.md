@@ -95,3 +95,20 @@ CR-0033 trial: `SPLIT_WINDOW_FEATURES` + loop change makes
 
 Trial implementation re-run against v3 tests: 25/25 pass; mutants M1-M8
 fail (M2 now 14 errors, others as before).
+
+## Deliverable 1b
+| run | commit | bar | result | outcome |
+|---|---|---|---|---|
+| 1 | `fa8bbc7` | "+ CR-0032 four (r30)" >= +0.006 AUC (5 seeds) | +0.0033 (AUC 0.7726 +/- 0.0035 vs 0.7693); all 12 Meta columns +0.0089, all six r30 +0.0040 | **FAILED: approval lapsed** (`evidence/CR-0032/1b_combo_run1.txt`) |
+
+Author's analysis after run 1, recorded as post-hoc: the gain sits in the
+100 m-radius columns. The trees see the new columns only at the point; the
+CNN sees a 30 m layer over its 64 x 64 window, and the 100 m mean and
+shares are area-weighted means of the 30 m cells, so the CNN can rebuild
+them. The like-for-like proxy for four 30 m layers is therefore the four
+at r30 **plus** r100. Because this was noticed after a failed result, the
+new bar is pre-stated in code before the run (`diagnose_structure_combo.py`
+comment, commit below): **"+ CR-0032 four (r30 + r100)" >= +0.006 AUC, mean
+of 5 seeds**. If it fails, the layer set is redesigned; if it passes, CR-0032
+is revised (Why now restated) and goes to a bounded re-review before any
+implementation. The CNN 3 + 3 evaluation remains the decider.

@@ -157,7 +157,11 @@ RASTER_FEATURES = ["evt", "evh", "evc", "sclass", "fdist", "ch", "cc",
                    # that keeps a file present for every year the rest of
                    # the stack has, which is what stops these features
                    # from shrinking the year-gap filter's retention.
-                   "balive", "tpa_live", "qmd", "carbon_dwn"]
+                   "balive", "tpa_live", "qmd", "carbon_dwn",
+                   # generate_canopy_structure.py (CR-0032): Meta 1 m
+                   # canopy height aggregated to 30 m. Static, written
+                   # once per available year like road_dist.
+                   "mch_mean", "mch_f01", "mch_f15", "mch_f512"]
 
 # Year-matching policy: a sighting's year resolves to the exact raster
 # year when present, else the CLOSEST year (ties -> earlier year, i.e.

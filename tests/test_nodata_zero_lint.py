@@ -60,6 +60,12 @@ ALLOWLIST = {
         "excluded by the separate `valid` mask it is indexed with, and 0 is "
         "a real reading (PA-0028) that the test deliberately counts as a "
         "boundary value.",
+    ("generate_canopy_structure.py", "(valid > 0) & (valid < 1)"):
+        "CR-0032 deliverable 2 (A2-1): pilot diagnostic counting cells whose "
+        "raw validity FRACTION lies strictly inside (0, 1) - the evidence "
+        "that the validity band was aggregated; a printed statistic, not a "
+        "mask, and `valid` is a 0-1 fraction where 0 means 'no source "
+        "pixel', not an encoded reading.",
     ("tests/test_cr0032.py", "[123, 0, NODATA, NODATA, NODATA]"):
         "CR-0032 review B2-1: expected encoder output in a test, where 0 is "
         "the encoded reading of a 0 m cell (PA-0028: 0 is a valid reading) "

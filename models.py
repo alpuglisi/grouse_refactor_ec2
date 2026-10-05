@@ -595,6 +595,15 @@ FEATURE_SPEC = {
     "tpa_live":   {"kind": "continuous", "scale": 10000.0},
     "qmd":        {"kind": "continuous", "scale": 1000.0},
     "carbon_dwn": {"kind": "continuous", "scale": 500.0},
+    # Meta/WRI 1 m canopy height aggregated to 30 m (CR-0032,
+    # generate_canopy_structure.py; encoders below): mean height in
+    # decimetres, and the per mille shares of 1 m pixels < 1 m, 1-5 m and
+    # 5-12 m tall. Fine-scale structure (gaps, sapling and pole patches)
+    # the 30 m LANDFIRE/TreeMap layers blur. Static (one imagery epoch).
+    "mch_mean": {"kind": "continuous", "scale": 300.0},
+    "mch_f01": {"kind": "continuous", "scale": 1000.0},
+    "mch_f15": {"kind": "continuous", "scale": 1000.0},
+    "mch_f512": {"kind": "continuous", "scale": 1000.0},
 }
 
 # ---- road_dist encoding ------------------------------------------------
@@ -681,6 +690,46 @@ def tsd_decode(stored):
     """Stored int16 units -> years. Inverse of tsd_encode."""
     import numpy as _np
     return _np.expm1(_np.asarray(stored, dtype=_np.float64) / TSD_LOG_SCALE)
+
+
+# =======================================================================
+# Meta 1 m canopy structure (mch_mean / mch_f01 / mch_f15 / mch_f512)
+# =======================================================================
+# CR-0032. Per 30 m cell, from the valid 1 m pixels of the Meta/WRI
+# canopy-height map: mean height (decimetres) and the shares of pixels in
+# MCH_BIN_EDGES_M bins (per mille; the >= 12 m share is 1000 minus the
+# three). A cell is nodata unless MCH_MIN_VALID_FRAC of its pixels are
+# valid; a mean above MCH_HEIGHT_MAX_M is a source artefact and is written
+# as nodata by the generator, never clipped (PA-0034). 0 is a real
+# reading for every one of the four (PA-0028).
+MCH_BIN_EDGES_M = (1.0, 5.0, 12.0)
+MCH_MIN_VALID_FRAC = 0.5
+MCH_HEIGHT_MAX_M = 60.0
+
+
+def mch_height_encode(metres):
+    """Metres -> int16 decimetres. Finite input only; rounds, then refuses
+    a stored value outside 0..MCH_HEIGHT_MAX_M*10 (no clipping)."""
+    import numpy as _np
+    d = _np.rint(_finite(metres, "mch_height_encode") * 10.0)
+    if ((d < 0) | (d > MCH_HEIGHT_MAX_M * 10.0)).any():
+        raise ValueError(f"mch_height_encode: "
+                         f"{int(((d < 0) | (d > MCH_HEIGHT_MAX_M * 10)).sum())} "
+                         f"value(s) outside 0-{MCH_HEIGHT_MAX_M:g} m")
+    return d.astype(_np.int16)
+
+
+def mch_share_encode(fraction):
+    """Fraction of pixels -> int16 per mille. Finite input only; rounds,
+    then refuses a stored value outside 0..1000, so a float32 mean a hair
+    outside [0, 1] is kept and a real out-of-range value is refused."""
+    import numpy as _np
+    p = _np.rint(_finite(fraction, "mch_share_encode") * 1000.0)
+    if ((p < 0) | (p > 1000)).any():
+        raise ValueError(f"mch_share_encode: "
+                         f"{int(((p < 0) | (p > 1000)).sum())} value(s) "
+                         f"outside [0, 1]")
+    return p.astype(_np.int16)
 
 
 # =======================================================================

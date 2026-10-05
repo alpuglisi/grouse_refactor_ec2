@@ -141,7 +141,7 @@ def recompute(ee, rows, cols, transform, crs_wkt):
     coll = ee.ImageCollection(MCH_ASSET)
     first = coll.first()
     native = first.projection()
-    h = coll.mosaic().setDefaultProjection(native)
+    h = coll.mosaic().select([0]).setDefaultProjection(native)
     img = ee.Image.cat([
         h.rename("h"), h.lt(1).rename("f01"),
         h.gte(1).And(h.lt(5)).rename("f15"),

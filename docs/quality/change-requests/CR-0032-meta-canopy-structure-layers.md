@@ -248,8 +248,12 @@ directory `docs/quality/evidence/CR-0032/`):**
 - [x] 1b. Four-column measurement on EC2: r30 alone failed its bar
       (+0.0033); the pre-stated r30 + r100 bar passed (+0.0086); both
       runs in the evidence directory.
-- [ ] 2. (CR-0033 landed, `714b325`.) `generate_canopy_structure.py`, `models.py`
-      constants/encoders/`FEATURE_SPEC`, `RASTER_FEATURES`; all suites pass.
+- [x] 2. (CR-0033 landed, `714b325`.) `generate_canopy_structure.py`,
+      `models.py` constants/encoders/`FEATURE_SPEC`, `RASTER_FEATURES`;
+      all suites pass (`test_cr0032` 25, `test_cr0033`, both lints,
+      `test_shared_constants`, and 16 further suites: 417 tests, 6
+      skipped for missing real data); PA-0035 sweep 0 hits; one PA-0028
+      allowlist entry (pilot statistic, reviewed in the code review).
 - [ ] 3. EC2 pilot, runtime estimate, full generation, gate passes (user
       runs; outputs committed to the evidence directory).
 - [ ] 4. Evaluation (3 + 3 runs) and the keep/remove decision recorded.

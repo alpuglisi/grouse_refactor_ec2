@@ -61,11 +61,11 @@
 !/docs/quality/evidence/CR-0021/live/*.json
 !/docs/quality/evidence/CR-0021/live/*.sha256
 
-# 11. CR-0022: reviewer's wrong-implementation runs and the EC2 smoke log.
-!/docs/quality/evidence/CR-0022/
-!/docs/quality/evidence/CR-0022/*.txt
-!/docs/quality/evidence/CR-0022/*.log
-!/docs/quality/evidence/CR-0022/*.py
-!/docs/quality/evidence/CR-0022/reviewA/
-!/docs/quality/evidence/CR-0022/reviewA/*.txt
-!/docs/quality/evidence/CR-0022/reviewA/*.py
+# 11. CR-0031: reviewer's wrong-implementation runs and the EC2 smoke log.
+!/docs/quality/evidence/CR-0031/
+!/docs/quality/evidence/CR-0031/*.txt
+!/docs/quality/evidence/CR-0031/*.log
+!/docs/quality/evidence/CR-0031/*.py
+!/docs/quality/evidence/CR-0031/reviewA/
+!/docs/quality/evidence/CR-0031/reviewA/*.txt
+!/docs/quality/evidence/CR-0031/reviewA/*.py

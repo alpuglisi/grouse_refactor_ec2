@@ -1,13 +1,13 @@
-"""CR-0022: background assumed-negatives take the training positives' years
+"""CR-0031: background assumed-negatives take the training positives' years
 (BUG-0074). Synthetic rasters only; no data/ access.
 
 Written before approval (CR-0011 A3) and reviewed with the CR. Every test
-except BuildDatasetsWiring.test_off_by_default fails until CR-0022
+except BuildDatasetsWiring.test_off_by_default fails until CR-0031
 deliverable 2 lands (`sample_background_points(year=...)`,
 `background_for_positives`, the build_datasets check).
 
 Run with
-    python -m unittest tests.test_cr0022
+    python -m unittest tests.test_cr0031
 """
 import hashlib
 import os
@@ -29,9 +29,9 @@ from grouse_data import DataConfig, RegionData  # noqa: E402
 
 W, N, RES, SIZE = -71.5, 44.6, 0.001, 100
 NODATA = -9999
-# Digests of sample_background_points' output at 9bb1636 (before CR-0022)
+# Digests of sample_background_points' output at 9bb1636 (before CR-0031)
 # on build_fixture(), in_state=everywhere: {(train_blocks_only, seed, n):
-# sha256 of digest_frame(df)}. CR-0022 §2 A: year="latest" must reproduce
+# sha256 of digest_frame(df)}. CR-0031 §2 A: year="latest" must reproduce
 # them exactly (pretrain.py's behaviour).
 PRE_CR_DIGESTS = {
     (False, 0, 40): "c8f84c95e6e08f860faf4229cfd003024006ede339b6fcd1f76f3f0d7bf574c6",
@@ -41,7 +41,7 @@ PRE_CR_DIGESTS = {
 }
 # vf 0: every block is a training block, so U4's train_blocks_only=True
 # fixtures pin only "the block filter keeps everything"; the filter itself
-# is owned by tests/test_cr0015_sampler.py (CR-0022 review A7/B12).
+# is owned by tests/test_cr0015_sampler.py (CR-0031 review A7/B12).
 ASSIGN = pd.DataFrame({"block_id": ["none"], "split": ["train"]})
 
 

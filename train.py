@@ -141,7 +141,7 @@ def sample_background_points(rd, features, n, seed=0, *, region,
     (BUG-0042); `assignments` (the block_assignments.csv DataFrame) is
     then required, and must be None otherwise.
 
-    year (CR-0022, BUG-0074) is the vintage every returned row carries:
+    year (CR-0031, BUG-0074) is the vintage every returned row carries:
     an integer (numbers.Integral, bool excluded) validates draws on
     rd.raster_path(features[0], year) - the raster GrousePatchDataset
     reads a row of that year from, fallbacks included; "latest" keeps the
@@ -176,7 +176,7 @@ def sample_background_points(rd, features, n, seed=0, *, region,
         latest, year = False, int(year)
     else:
         raise ValueError(f"year must be an integer or 'latest', not "
-                         f"{year!r} (CR-0022)")
+                         f"{year!r} (CR-0031)")
     if in_state is None:
         in_state = regions.in_state
 
@@ -248,7 +248,7 @@ def sample_background_points(rd, features, n, seed=0, *, region,
 def background_for_positives(rd, features, pos_years, ratio, *, seed,
                              region_i, region, assignments, in_state=None):
     """Background assumed-negatives with the training positives' year
-    histogram (CR-0022, BUG-0074): per distinct positive year y,
+    histogram (CR-0031, BUG-0074): per distinct positive year y,
     n_y = round(count_y x ratio) points drawn with
     sample_background_points(year=y, train_blocks_only=True), seeded
     (seed, region_i, y). pos_years (array-like) must be non-null and
@@ -261,7 +261,7 @@ def background_for_positives(rd, features, pos_years, ratio, *, seed,
     yrs = pd.Series(np.asarray(pos_years, dtype=np.float64))
     if yrs.isna().any() or (yrs != np.floor(yrs)).any():
         raise ValueError(f"[{region}] positive years must be non-null "
-                         f"integers (CR-0022, PA-0034)")
+                         f"integers (CR-0031, PA-0034)")
     counts = yrs.astype(np.int64).value_counts().sort_index()
     want = {int(y): int(round(int(c) * ratio)) for y, c in counts.items()}
     want = {y: n for y, n in want.items() if n > 0}
@@ -279,8 +279,8 @@ def background_for_positives(rd, features, pos_years, ratio, *, seed,
     got = {int(y): int(c) for y, c in out["year"].value_counts().items()}
     if got != want:
         raise RuntimeError(f"[{region}] background year counts {got} != "
-                           f"requested {want} (CR-0022)")
-    out.attrs["acceptance"] = acc          # after the concat (CR-0022 B11)
+                           f"requested {want} (CR-0031)")
+    out.attrs["acceptance"] = acc          # after the concat (CR-0031 B11)
     return out
 
 
@@ -424,7 +424,7 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
         train_parts += [p_tr, n_tr]
         train_labels += [p_tr.labels, n_tr.labels]
         if background_per_pos > 0:
-            # CR-0022: the background takes the TRAINING POSITIVES' years
+            # CR-0031: the background takes the TRAINING POSITIVES' years
             # (one draw per year, seeded (seed, region_i, year)), then the
             # counts are re-derived here from pos_df itself - independent
             # of the helper - so a wrong frame wired in cannot pass.
@@ -441,7 +441,7 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
                 raise RuntimeError(
                     f"[{region}] background year counts {got} != the "
                     f"training positives' {expected} x "
-                    f"{background_per_pos:g} (CR-0022)")
+                    f"{background_per_pos:g} (CR-0031)")
             n_bg = len(bg_df)
             if n_bg > 0:
                 bg_tr = GrousePatchDataset(
@@ -903,7 +903,7 @@ def main():
                              "year so the background's per-year counts "
                              "equal the region's training positives' "
                              "(x this multiple), and is validated on and "
-                             "read from that year's rasters (CR-0022). "
+                             "read from that year's rasters (CR-0031). "
                              "Validation is untouched so "
                              "metrics stay comparable. 0 = off. Usable "
                              "with either --loss, but designed for "

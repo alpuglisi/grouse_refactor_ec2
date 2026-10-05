@@ -1,6 +1,6 @@
-# CR-0022 review log
+# CR-0031 review log
 
-Companion to `CR-0022-background-years-match-positives.md` (CR-0011 A4):
+Companion to `CR-0031-background-years-match-positives.md` (CR-0011 A4):
 rounds, verdicts and every concern's disposition.
 
 ## Rounds
@@ -12,7 +12,7 @@ rounds, verdicts and every concern's disposition.
 ## Round 1, reviewer A: concerns and dispositions (as of v2)
 | id | sev | concern (short) | disposition | where |
 |---|---|---|---|---|
-| A1 | MAJOR | `tests/test_cr0022.py` not committed; acceptance tests unreviewable | accepted: tests committed with v2 (15 tests; fail at `9bb1636` as expected, pass against an uncommitted trial implementation) | `tests/test_cr0022.py`; Test plan |
+| A1 | MAJOR | `tests/test_cr0031.py` not committed; acceptance tests unreviewable | accepted: tests committed with v2 (15 tests; fail at `9bb1636` as expected, pass against an uncommitted trial implementation) | `tests/test_cr0031.py`; Test plan |
 | A2 | MEDIUM | U2 only tests exact-year rasters; resolver variants (exact path, no fallback, own tie-break) pass | accepted: fixture has no 2021 raster (tie → 2020) and an empty 2023 placeholder (fallback → 2024); U2 asserts the validity path equals `GrousePatchDataset._path_for` | U2; fixture |
 | A3 | MEDIUM | the run-time check compares against the helper's own counts (PA-0021(e)); a wrong frame wired in passes | accepted: `build_datasets` recomputes the expected counts from `pos_df["year"]` independently (§2 C); W3 wires the training negatives in and must fail | §2 C; W3 |
 | A4 | MEDIUM | U4's reference ("pre-CR function") unspecified; `todays_sampler` is pre-BUG-0042 | accepted: sha256 digests of the sampler's frames at `9bb1636` pinned in the test (four fixtures), generated before any production edit | U4; `PRE_CR_DIGESTS` |
@@ -56,19 +56,19 @@ deliverable 3 re-runs them against the committed code.
 
 | id | sev | concern (short) | disposition | where |
 |---|---|---|---|---|
-| A7 = B12 | LOW | `ASSIGN` has validation share 0, so U4's `train_blocks_only=True` digests pin only a no-op filter | accepted: comment in the test naming `test_cr0015_sampler` as the filter's owner; tracker entry to add a non-zero-share fixture | `tests/test_cr0022.py` `ASSIGN`; tracker |
+| A7 = B12 | LOW | `ASSIGN` has validation share 0, so U4's `train_blocks_only=True` digests pin only a no-op filter | accepted: comment in the test naming `test_cr0015_sampler` as the filter's owner; tracker entry to add a non-zero-share fixture | `tests/test_cr0031.py` `ASSIGN`; tracker |
 | B13 | LOW | U6b passes if the column stays float; `pos_years` type unstated | fixed: U6b asserts an integer dtype; §2 B says array-like | U6; §2 B |
-| B14 | LOW | test docstring names the wrong passing test | fixed | `tests/test_cr0022.py:4-7` |
+| B14 | LOW | test docstring names the wrong passing test | fixed | `tests/test_cr0031.py:4-7` |
 
 ## Approval (2026-10-05)
 Quorum (CLAUDE.md §1.4): author and both reviewers who commented. A:
 APPROVE (round 2). B: APPROVE WITH FOLLOW-UPS (round 2). No BLOCKING
-concern in either round; every MAJOR resolved in the text. **CR-0022
+concern in either round; every MAJOR resolved in the text. **CR-0031
 APPROVED.** Deliverable 2 (code) may start.
 
 ## Deliverable 3: wrong-implementation runs (reviewer A, at `e18944d`)
-Record: `docs/quality/evidence/CR-0022/reviewA/wrong_impl_runs.txt`
-(variants re-runnable with `mutate.py`). Control: `test_cr0022` 15/15,
+Record: `docs/quality/evidence/CR-0031/reviewA/wrong_impl_runs.txt`
+(variants re-runnable with `mutate.py`). Control: `test_cr0031` 15/15,
 `test_cr0015_sampler` 12/12. Every variant, (i)–(v) and the reviewer's two
 extras, is detected (each run FAILED). The record's verdict line reads
 **FAIL** by the literal rule the author set ("each variant fails the test
@@ -84,3 +84,13 @@ two variants. The record is kept unedited.
   variant fails its named test — reviewer A's statement in the record
   ("correct the CR's test mapping for (i) and (v) and re-state the
   verdict"), with no re-run needed since the outcomes are unchanged.
+
+## Renumbering CR-0022 → CR-0031 (user decision, 2026-10-05)
+The unmerged branch `claude/wonderful-gauss-ghz53i` (2026-09-30, based on
+`3b3e7d1`) had already allocated CR-0020..CR-0030, BUG-0076..BUG-0092 and
+PA-0033..PA-0047. Decision: IDs already on `main` stay; this CR, not yet
+merged, becomes **CR-0031**; new IDs start above both sets (CR-0032+,
+BUG-0093+, PA-0048+). Files, code comments, tests (`tests/test_cr0031.py`)
+and the evidence directory were renamed. Commits up to `22d8879` and
+reviewer A's record (`evidence/CR-0031/reviewA/wrong_impl_runs.txt`, kept
+verbatim) say "CR-0022"; they refer to this CR.

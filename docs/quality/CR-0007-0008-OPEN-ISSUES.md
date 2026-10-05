@@ -7,6 +7,8 @@ Deliverables, test plan), not just in a revision note.
 IDs: `R7-n` = CR-0008 round 7 concern n; `B-n` = CR-0007 v7 reviewer B concern n.
 
 ## Shared / decisions needed
+- [x] **ID collision (user decision, 2026-10-05):** the unmerged branch `claude/wonderful-gauss-ghz53i` (2026-09-30) allocated CR-0020..CR-0030, BUG-0076..BUG-0092 and PA-0033..PA-0047; `main` independently has CR-0021, BUG-0076/0077 and PA-0033..PA-0035. Decision: IDs on `main` stay; the in-progress CR-0022 became **CR-0031**; new IDs start at **CR-0032, BUG-0093, PA-0048**. If that branch is ever merged, its colliding IDs are renumbered then (and its CR-0020 vs this tracker's CR-0020 retrain reservation resolved). Owner: lead
+- [ ] **Unmerged branch `claude/wonderful-gauss-ghz53i`** carries a static code review's BUG-0076..0092, trivial fixes (`2c05388`) and ten approved CRs that are not on `main`. Decide whether to merge (with renumbering) or retire it. Owner: lead (user)
 - [ ] Land bookkeeping batch: PA-0019/0020/0021, BUG-0030/0033/0035; name an owner (0007 B-8, 0008 R7-2) — **PA-0021 and BUG-0033 filed** (CR-0013 deliverable 0, 2026-09-30; calibration cause split out as BUG-0038); BUG-0030/0035 filed earlier (CR-0008/CR-0010). Remaining: PA-0019 (Tracked, with BUG-0028). **PA-0020 filed** (CR-0007 deliverable 6, 2026-09-30; the tracker said "deliverable 7" in error)
 - [x] Decide: pre-landing baselines vs `gate_obs_only` — **baselines first, no escape mode** (user, 2026-09-30). CR-0009 updated to match in v4 (0007 B-2)
 - [x] Decide: CR-0007 structure — **split into 3** (user, 2026-09-30): CR-0007 partition + constants; CR-0012 global split + pooled draw; CR-0013 acceptance gates as a committed script
@@ -285,5 +287,5 @@ Year-matched negative draw (BUG-0073). Review log: `docs/quality/change-requests
 - [ ] PA-0035 lint: turn `docs/quality/evidence/CR-0021/sweep_main_last.py` into a lint test (needs a CR; with the PA-0031 lint item). Owner: lead
 - [ ] PA-0034 sweep beyond `year`: coerced codes/ids (`int(...)` on raster codes, `gbif_id`, block ids) not yet swept; with the next CR touching them. Owner: lead
 
-## CR-0022 (APPROVED, 2026-10-05) — follow-ups, owner: lead
-- [ ] LOW (review A7 = B12): `tests/test_cr0022.py` U4 pins `year="latest"` with a validation share of 0, so the training-block filter is a no-op there; add one fixture with a non-zero validation share (the filter itself is covered by `test_cr0015_sampler`). Owner: lead
+## CR-0031 (APPROVED, 2026-10-05) — follow-ups, owner: lead
+- [ ] LOW (review A7 = B12): `tests/test_cr0031.py` U4 pins `year="latest"` with a validation share of 0, so the training-block filter is a no-op there; add one fixture with a non-zero validation share (the filter itself is covered by `test_cr0015_sampler`). Owner: lead

@@ -13,7 +13,7 @@ Every function here has exactly the signature of the correct sampler
     (rd, features, n, seed=0, *, region, train_blocks_only,
      assignments=None, in_state=None)
 
-plus `year="latest"` (CR-0022), accepted and ignored: these model the
+plus `year="latest"` (CR-0031), accepted and ignored: these model the
 latest-vintage sampler, and cr0015_background_check.draw() passes it.
 
 and returns the same frame (longitude, latitude, year, label=0.0,

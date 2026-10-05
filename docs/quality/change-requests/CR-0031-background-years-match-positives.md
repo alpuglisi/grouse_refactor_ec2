@@ -1,7 +1,11 @@
-# CR-0022: Background assumed-negatives take the positives' years (BUG-0074)
+# CR-0031: Background assumed-negatives take the positives' years (BUG-0074)
 
 **Status: APPROVED, 2026-10-05** (v2; reviewers A and B, round 2).
-Verdicts and dispositions: `CR-0022-review-log.md`. This document states
+Numbered CR-0031, not CR-0022: CR-0020..CR-0030 were already allocated on
+the unmerged branch `claude/wonderful-gauss-ghz53i` (user decision
+2026-10-05, tracker § Shared / decisions needed). Commits and evidence
+before the renumbering say "CR-0022".
+Verdicts and dispositions: `CR-0031-review-log.md`. This document states
 only current intent.
 
 ## Scope
@@ -98,7 +102,7 @@ counts.
 
 **D. Text.** `--an-background` help (`train.py:819`) and the sampler's
 docstring say that background years follow the training positives'
-histogram (CR-0022) and document `year`.
+histogram (CR-0031) and document `year`.
 
 **Before / after** (region with training positives {2020: a, …, 2024: e}):
 
@@ -157,7 +161,7 @@ acceptance-gate change.
 | Per-year draws change in-state or training-block filtering | Those filters read only coordinates (`train.py:196-202`), never the raster year; only the validity raster depends on the year (U2). The real-data V1 check (`test_cr0015_real`, `draw()` with `"latest"`) still exercises the filters on real polygons and blocks |
 
 ## Test plan
-**In this repository (synthetic; no data): `tests/test_cr0022.py`**,
+**In this repository (synthetic; no data): `tests/test_cr0031.py`**,
 committed before approval (CR-0011 A3) and reviewed with this CR. Its
 fixture writes four `evt` rasters through the real `RegionData`
 (`DataConfig(base_dir=tmp)`): 2020 valid only in the west half, 2022 only
@@ -209,7 +213,7 @@ evidence.
 **On the EC2 host (real data, writes nothing under `data/`):**
 ```bash
 python train.py --epochs 1 --an-background 1.0 --batch-size 128 \
-  --cache-dir '' --save-path /tmp/cr0022_smoke.pth 2>&1 | tee cr0022_smoke.log
+  --cache-dir '' --save-path /tmp/cr0031_smoke.pth 2>&1 | tee cr0031_smoke.log
 ```
 Pass: each region's printed per-year background counts equal its training
 positives' year counts (`acceptance_split` O9's `year_hist.pos`, train
@@ -220,7 +224,7 @@ evidence.
 experiment this CR unblocks, not its acceptance).
 
 ## Deliverables
-- [x] 1. This CR and `tests/test_cr0022.py` (pre-approval, CR-0011 A3);
+- [x] 1. This CR and `tests/test_cr0031.py` (pre-approval, CR-0011 A3);
       two independent reviews, dispositions in the review log; approval.
       — Done: round 1 `9bb1636`, v2 and tests `069f50c`, round 2 APPROVE
       (A) and APPROVE WITH FOLLOW-UPS (B); review log.
@@ -230,10 +234,10 @@ experiment this CR unblocks, not its acceptance).
       independent check in `build_datasets`, help/docstrings),
       `pretrain.py` (`year="latest"`), `tests/test_cr0015_sampler.py`,
       `tests/cr0015_background_check.py`, `tests/cr0015_wrong_samplers.py`.
-      All 19 test modules pass (`test_cr0022` 15/15; `test_cr0015_real`
+      All 19 test modules pass (`test_cr0031` 15/15; `test_cr0015_real`
       skips without data).
 - [x] 3. Reviewer's wrong-implementation runs (i)–(v) recorded.
-      — Done: `docs/quality/evidence/CR-0022/reviewA/wrong_impl_runs.txt`
+      — Done: `docs/quality/evidence/CR-0031/reviewA/wrong_impl_runs.txt`
       (re-runnable with `mutate.py`), at `e18944d`: control 15/15; every
       variant detected; mapping of (i) and (v) corrected (review log I1).
 - [ ] 4. EC2 smoke run log committed as evidence.

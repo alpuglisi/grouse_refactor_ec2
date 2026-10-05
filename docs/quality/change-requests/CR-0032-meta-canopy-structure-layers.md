@@ -69,7 +69,9 @@ encoding is local (§3.3).
 ### 3.2 Grid and tiles
 The output grid is the region's **template grid** (latest `evt` clip,
 `download_tcc_nlcd.template_raster`). Each tile is a window of that grid,
-`tile_px` x `tile_px` (default 256, a multiple of 16; `--tile-px`),
+`tile_px` x `tile_px` (default 64, a multiple of 16; `--tile-px`; 256
+exceeds Earth Engine's reprojection limit for the 1 m source, pilot
+evidence),
 fetched by `fetch_window(ee, image, crs_wkt, transform, width, height,
 dest, retries=4)`: one `getDownloadURL` with the template's WKT as `crs`,
 the window's affine as `crs_transform` and the window rectangle as

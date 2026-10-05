@@ -1,0 +1,25 @@
+# CR-0032 deliverable 3, EC2 pilot (user, 2026-10-05), region NH, --dry-run
+# run 1 (1e14290, tile 256): HTTP 400 x5, reason discarded (fixed in 5c08281)
+# run 2 (5c08281, tile 256): HTTP 400 "Reprojection output too large (8962x8987 pixels)."
+# run 3 (5c08281, tile 128 then 64): fetch OK; grid check FAILED both (best offset (-1, 0)); gate PASS on the 64 px pilot
+source projection EPSG:3857, nominal scale 1.194, ground pixel 0.859 m -> up to 1296 pixels per cell (maxPixels 4096)
+=== tile-px 128 ===
+pilot window 128 x 128 cells, fetched in 50.0 s
+-1 (EE-masked) cells: 0; valid < 0.5: 0; > 60 m: 0
+valid fraction strictly inside (0, 1): 0.00% of cells (window fully covered: no coverage edge)
+mch_mean  encoded 16,384 of 16,384 cells, range 0..219
+mch_f01/f15/f512 encoded 16,384 of 16,384 cells, range 0..1000
+grid check vs on-disk nlcd: 79.79% equal at offset (0, 0); best offset (-1, 0), margin -5.49% -> refused
+=== tile-px 64 ===
+pilot window 64 x 64 cells, fetched in 9.9 s
+-1 (EE-masked) cells: 0; valid < 0.5: 0; > 60 m: 0
+mch_mean  encoded 4,096 of 4,096 cells, range 0..202
+mch_f01/f15/f512 encoded 4,096 of 4,096 cells, range 0..1000
+grid check vs on-disk nlcd: 82.20% equal at offset (0, 0); best offset (-1, 0), margin -5.37% -> refused
+=== check_canopy_structure.py --pilot /tmp/mch_pilot_NH.tif (64 px pilot) ===
+pilot: 400 cells  PASS
+  mch_mean  agree 100.0% (need 90%); median |diff| 0.2; value where source has none 0; nodata where source has data 0
+  mch_f01   agree 100.0% (need 90%); median |diff| 0.0
+  mch_f15   agree 100.0% (need 90%); median |diff| 0.0
+  mch_f512  agree 100.0% (need 90%); median |diff| 0.1
+  interior shares  57.8% of valid cells (need 10%)

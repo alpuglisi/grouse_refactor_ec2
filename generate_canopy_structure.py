@@ -553,7 +553,9 @@ def main():
     ap.add_argument("--regions", nargs="+", default=list(REGIONS),
                     choices=list(REGIONS))
     ap.add_argument("--project", default=os.environ.get("EARTHENGINE_PROJECT"))
-    ap.add_argument("--tile-px", type=int, default=256)
+    # 64: EC2 pilot 2026-10-05 - 256 exceeds Earth Engine's reprojection
+    # limit for the 1 m source; 64 fetched fastest per cell (9.9 s)
+    ap.add_argument("--tile-px", type=int, default=64)
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--tile-dir", default=os.path.expanduser(
         "~/.cache/grouse_mch"))

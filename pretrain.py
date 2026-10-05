@@ -193,7 +193,8 @@ def main():
         # none; they are kept in-state (CR-0015 section 3).
         df = sample_background_points(rd, features, args.tiles,
                                       seed=args.seed + i, region=region,
-                                      train_blocks_only=False)
+                                      train_blocks_only=False,
+                                      year="latest")
         parts.append(SSLPairDataset(df, rd, cat_f, cont_f,
                                     img_size=args.img_size,
                                     jitter=args.jitter,

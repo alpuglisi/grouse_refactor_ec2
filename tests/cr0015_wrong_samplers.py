@@ -13,6 +13,9 @@ Every function here has exactly the signature of the correct sampler
     (rd, features, n, seed=0, *, region, train_blocks_only,
      assignments=None, in_state=None)
 
+plus `year="latest"` (CR-0022), accepted and ignored: these model the
+latest-vintage sampler, and cr0015_background_check.draw() passes it.
+
 and returns the same frame (longitude, latitude, year, label=0.0,
 weight=1.0; exactly n rows; SystemExit on shortfall). Each is wrong in
 exactly ONE way and otherwise reproduces the correct sampler (same RNG
@@ -46,7 +49,7 @@ import pandas as pd
 # 1. today's sampler: faithful copy of 00c0b6f:train.py body.
 # ---------------------------------------------------------------------------
 def todays_sampler(rd, features, n, seed=0, *, region, train_blocks_only,
-                   assignments=None, in_state=None):
+                   assignments=None, in_state=None, year="latest"):
     """WRONG: the pre-CR-0015 sampler. No in-state test, no block rule,
     0 rejected as nodata. region/train_blocks_only/assignments/in_state
     are accepted and ignored."""
@@ -190,7 +193,8 @@ def _sample(rd, features, n, seed, region, train_blocks_only, assignments,
 # 2-6. One wrongness each.
 # ---------------------------------------------------------------------------
 def unassigned_excluded(rd, features, n, seed=0, *, region,
-                        train_blocks_only, assignments=None, in_state=None):
+                        train_blocks_only, assignments=None, in_state=None,
+                        year="latest"):
     """WRONG: a block not listed in assignments is excluded; only blocks
     listed as "train" are kept."""
     return _sample(rd, features, n, seed, region, train_blocks_only,
@@ -198,7 +202,7 @@ def unassigned_excluded(rd, features, n, seed=0, *, region,
 
 
 def unassigned_train(rd, features, n, seed=0, *, region, train_blocks_only,
-                     assignments=None, in_state=None):
+                     assignments=None, in_state=None, year="latest"):
     """WRONG: a block not listed in assignments is train (listed "val"
     still excluded)."""
     return _sample(rd, features, n, seed, region, train_blocks_only,
@@ -206,7 +210,7 @@ def unassigned_train(rd, features, n, seed=0, *, region, train_blocks_only,
 
 
 def md5_fraction_018(rd, features, n, seed=0, *, region, train_blocks_only,
-                     assignments=None, in_state=None):
+                     assignments=None, in_state=None, year="latest"):
     """WRONG: the md5 rule for unlisted blocks uses fraction 0.18 instead
     of vf."""
     return _sample(rd, features, n, seed, region, train_blocks_only,
@@ -215,7 +219,7 @@ def md5_fraction_018(rd, features, n, seed=0, *, region, train_blocks_only,
 
 def val_fraction_constant(rd, features, n, seed=0, *, region,
                           train_blocks_only, assignments=None,
-                          in_state=None):
+                          in_state=None, year="latest"):
     """WRONG: the md5 rule for unlisted blocks uses regions.VAL_FRACTION
     (0.2) instead of vf."""
     import regions
@@ -224,7 +228,7 @@ def val_fraction_constant(rd, features, n, seed=0, *, region,
 
 
 def native_xy(rd, features, n, seed=0, *, region, train_blocks_only,
-              assignments=None, in_state=None):
+              assignments=None, in_state=None, year="latest"):
     """WRONG: block ids computed from the raster's native x/y instead of
     lon/lat -> EPSG:5070."""
     return _sample(rd, features, n, seed, region, train_blocks_only,

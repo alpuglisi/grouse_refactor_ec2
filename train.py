@@ -119,7 +119,7 @@ def discover_features(data, regions):
 
 
 def sample_background_points(rd, features, n, seed=0, *, region,
-                             train_blocks_only, assignments=None,
+                             train_blocks_only, year, assignments=None,
                              in_state=None):
     """n uniformly random locations inside the region's reference
     raster, kept only where they are valid, in the region's own state
@@ -141,9 +141,19 @@ def sample_background_points(rd, features, n, seed=0, *, region,
     (BUG-0042); `assignments` (the block_assignments.csv DataFrame) is
     then required, and must be None otherwise.
 
-    region and train_blocks_only are required keywords: a caller cannot
-    get an unconstrained draw by omission. Deterministic for a given seed
-    (one numpy default_rng stream per call). The returned frame's
+    year (CR-0022, BUG-0074) is the vintage every returned row carries:
+    an integer (numbers.Integral, bool excluded) validates draws on
+    rd.raster_path(features[0], year) - the raster GrousePatchDataset
+    reads a row of that year from, fallbacks included; "latest" keeps the
+    single latest vintage (pretrain.py only: SSL tiles carry no label).
+    Anything else raises ValueError before any raster is opened.
+    Labelled training rows come from background_for_positives, which
+    matches the training positives' years.
+
+    region, train_blocks_only and year are required keywords: a caller
+    cannot get an unconstrained or one-vintage draw by omission.
+    Deterministic for a given seed (one numpy default_rng stream per call;
+    seed may be an int or a tuple of ints). The returned frame's
     attrs["acceptance"] holds the draw counts behind the acceptance rate.
     """
     import numpy as np
@@ -159,12 +169,23 @@ def sample_background_points(rd, features, n, seed=0, *, region,
     if not train_blocks_only and assignments is not None:
         raise ValueError("assignments must be None when "
                          "train_blocks_only is False")
+    import numbers
+    if isinstance(year, str) and year == "latest":
+        latest = True
+    elif isinstance(year, numbers.Integral) and not isinstance(year, bool):
+        latest, year = False, int(year)
+    else:
+        raise ValueError(f"year must be an integer or 'latest', not "
+                         f"{year!r} (CR-0022)")
     if in_state is None:
         in_state = regions.in_state
 
     feat = features[0]            # validity is judged on `features[0]` as passed
-    path = rd.latest_raster_path(feat)
-    year = max(rd.raster_years(feat))
+    if latest:
+        path = rd.latest_raster_path(feat)
+        year = max(rd.raster_years(feat))
+    else:
+        path = rd.raster_path(feat, year)   # = dataset.py's per-row resolver
     rng = np.random.default_rng(seed)
     sentinels = np.asarray(NODATA_SENTINELS, dtype=np.float64)
     lons, lats = [], []
@@ -207,11 +228,12 @@ def sample_background_points(rd, features, n, seed=0, *, region,
     acceptance = {"region": region, "drawn": drawn, "valid": n_valid,
                   "in_state": n_in_state, "accepted": n_kept,
                   "rounds": attempts,
-                  "train_blocks_only": bool(train_blocks_only)}
+                  "train_blocks_only": bool(train_blocks_only),
+                  "year": int(year)}
     if len(lons) < n:
         rate = n_kept / drawn if drawn else 0.0
         raise SystemExit(
-            f"[{region}] background sampling found only {len(lons)}/{n} "
+            f"[{region} {year}] background sampling found only {len(lons)}/{n} "
             f"accepted locations in {path} after {attempts} rounds - "
             f"observed acceptance rate {rate:.4f} ({n_kept}/{drawn} draws; "
             f"valid {n_valid}, in-state {n_in_state}"
@@ -220,6 +242,45 @@ def sample_background_points(rd, features, n, seed=0, *, region,
     out = pd.DataFrame({"longitude": lons, "latitude": lats,
                         "year": int(year), "label": 0.0, "weight": 1.0})
     out.attrs["acceptance"] = acceptance
+    return out
+
+
+def background_for_positives(rd, features, pos_years, ratio, *, seed,
+                             region_i, region, assignments, in_state=None):
+    """Background assumed-negatives with the training positives' year
+    histogram (CR-0022, BUG-0074): per distinct positive year y,
+    n_y = round(count_y x ratio) points drawn with
+    sample_background_points(year=y, train_blocks_only=True), seeded
+    (seed, region_i, y). pos_years (array-like) must be non-null and
+    integral - 2020.0 is cast, 2020.5 or a null raises (PA-0034). Returns
+    the concatenation in ascending year order; attrs["acceptance"] is the
+    list of per-year acceptance dicts. Raises RuntimeError if the result's
+    year histogram is not {y: n_y} (a sampler that ignores `year`)."""
+    import numpy as np
+    import pandas as pd
+    yrs = pd.Series(np.asarray(pos_years, dtype=np.float64))
+    if yrs.isna().any() or (yrs != np.floor(yrs)).any():
+        raise ValueError(f"[{region}] positive years must be non-null "
+                         f"integers (CR-0022, PA-0034)")
+    counts = yrs.astype(np.int64).value_counts().sort_index()
+    want = {int(y): int(round(int(c) * ratio)) for y, c in counts.items()}
+    want = {y: n for y, n in want.items() if n > 0}
+    parts, acc = [], []
+    for y, n in want.items():
+        df = sample_background_points(
+            rd, features, n, seed=(int(seed), int(region_i), y),
+            region=region, train_blocks_only=True, year=y,
+            assignments=assignments, in_state=in_state)
+        acc.append(df.attrs.get("acceptance"))
+        parts.append(df)
+    out = (pd.concat(parts, ignore_index=True) if parts else
+           pd.DataFrame(columns=["longitude", "latitude", "year", "label",
+                                 "weight"]))
+    got = {int(y): int(c) for y, c in out["year"].value_counts().items()}
+    if got != want:
+        raise RuntimeError(f"[{region}] background year counts {got} != "
+                           f"requested {want} (CR-0022)")
+    out.attrs["acceptance"] = acc          # after the concat (CR-0022 B11)
     return out
 
 
@@ -363,15 +424,26 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
         train_parts += [p_tr, n_tr]
         train_labels += [p_tr.labels, n_tr.labels]
         if background_per_pos > 0:
-            n_bg = int(round(background_per_pos * len(pos_df)))
+            # CR-0022: the background takes the TRAINING POSITIVES' years
+            # (one draw per year, seeded (seed, region_i, year)), then the
+            # counts are re-derived here from pos_df itself - independent
+            # of the helper - so a wrong frame wired in cannot pass.
+            bg_df = background_for_positives(
+                rd, features, pos_df["year"], background_per_pos,
+                seed=seed, region_i=region_i, region=region,
+                assignments=data.block_assignments)
+            expected = {int(y): int(round(int(c) * background_per_pos))
+                        for y, c in pos_df["year"].value_counts().items()}
+            expected = {y: n for y, n in expected.items() if n > 0}
+            got = {int(y): int(c)
+                   for y, c in bg_df["year"].value_counts().items()}
+            if got != expected:
+                raise RuntimeError(
+                    f"[{region}] background year counts {got} != the "
+                    f"training positives' {expected} x "
+                    f"{background_per_pos:g} (CR-0022)")
+            n_bg = len(bg_df)
             if n_bg > 0:
-                # seed + region index: each region draws its own RNG
-                # stream (same convention as pretrain.py) instead of
-                # every region replaying identical row/col sequences.
-                bg_df = sample_background_points(
-                    rd, features, n_bg, seed=seed + region_i,
-                    region=region, train_blocks_only=True,
-                    assignments=data.block_assignments)
                 bg_tr = GrousePatchDataset(
                     bg_df, rd, cat_f, cont_f, img_size=img_size,
                     expand_rotations=True, label=0.0,
@@ -381,7 +453,9 @@ def build_datasets(data, regions, features, img_size, cache_dir=None,
                 print(f"   {region}: +{n_bg:,} random background "
                       f"assumed-negatives (x{background_per_pos:g} per "
                       f"positive; in-state, training blocks only - "
-                      f"validation unchanged).")
+                      f"validation unchanged); years "
+                      + ", ".join(f"{y}: {n}" for y, n in
+                                  sorted(expected.items())) + ".")
         # Validation is never augmented: the 4 fixed rotations are kept so
         # val scores stay comparable across runs (and so the evaluator can
         # average them per point as test-time augmentation).
@@ -825,7 +899,12 @@ def main():
                              "raster, valid-data filtered, in-state, "
                              "training blocks only, NOT buffered "
                              "away from presences (assumed negative is "
-                             "the point). Validation is untouched so "
+                             "the point). Each background point takes a "
+                             "year so the background's per-year counts "
+                             "equal the region's training positives' "
+                             "(x this multiple), and is validated on and "
+                             "read from that year's rasters (CR-0022). "
+                             "Validation is untouched so "
                              "metrics stay comparable. 0 = off. Usable "
                              "with either --loss, but designed for "
                              "an_full.")

@@ -222,8 +222,14 @@ experiment this CR unblocks, not its acceptance).
       two independent reviews, dispositions in the review log; approval.
       — Done: round 1 `9bb1636`, v2 and tests `069f50c`, round 2 APPROVE
       (A) and APPROVE WITH FOLLOW-UPS (B); review log.
-- [ ] 2. Code: §2 A–D; callers and CR-0015 test fixtures updated; all
+- [x] 2. Code: §2 A–D; callers and CR-0015 test fixtures updated; all
       suites pass.
+      — Done: `train.py` (sampler `year`, `background_for_positives`,
+      independent check in `build_datasets`, help/docstrings),
+      `pretrain.py` (`year="latest"`), `tests/test_cr0015_sampler.py`,
+      `tests/cr0015_background_check.py`, `tests/cr0015_wrong_samplers.py`.
+      All 19 test modules pass (`test_cr0022` 15/15; `test_cr0015_real`
+      skips without data).
 - [ ] 3. Reviewer's wrong-implementation runs (i)–(v) recorded.
 - [ ] 4. EC2 smoke run log committed as evidence.
 - [ ] 5. Bookkeeping: BUG-0074 → FIXED (corrective action, recurrence

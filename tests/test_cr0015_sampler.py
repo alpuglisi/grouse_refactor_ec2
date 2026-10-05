@@ -113,7 +113,7 @@ class U1InState(Base):
 
         df = train.sample_background_points(
             rd, ["evt"], 500, seed=1, region="AA", train_blocks_only=False,
-            in_state=in_state)
+            year="latest", in_state=in_state)
         self.assertEqual(len(df), 500)
         self.assertTrue((df["longitude"] < line).all())
         self.assertTrue(calls)
@@ -195,7 +195,7 @@ class U2TrainBlocks(Base):
     def draw(self, **kw):
         return train.sample_background_points(
             self.rd, ["evt"], self.N, seed=3, region="AA",
-            train_blocks_only=True, assignments=self.assign,
+            train_blocks_only=True, year="latest", assignments=self.assign,
             in_state=lambda lon, lat, r: np.ones(len(lon), bool), **kw)
 
     def violations(self, df):
@@ -271,6 +271,7 @@ class U3Validity(Base):
         rd = self.lonlat_raster("u3.tif", arr, nodata=-5555.0)
         df = train.sample_background_points(
             rd, ["tcc"], 2000, seed=5, region="AA", train_blocks_only=False,
+            year="latest",
             in_state=lambda lon, lat, r: np.ones(len(lon), bool))
         with rasterio.open(rd.latest_raster_path("tcc")) as src:
             v = np.array([x[0] for x in src.sample(zip(df.longitude,
@@ -282,7 +283,7 @@ class U3Validity(Base):
 class U4CountAndDeterminism(Base):
     def test_exact_n_and_same_seed_same_points(self):
         rd = self.lonlat_raster("u4.tif", np.full((80, 80), 4, np.int16))
-        kw = dict(region="AA", train_blocks_only=False,
+        kw = dict(region="AA", train_blocks_only=False, year="latest",
                   in_state=lambda lon, lat, r: np.asarray(lat) > 44.2)
         a = train.sample_background_points(rd, ["evt"], 777, seed=9, **kw)
         b = train.sample_background_points(rd, ["evt"], 777, seed=9, **kw)
@@ -299,7 +300,7 @@ class U5Shortfall(Base):
         with self.assertRaises(SystemExit) as cm:
             train.sample_background_points(
                 rd, ["evt"], 100, seed=0, region="AA",
-                train_blocks_only=False,
+                train_blocks_only=False, year="latest",
                 in_state=lambda lon, lat, r: np.zeros(len(lon), bool))
         self.assertIn("acceptance rate", str(cm.exception.code))
         self.assertIn("AA", str(cm.exception.code))
@@ -313,22 +314,25 @@ class U6Signature(Base):
     def test_region_required(self):
         with self.assertRaises(TypeError):
             train.sample_background_points(self.rd, ["evt"], 5,
-                                           train_blocks_only=False)
+                                           train_blocks_only=False,
+                                           year="latest")
 
     def test_train_blocks_only_required(self):
         with self.assertRaises(TypeError):
-            train.sample_background_points(self.rd, ["evt"], 5, region="AA")
+            train.sample_background_points(self.rd, ["evt"], 5, region="AA",
+                                           year="latest")
 
     def test_assignments_required_when_train_blocks_only(self):
         with self.assertRaises(ValueError):
             train.sample_background_points(self.rd, ["evt"], 5, region="AA",
-                                           train_blocks_only=True)
+                                           train_blocks_only=True,
+                                           year="latest")
 
     def test_assignments_refused_when_not_train_blocks_only(self):
         with self.assertRaises(ValueError):
             train.sample_background_points(
                 self.rd, ["evt"], 5, region="AA", train_blocks_only=False,
-                assignments=pd.DataFrame({"block_id": [], "split": []}))
+                year="latest", assignments=pd.DataFrame({"block_id": [], "split": []}))
 
 
 if __name__ == "__main__":

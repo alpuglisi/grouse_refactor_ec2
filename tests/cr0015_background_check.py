@@ -172,7 +172,8 @@ def real_inputs():
 
 def draw(sampler, data, feats, assignments, region, seed, n=V_N):
     return sampler(data[region], feats, n, seed=seed, region=region,
-                   train_blocks_only=True, assignments=assignments)
+                   train_blocks_only=True, year="latest",
+                   assignments=assignments)
 
 
 def calibrate(seeds, out_path):

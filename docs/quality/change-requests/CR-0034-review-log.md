@@ -21,8 +21,8 @@ Companion to `CR-0034-ee-download-on-source-lattice.md` (CR-0011 A4).
 | A34-5 | LOW | `%` wrap: 29.9999999 refused | accepted: `min(r, 30 - r)`; G6 float-noise test; mutant fails | §2; G6 |
 
 ## Author's trial implementation (v2, not committed)
-`tests/test_cr0034.py` v2 (31 tests) and the updated
-`test_cr0018_candidates` pass (44/44). Mutants, each must fail: 0-origin
+`tests/test_cr0034.py` v2 (24 tests) and the updated
+`test_cr0018_candidates` (20) pass (44/44). Mutants, each must fail: 0-origin
 snap; hard-coded request `crs`; no lattice check; TreeMap's own
 `region_grid`; merged file labelled EPSG:5070; raw TreeMap labelled
 EPSG:5070; no `filterBounds`; first image only; wrap-around lattice test.

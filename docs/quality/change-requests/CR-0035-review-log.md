@@ -59,3 +59,9 @@ script and the steps, the changed text goes to a bounded round 3.
 | A35-3-3 | LOW | `DerivedGate` re-ran the parent's tests | accepted: shared `GateFixture` base with no tests | tests |
 | B35-3-1 | MEDIUM | Risk row claims atomic writes everywhere; TreeMap raw and the generators write final paths | accepted: TreeMap raw write made atomic (CR-0034 §3); Risk row names the two rewrite-always generators | Risk; CR-0034 §3 |
 | A34-3-1 (CR-0034) | MEDIUM | `tsd` warp | step 2.5 regenerates `tsd` with the exact warp (BUG-0096) | step 2.5 |
+
+## Implementation notes (no new review round; recorded per §1.3)
+| id | sev | note | disposition | where |
+|---|---|---|---|---|
+| I35-1 | MEDIUM | Step 2 says `C_tcc` is "the collection id recorded in step 1". The pilot recorded what `resolve_collection` picks today (`Product_Version/2025-6`). The pre-repair TCC files are `v2023-5`: the snapshot is 96-97 % equal to it at the BUG-0094 offset, against 23-26 % for 2025-6. Pinning 2025-6 would change the product and the registration together, and step 3's attribution and step 5's measurement would then confound the two. | `C_tcc` = `USGS/NLCD_RELEASES/2023_REL/TCC/v2023-5`, the version on disk, which is the intent of the Risk row "Product versions moved ... `--collection` pins". `C_nlcd` is unchanged: the snapshot is 99 % equal to it at the offset. Migrating TCC to 2025-6 is a separate change (tracked). | step 2.2; evidence `step2_1_nlcd_and_tcc_version.txt` |
+

@@ -1,0 +1,25 @@
+# CR-0035 step 2.1 and the C_tcc decision (user, EC2, 2026-10-05)
+## step 2.1 NLCD re-download (ME, NH, VT; years 2016-2025; C_nlcd =
+## projects/sat-io/open-datasets/USGS/ANNUAL_NLCD/LANDCOVER)
+   completed; final lines (VT):
+   wrote data/landfire/VT_2019_nlcd.tif ... VT_2025_nlcd.tif (5709x9205 px, 92.5% valid, band=b1, on template grid VT_2024_evt.tif)
+   real 32m35.698s
+## snapshot registration check, with the old TCC product version
+python check_layer_registration.py --data-root ~/grouse2_before --regions NH --skip-treemap \
+  --collection-nlcd projects/sat-io/open-datasets/USGS/ANNUAL_NLCD/LANDCOVER \
+  --collection-tcc USGS/NLCD_RELEASES/2023_REL/TCC/v2023-5
+   NH nlcd 2016..2025: equal 81.75-83.50% of 400, FAIL; at BUG-0094 offset 99% (every year)
+   NH tcc  2016..2023: equal 40.25-43.75% of 400, FAIL; at BUG-0094 offset 96-97% (every year)
+   Gate: FAIL - 0 of 18 files pass   (expected on the snapshot: step 3)
+   EE warning: v2023-5 is deprecated, superseded by
+   projects/gtac-data-publish/assets/TCC/Product_Version/2025-6 (asset still readable)
+## earlier run, same snapshot, C_tcc = Product_Version/2025-6 (the id the step-1 pilot printed):
+   NH tcc: centre 15-20%, at BUG-0094 offset 23-26%  -> a different product version, not just a shift
+## decision: C_tcc = USGS/NLCD_RELEASES/2023_REL/TCC/v2023-5
+   The pre-repair TCC files were v2023-5 (96-97% equal at the BUG-0094 offset), shifted. The
+   step-1 pilot printed what resolve_collection picks today (2025-6), not the version on disk
+   (files were untagged, step 0.3). CR-0035 is a registration repair; its risk row ("Product
+   versions moved since the first download -> --collection pins") and step 3's attribution
+   requirement both need the on-disk version, and step 5's before/after measurement needs the
+   product held fixed. Migrating TCC to 2025-6 (and to 2024-2025 years) is out of scope here:
+   it is a separate change.

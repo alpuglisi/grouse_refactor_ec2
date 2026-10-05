@@ -315,3 +315,4 @@ Split window mask reads pinned `SPLIT_WINDOW_FEATURES` (BUG-0093, PA-0048).
 - [ ] BUG-0095 sweep: `predict.py:724` display reprojection of the output map uses the default transformer (map output only, low); `find_tsd_contrast_points.py:117` diagnostic (low). Owner: lead
 - [ ] TreeMap assets `USFS/GTAC/TreeMap/v20xx` deprecated; migrate to `projects/gtac-data-publish/assets/TreeMap/Product_Version/2023-1` (own CR). Owner: lead
 - [ ] PA-0049(b) follow-up: make the registration gate a standing check before training (CR candidate). Owner: lead
+- [ ] TCC asset `USGS/NLCD_RELEASES/2023_REL/TCC/v2023-5` deprecated (CR-0035 pins it, I35-1); migrate to `projects/gtac-data-publish/assets/TCC/Product_Version/2025-6` (adds 2024-2025) under its own CR, with a before/after evaluation. Owner: lead

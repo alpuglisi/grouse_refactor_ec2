@@ -1,0 +1,20 @@
+# CR-0035 steps 2.2-2.5 and the step-2 acceptance (user, EC2, 2026-10-05)
+## code that ran
+EC2 HEAD was 472ba5e (pre-CR-0034), but the working tree held the CR-0034 files (staged):
+  git diff --stat origin/claude/nice-cori-creqpb (at 3c3f7e4) -- download_tcc_nlcd.py download_treemap.py
+    generate_treemap_features.py generate_time_since_disturbance.py check_layer_registration.py
+    grouse_data.py realign_rasters.py regions.py       -> EMPTY (byte-identical to the fixed code)
+  then: git stash (3 local diagnose_*.py edits); git pull -> fast-forward 472ba5e..3c3f7e4
+## ~/cr0035_step2.sh (per region ME, NH, VT; C_tcc = USGS/NLCD_RELEASES/2023_REL/TCC/v2023-5 per I35-1)
+  2.2 download_tcc_nlcd --features tcc --years 2016-2023 --collection C_tcc
+  2.3 download_treemap --vintages <from snapshot treemap_raw> = 2016 2020 2022
+      (USFS/GTAC/TreeMap/v20xx, deprecated, still readable; native grid origin (-2361585.0, 3177435.0000000037))
+  2.4 generate_treemap_features --years 2016-2025: year->vintage {2016-18:2016, 2019-21:2020, 2022-25:2022}
+      [warn] {2025: 2022} > 2 yr from any TreeMap vintage (pre-existing; no TreeMap 2023 in EE)
+  2.5 generate_time_since_disturbance --years 2016-2025: LANDFIRE Annual Disturbance 1999-2024 (26 rasters)
+  STEP 2 DONE, no FAILED lines
+## step-2 acceptance
+  inventory_after.txt (feature-year lines, ME/NH/VT): nlcd 2016-2025; tcc 2016-2023;
+    balive/tpa_live/qmd/carbon_dwn 2016-2025; tsd 2016-2025
+  diff inventory_before vs inventory_after (excluding raw/tags lines): INVENTORY EQUAL
+  native-lattice tag count in inventory_after.txt: 81 = 30 nlcd + 24 tcc + 27 raw TreeMap (every in-scope file)
